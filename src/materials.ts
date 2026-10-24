@@ -50,6 +50,7 @@ export const MAT = {
   stone: 0, ground: 1, plaster: 2, wood: 3, roof: 4, rock: 5, bone: 6,
   iron: 7, window: 8, bigstone: 9, slab: 10, cloth: 11,
   brick: 12, rubble: 13, marble: 14, ember: 15, horn: 16, clay: 17, bronze: 18,
+  block: 19,
 } as const;
 export type MatName = keyof typeof MAT;
 
@@ -71,6 +72,8 @@ const CFG: Partial<Record<number, MatCfg>> = {
   12: { set: 'brick', tile: 2.5, alb: 0.95, moss: 0.5 },
   13: { set: 'rubble', tile: 2.12, alb: 0.95, moss: 0.6 },
   14: { set: 'marble', tile: 1.8, alb: 0.75, moss: 0.5 },
+  // One dressed stone: quoins, voussoirs, sills. Greyed towards local limestone.
+  19: { set: 'block', tile: 1.4, alb: 0.95, moss: 0.5, tint: [0.98, 0.98, 1.04] },
 };
 const f = (x: number) => x.toFixed(4);
 

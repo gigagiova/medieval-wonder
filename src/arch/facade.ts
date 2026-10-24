@@ -76,7 +76,7 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
   // Keep the frame right-handed (u × v = w) so extrusions are not mirrored.
   if (v3(e.x, 0, e.y).cross(v3(0, 1, 0)).dot(out3) < 0) { [A, B] = [B, A]; e = e.negate(); }
   const f = Frame.facade(A.x, A.y, e.x, e.y, s.out.x, s.out.y);
-  const stoneM: MatName = s.lower === 'brick' ? 'brick' : chance(0.75) ? 'stone' : 'bigstone';
+  const stoneM: MatName = s.lower === 'brick' ? 'brick' : 'block';
   const T = R(0.5, 0.72);
 
   // ---- ground floor: a door (arched or under a lintel), maybe a slit or a shop arch
@@ -132,7 +132,7 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
       for (const u of [0, L]) box(acc, s.upper, f, u + (u ? -0.06 : 0.06), (lowTop + s.h) / 2, jetty / 2 - 0.05, 0.06, (s.h - lowTop) / 2, jetty / 2 + 0.05);
     } else {
       // A string course or a slight set-back where the build changes.
-      box(acc, stoneM === 'brick' ? 'brick' : 'stone', f, L / 2, lowTop - 0.04, 0.03, L / 2, 0.06, 0.07, 0.01);
+      box(acc, stoneM === 'brick' ? 'brick' : 'block', f, L / 2, lowTop - 0.04, 0.03, L / 2, 0.06, 0.07, 0.01);
     }
   }
 
@@ -165,7 +165,7 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
     }
     // Sill or threshold.
     if (isDoor) box(acc, 'slab', f, c, -0.06, wFace - T / 2 + 0.06, r + 0.08, 0.08, T / 2 + 0.08, 0.01);
-    else box(acc, stoneM === 'bigstone' ? 'stone' : stoneM, f, c, o.v0 - 0.06, wFace - 0.12, r + R(0.06, 0.12), 0.06, 0.2, 0.01);
+    else box(acc, stoneM, f, c, o.v0 - 0.06, wFace - 0.12, r + R(0.06, 0.12), 0.06, 0.2, 0.01);
   };
 
   // Door: planked leaf set back in the deep reveal; sometimes standing ajar.
@@ -257,7 +257,7 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
   if (s.lower !== 'brick' || chance(0.4)) {
     for (const [u, dir] of [[0, 1], [L, -1]] as const) {
       if (chance(0.25)) continue;
-      const qm: MatName = chance(0.15) ? 'marble' : stoneM === 'brick' ? 'stone' : stoneM;
+      const qm: MatName = chance(0.15) ? 'marble' : stoneM === 'brick' ? 'block' : stoneM;
       let v = s.base + 0.3;
       for (let k = 0; v < (oneMass ? s.h : lowTop) - 0.15; k++) {
         const hgt = R(0.26, 0.38);
@@ -294,7 +294,7 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
     const bw = R(1.6, Math.min(2.6, L - 1)), u0 = R(0.4, L - 0.4 - bw);
     const blk: Opening = { u0, u1: u0 + bw, v0: 0, v1: R(1.3, 1.7), arch: true };
     if (free(blk.u0, blk.u1)) {
-      voussoirs(acc, s.lower === 'brick' ? 'stone' : 'brick', f, u0 + bw / 2, blk.v1, bw / 2, bw / 2 + 0.36, -0.06, 0.012, 0, Math.PI, 0.09);
+      voussoirs(acc, s.lower === 'brick' ? 'block' : 'brick', f, u0 + bw / 2, blk.v1, bw / 2, bw / 2 + 0.36, -0.06, 0.012, 0, Math.PI, 0.09);
       box(acc, s.lower === 'brick' ? 'rubble' : 'brick', f, u0 + bw / 2, blk.v1 / 2, 0.006, bw / 2 - 0.02, blk.v1 / 2, 0.01);
       for (let k = 0; k < 7; k++) {
         const a = (k + 0.5) / 7 * Math.PI, rr = bw / 2 - 0.05;

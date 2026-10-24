@@ -393,7 +393,7 @@ function backWindows(acc: Acc, c: V2[], base: number, h: number, m: MatName) {
       if (rand() < 0.4) continue;
       const u = R(0.5, L - 0.5), v = R(1.4, Math.max(1.5, h - 1.2));
       kbox(acc, 'iron', f, u, v, 0.006, R(0.18, 0.3), R(0.25, 0.4), 0.01);
-      kbox(acc, m === 'brick' ? 'stone' : 'wood', f, u, v + 0.3, 0.03, 0.4, 0.07, 0.04, 0.01);
+      kbox(acc, m === 'brick' ? 'block' : 'wood', f, u, v + 0.3, 0.03, 0.4, 0.07, 0.04, 0.01);
     }
     void base;
   }
@@ -437,7 +437,7 @@ export function buildBridges(b: Builder, t: Town) {
         return rh >= 0 ? Frame.facade(o.x, o.y, ux, uz, dz.x, dz.y)
           : Frame.facade(o.x + n.x * span, o.y + n.y * span, -ux, -uz, dz.x, dz.y);
       };
-      const stoneM: MatName = rand() < 0.5 ? 'stone' : 'brick';
+      const stoneM: MatName = rand() < 0.5 ? 'block' : 'brick';
       const pont = rand() < 0.55 && !s.main;
       BRIDGE_SPOTS.push({ x: a.p.x, z: a.p.y, yaw: Math.atan2(-a.d.x, -a.d.y), pontile: pont });
       if (pont) {
@@ -451,12 +451,12 @@ export function buildBridges(b: Builder, t: Town) {
           // Corbel course under the room, a window with shutters.
           const yb = spring + s.w / 2 + 0.55;
           for (let u = 0.25; u < span - 0.2; u += R(0.38, 0.5)) kbox(acc, stoneM, f, u, yb, 0.08, 0.08, 0.1, 0.1, 0.01);
-          kbox(acc, 'stone', f, span / 2, yb + 0.15, 0.06, span / 2, 0.06, 0.08, 0.01);
+          kbox(acc, 'block', f, span / 2, yb + 0.15, 0.06, span / 2, 0.06, 0.08, 0.01);
           if (rand() < 0.75) {
             const ww = R(0.45, 0.65), u0 = R(0.6, span - 0.6 - ww), v0 = yb + R(0.7, 1.1);
             kbox(acc, rand() < 0.35 ? 'window' : 'iron', f, u0 + ww / 2, v0 + 0.35, -0.12, ww / 2, 0.38, 0.01);
             voussoirs(acc, 'brick', f, u0 + ww / 2, v0 + 0.7, ww / 2, ww / 2 + 0.22, -0.05, 0.015, 0, Math.PI, 0.075);
-            kbox(acc, 'stone', f, u0 + ww / 2, v0 - 0.05, 0.02, ww / 2 + 0.1, 0.05, 0.12, 0.01);
+            kbox(acc, 'block', f, u0 + ww / 2, v0 - 0.05, 0.02, ww / 2 + 0.1, 0.05, 0.12, 0.01);
             for (const half of [0, 1]) kbox(acc, 'wood', f, u0 + ww * (0.25 + half * 0.5), v0 + 0.35, -0.05, ww / 4 - 0.01, 0.36, 0.025, 0.004);
           }
         }
@@ -468,7 +468,7 @@ export function buildBridges(b: Builder, t: Town) {
         const f = mk(1, depth);
         const r0 = (s.w + 0.1) / 2;
         const f2 = new Frame(f.o.clone().setY(y0), f.x, f.y, f.z);
-        voussoirs(acc, rand() < 0.6 ? 'brick' : 'stone', f2, span / 2, 0, r0, r0 + 0.38, -depth, 0, 0, Math.PI, rand() < 0.6 ? 0.075 : 0.22);
+        voussoirs(acc, rand() < 0.6 ? 'brick' : 'block', f2, span / 2, 0, r0, r0 + 0.38, -depth, 0, 0, Math.PI, rand() < 0.6 ? 0.075 : 0.22);
         b.geo('rubble', arcadeGeo(span - 0.4, r0 + 0.7, depth * 0.85, 1, s.w + 0.86, 0.01), a.p.x, y0, a.p.y, ry, false);
       }
       acc.flush(b);

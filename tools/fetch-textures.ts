@@ -34,6 +34,7 @@ export const SETS: { slot: string; asset: string; res: '1k' | '2k'; use: string 
   { slot: 'coppi', asset: 'roof_tiles_14', res: '1k', use: 'roofs: old curved clay tiles' },
   { slot: 'marble', asset: 'rock_boulder_dry', res: '1k', use: 'weathered marble / travertine spolia' },
   { slot: 'bark', asset: 'bark_willow', res: '1k', use: 'forest trees' },
+  { slot: 'block', asset: 'rock_surface', res: '1k', use: 'single dressed stones: quoins, voussoirs, sills, plinth blocks' },
 ];
 
 function curl(url: string, dest: string) {

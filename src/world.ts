@@ -12,7 +12,7 @@ function buttress(b: Builder, m: MatName, w: number, h: number, d: number, x: nu
   // Sloping weatherings on each step.
   b.box('stone', w + 0.06, 0.12, d * 0.45, x + X * d * 0.3, y + h1 - 0.04, z + Z * d * 0.3, ry, false, -0.45);
   b.box('stone', w * 0.86, 0.12, d * 0.4, x + X * d * 0.0, y + h - 0.06, z + Z * d * 0.0, ry, false, -0.5);
-  quoinBox(b, 'stone', w, h1, d, x, y, z, ry);
+  quoinBox(b, 'block', w, h1, d, x, y, z, ry);
 }
 import { torch, brazier, hornLantern, bracketLantern, lucerna, polykandelon, candle } from './lights';
 import { layoutTown, lotsFor, buildHouse, buildBridges, townTexture, BRIDGE_SPOTS, type Town } from './town';
@@ -244,7 +244,7 @@ function townWall(b: Builder) {
       const ry = Math.atan2(o.x, o.y) + R(-0.1, 0.1);
       const tw = R(5, 6.5), td = R(5, 6.5);
       b.box('brick', tw, h, td, p.x + o.x * 1.8, -0.6, p.y + o.y * 1.8, ry);
-      quoinBox(b, 'bigstone', tw, h * R(0.55, 0.9), td, p.x + o.x * 1.8, -0.6, p.y + o.y * 1.8, ry);
+      quoinBox(b, 'block', tw, h * R(0.55, 0.9), td, p.x + o.x * 1.8, -0.6, p.y + o.y * 1.8, ry);
       if (rand() < 0.5) pyramidRoof(b, 6.6, 1.6, p.x + o.x * 1.8, h - 0.6, p.y + o.y * 1.8);
       else ruin(b, 'rubble', 6, 2.2, 6, p.x + o.x * 1.8, h - 0.7, p.y + o.y * 1.8, ry, 0.8);
     } else if (kind < 0.8) {
@@ -270,7 +270,7 @@ function gateway(b: Builder, p: THREE.Vector2, dir: THREE.Vector2, main: boolean
   if (main) {
     const tp = p.clone().addScaledVector(dir, 5.5).addScaledVector(out, 1.4);
     b.box('brick', 6, 12, 6.4, tp.x, -0.6, tp.y, ry + 0.05);
-    quoinBox(b, 'bigstone', 6, 11.8, 6.4, tp.x, -0.6, tp.y, ry + 0.05);
+    quoinBox(b, 'block', 6, 11.8, 6.4, tp.x, -0.6, tp.y, ry + 0.05);
     pyramidRoof(b, 6.8, 1.8, tp.x, 11.3, tp.y);
     const sp = p.clone().addScaledVector(dir, -5.2).addScaledVector(out, 1.6);
     ruin(b, 'brick', 6, 5.5, 5.8, sp.x, -0.6, sp.y, ry - 0.07, 0.7);
@@ -394,7 +394,7 @@ function church(b: Builder) {
   b.geo('marble', arcadeGeo(3.1, 3.9, 0.3, 1, 2.0, 2.5), cx + 0.6, -0.3, z1 + 0.5, 0);
   archRings(b, 'marble', cx + 0.6, -0.3, z1 + 0.5, 0, 0.32, 2.0, 2.5, 0.3, 0.26);
   // Façade corners in reused squared blocks; a relieving arch over the portal.
-  quoinBox(b, 'bigstone', x1 - x0 + 0.95, H - 0.2, 0.95, cx, -0.3, z1, 0);
+  quoinBox(b, 'block', x1 - x0 + 0.95, H - 0.2, 0.95, cx, -0.3, z1, 0);
   archRings(b, 'brick', cx + 0.6, 1.4, z1, 0, 0.92, 3.6, 2.4, 0.3, 0.075);
   b.box('iron', 0.6, 0.9, 1.0, cx - 0.5, 7.2, z1, 0, false);
   b.box('brick', 1.3, 2.0, 0.2, x1 + 1.8, -0.3, z1 - 3, 0.02);
@@ -560,7 +560,7 @@ function cellaMemoriae(b: Builder) {
   const P = (lx: number, lz: number): [number, number] => [cx + lx * Math.cos(ry) + lz * Math.sin(ry), cz - lx * Math.sin(ry) + lz * Math.cos(ry)];
   const [ex, ez] = P(0, 3);
   b.geo('rubble', arcadeGeo(5.2, 3.6, 0.7, 1, 1.5, 1.7), ex, -0.2, ez, ry);
-  archRings(b, 'stone', ex, -0.2, ez, ry, 0.7, 1.5, 1.7, 0.3, 0.2);
+  archRings(b, 'block', ex, -0.2, ez, ry, 0.7, 1.5, 1.7, 0.3, 0.2);
   for (const s of [-1, 1]) {
     const [wx, wz] = P(s * 2.6, 0);
     ruin(b, 'rubble', 6, R(2.2, 3.4), 0.7, wx, -0.2, wz, ry + Math.PI / 2, 0.6);

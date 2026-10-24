@@ -190,7 +190,10 @@ let audio: Soundscape | null = null;
 player.onStep = (run) => audio?.step(run, player.pos.y < -2);
 
 // Post: bloom, ACES, then our own grade / grain / vignette / fringe.
-const composer = new EffectComposer(renderer);
+// 4x multisampled HDR target: every geometric edge (stones, arches, tiles)
+// is anti-aliased instead of stair-stepping and crawling.
+const msaaTarget = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: 4 });
+const composer = new EffectComposer(renderer, msaaTarget);
 composer.setPixelRatio(renderer.getPixelRatio());
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.7, 0.55, 0.82);

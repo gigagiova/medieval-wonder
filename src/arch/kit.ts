@@ -18,6 +18,9 @@ type V3 = THREE.Vector3;
 const v3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const _a = v3(), _b = v3(), _n = v3(), _c = v3();
 
+/** Edge wear per material (metres): dressed stone more, brick a little, timber none. */
+const BEVEL: Partial<Record<MatName, number>> = { block: 0.03, stone: 0.03, bigstone: 0.04, marble: 0.025, rubble: 0.035, slab: 0.02, brick: 0.012 };
+
 /** Numeric key for a position on a 4 mm lattice (±250 m). */
 const key = (x: number, y: number, z: number) =>
   ((Math.round(x * 250) + 65536) * 131072 + (Math.round(y * 250) + 65536)) * 131072 + (Math.round(z * 250) + 65536);
@@ -50,14 +53,54 @@ export class Acc {
     this.tri(m, p, r, s, inside);
   }
 
-  /** A hexahedron from 8 corners: bottom face 0-3, top face 4-7 (same order). */
+  /**
+   * A hexahedron from 8 corners: bottom face 0-3, top face 4-7 (same order).
+   * Stone-like materials get worn, chamfered edges (a narrow bevel along every
+   * edge and a facet at every corner): no stone in a medieval wall has a
+   * knife-sharp arris, and the bevels catch the light the way real ones do.
+   */
   hexa(m: MatName, c: V3[]) {
     const ctr = v3();
     for (const p of c) ctr.add(p);
     ctr.multiplyScalar(1 / 8);
     const F = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]];
+    const bev = BEVEL[m] ?? 0;
+    if (bev > 0) {
+      let minEdge = Infinity;
+      for (const f of F) for (let i = 0; i < 4; i++) minEdge = Math.min(minEdge, c[f[i]].distanceTo(c[f[(i + 1) % 4]]));
+      const r = Math.min(bev * R(0.7, 1.3), minEdge * 0.22);
+      if (r > 0.003) { this.bevelled(m, c, F, ctr, r); return; }
+    }
     for (const [a, b, cc, d] of F) this.quad(m, c[a], c[b], c[cc], c[d], ctr);
   }
+  private bevelled(m: MatName, c: V3[], F: number[][], ctr: V3, r: number) {
+    // Q(f, k): corner k pulled into face f along its two in-face edges.
+    const Q = (fi: number, k: number) => {
+      const f = F[fi], i = f.indexOf(k);
+      const p = c[f[(i + 3) % 4]], n = c[f[(i + 1) % 4]];
+      const d1 = v3().subVectors(p, c[k]).normalize(), d2 = v3().subVectors(n, c[k]).normalize();
+      return c[k].clone().addScaledVector(d1, r).addScaledVector(d2, r);
+    };
+    const q = F.map((f, fi) => f.map((k) => Q(fi, k)));
+    for (let fi = 0; fi < 6; fi++) this.quad(m, q[fi][0], q[fi][1], q[fi][2], q[fi][3], ctr);
+    // Edge bevels: for every edge shared by two faces.
+    const seen = new Set<string>();
+    for (let f1 = 0; f1 < 6; f1++) for (let i = 0; i < 4; i++) {
+      const a = F[f1][i], b = F[f1][(i + 1) % 4];
+      const key2 = a < b ? a + ',' + b : b + ',' + a;
+      if (seen.has(key2)) continue;
+      seen.add(key2);
+      const f2 = F.findIndex((f, fi) => fi !== f1 && f.includes(a) && f.includes(b));
+      if (f2 < 0) continue;
+      this.quad(m, q[f1][F[f1].indexOf(a)], q[f1][F[f1].indexOf(b)], q[f2][F[f2].indexOf(b)], q[f2][F[f2].indexOf(a)], ctr);
+    }
+    // Corner facets.
+    for (let k = 0; k < 8; k++) {
+      const fs = F.map((f, fi) => (f.includes(k) ? fi : -1)).filter((x) => x >= 0);
+      this.tri(m, q[fs[0]][F[fs[0]].indexOf(k)], q[fs[1]][F[fs[1]].indexOf(k)], q[fs[2]][F[fs[2]].indexOf(k)], ctr);
+    }
+  }
+
 
   /**
    * Flush everything into the Builder (no collision). The pieces are bent by
@@ -123,7 +166,7 @@ export function voussoirs(acc: Acc, m: MatName, f: Frame, cu: number, cv: number
     const t0 = a0 + ((a1 - a0) * i) / n + gap, t1 = a0 + ((a1 - a0) * (i + 1)) / n - gap;
     const key = i === (n >> 1);
     const ro = r1 + (key ? 0.06 : 0) + R(-0.035, 0.035);
-    const pr = R(0, 0.025);
+    const pr = R(0.025, 0.05);
     const c: V3[] = [];
     for (const w of [w0 - 0.01, w1 + pr]) {
       for (const [a, r] of [[t0, r0], [t1, r0], [t1, ro], [t0, ro]] as const) {
