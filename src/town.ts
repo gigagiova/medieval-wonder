@@ -87,7 +87,7 @@ const lengthOf = (pts: V2[]) => pts.reduce((a, p, i) => (i ? a + p.distanceTo(pt
  * Lay out the town inside `wall`, avoiding `reserved` polygons (abbey, ruins).
  * `gate` is where the main lane enters; `goal` where it ends (abbey atrium).
  */
-export function layoutTown(wall: V2[], reserved: V2[][], gate: V2, goal: V2, eastGate: V2): Town {
+export function layoutTown(wall: V2[], reserved: V2[][], gate: V2, goal: V2, eastGate: V2, eastGoal = V(-58, 18), clear: [number, number, number][] = []): Town {
   const t = new Town();
   t.wall = wall;
   // Classify cells.
@@ -159,7 +159,15 @@ export function layoutTown(wall: V2[], reserved: V2[][], gate: V2, goal: V2, eas
   };
   // The one real lane, from the gate up to the abbey; and a crooked cross lane.
   add(walk(gate, Math.atan2(goal.x - gate.x, goal.y - gate.y), 220, 2.7, goal), 2.7, true);
-  add(walk(eastGate, -Math.PI / 2 - 0.25, 160, 2.2, V(-58, 18)), 2.2, true);
+  add(walk(eastGate, -Math.PI / 2 - 0.25, 160, 2.2, eastGoal), 2.2, true);
+  // Small open places (forecourts) cleared before the alleys grow, so alleys find them.
+  for (const [cx, cz, r] of clear) {
+    for (let zz = cz - r - 1; zz <= cz + r + 1; zz += RES) for (let xx = cx - r - 1; xx <= cx + r + 1; xx += RES) {
+      const ang = Math.atan2(xx - cx, zz - cz);
+      if (Math.hypot(xx - cx, zz - cz) < r * (0.8 + 0.2 * Math.sin(ang * 3 + 1.1)) && t.at(xx, zz) === FREE) t.set(xx, zz, STREET);
+    }
+    t.streets.push({ pts: [V(cx - r * 0.6, cz), V(cx, cz + 0.3), V(cx + r * 0.6, cz)], w: r, main: false });
+  }
   // Alleys branch off everything that exists, wander, and join or dead-end.
   for (let n = 0; n < 70; n++) {
     const src = t.streets[Math.floor(rand() * t.streets.length)];
