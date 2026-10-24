@@ -17,7 +17,7 @@ function buttress(b: Builder, m: MatName, w: number, h: number, d: number, x: nu
 import { torch, brazier, hornLantern, bracketLantern, lucerna, polykandelon, candle } from './lights';
 import { layoutTown, lotsFor, buildHouse, buildBridges, townTexture, BRIDGE_SPOTS, type Town } from './town';
 import { setGroundExtra } from './displace';
-import { buildCatacombs, CATACOMB_SPOTS } from './catacombs';
+import { buildCatacombs, CATACOMB_SPOTS, CELLA_STAIR } from './catacombs';
 import { buildForest, treeSpots } from './forest';
 import { buildBaths, BATHS_SPOT } from './baths';
 import { buildPalace, PALACE_SPOT } from './palace';
@@ -513,7 +513,9 @@ const GROUND_STEP = 0.6;
 function ground(b: Builder) {
   const IN = 96;
   const hx0 = STAIR_X - STAIR_W / 2, hx1 = STAIR_X + STAIR_W / 2;
-  const hole = (x: number, z: number) => x > hx0 && x < hx1 && z < STAIR_TOP && z > HOLE_END;
+  const ch = CELLA_STAIR.hole;
+  const inCella = (x: number, z: number, m = 0) => x > ch.x0 - m && x < ch.x1 + m && z > ch.z0 - m && z < ch.z1 + m;
+  const hole = (x: number, z: number) => (x > hx0 && x < hx1 && z < STAIR_TOP && z > HOLE_END) || inCella(x, z);
   // Wells pierce the ground: drop the cells over each shaft and snap the
   // remaining edge vertices onto a circle hidden inside the well's wall.
   const inWell = (x: number, z: number) => WELLS.some((w) => Math.hypot(x - w.x, z - w.z) < (w.rIn + w.rOut) / 2);
@@ -527,11 +529,32 @@ function ground(b: Builder) {
     }
   }
   b.add(g, 'ground', undefined, false, true);
-  b.add(grid(-400, 400, 4, -0.04, (x, z) => Math.abs(x) < IN - 2 && Math.abs(z) < IN - 2), 'ground', undefined, false, true);
+  // The outer grid overlaps the town grid's last 2 m: hole it at the cella too.
+  b.add(grid(-400, 400, 4, -0.04, (x, z) => (Math.abs(x) < IN - 2 && Math.abs(z) < IN - 2) || inCella(x, z, 2)), 'ground', undefined, false, true);
   // Walkable ground for collision: 4 m cells, lined up so the stair opening
   // (x -38..-34, z -56..-52) is exactly one 4 x 4 cell, plus 10 m cells beyond.
-  b.collideShape(grid(-98, 98, 4, 0, (x, z) => x > -38 && x < -34 && z > -56 && z < -52, -96), 'ground');
-  b.collideShape(grid(-200, 200, 10, -0.04, (x, z) => Math.abs(x) < 95 && Math.abs(z) < 95), 'ground');
+  // The martyr's stair (x -21..-19.2, z -96..-91.2) drops the 4 m cells it
+  // touches and the 10 m cell over it; patches put the ground back round it.
+  b.collideShape(grid(-98, 98, 4, 0, (x, z) => (x > -38 && x < -34 && z > -56 && z < -52) || inCella(x, z, 2), -96), 'ground');
+  b.collideShape(grid(-200, 200, 10, -0.04, (x, z) => (Math.abs(x) < 95 && Math.abs(z) < 95) || inCella(x, z, 5), -200), 'ground');
+  const patch = (x0: number, x1: number, z0: number, z1: number) => {
+    const nx = Math.max(1, Math.ceil((x1 - x0) / 1)), nz = Math.max(1, Math.ceil((z1 - z0) / 1));
+    const pos: number[] = [];
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const a = x0 + ((x1 - x0) * i) / nx, b2 = x0 + ((x1 - x0) * (i + 1)) / nx;
+      const c = z0 + ((z1 - z0) * j) / nz, d = z0 + ((z1 - z0) * (j + 1)) / nz;
+      pos.push(a, 0, c, a, 0, d, b2, 0, c, b2, 0, c, a, 0, d, b2, 0, d);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    b.collideShape(g, 'ground');
+  };
+  // 4 m cells removed: x -22..-18, z -96..-88. Put back everything but the opening.
+  patch(-22, ch.x0, -96, -88);
+  patch(ch.x1, -18, -96, -88);
+  patch(ch.x0, ch.x1, ch.z1, -88);
+  // 10 m cell removed: x -30..-10, z -100..-90; the 4 m grid still covers z > -96.
+  patch(-30, -10, -100, -96);
 }
 
 
@@ -555,25 +578,25 @@ function deadTree(b: Builder, x: number, z: number, h: number) {
  * memoriae) standing over the crypt, reached by a trodden path.
  */
 function cellaMemoriae(b: Builder) {
+  // Roofless memoria over the martyr's crypt. Its floor is mostly the
+  // opening of the stair down to the crypt (CELLA_STAIR), walled round
+  // with a parapet; you walk round it to the head of the stair by the apse.
   const cx = -20.3, cz = -93.1;
-  const ry = Math.atan2(NORTH.p.x - cx, NORTH.p.y - cz);
-  const P = (lx: number, lz: number): [number, number] => [cx + lx * Math.cos(ry) + lz * Math.sin(ry), cz - lx * Math.sin(ry) + lz * Math.cos(ry)];
-  const [ex, ez] = P(0, 3);
+  const ry = 0;
+  const P = (lx: number, lz: number): [number, number] => [cx + lx, cz + lz];
+  const [ex, ez] = P(0, 3.5);
   b.geo('rubble', arcadeGeo(5.2, 3.6, 0.7, 1, 1.5, 1.7), ex, -0.2, ez, ry);
   archRings(b, 'block', ex, -0.2, ez, ry, 0.7, 1.5, 1.7, 0.3, 0.2);
   for (const s of [-1, 1]) {
-    const [wx, wz] = P(s * 2.6, 0);
-    ruin(b, 'rubble', 6, R(2.2, 3.4), 0.7, wx, -0.2, wz, ry + Math.PI / 2, 0.6);
+    const [wx, wz] = P(s * 2.6, 0.15);
+    ruin(b, 'rubble', 6.7, R(2.2, 3.4), 0.7, wx, -0.2, wz, ry + Math.PI / 2, 0.6);
   }
   for (let i = 0; i <= 6; i++) {
     const a = Math.PI / 2 + (i / 6) * Math.PI;
-    const [ax, az] = P(Math.sin(a) * 2.3, -3 + Math.cos(a) * 2.3);
+    const [ax, az] = P(Math.sin(a) * 2.3, -3.2 + Math.cos(a) * 2.3);
     b.box('rubble', 1.3, R(1.6, 2.8), 0.7, ax, -0.2, az, ry + a);
   }
-  const [sx, sz] = P(0, -1.2);
-  b.box('marble', 1.0, 0.25, 2.0, sx, -0.15, sz, ry + 0.06);
-  lucerna(b, sx + 0.2, 0.12, sz, ry, false);
-  const [tx, tz] = P(1.9, 2.7);
+  const [tx, tz] = P(1.9, 3.2);
   torch(b, tx, 2.2, tz, ry);
 }
 

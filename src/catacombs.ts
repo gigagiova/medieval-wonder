@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { field } from './displace';
 import { Builder, rng } from './builder';
 import type { MatName } from './materials';
 
@@ -17,7 +18,23 @@ const STEPS = Math.round(-DEPTH / STAIR_RISE);
 const STAIR_END = STAIR_TOP - STEPS * STAIR_RUN;
 const HOLE_END = -56;
 const CELL = 0.2;
-const DOM = { x0: -65, x1: -9, y0: -8.2, y1: 0.02, z0: -105, z1: -50.5 };
+// The field is rock outside the carved void; surface nets emit no faces in the
+// outermost cell layer, so the domain keeps >= 2 coarse (0.6 m) collision cells
+// of rock below the deepest floor (-7.7 in the crypt). With y0 = -8.2 the crypt
+// floor fell inside that unmeshed layer and had no collision: players fell out.
+const DOM = { x0: -65, x1: -9, y0: -9.4, y1: 0.02, z0: -105, z1: -50.5 };
+
+/**
+ * The martyr's stair: from inside the cella memoriae outside the north postern
+ * down to the crypt. Descends towards +z. Its opening in the ground (x, z) is
+ * aligned to the 0.6 m town ground grid; world.ts cuts the same hole.
+ */
+export const CELLA_STAIR = {
+  x: -20.1, w: 1.5, top: -96.0, holeEnd: -91.2, rise: 0.25, run: 0.35, bottomF: -7.35,
+  hole: { x0: -21.0, x1: -19.2, z0: -96.0, z1: -91.2 },
+  /** Tread height of the top step: the ground there (set by world.ts before building). */
+  topF: 1.4,
+};
 
 const rand = rng(7331);
 const R = (a: number, b: number) => a + (b - a) * rand();
@@ -122,13 +139,27 @@ function evalPrim(p: Prim, x: number, y: number, z: number): number {
       return section(l, y - (p.fa + (p.fb - p.fa) * t), w, h, w * 0.47);
     }
     case K.Stair: {
-      const zc = Math.min(p.az, Math.max(p.bz, z));
-      const l = Math.hypot(x - p.ax, z - zc);
-      const fl = stairFloor(zc), ce = stairCeil(zc);
-      // Square-shouldered near the opening (so the walls meet the ground), vaulted below.
-      const rt = ce > 0.2 ? 0.25 : 1.35;
-      // Nothing is carved behind the top step: the opening ends there.
-      return Math.max(section(l, y - fl, p.wa, ce - fl, rt), z - STAIR_TOP);
+      // ux = +1: the ossuary stair (descends towards -z, global profile).
+      // ux = -1: a generic stair descending towards +z from az (top) to bz,
+      // top tread fa, ceiling ha above the line of the nosings.
+      if (p.ux > 0) {
+        const zc = Math.min(p.az, Math.max(p.bz, z));
+        const l = Math.hypot(x - p.ax, z - zc);
+        const fl = stairFloor(zc), ce = stairCeil(zc);
+        // Square-shouldered near the opening (so the walls meet the ground), vaulted below.
+        const rt = ce > 0.2 ? 0.25 : 1.35;
+        // Nothing is carved behind the top step: the opening ends there.
+        return Math.max(section(l, y - fl, p.wa, ce - fl, rt), z - STAIR_TOP);
+      }
+      const zc = Math.max(p.az, Math.min(p.bz, z));
+      const l = Math.abs(x - p.ax);
+      const t = (zc - p.az) / p.hu, n = p.hv;
+      const k = Math.min(n, Math.floor(t)), f = t - Math.floor(t);
+      const e = k >= n ? 0 : f < 0.72 ? 0 : (f - 0.72) / 0.28;
+      const fl = p.fa - p.hw * (Math.min(n, k + e * e * (3 - 2 * e)));
+      const ce = p.fa + p.ha - p.hw * Math.min(n, t);
+      const rt = ce > 0.2 ? 0.2 : 1.1;
+      return Math.max(section(l, y - fl, p.wa, ce - fl, rt), p.az - z);
     }
     default: {
       const rx = x - p.cx, rz = z - p.cz;
@@ -410,6 +441,60 @@ export function buildCatacombs(b: Builder): void {
     layGallery(n.x, n.z, n.f, m.x, m.z, m.f);
   }
 
+  // The martyr's stair from the cella memoriae, and a gallery from its foot to the crypt.
+  {
+    const C = CELLA_STAIR;
+    // Its top tread sits on the (displaced) ground at the head of the stair.
+    const gv = v(0, 0, 0);
+    field(C.x, 0, C.top, 'ground', gv);
+    C.topF = gv.y;
+    const n = Math.round((C.topF - C.bottomF) / C.rise);
+    const bot = C.top + n * C.run;
+    const sp = blank();
+    Object.assign(sp, { k: K.Stair, ux: -1, ax: C.x, az: C.top, bz: bot + 0.8, wa: C.w + 0.12, fa: C.topF, ha: 2.3, hu: C.run, hv: n, hw: C.rise, smooth: 0.2 });
+    sp.xmin = C.x - 2.4; sp.xmax = C.x + 2.4; sp.zmin = C.top - 2.4; sp.zmax = bot + 3.2;
+    sp.ymin = C.bottomF - 0.8; sp.ymax = C.topF + 3;
+    prims.push(sp);
+    // Smooth ramp for walking, on the line of the nosings.
+    const run = bot - C.top, drop = C.topF - C.bottomF;
+    const ramp = new THREE.BoxGeometry(C.w, 0.1, Math.hypot(run, drop));
+    ramp.rotateX(Math.atan2(drop, run));
+    ramp.translate(C.x, (C.topF + C.bottomF) / 2 - 0.05, (C.top + bot) / 2);
+    b.collide(ramp.toNonIndexed());
+    // The steps above y = 0 (the rock field stops there) are laid stone.
+    for (let i = 0; i < n; i++) {
+      const top = C.topF - i * C.rise;
+      if (top <= 0.04) break;
+      const h = top + 0.45;
+      raw(b, 'block', new THREE.BoxGeometry(C.w + 0.3, h, C.run + 0.04), C.x + R(-0.02, 0.02), top - h / 2, C.top + (i + 0.5) * C.run, R(-0.02, 0.02));
+    }
+    // Lining walls round the opening: they close the gap between the rock
+    // (which stops at y = 0) and the ground, and rise above it as a parapet.
+    const H = C.topF, pH = H + 0.85, hx = C.hole;
+    const wallBox = (w: number, h: number, d: number, x: number, y0: number, z: number) => {
+      const g = new THREE.BoxGeometry(w, h, d);
+      raw(b, 'block', g.clone(), x, y0 + h / 2, z, R(-0.01, 0.01));
+      b.collide(g.translate(x, y0 + h / 2, z).toNonIndexed());
+    };
+    const inner = C.w / 2 + 0.03;
+    for (const s of [-1, 1]) {
+      const x = s < 0 ? Math.min(C.x - inner - 0.2, hx.x0 + 0.05) : Math.max(C.x + inner + 0.2, hx.x1 - 0.05);
+      wallBox(0.45, pH + 0.6, hx.z1 - hx.z0 + 0.45, x, -0.6, (hx.z0 + hx.z1) / 2 + 0.2);
+    }
+    // The far end wall spans the stair as a lintel: it starts above head height
+    // and reaches back far enough for the rock vault to take over below it.
+    wallBox(hx.x1 - hx.x0 + 0.5, pH - 0.1, 0.7, (hx.x0 + hx.x1) / 2, 0.1, hx.z1 + 0.26);
+    // Riser behind the top step: closes the gap under the ground at the head of the stair.
+    raw(b, 'block', new THREE.BoxGeometry(hx.x1 - hx.x0 + 0.5, H + 0.6, 0.3), C.x, (H - 0.6) / 2 - 0.02, C.top - 0.15);
+    // A lucerna on the parapet, and the iron grille that closed the stair, leant open.
+    lucernaRaw(b, hx.x1 + 0.05, pH + 0.02, hx.z1 - 0.6, Math.PI / 2, true);
+    for (let i = 0; i < 6; i++) raw(b, 'iron', new THREE.BoxGeometry(0.03, 1.5, 0.03), hx.x0 - 0.5 + i * 0.27, H + 0.72, C.top - 0.55, 0, -0.32, 0);
+    for (const yy of [0.25, 0.75, 1.25]) raw(b, 'iron', new THREE.BoxGeometry(1.45, 0.035, 0.03), hx.x0 + 0.17, H + yy * 0.95 + 0.03, C.top - 0.62 + yy * 0.3, 0, -0.32, 0);
+    // From the foot of the stair, a gallery into the crypt's north side.
+    layGallery(C.x, bot + 0.6, C.bottomF, Cr.x - 0.85, Cr.z + 2.35, Cr.f, 1.35, 2.7, 0.5);
+    CATACOMB_SPOTS.cellaTop.set(C.x, C.topF + 1.65, C.top - 0.7);
+  }
+
   // Crypt: a wide low chamber with two rock pillars left standing.
   box(K.Box, Cr.x, Cr.f + 1.55, Cr.z, 0.94, 0.34, 4.2, 1.9, 3.2, 1.5, 0.5);
   const pillars = [[-1.6, 0.6], [1.9, -0.9]];
@@ -637,4 +722,6 @@ export const CATACOMB_SPOTS = {
   crypt: v(-23.5 + 3.2, DEPTH - 0.35 + 1.65, -95.5 + 2.4),
   gallery: v(0, 0, 0),
   galleryYaw: 0,
+  /** Eye position just behind the head of the martyr's stair, in the cella. */
+  cellaTop: v(0, 0, 0),
 };
