@@ -8,6 +8,7 @@ import { setGroundExtra } from './displace';
 import { buildCatacombs, CATACOMB_SPOTS } from './catacombs';
 import { buildForest, treeSpots } from './forest';
 import { buildBaths, BATHS_SPOT } from './baths';
+import { buildPalace, PALACE_SPOT } from './palace';
 import { terrain } from './displace';
 
 // A Lombard town around AD 750, packed inside what is left of a Roman circuit.
@@ -87,6 +88,7 @@ export function getTeleports(): Teleport[] {
     { name: 'Catacumbae', x: cs.stairBottom.x, y: cs.stairBottom.y + 0.2, z: cs.stairBottom.z, yaw: 0 },
     { name: 'Crypta', x: cs.crypt.x, y: cs.crypt.y + 0.2, z: cs.crypt.z, yaw: 0.9 },
     above('Aquaeductus', 92, -66, 140, -100),
+    above('Palatium', PALACE_SPOT.x, PALACE_SPOT.z, PALACE_SPOT.x, PALACE_SPOT.z - 10),
     { name: 'Thermae', x: BATHS_SPOT.x, z: BATHS_SPOT.z, y: terrain(BATHS_SPOT.x, BATHS_SPOT.z) + 1.4 + 2.2, yaw: BATHS_SPOT.yaw },
     above('Porta Septentrionalis', NORTH.p.x - 0.5, NORTH.p.y - 6, -20.3, -93.1),
   ];
@@ -104,6 +106,7 @@ export function getMapData() {
       { name: 'Porta Septentrionalis', x: NORTH.p.x, z: NORTH.p.y },
       { name: 'Cella Memoriae', x: -20.3, z: -93.1 },
       { name: 'Thermae', x: -33, z: 24 },
+      { name: 'Palatium', x: 40, z: -23 },
       { name: 'Basilica', x: -17.3, z: -53 },
       { name: 'Atrium', x: -16, z: -35 },
       { name: 'Ossuarium', x: -36, z: -54.5 },
@@ -135,6 +138,7 @@ export function buildWorld(scene: THREE.Scene) {
   monastery(b);
   buildCatacombs(b);
   buildBaths(b, scene);
+  buildPalace(b, scene);
   outskirts(b);
   // The wood: dense, old and dead, right up to a cleared strip along the wall.
   const insideWall = (x: number, z: number) => {
