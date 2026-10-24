@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Builder, rng } from './builder';
 import type { MatName } from './materials';
 import { arcadeGeo } from './shapes';
@@ -284,36 +285,72 @@ const WALL_STEP = 0.8;
  * Walls of a prism over polygon c, from y0 to y0 + h, as indexed grids (one per
  * side, so corners stay creased) that the displacement field can bend.
  */
-function prismWalls(c: V2[], y0: number, h: number, step = WALL_STEP, skip = -1) {
+function prismWalls(c: V2[], y0: number, h: number, step = WALL_STEP, skip = -1, round = 0.14) {
   let cx = 0, cz = 0;
   for (const p of c) { cx += p.x / c.length; cz += p.y / c.length; }
+  const n = c.length;
+  // Rounded corners: for corner k, the arc centre, tangent distance and the
+  // outward bisector. Both walls meeting there land on the same arc.
+  const corner = c.map((P, k) => {
+    const A = c[(k + 1) % n], B = c[(k + n - 1) % n];
+    const eA = A.clone().sub(P).normalize(), eB = B.clone().sub(P).normalize();
+    const phi = Math.acos(THREE.MathUtils.clamp(eA.dot(eB), -1, 1));
+    const r = Math.min(round, 0.3 * Math.min(P.distanceTo(A), P.distanceTo(B)) * Math.tan(phi / 2));
+    const bis = eA.clone().add(eB).normalize();
+    const C = P.clone().addScaledVector(bis, r / Math.sin(phi / 2));
+    return { P, eA, eB, r, dT: r / Math.tan(phi / 2), C, bo: bis.clone().negate() };
+  });
+  /** Point at distance t from corner k along the wall that leaves it in direction e. */
+  const arc = (k: number, e: V2, t: number) => {
+    const q = corner[k];
+    if (q.r < 1e-3 || t >= q.dT) return q.P.clone().addScaledVector(e, t);
+    const other = e === q.eA ? q.eB : q.eA;
+    const nrm = other.clone().sub(e.clone().multiplyScalar(other.dot(e))).normalize().negate();
+    // Spherical interpolation from the wall's normal (at the tangent point)
+    // to the outward bisector (at the corner itself).
+    const s = 1 - t / q.dT;
+    const om = Math.acos(THREE.MathUtils.clamp(nrm.dot(q.bo), -1, 1));
+    const ang = om * s;
+    const w1 = om > 1e-4 ? Math.sin(om - ang) / Math.sin(om) : 1 - s, w2 = om > 1e-4 ? Math.sin(ang) / Math.sin(om) : s;
+    return q.C.clone().add(new THREE.Vector2(nrm.x * w1 + q.bo.x * w2, nrm.y * w1 + q.bo.y * w2).multiplyScalar(q.r));
+  };
   const pos: number[] = [], idx: number[] = [];
   const nv = Math.max(1, Math.ceil(h / step));
-  for (let k = 0; k < c.length; k++) {
+  for (let k = 0; k < n; k++) {
     if (k === skip) continue;
-    const a = c[k], b = c[(k + 1) % c.length];
+    const a = c[k], b = c[(k + 1) % n];
     const L = a.distanceTo(b);
     if (L < 0.05) continue;
-    const nu = Math.max(1, Math.ceil(L / step));
-    const ex = (b.x - a.x) / L, ez = (b.y - a.y) / L;
-    // Triangle (p00, p10, p11) faces (-ez, 0, ex); flip if that points inward.
+    const e = b.clone().sub(a).normalize();
+    const ka = k, kb = (k + 1) % n;
+    const dA = corner[ka].dT, dB = corner[kb].dT;
+    // Columns: densely round each corner, ~step apart in between.
+    const U: number[] = [0, dA * 0.4, dA * 0.75];
+    const mid = Math.max(1, Math.ceil((L - dA - dB) / step));
+    for (let i = 0; i <= mid; i++) U.push(dA + ((L - dA - dB) * i) / mid);
+    U.push(L - dB * 0.75, L - dB * 0.4, L);
+    const cols = U.filter((u, i) => i === 0 || u - U[i - 1] > 1e-3).map((u) =>
+      u <= dA ? arc(ka, corner[ka].eA, u)
+        : u >= L - dB ? arc(kb, corner[kb].eB, L - u)
+          : a.clone().addScaledVector(e, u));
+    const nu = cols.length - 1;
     const mx = (a.x + b.x) / 2 - cx, mz = (a.y + b.y) / 2 - cz;
-    const flip = -ez * mx + ex * mz < 0;
+    const flip = -e.y * mx + e.x * mz < 0;
     const base = pos.length / 3;
-    for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
-      pos.push(a.x + (b.x - a.x) * (i / nu), y0 + (h * j) / nv, a.y + (b.y - a.y) * (i / nu));
-    }
+    for (let j = 0; j <= nv; j++) for (const p of cols) pos.push(p.x, y0 + (h * j) / nv, p.y);
     for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
       const p00 = base + j * (nu + 1) + i, p10 = p00 + 1, p01 = p00 + nu + 1, p11 = p01 + 1;
       if (flip) idx.push(p00, p11, p10, p00, p01, p11);
       else idx.push(p00, p10, p11, p00, p11, p01);
     }
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(pos.length), 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
-  g.setIndex(idx);
+  const g0 = new THREE.BufferGeometry();
+  g0.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g0.setIndex(idx);
+  // Weld the walls at the corners so the shading flows round them.
+  const g = mergeVertices(g0, 1e-3);
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 3), 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
   return g;
 }
 

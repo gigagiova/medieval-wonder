@@ -1,5 +1,57 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+/**
+ * A box whose faces are grids already fine enough to bend (spacing ~L), with
+ * two extra grid lines just inside every edge, projected onto a rounded box of
+ * radius r. Worn arrises for the price of a few more triangles.
+ */
+function wornBox(w: number, h: number, d: number, r: number, L: number) {
+  const lines = (s: number) => {
+    const half = s / 2, a = [-half, -half + r * 0.35, -half + r];
+    const n = Math.max(1, Math.ceil((s - 2 * r) / L));
+    for (let i = 1; i < n; i++) a.push(-half + r + ((s - 2 * r) * i) / n);
+    a.push(half - r, half - r * 0.35, half);
+    return a;
+  };
+  const X = lines(w), Y = lines(h), Z = lines(d);
+  const pos: number[] = [], idx: number[] = [];
+  const hx = w / 2 - r, hy = h / 2 - r, hz = d / 2 - r;
+  const push = (x: number, y: number, z: number) => {
+    const cx = Math.max(-hx, Math.min(hx, x)), cy = Math.max(-hy, Math.min(hy, y)), cz = Math.max(-hz, Math.min(hz, z));
+    let dx = x - cx, dy = y - cy, dz = z - cz;
+    const l = Math.hypot(dx, dy, dz) || 1;
+    dx /= l; dy /= l; dz /= l;
+    pos.push(cx + dx * r, cy + dy * r, cz + dz * r);
+  };
+  // Each face: a grid over two axes at a fixed third coordinate.
+  const face = (U: number[], V: number[], f: (u: number, v: number) => [number, number, number], flip: boolean) => {
+    const base = pos.length / 3;
+    for (const v of V) for (const u of U) push(...f(u, v));
+    const nu = U.length;
+    for (let j = 0; j < V.length - 1; j++) for (let i = 0; i < nu - 1; i++) {
+      const a = base + j * nu + i, b = a + 1, c = a + nu, e = c + 1;
+      if (flip) idx.push(a, e, b, a, c, e); else idx.push(a, b, e, a, e, c);
+    }
+  };
+  face(X, Y, (u, v) => [u, v, d / 2], false);
+  face(X, Y, (u, v) => [u, v, -d / 2], true);
+  face(Z, Y, (u, v) => [w / 2, v, u], true);
+  face(Z, Y, (u, v) => [-w / 2, v, u], false);
+  face(X, Z, (u, v) => [u, h / 2, v], true);
+  face(X, Z, (u, v) => [u, -h / 2, v], false);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  // Faces meet with duplicated vertices; merge so normals are smooth round the arris.
+  const m = mergeVertices(g, 1e-4);
+  m.computeVertexNormals();
+  m.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(m.attributes.position.count * 2), 2));
+  return m;
+}
+
+/** Masonry never has knife edges: these materials get rounded, weathered arrises. */
+const WORN: Partial<Record<MatName, number>> = { stone: 1, block: 1, bigstone: 1.3, rubble: 1.2, brick: 0.8, marble: 0.9, slab: 0.7, plaster: 1.1, rock: 1.4, ground: 1.4, clay: 0.6 };
 import { mat, type MatName } from './materials';
 import { tessellate, displace, displacePositions, field, TESS } from './displace';
 
@@ -88,7 +140,16 @@ export class Builder {
     tmpM.compose(new THREE.Vector3(x, y + h / 2, z), tmpQ, new THREE.Vector3(1, 1, 1));
     const L = TESS[m] ?? 1e9;
     const seg = (s: number) => Math.min(64, Math.max(1, Math.ceil(s / L)));
-    this.add(new THREE.BoxGeometry(w, h, d, seg(w), seg(h), seg(d)), m, tmpM, collide, true, false, collide ? new THREE.BoxGeometry(w, h, d) : undefined);
+    const proxy = collide ? new THREE.BoxGeometry(w, h, d) : undefined;
+    const worn = WORN[m];
+    const small = Math.min(w, h, d);
+    if (worn && small > 0.03) {
+      // Radius grows with the block: a few cm on a sill, 10-20 cm on a wall end.
+      const r = THREE.MathUtils.clamp(small * 0.16 * worn, 0.012, 0.2 * worn);
+      this.add(wornBox(w, h, d, Math.min(r, small * 0.45), Math.min(L, 4)), m, tmpM, collide, true, false, proxy);
+      return;
+    }
+    this.add(new THREE.BoxGeometry(w, h, d, seg(w), seg(h), seg(d)), m, tmpM, collide, true, false, proxy);
   }
 
   geo(m: MatName, g: THREE.BufferGeometry, x: number, y: number, z: number, ry = 0, collide = true, rx = 0, rz = 0, fine = false, proxy?: THREE.BufferGeometry) {

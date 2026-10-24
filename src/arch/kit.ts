@@ -3,6 +3,7 @@ import type { Builder } from '../builder';
 import { rng } from '../builder';
 import type { MatName } from '../materials';
 import { field, tessellate } from '../displace';
+import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // A small kit for hand-built architecture: everything is emitted as raw
 // triangles into per-material accumulators and handed to the Builder in one
@@ -19,7 +20,7 @@ const v3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const _a = v3(), _b = v3(), _n = v3(), _c = v3();
 
 /** Edge wear per material (metres): dressed stone more, brick a little, timber none. */
-const BEVEL: Partial<Record<MatName, number>> = { block: 0.03, stone: 0.03, bigstone: 0.04, marble: 0.025, rubble: 0.035, slab: 0.02, brick: 0.012 };
+const BEVEL: Partial<Record<MatName, number>> = { block: 0.035, stone: 0.035, bigstone: 0.045, marble: 0.03, rubble: 0.04, slab: 0.025, brick: 0.02, plaster: 0.04, wood: 0.008 };
 
 /** Numeric key for a position on a 4 mm lattice (±250 m). */
 const key = (x: number, y: number, z: number) =>
@@ -68,7 +69,8 @@ export class Acc {
     if (bev > 0) {
       let minEdge = Infinity;
       for (const f of F) for (let i = 0; i < 4; i++) minEdge = Math.min(minEdge, c[f[i]].distanceTo(c[f[(i + 1) % 4]]));
-      const r = Math.min(bev * R(0.7, 1.3), minEdge * 0.22);
+      // Wear grows with the piece: 2-4 cm on a stone, up to 12 cm on a wall end.
+      const r = Math.min(Math.max(bev * R(0.7, 1.3), minEdge * 0.12), minEdge * 0.3, 0.12);
       if (r > 0.003) { this.bevelled(m, c, F, ctr, r); return; }
     }
     for (const [a, b, cc, d] of F) this.quad(m, c[a], c[b], c[cc], c[d], ctr);
@@ -121,6 +123,8 @@ export class Acc {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(a, 3));
       g.computeVertexNormals();
+      const sm = toCreasedNormals(g, (50 * Math.PI) / 180);
+      g.setAttribute('normal', sm.attributes.normal);
       g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((a.length / 3) * 2), 2));
       b.add(g, m, undefined, false, true, true);
     }
