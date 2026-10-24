@@ -151,12 +151,42 @@ export function ringGeo(rOut: number, rIn: number, h: number, depth = 0, seg = 2
     pts.push(new THREE.Vector2(rIn + t / 2 + Math.cos(a) * t / 2, h - r + Math.sin(a) * r));
   }
   pts.push(new THREE.Vector2(rOut, h - r), new THREE.Vector2(rOut * 1.03, 0));
-  return new THREE.LatheGeometry(pts, seg);
+  // Lathe faces point outward when the profile climbs, so run it outer-up, inner-down.
+  return new THREE.LatheGeometry(pts.reverse(), seg);
 }
 
-/** A well: thick drum with a dark water surface down the shaft. */
-export function wellHead(b: Builder, m: MatName, x: number, y: number, z: number, rOut: number, h: number) {
-  const rIn = rOut - 0.16;
-  b.geo(m, ringGeo(rOut, rIn, h, 0.3), x, y, z, 0, true, 0, 0, false, new THREE.CylinderGeometry(rOut, rOut, h, 8, 1, true).translate(0, h / 2, 0));
-  b.add(new THREE.CircleGeometry(rIn + 0.02, 24).rotateX(-Math.PI / 2), 'iron', new THREE.Matrix4().makeTranslation(x, y + 0.08, z), false, true);
+/** Where wells pierce the ground (x, z, radius at the middle of the wall). */
+export const WELLS: { x: number; z: number; rIn: number; rOut: number }[] = [];
+
+/**
+ * A well: a ring of masonry ~0.4 m thick around an open shaft that goes
+ * 3 m down to black water, capped with a ring of irregular stones.
+ * The ground must be pierced at (x, z) — see WELLS.
+ */
+export function wellHead(b: Builder, m: MatName, x: number, y: number, z: number, rOut: number, h: number, cap: MatName = 'stone') {
+  const rIn = rOut - 0.4;
+  const shaft = 3.0;
+  // Body: outer face, inner face continuing down the shaft (one closed lathe).
+  // Outer face climbing, across the top, inner face descending the shaft:
+  // the order that makes every face look out of the masonry.
+  const prof: THREE.Vector2[] = [
+    new THREE.Vector2(rOut * 1.04, -0.15), new THREE.Vector2(rOut, h - 0.12),
+    new THREE.Vector2(rIn, h - 0.12), new THREE.Vector2(rIn, -shaft),
+  ];
+  b.geo(m, new THREE.LatheGeometry(prof, 32), x, y, z, 0, true, 0, 0, false,
+    new THREE.CylinderGeometry(rOut, rOut, h, 10, 1, true).translate(0, h / 2, 0));
+  // Shaft floor: black water.
+  b.add(new THREE.CircleGeometry(rIn + 0.05, 24).rotateX(-Math.PI / 2), 'iron',
+    new THREE.Matrix4().makeTranslation(x, y - shaft + 0.4, z), false, true);
+  // Cap stones: big irregular blocks set round the top, each a little different.
+  const n = Math.max(9, Math.round((Math.PI * 2 * (rIn + rOut) / 2) / 0.4));
+  let a0 = R(0, 1);
+  for (let i = 0; i < n; i++) {
+    const a = a0 + (i / n) * Math.PI * 2;
+    const len = ((Math.PI * 2 * (rIn + rOut) / 2) / n) * R(0.86, 0.97);
+    const rad = (rIn + rOut) / 2 + R(-0.02, 0.03);
+    b.box(cap, len, R(0.1, 0.15), (rOut - rIn) + R(0.04, 0.1), x + Math.sin(a) * rad, y + h - 0.13, z + Math.cos(a) * rad,
+      a + Math.PI / 2, false, R(-0.04, 0.04), R(-0.04, 0.04));
+  }
+  WELLS.push({ x, z, rIn, rOut });
 }

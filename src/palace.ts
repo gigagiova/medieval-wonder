@@ -463,7 +463,7 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
   leanTo(b, 12.4, 1.5, 6.3, 5.6, 40.2, hz + 0.85, 0);
   b.box('iron', 0.9, 1.9, 0.62, 37.8, 3.6, hz, 0, false);
   // The well: a Roman puteal, its rim grooved by ropes.
-  wellHead(b, 'marble', 37.4, -0.08, -25.4, 0.68, 0.9);
+  wellHead(b, 'marble', 37.4, -0.08, -25.4, 0.85, 0.9, 'marble');
   b.box('wood', 0.13, 2.1, 0.13, 38.1, -0.1, -25.3, 0, true, 0, 0.05);
   b.box('wood', 0.13, 2.0, 0.13, 36.7, -0.1, -25.5, 0, true, 0.04);
   b.box('wood', 1.7, 0.12, 0.12, 37.4, 1.95, -25.4, 0.1, false);

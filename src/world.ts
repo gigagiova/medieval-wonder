@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Builder, rng } from './builder';
 import type { MatName } from './materials';
-import { arcadeGeo, arcade, ruinGeo, ruin, column, fallenDrum, gable, leanTo, pyramidRoof, ringGeo, wellHead } from './shapes';
+import { arcadeGeo, arcade, ruinGeo, ruin, column, fallenDrum, gable, leanTo, pyramidRoof, ringGeo, wellHead, WELLS } from './shapes';
 import { torch, brazier, hornLantern, bracketLantern, lucerna, polykandelon, candle } from './lights';
 import { layoutTown, lotsFor, buildHouse, buildBridges, townTexture, type Town } from './town';
 import { setGroundExtra } from './displace';
@@ -137,7 +137,6 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
   town = layoutTown(WALL, [abbey, temple, thermae, palatium], GATE.p.clone().multiplyScalar(0.985), V(-15.5, -27.5), EAST.p.clone().multiplyScalar(0.985),
     V(-16.2, 29.5), [[39.5, -6.5, 3.6], [NORTH.p.x * 0.96, NORTH.p.y * 0.96, 2.4]]);
   setGroundExtra((x, z) => town.gutterAt(x, z));
-  ground(b);
   townWall(b);
   await progress('Raising the houses', 0.1);
   const lots = lotsFor(town);
@@ -158,6 +157,7 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
   await progress('Copying the codices', 0.64);
   buildLibrary(b, scene);
   outskirts(b);
+  ground(b);
   await progress('The wood grows dark', 0.7);
   // The wood: dense, old and dead, right up to a cleared strip along the wall.
   const insideWall = (x: number, z: number) => {
@@ -309,7 +309,7 @@ function roman(b: Builder) {
 function well(b: Builder, x: number, z: number) {
   mapMarks.well.set(x, z);
   // A reused Roman puteal: a marble drum, and a crooked wooden frame.
-  wellHead(b, 'marble', x, 0, z, 0.75, 0.88);
+  wellHead(b, 'rubble', x, 0, z, 0.95, 0.85, 'stone');
   b.box('wood', 0.15, 2.2, 0.15, x + 0.85, 0, z + 0.1, 0, true, 0, 0.06);
   b.box('wood', 0.15, 2.1, 0.15, x - 0.8, 0, z - 0.1, 0, true, 0.04, 0);
   b.box('wood', 2.1, 0.13, 0.13, x, 2.08, z, 0.08, false);
@@ -411,7 +411,7 @@ function church(b: Builder) {
   ruin(b, 'rubble', 5, 3.2, 0.8, -20.5, -0.3, az1, 0.05, 0.6);
   for (let i = 0; i < 2; i++) column(b, -10.6 - i * 2.4, -0.3, az1 - 0.8, 3.3, 0.22, i === 1 ? 0.6 : 0);
   // The cantharus, the fountain of the atrium, long dry.
-  b.geo('marble', ringGeo(1.0, 0.86, 0.72), -16.5, -0.05, -35.5);
+  b.geo('marble', ringGeo(1.0, 0.72, 0.72), -16.5, -0.05, -35.5);
   b.geo('marble', new THREE.CircleGeometry(0.9, 24).rotateX(-Math.PI / 2), -16.5, 0.12, -35.5, 0, false);
   brazier(b, -14.2, -32.5);
   hornLantern(b, -11.2, 2.4, -38.5);
@@ -491,7 +491,19 @@ function ground(b: Builder) {
   const IN = 96;
   const hx0 = STAIR_X - STAIR_W / 2, hx1 = STAIR_X + STAIR_W / 2;
   const hole = (x: number, z: number) => x > hx0 && x < hx1 && z < STAIR_TOP && z > HOLE_END;
-  b.add(grid(-IN, IN, GROUND_STEP, 0, hole), 'ground', undefined, false, true);
+  // Wells pierce the ground: drop the cells over each shaft and snap the
+  // remaining edge vertices onto a circle hidden inside the well's wall.
+  const inWell = (x: number, z: number) => WELLS.some((w) => Math.hypot(x - w.x, z - w.z) < (w.rIn + w.rOut) / 2);
+  const g = grid(-IN, IN, GROUND_STEP, 0, (x, z) => hole(x, z) || inWell(x, z));
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    for (const w of WELLS) {
+      const r = (w.rIn + w.rOut) / 2, d = Math.hypot(x - w.x, z - w.z);
+      if (d < r && d > 1e-4) pos.setXYZ(i, w.x + ((x - w.x) / d) * r, 0, w.z + ((z - w.z) / d) * r);
+    }
+  }
+  b.add(g, 'ground', undefined, false, true);
   b.add(grid(-400, 400, 4, -0.04, (x, z) => Math.abs(x) < IN - 2 && Math.abs(z) < IN - 2), 'ground', undefined, false, true);
   // Walkable ground for collision: 4 m cells, lined up so the stair opening
   // (x -38..-34, z -56..-52) is exactly one 4 x 4 cell, plus 10 m cells beyond.
