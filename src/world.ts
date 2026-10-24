@@ -5,7 +5,8 @@ import { arcadeGeo, arcade, ruinGeo, ruin, column, fallenDrum, gable, leanTo, py
 import { torch, brazier, hornLantern, bracketLantern, lucerna, polykandelon, candle } from './lights';
 import { layoutTown, lotsFor, buildHouse, buildBridges, townTexture, type Town } from './town';
 import { setGroundExtra } from './displace';
-import { buildCatacombs } from './catacombs';
+import { buildCatacombs, CATACOMB_SPOTS } from './catacombs';
+import { terrain } from './displace';
 
 // A Lombard town around AD 750, packed inside what is left of a Roman circuit.
 // Houses of river cobble and reused brick stand wall to wall along crooked
@@ -60,6 +61,31 @@ export const SPAWN = new THREE.Vector3(GATE.p.x + 1.5, 3, GATE.p.y + 30);
 let town: Town;
 const mapMarks = { trees: [] as THREE.Vector2[], tombs: [] as THREE.Vector2[], aqueduct: [] as THREE.Vector2[], arch: V(0, 0) };
 
+export interface Teleport { name: string; x: number; y: number; z: number; yaw: number }
+/** Places the map can send you to. y is eye height (above ground ones are dropped in from a little higher). */
+export function getTeleports(): Teleport[] {
+  const above = (name: string, x: number, z: number, lookX: number, lookZ: number): Teleport =>
+    ({ name, x, z, y: terrain(x, z) + 2.2, yaw: Math.atan2(-(lookX - x), -(lookZ - z)) });
+  const out = GATE.p.clone().normalize();
+  const lane = town.streets[0].pts;
+  const mid = lane[Math.floor(lane.length * 0.55)];
+  const cs = CATACOMB_SPOTS;
+  return [
+    above('Porta', GATE.p.x + out.x * 9, GATE.p.y + out.y * 9, GATE.p.x, GATE.p.y),
+    above('Via Sepulcrorum', GATE.p.x + out.x * 32, GATE.p.y + out.y * 32, GATE.p.x, GATE.p.y),
+    above('Arcus', mapMarks.arch.x, mapMarks.arch.y + 4, mapMarks.arch.x, mapMarks.arch.y - 10),
+    above('Civitas', mid.x, mid.y, lane[Math.floor(lane.length * 0.55) + 1].x, lane[Math.floor(lane.length * 0.55) + 1].y),
+    above('Templum', 18.5, 21.5, 21, 6),
+    above('Atrium', -15.5, -31, -17, -45),
+    above('Basilica', -17.6, -45, -17, -62),
+    above('Bibliotheca', -12.6, -50, -7, -50),
+    above('Ossuarium', -36, -50.2, -36, -56),
+    { name: 'Catacumbae', x: cs.stairBottom.x, y: cs.stairBottom.y + 0.2, z: cs.stairBottom.z, yaw: 0 },
+    { name: 'Crypta', x: cs.crypt.x, y: cs.crypt.y + 0.2, z: cs.crypt.z, yaw: 0.9 },
+    above('Aquaeductus', 92, -66, 140, -100),
+  ];
+}
+
 /** Everything the map needs: the town raster, the wall, streets, landmarks, surroundings. */
 export function getMapData() {
   return {
@@ -76,6 +102,7 @@ export function getMapData() {
       { name: 'Arcus', x: mapMarks.arch.x, z: mapMarks.arch.y },
     ],
     trees: mapMarks.trees, tombs: mapMarks.tombs, aqueduct: mapMarks.aqueduct,
+    teleports: getTeleports(),
   };
 }
 /** The main lane, gate to abbey, as a polyline (for the monk's round). */
@@ -230,22 +257,6 @@ function well(b: Builder, x: number, z: number) {
 function monastery(b: Builder) {
   church(b);
   chapel(b);
-  // Long low range of cells and the scriptorium along the east side.
-  const pts = [V(-9.5, -63), V(-7.6, -54), V(-8.4, -45)];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i], c = pts[i + 1];
-    const mid = a.clone().add(c).multiplyScalar(0.5);
-    const L = a.distanceTo(c) + 0.6;
-    const ry = Math.atan2(c.x - a.x, c.y - a.y);
-    const h = R(4.2, 5.6);
-    b.box('rubble', 5.2, h, L, mid.x, -0.3, mid.y, ry);
-    gable(b, L, 5.2, 1.2, mid.x, h - 0.3, mid.y, ry + Math.PI / 2, 'rubble', 0.45);
-    for (let w = -L / 2 + 1; w < L / 2 - 0.5; w += R(1.8, 2.8)) {
-      const wx = mid.x - Math.cos(ry) * 2.63 + Math.sin(ry) * w, wz = mid.y + Math.sin(ry) * 2.63 + Math.cos(ry) * w;
-      b.box(rand() < 0.35 ? 'window' : 'wood', 0.4, 0.55, 0.06, wx, R(2.2, 2.8), wz, ry + Math.PI / 2, false);
-    }
-  }
-  bracketLantern(b, -10.4, 2.3, -50, -Math.PI / 2 - 0.1);
   // Graves between chapel and church: mounds, slabs, a few wooden crosses.
   for (let i = 0; i < 26; i++) {
     const x = R(-31, -24), z = R(-63, -44);

@@ -9,11 +9,12 @@ import { shared, mat, MAT, makeSurfaceMaterial, makeSky, makeMotes } from './mat
 import { makeFire } from './fire';
 import { makeBones } from './bones';
 import { NLAMP } from './shaders';
-import { buildWorld, SPAWN, regionName, mainLane } from './world';
+import { buildWorld, SPAWN, regionName, mainLane, type Teleport } from './world';
 import { terrain } from './displace';
 import { Player } from './player';
 import { Soundscape } from './audio';
 import { initMap } from './map';
+import { loadMonkAssets, createMonk } from './monk';
 import type { Lamp, Cell, PropKind } from './builder';
 
 const params = new URLSearchParams(location.search);
@@ -37,7 +38,6 @@ const t0 = performance.now();
 const { collider, cells, lamps, flames, props, townTex } = buildWorld(scene);
 shared.uTown.value = townTex;
 (window as unknown as { __camera: THREE.Camera }).__camera = camera;
-initMap();
 const bvh = new MeshBVH(collider.geometry);
 (collider.geometry as unknown as { boundsTree: MeshBVH }).boundsTree = bvh;
 const buildMs = performance.now() - t0;
@@ -112,36 +112,22 @@ function updateBones(showAbove: boolean, showUnder: boolean) {
 }
 scene.add(makeMotes());
 
-// Hooded monks carrying lanterns on fixed rounds.
-function makeMonk(path: (t: number) => THREE.Vector3, speed: number) {
-  const g = new THREE.Group();
-  const robe = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.55, 10, 1, true), mat('cloth'));
-  robe.position.y = 0.78;
-  const hood = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), mat('cloth'));
-  hood.position.y = 1.62;
-  hood.scale.set(1, 1.2, 1.1);
-  // A Roman-type horn lantern carried at the hip.
-  const box = new THREE.Group();
-  const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.22, 10, 1, true), mat('horn'));
-  const lid = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), mat('bronze'));
-  lid.position.y = 0.11;
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.025, 10), mat('bronze'));
-  base.position.y = -0.12;
-  box.add(horn, lid, base);
-  box.position.set(0.32, 0.85, 0.25);
-  for (const m of [robe, hood]) m.castShadow = true;
-  g.add(robe, hood, box);
-  scene.add(g);
+// Monks: rigged, animated bodies under cloth-simulated habits (Bullet soft
+// bodies), each carrying a horn lantern that feeds the light pool.
+await loadMonkAssets();
+function makeMonk(path: (t: number) => THREE.Vector3, rate: number) {
+  const monk = createMonk(scene);
   const lamp: Lamp = { pos: new THREE.Vector3(), color: new THREE.Color(1, 0.5, 0.18), intensity: 0.5, under: false, seed: Math.random() * 50 };
   lamps.push(lamp);
   let t = Math.random() * 100;
+  const prev = path(t);
   return (dt: number) => {
-    t += dt * speed;
+    t += dt * rate;
     const p = path(t), q = path(t + 0.05);
-    g.position.copy(p);
-    g.position.y += Math.abs(Math.sin(t * 9)) * 0.03;
-    g.rotation.y = Math.atan2(q.x - p.x, q.z - p.z);
-    box.getWorldPosition(lamp.pos);
+    const speed = dt > 0 ? p.distanceTo(prev) / dt : 0;
+    prev.copy(p);
+    monk.update(dt, p, Math.atan2(q.x - p.x, q.z - p.z), Math.min(speed, 2));
+    lamp.pos.copy(monk.lanternWorldPos);
   };
 }
 // One monk walks the lane between the gate and the abbey, back and forth;
@@ -169,6 +155,13 @@ const atrium = (t: number) => {
 const monks = [makeMonk(onLane, 1), makeMonk(atrium, 1)];
 
 const player = new Player(collider, SPAWN, camera, renderer.domElement);
+(window as unknown as { __teleport: (t: Teleport) => void }).__teleport = (t) => {
+  player.pos.set(t.x, t.y, t.z);
+  player.vel.set(0, 0, 0);
+  player.yaw = t.yaw;
+  player.pitch = 0;
+};
+initMap();
 let audio: Soundscape | null = null;
 player.onStep = (run) => audio?.step(run, player.pos.y < -2);
 
@@ -230,9 +223,14 @@ renderer.domElement.addEventListener('click', () => {
 document.addEventListener('pointerlockchange', () => {
   if (!document.pointerLockElement && !params.has('shot')) overlay.classList.remove('hidden');
 });
+const lanternBtn = document.getElementById('lanternbtn')!;
+const setLantern = (v: boolean) => { lanternOn = v; lanternBtn.classList.toggle('on', v); lanternBtn.setAttribute('aria-pressed', String(v)); };
 addEventListener('keydown', (e) => {
-  if (e.code === 'KeyF') lanternOn = !lanternOn;
+  if (e.code === 'KeyF') setLantern(!lanternOn);
 });
+lanternBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+lanternBtn.addEventListener('click', (e) => { e.stopPropagation(); setLantern(!lanternOn); });
+if (matchMedia('(pointer: coarse)').matches) hintEl.textContent = 'It is dark. Tap the lantern to light it.';
 let region = '';
 let regionTimer = 0;
 
@@ -244,7 +242,7 @@ if (params.has('shot')) {
   const [x, y, z, yaw, pitch] = params.get('shot')!.split(',').map(Number);
   player.pos.set(x, y, z); player.yaw = yaw; player.pitch = pitch ?? 0;
   overlay.classList.add('hidden');
-  if (params.has('lantern')) lanternOn = true;
+  if (params.has('lantern')) setLantern(true);
 }
 
 // ---- Culling ----------------------------------------------------------------

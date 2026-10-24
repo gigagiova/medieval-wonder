@@ -28,11 +28,23 @@
 <div id="overlay">
   <h1>Abbatia Nebularum</h1>
   <p>Anno Domini DCCXXVII, in the kingdom of the Lombards. The fog has not lifted in forty days. Inside the old Roman walls the abbey keeps its silence, and beneath it, its dead.</p>
-  <p class="keys">WASD or the stick to walk · Shift to hasten · Mouse to look · F for your lantern · Gamepad works too</p>
+  <p class="keys">WASD or the stick to walk · Shift to hasten · Mouse to look · F or the lantern button for light · Gamepad works too</p>
   <p class="enter">The fog gathers…</p>
 </div>
 <div id="region"></div>
 <div id="hint">It is dark. Press F to light your lantern.</div>
+<style>
+  /* Lantern toggle: bottom-left, away from the stick (bottom-right). */
+  #lanternbtn { position: fixed; z-index: 5; left: max(20px, calc(env(safe-area-inset-left, 0px) + 16px)); bottom: max(24px, calc(env(safe-area-inset-bottom, 0px) + 18px));
+    width: 64px; height: 64px; border-radius: 50%; padding: 0; cursor: pointer; touch-action: manipulation;
+    background: radial-gradient(circle at 38% 32%, rgba(60,42,22,0.88), rgba(14,10,6,0.88)); border: 2px solid rgba(201,154,86,0.8);
+    box-shadow: 0 0 14px rgba(0,0,0,0.6); color: #d9b878; opacity: 0.85; transition: box-shadow 0.4s, background 0.4s; }
+  #lanternbtn svg { width: 34px; height: 34px; display: block; margin: auto; }
+  #lanternbtn.on { background: radial-gradient(circle at 50% 55%, #ffd58a 0%, #c9802e 40%, #4a3018 100%); color: #2a1606; box-shadow: 0 0 22px rgba(255,170,80,0.65); }
+  #lanternbtn:focus-visible { outline: 2px solid #e8c88a; outline-offset: 3px; }
+  body.locked:not(.touch) #lanternbtn { opacity: 0; pointer-events: none; }
+</style>
+<button id="lanternbtn" type="button" aria-pressed="false" aria-label="Lantern" title="Lantern (F)"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5a3 3 0 0 1 6 0"/><path d="M10.5 10.5c0-2 2.5-3.5 5.5-3.5s5.5 1.5 5.5 3.5"/><rect x="10.5" y="10.5" width="11" height="13" rx="1.5"/><path d="M13 10.5v13M19 10.5v13"/><path d="M16 15.5c-1.2 1.5-1.2 3 0 4.2 1.2-1.2 1.2-2.7 0-4.2z" fill="currentColor"/><path d="M9.5 25.5h13"/></svg></button>
 <style>
   canvas { touch-action: none; }
   /* Movement stick: bottom-right, clear of the safe-area insets in both orientations. */

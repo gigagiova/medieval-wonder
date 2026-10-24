@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getMapData } from './world';
+import { getMapData, type Teleport } from './world';
 
 // A hand-drawn map of the town and its surroundings, in the manner of a
 // monastic scribe: aged parchment, sepia ink with a trembling hand,
@@ -45,7 +45,75 @@ export function initMap(): void {
     else if (e.code === 'Escape' && open) setOpen(false);
   });
   addEventListener('resize', () => { if (open) layout(); });
-  if (matchMedia('(pointer: coarse)').matches) ov.querySelector('.hint')!.textContent = 'Tap outside the map to close';
+  if (matchMedia('(pointer: coarse)').matches) ov.querySelector('.hint')!.textContent = 'Tap a gilded mark to travel there · tap outside to close';
+  else ov.querySelector('.hint')!.textContent = 'Click a gilded mark to travel there · M or Esc to close';
+  // Travel: a tap on (or near) a gilded mark sends you there.
+  const sheet = cv.parentElement!;
+  sheet.addEventListener('pointermove', (e) => { hover = pickMark(e); sheet.style.cursor = hover ? 'pointer' : ''; });
+  sheet.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const t = pickMark(e);
+    if (!t) return;
+    const tp = (window as unknown as { __teleport?: (t: Teleport) => void }).__teleport;
+    if (tp) { tp(t); setOpen(false); }
+  });
+}
+
+let hover: Teleport | null = null;
+function markXY(t: Teleport, S: number): [number, number] {
+  const k = S / (HALF * 2);
+  return [(t.x - (CX - HALF)) * k, (t.z - (CZ - HALF)) * k];
+}
+function pickMark(e: MouseEvent): Teleport | null {
+  if (!data) return null;
+  const r = me.getBoundingClientRect();
+  const px = ((e.clientX - r.left) / r.width) * me.width, py = ((e.clientY - r.top) / r.height) * me.height;
+  let best: Teleport | null = null, bd = (me.width * 0.035) ** 2;
+  for (const t of data.teleports) {
+    const [x, y] = markXY(t, me.width);
+    const d = (x - px) ** 2 + (y - py) ** 2;
+    if (d < bd) { bd = d; best = t; }
+  }
+  return best;
+}
+
+/** Gilded travel marks: a little gold roundel with a cross, and the place name. */
+function drawMarks(ctx: CanvasRenderingContext2D, S: number, t: number) {
+  if (!data) return;
+  const r = S * 0.011;
+  for (const m of data.teleports) {
+    const [x, y] = markXY(m, S);
+    const h = hover === m;
+    const glint = 0.5 + 0.5 * Math.sin(t * 2 + x * 0.05);
+    ctx.save();
+    ctx.translate(x, y);
+    const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r * (h ? 1.5 : 1.15));
+    g.addColorStop(0, '#fff3c4');
+    g.addColorStop(0.45, '#d9a93e');
+    g.addColorStop(1, '#7a5418');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = Math.max(1, S * 0.0016);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * (h ? 1.45 : 1.1), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(80,40,10,${0.7 + glint * 0.3})`;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.55, 0); ctx.lineTo(r * 0.55, 0);
+    ctx.moveTo(0, -r * 0.55); ctx.lineTo(0, r * 0.55);
+    ctx.stroke();
+    if (h || matchMedia('(pointer: coarse)').matches) {
+      ctx.font = `italic ${Math.max(10, S * 0.016)}px 'IM Fell English', Georgia, serif`;
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(236,222,190,0.85)';
+      ctx.strokeText(m.name, 0, -r * 1.9);
+      ctx.fillStyle = h ? RED : INK;
+      ctx.fillText(m.name, 0, -r * 1.9);
+    }
+    ctx.restore();
+  }
 }
 
 function toggle() { setOpen(!open); }
@@ -786,6 +854,7 @@ function drawMarker() {
   const ctx = me.getContext('2d')!;
   const S = me.width;
   ctx.clearRect(0, 0, S, S);
+  drawMarks(ctx, S, performance.now() / 1000);
   const cam = (window as unknown as { __camera?: THREE.Camera }).__camera;
   if (!cam) return;
   const k = S / (HALF * 2);
