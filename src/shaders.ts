@@ -86,12 +86,16 @@ uniform sampler2D uTown; // R main lane, G street, B gutter, A terrain height
 vec4 townAt(vec2 xz){ return texture2D(uTown, (xz + 100.)/200.); }
 float groundY(vec3 p){ return p.y < -2.5 ? -7.0 : townAt(p.xz).a*4. - 1.5; }
 
-// Porous surfaces reflect almost nothing: keep a little of the specular.
+// Porous stone, brick, lime, timber and earth scatter light; they do not
+// mirror the sky. A grazing sky reflection on them is exactly what reads as
+// plastic, so keep only a trace of specular (metals and glazes keep theirs).
 #if MAT == 7 || MAT == 8 || MAT == 16 || MAT == 18 || MAT == 15
   #define SPEC_K 1.0
 #else
-  #define SPEC_K 0.35
+  #define SPEC_K 0.1
 #endif
+// Scanned roughness maps run as low as ~0.5; dry porous surfaces never are.
+#define POROUS(r) mix(0.86, 1.0, clamp(r, 0.0, 1.0))
 
 #ifdef TILE
 uniform sampler2D tA; uniform sampler2D tN; uniform sampler2D tM;
@@ -142,6 +146,11 @@ Smp sampleSet(sampler2D A, sampler2D Nm, sampler2D M, vec2 uv){
 // curved surfaces, a third cheaper than triplanar. Normals are reoriented
 // per projection (UDN) and summed onto the geometric normal.
 Smp biplanar(vec3 p, vec3 n){
+  // Hand-laid courses are never ruled lines: wave the lookup a few cm over a
+  // metre or two, so brick and stone rows rise, dip and drift.
+  vec2 wv = texture2D(uNoise, vec2(p.x + p.z, p.y) * 0.045).rg - 0.5;
+  vec2 wv2 = texture2D(uNoise, p.xz * 0.06 + p.y * 0.02).ba - 0.5;
+  p += vec3(wv.x, wv.y * 0.6, wv2.x) * 0.09 + vec3(wv2.y, 0.0, wv.x) * 0.03;
   vec3 an = abs(n);
   // major axis
   ivec3 ma = (an.x > an.y && an.x > an.z) ? ivec3(0,1,2) : (an.y > an.z) ? ivec3(1,2,0) : ivec3(2,0,1);
@@ -202,7 +211,7 @@ Surf surface(vec3 p, vec3 n){
   Smp t = biplanar(p, n);
   s.alb = t.a * ALB_K;
   s.ao = t.m.r;
-  s.rough = clamp(t.m.g * ROUGH_K, 0.0, 1.0);
+  s.rough = POROUS(t.m.g * ROUGH_K);
   s.nrm = normalize(n + t.n * NRM_K);
   #ifdef TINT
   s.alb = tintTex(s.alb, TINT, 1.0);
@@ -215,7 +224,7 @@ Surf surface(vec3 p, vec3 n){
   Smp t = sampleSet(tA, tN, tM, vec2(dot(p, A), dot(p, B)) / TILE);
   s.alb = t.a * ALB_K;
   s.ao = t.m.r;
-  s.rough = clamp(t.m.g * ROUGH_K, 0.0, 1.0);
+  s.rough = POROUS(t.m.g * ROUGH_K);
   s.nrm = normalize(n + (t.n.x*A + t.n.y*B) * NRM_K);
   weather(s, p, n, MOSS);
 #elif MAT == 1
@@ -257,7 +266,7 @@ Surf surface(vec3 p, vec3 n){
   a /= wsum; nn /= wsum; m /= wsum;
   s.alb = a * 0.85;
   s.ao = m.r;
-  s.rough = m.g;
+  s.rough = POROUS(m.g);
   s.nrm = normalize(n + vec3(nn.x, 0.0, nn.y) * 1.0);
   // Standing water: in the gutters and the low spots of the mud. Dull, not mirrors.
   float wet = clamp(tw.b * street + mud * smoothstep(0.62, 0.7, nz.g) * smoothstep(0.35, 0.15, m.b), 0.0, 1.0) * (1.0 - under);

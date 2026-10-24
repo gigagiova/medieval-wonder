@@ -20,7 +20,9 @@ const v3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const _a = v3(), _b = v3(), _n = v3(), _c = v3();
 
 /** Edge wear per material (metres): dressed stone more, brick a little, timber none. */
-const BEVEL: Partial<Record<MatName, number>> = { block: 0.035, stone: 0.035, bigstone: 0.045, marble: 0.03, rubble: 0.04, slab: 0.025, brick: 0.02, plaster: 0.04, wood: 0.008 };
+/** Corner jitter per material (metres, capped at 9% of the block's smallest edge). */
+const IRREG: Partial<Record<MatName, number>> = { block: 0.03, stone: 0.03, bigstone: 0.045, rubble: 0.045, marble: 0.02, slab: 0.025, brick: 0.012, plaster: 0.03, roof: 0.01 };
+const BEVEL: Partial<Record<MatName, number>> = { block: 0.035, stone: 0.035, bigstone: 0.045, marble: 0.03, rubble: 0.04, slab: 0.025, brick: 0.02, plaster: 0.04 };
 
 /** Numeric key for a position on a 4 mm lattice (±250 m). */
 const key = (x: number, y: number, z: number) =>
@@ -61,6 +63,15 @@ export class Acc {
    * knife-sharp arris, and the bevels catch the light the way real ones do.
    */
   hexa(m: MatName, c: V3[]) {
+    // Nothing hand-made is square: nudge every corner of a block a little
+    // (more for rough stone, less for brick), so edges are never ruled lines.
+    const irr = IRREG[m] ?? 0;
+    if (irr > 0) {
+      let minEdge = Infinity;
+      for (let i = 0; i < 4; i++) minEdge = Math.min(minEdge, c[i].distanceTo(c[(i + 1) % 4]), c[i].distanceTo(c[i + 4]));
+      const j = Math.min(irr, minEdge * 0.09);
+      c = c.map((p) => p.clone().add(v3(R(-j, j), R(-j, j), R(-j, j))));
+    }
     const ctr = v3();
     for (const p of c) ctr.add(p);
     ctr.multiplyScalar(1 / 8);
@@ -166,15 +177,19 @@ export function voussoirs(acc: Acc, m: MatName, f: Frame, cu: number, cv: number
   const span = (a1 - a0) * (r0 + r1) / 2;
   const n = Math.max(5, Math.round(span / blk) | 1);
   const gap = 0.012 / ((r0 + r1) / 2);
+  const archSag = R(0.02, 0.06), archLean = R(-0.02, 0.02);
   for (let i = 0; i < n; i++) {
     const t0 = a0 + ((a1 - a0) * i) / n + gap, t1 = a0 + ((a1 - a0) * (i + 1)) / n - gap;
     const key = i === (n >> 1);
-    const ro = r1 + (key ? 0.06 : 0) + R(-0.035, 0.035);
-    const pr = R(0.025, 0.05);
+    const ro = r1 + (key ? 0.07 : 0) + R(-0.07, 0.06);
+    const pr = R(0.02, 0.06);
+    // Centuries of settling: the crown has dropped a little and the arch leans.
+    const sag = (a: number) => 1 - archSag * Math.sin(a) ** 4 + archLean * Math.cos(a);
+    const ri0 = r0 + R(-0.025, 0.025), ri1 = r0 + R(-0.025, 0.025);
     const c: V3[] = [];
-    for (const w of [w0 - 0.01, w1 + pr]) {
-      for (const [a, r] of [[t0, r0], [t1, r0], [t1, ro], [t0, ro]] as const) {
-        c.push(f.p(cu + Math.cos(a) * r, cv + Math.sin(a) * r, w));
+    for (const w of [w0 - 0.01 + R(-0.01, 0.01), w1 + pr]) {
+      for (const [a, r] of [[t0, ri0], [t1, ri1], [t1, ro], [t0, ro + R(-0.03, 0.03)]] as const) {
+        c.push(f.p(cu + Math.cos(a) * r * sag(a), cv + Math.sin(a) * r * sag(a), w));
       }
     }
     acc.hexa(m, [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]);
@@ -183,15 +198,33 @@ export function voussoirs(acc: Acc, m: MatName, f: Frame, cu: number, cv: number
 
 /** Planks side by side in a frame, from u0 to u1, height given per plank (arched tops allowed). */
 export function planks(acc: Acc, m: MatName, f: Frame, u0: number, u1: number, v0: number, top: (u: number) => number, w: number, th = 0.05, pw = 0.16) {
-  const n = Math.max(2, Math.round((u1 - u0) / pw));
-  const step = (u1 - u0) / n;
-  for (let i = 0; i < n; i++) {
-    const a = u0 + i * step + 0.006, b = u0 + (i + 1) * step - 0.006;
-    const ta = top(a) + R(-0.015, 0.01), tb = top(b) + R(-0.015, 0.01);
-    const sink = R(-0.008, 0.008);
-    const c = [f.p(a, v0, w - th + sink), f.p(b, v0, w - th + sink), f.p(b, v0, w + sink), f.p(a, v0, w + sink),
-      f.p(a, ta, w - th + sink), f.p(b, tb, w - th + sink), f.p(b, tb, w + sink), f.p(a, ta, w + sink)];
-    acc.hexa(m, c);
+  // Boards of uneven width, each bowed and slightly twisted along its length,
+  // with gaps that open and close and ends that are never quite square.
+  const widths: number[] = [];
+  let tot = 0;
+  while (tot < u1 - u0 - 0.04) { const pwi = pw * R(0.7, 1.35); widths.push(pwi); tot += pwi; }
+  const k = (u1 - u0) / tot;
+  let u = u0;
+  for (const wd of widths) {
+    const a = u + R(0.003, 0.012), b = u + wd * k - R(0.003, 0.012);
+    u += wd * k;
+    const ta = top(a) + R(-0.03, 0.015), tb = top(b) + R(-0.03, 0.015);
+    const bow = R(-0.012, 0.012), twist = R(-0.01, 0.01), lean = R(-0.008, 0.008);
+    const segs = Math.max(2, Math.round(((ta + tb) / 2 - v0) / 0.45));
+    for (let sI = 0; sI < segs; sI++) {
+      const t0 = sI / segs, t1 = (sI + 1) / segs;
+      const off = (t: number) => bow * Math.sin(Math.PI * t);
+      const tw = (t: number) => twist * (t - 0.5);
+      const ya = (t: number) => v0 + (ta - v0) * t, yb = (t: number) => v0 + (tb - v0) * t;
+      const sh = (t: number) => lean * t;
+      const c = [
+        f.p(a + sh(t0), ya(t0), w - th + off(t0) - tw(t0)), f.p(b + sh(t0), yb(t0), w - th + off(t0) + tw(t0)),
+        f.p(b + sh(t0), yb(t0), w + off(t0) + tw(t0)), f.p(a + sh(t0), ya(t0), w + off(t0) - tw(t0)),
+        f.p(a + sh(t1), ya(t1), w - th + off(t1) - tw(t1)), f.p(b + sh(t1), yb(t1), w - th + off(t1) + tw(t1)),
+        f.p(b + sh(t1), yb(t1), w + off(t1) + tw(t1)), f.p(a + sh(t1), ya(t1), w + off(t1) - tw(t1)),
+      ];
+      acc.hexa(m, c);
+    }
   }
 }
 

@@ -135,7 +135,7 @@ export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
       )
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         reflectedLight.directSpecular *= SPEC_K;
-        reflectedLight.indirectSpecular *= SPEC_K;`)
+        reflectedLight.indirectSpecular *= SPEC_K * S.ao;`)
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = applyAtmos(gl_FragColor.rgb, vWPos);');
   };
   return m;
