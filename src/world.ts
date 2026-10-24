@@ -9,6 +9,7 @@ import { buildCatacombs, CATACOMB_SPOTS } from './catacombs';
 import { buildForest, treeSpots } from './forest';
 import { buildBaths, BATHS_SPOT } from './baths';
 import { buildPalace, PALACE_SPOT } from './palace';
+import { buildLibrary } from './library';
 import { terrain } from './displace';
 
 // A Lombard town around AD 750, packed inside what is left of a Roman circuit.
@@ -139,6 +140,7 @@ export function buildWorld(scene: THREE.Scene) {
   buildCatacombs(b);
   buildBaths(b, scene);
   buildPalace(b, scene);
+  buildLibrary(b, scene);
   outskirts(b);
   // The wood: dense, old and dead, right up to a cleared strip along the wall.
   const insideWall = (x: number, z: number) => {
@@ -343,7 +345,11 @@ function church(b: Builder) {
   b.box('brick', 0.7, H - 6.1, L, x1, 6.1, cz);
   for (let i = 0; i < n; i++) b.box('iron', 0.8, 1.2, 0.9, x1, 7.4, z0 + bay * (i + 0.5) + R(-0.4, 0.4), 0, false);
   const ax1 = -9.8;
-  b.box('rubble', 0.8, 5.6, L - 3, ax1, -0.3, cz - 1.5, -0.01);
+  // Aisle wall, with a doorway through to the library (z -51.3 .. -48.7).
+  const az0w = cz - 1.5 - (L - 3) / 2, az1w = cz - 1.5 + (L - 3) / 2;
+  b.box('rubble', 0.8, 5.6, -51.3 - az0w, ax1, -0.3, (az0w - 51.3) / 2, -0.01);
+  b.box('rubble', 0.8, 5.6, az1w + 48.7, ax1, -0.3, (az1w - 48.7) / 2, -0.01);
+  b.geo('brick', arcadeGeo(2.6, 5.6, 0.85, 1, 1.5, 2.1), ax1, -0.3, -50, Math.PI / 2);
   leanTo(b, L - 2, 3.8, 6.5, 5.2, (x1 + ax1) / 2, cz - 1, Math.PI / 2);
   gable(b, L + 0.4, x1 - x0 + 1.2, 1.9, cx, H - 0.3, cz, Math.PI / 2, 'brick', 0.6);
   // Façade (south): portal off-centre, a small window, an older doorway bricked up.

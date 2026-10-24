@@ -14,6 +14,8 @@ import { terrain } from './displace';
 import { Player } from './player';
 import { Soundscape } from './audio';
 import { initMap } from './map';
+import { updateLibrary, pushOutOfSecretDoor } from './library';
+import { isReading } from './codex';
 import { loadMonkAssets, createMonk } from './monk';
 import type { Lamp, Cell, PropKind } from './builder';
 
@@ -320,7 +322,9 @@ function frame() {
   fps += (1 / Math.max(dt, 1e-3) - fps) * 0.05;
   renderer.info.reset();
 
-  player.update(dt);
+  if (!isReading()) player.update(dt);
+  pushOutOfSecretDoor(player.pos);
+  updateLibrary(camera);
   for (const m of monks) m(dt);
 
   const camY = camera.position.y;

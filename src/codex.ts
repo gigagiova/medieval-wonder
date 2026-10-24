@@ -542,7 +542,8 @@ export function drawPage(ctx: CanvasRenderingContext2D, x: number, y: number, w:
     ctx.fillText(line, bx, ly);
   }
   if (page.initial) {
-    const size = f.pitch * w * 5.2;
+    // Greek capitals are wider than the uncial I: size the initial to its box.
+    const size = f.pitch * w * (page.font.includes('Cardo') ? 3.6 : 5.2);
     const key = page.initial + Math.round(size);
     let img = initialCache.get(key + page.font);
     if (!img) { img = initial(page.initial, size, page.font); initialCache.set(key + page.font, img); }
@@ -700,7 +701,7 @@ function render() {
     ctx.shadowBlur = 0;
     drawPage(ctx, x, y, pw, pages, first, cols, true, current.seed);
     drawPage(ctx, x + pw, y, pw, pages, first + 1, cols, false, current.seed);
-    ui.label.textContent = `${current.text.rubric.replace(/^Incipit /, '')} · f. ${toRoman(k + 1)}v–${toRoman(k + 2)}r`;
+    ui.label.textContent = `${current.text.rubric.replace(/^Incipit /, '')} · ${k === 0 && o ? 'f. ir' : `f. ${toRoman(k + (o ? 0 : 1))}v–${toRoman(k + (o ? 1 : 2))}r`}`;
   } else {
     const x = (innerWidth - pw) / 2;
     ctx.fillStyle = '#3a2414';
