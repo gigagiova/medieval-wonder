@@ -77,62 +77,265 @@ export function makeLantern() {
 
 // ------------------------------------------------------------------ headgear
 
-/** A felt cap (pileus), rounded and a little slouched. */
-export function makeCap(Ms: Measure, color: THREE.Color) {
-  const h = Ms.head, rx = h.rx + 0.014, rz = h.rz + 0.016, ht = h.top - h.brow + 0.03;
-  const pts: [number, number][] = [];
-  for (let i = 0; i <= 10; i++) { const t = (i / 10) * Math.PI / 2; pts.push([Math.cos(t) * 1.0 + (i === 0 ? 0.04 : 0), Math.sin(t) * 1.0]); }
-  pts.unshift([0.98, -0.06]);
-  const g = lathe(pts.reverse().map(([r, y]) => [r, y]) as [number, number][], 18);
-  g.scale(rx, ht, rz);
-  wobble(g, 0.04, 14, color.r * 9);
-  const mat = matte(color, 1, 0, { side: THREE.DoubleSide });
-  const mesh = new THREE.Mesh(g, mat);
-  mesh.rotation.x = -0.12; // worn tipped back a little
-  const o = new THREE.Group();
-  o.add(mesh);
-  return { obj: o, place: placeAt(new THREE.Vector3(h.c.x, h.brow - 0.005, h.c.z - 0.005)) };
+/** A tiling normal map from a height function on the unit square. */
+function normalTex(size: number, height: (x: number, y: number) => number, k: number) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d')!, h = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) h[y * size + x] = height(x / size, y / size);
+  const img = g.createImageData(size, size), n = new THREE.Vector3();
+  const H = (x: number, y: number) => h[((y + size) % size) * size + ((x + size) % size)];
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    n.set(-(H(x + 1, y) - H(x - 1, y)) * k, -(H(x, y + 1) - H(x, y - 1)) * k, 1).normalize();
+    const o = (y * size + x) * 4;
+    img.data[o] = (n.x * 0.5 + 0.5) * 255; img.data[o + 1] = (n.y * 0.5 + 0.5) * 255; img.data[o + 2] = (n.z * 0.5 + 0.5) * 255; img.data[o + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+/** Smooth value noise on a torus of period p (for tiling textures). */
+function tileNoise(p: number, seed: number) {
+  const r = (i: number, j: number) => { const v = Math.sin(((i % p + p) % p) * 127.1 + ((j % p + p) % p) * 311.7 + seed * 74.7) * 43758.5453; return v - Math.floor(v); };
+  return (x: number, y: number) => {
+    const X = x * p, Y = y * p, i = Math.floor(X), j = Math.floor(Y), fx = X - i, fy = Y - j;
+    const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+    return (r(i, j) * (1 - u) + r(i + 1, j) * u) * (1 - v) + (r(i, j + 1) * (1 - u) + r(i + 1, j + 1) * u) * v;
+  };
+}
+
+let HM: ReturnType<typeof makeHeadMats> | null = null;
+function makeHeadMats() {
+  // Forged iron: hammer-dimpled, darkened, with rust blooming in patches.
+  const n1 = tileNoise(6, 1), n2 = tileNoise(22, 2), n3 = tileNoise(48, 3);
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!, img = g.createImageData(128, 128);
+  for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+    const u = x / 128, v = y / 128;
+    const rust = THREE.MathUtils.smoothstep(n1(u, v) * 0.6 + n2(u, v) * 0.4, 0.55, 0.8);
+    const grime = 0.85 + n3(u, v) * 0.15;
+    const o = (y * 128 + x) * 4;
+    img.data[o] = (0.62 * (1 - rust) + 0.55 * rust) * grime * 255;
+    img.data[o + 1] = (0.6 * (1 - rust) + 0.32 * rust) * grime * 255;
+    img.data[o + 2] = (0.58 * (1 - rust) + 0.18 * rust) * grime * 255;
+    img.data[o + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const rust = new THREE.CanvasTexture(c);
+  rust.wrapS = rust.wrapT = THREE.RepeatWrapping;
+  rust.colorSpace = THREE.SRGBColorSpace;
+  const hammer = normalTex(128, (x, y) => tileNoise(14, 5)(x, y) + tileNoise(40, 6)(x, y) * 0.3, 2.5);
+  // Riveted mail: rows of small rings, each row offset by half a ring.
+  const mail = normalTex(128, (x, y) => {
+    const R = 16, row = Math.floor(y * R), cy = (row + 0.5) / R, cx = (Math.round(x * R - (row % 2) * 0.5) + (row % 2) * 0.5) / R;
+    const d = Math.hypot(x - cx, (y - cy) * 1.2) * R;
+    return Math.exp(-Math.pow((d - 0.36) / 0.13, 2));
+  }, 3);
+  // Felt: matted, fibrous, no weave at all.
+  const fluff = tileNoise(40, 7), fuzz = tileNoise(110, 8);
+  const felt = normalTex(256, (x, y) => fluff(x, y) * 0.6 + fuzz(x, y) * 0.4, 1.6);
+  const D = { side: THREE.DoubleSide };
+  return {
+    iron: withAtmos(new THREE.MeshStandardMaterial({ color: 0x8a8580, map: rust, roughness: 0.5, metalness: 0.45, normalMap: hammer, normalScale: new THREE.Vector2(0.35, 0.35), ...D })),
+    bronze: withAtmos(new THREE.MeshStandardMaterial({ color: 0x86683c, roughness: 0.45, metalness: 0.5, normalMap: hammer, normalScale: new THREE.Vector2(0.15, 0.15), ...D })),
+    mail: withAtmos(new THREE.MeshStandardMaterial({ color: 0x4e4b47, roughness: 0.55, metalness: 0.5, normalMap: mail, normalScale: new THREE.Vector2(1.2, 1.2), ...D })),
+    lace: matte(0x2e1e12, 0.85, 0, D),
+    felt: (color: THREE.Color) => withAtmos(new THREE.MeshPhysicalMaterial({
+      color, roughness: 1, metalness: 0, sheen: 1, sheenRoughness: 0.9, sheenColor: color.clone().lerp(new THREE.Color(0xc8b89a), 0.2),
+      normalMap: felt, normalScale: new THREE.Vector2(0.55, 0.55), ...D,
+    })),
+  };
+}
+const headMats = () => (HM ??= makeHeadMats());
+
+/** A grid surface p(i/rows, j/cols) with uvs; columns may wrap. */
+function surface(rows: number, cols: number, p: (t: number, s: number) => THREE.Vector3, uvScale = [1, 1]) {
+  const pos: number[] = [], uv: number[] = [], ix: number[] = [];
+  for (let i = 0; i <= rows; i++) for (let j = 0; j <= cols; j++) {
+    const v = p(i / rows, j / cols);
+    pos.push(v.x, v.y, v.z);
+    uv.push((j / cols) * uvScale[0], (i / rows) * uvScale[1]);
+  }
+  for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) {
+    const a = i * (cols + 1) + j, b = a + 1, c = a + cols + 1, d = c + 1;
+    ix.push(a, b, c, b, d, c);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(ix);
+  g.computeVertexNormals();
+  return g;
 }
 
 /**
- * A Spangenhelm: an iron cone of segments riveted to copper-alloy bands, a
- * brow band and a small finial; cheek pieces hang at the sides.
+ * The shell of something worn on the head, in the frame of its base (y up
+ * from y0): it clears the skull's ellipsoid by `margin` everywhere and rises
+ * to a point of the given sharpness (0 = round).
  */
-export function makeHelmet(Ms: Measure) {
-  const m = propMats();
-  const h = Ms.head, rx = h.rx + 0.02, rz = h.rz + 0.022, ht = h.top - h.brow + 0.06;
-  const prof: [number, number][] = [];
-  for (let i = 0; i <= 12; i++) {
-    const t = i / 12;
-    // A slightly pointed ogive.
-    prof.push([Math.pow(1 - t, 0.7) * (1 - 0.15 * t), t]);
-  }
-  const dome = lathe(prof.reverse(), 24);
-  dome.scale(rx, ht, rz);
-  const bands: THREE.BufferGeometry[] = [];
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
-    const pts: THREE.Vector3[] = [];
-    for (let i = 0; i <= 8; i++) {
-      const t = (i / 8) * 0.96;
-      const r = Math.pow(1 - t, 0.7) * (1 - 0.15 * t);
-      pts.push(new THREE.Vector3(Math.sin(a) * r * rx * 1.04 + 0.0, t * ht + 0.004, Math.cos(a) * r * rz * 1.04));
-    }
-    const tube = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 10, 0.0085, 4, false);
-    bands.push(tube);
-  }
-  bands.push(lathe([[rx * 1.05, -0.004], [rx * 1.07, 0.012], [rx * 1.06, 0.034], [rx * 1.03, 0.04]], 24).scale(1, 1, rz / rx));
-  bands.push(at(new THREE.SphereGeometry(0.012, 8, 6), 0, ht + 0.006, 0));
-  const cheeks: THREE.BufferGeometry[] = [];
-  for (const sx of [1, -1]) {
-    const c = new THREE.BoxGeometry(0.008, 0.085, 0.06, 1, 4, 3);
-    const p = c.attributes.position;
-    for (let i = 0; i < p.count; i++) p.setX(i, p.getX(i) - Math.pow(p.getY(i) / 0.045, 2) * 0.012 * sx);
-    cheeks.push(at(c, sx * (rx * 0.98), -0.045, rz * 0.25, 0, 0, sx * 0.08));
-  }
+function headShell(h: Measure['head'], y0: number, H: number, margin: number, point: number) {
+  const ry = h.top - h.c.y + margin * 0.6;
+  const k = 0.02;
+  const smax = (a: number, b: number) => (a + b + Math.sqrt((a - b) * (a - b) + k * k)) / 2;
+  const f = (t: number) => {
+    const e = (y0 + t * H - h.c.y) / ry;
+    return e <= 0 ? 1 : Math.sqrt(Math.max(0, 1 - e * e));
+  };
+  const ax = (t: number) => (t >= 1 ? 0 : smax(h.rx * f(t) + margin * (1 - t * t), (h.rx + margin) * Math.pow(1 - t, 1 - point * 0.35) * point));
+  const az = (t: number) => (t >= 1 ? 0 : smax(h.rz * f(t) + margin * (1 - t * t), (h.rz + margin) * Math.pow(1 - t, 1 - point * 0.35) * point));
+  const at = (t: number, a: number, off = 0) => new THREE.Vector3(Math.sin(a) * (ax(t) + off), t * H, Math.cos(a) * (az(t) + off));
+  return { ax, az, at, H };
+}
+
+/**
+ * A felt cap, the pileus pannonicus: a soft, flat-topped pillbox of matted
+ * wool, its sides a little uneven and its crown sagging.
+ */
+export function makeCap(Ms: Measure, color: THREE.Color) {
+  const h = Ms.head;
+  const y0 = h.brow + 0.008, H = h.top - y0 + 0.016;
+  const ax0 = h.rx + 0.004, az0 = h.rz + 0.01;
+  const seed = color.r * 31 + color.g * 7;
+  // Profile: radius (fraction of the band) against height (fraction of H).
+  const prof: [number, number][] = [[1.0, -0.02], [1.012, 0.25], [1.01, 0.55], [0.995, 0.78], [0.965, 0.9], [0.9, 0.965], [0.78, 0.995], [0.55, 1.0], [0.28, 1.0], [0.0, 0.995]];
+  const L = [0];
+  for (let i = 1; i < prof.length; i++) L.push(L[i - 1] + Math.hypot((prof[i][0] - prof[i - 1][0]) * ax0, (prof[i][1] - prof[i - 1][1]) * H));
+  const along = (u: number) => {
+    const d = u * L[L.length - 1];
+    let i = 1;
+    while (i < L.length - 1 && L[i] < d) i++;
+    const f = (d - L[i - 1]) / (L[i] - L[i - 1]);
+    return [prof[i - 1][0] + (prof[i][0] - prof[i - 1][0]) * f, prof[i - 1][1] + (prof[i][1] - prof[i - 1][1]) * f];
+  };
+  const g = surface(22, 48, (u, s) => {
+    const a = s * Math.PI * 2, [k, y] = along(u);
+    // Felt is never true: soft dents in the sides, the crown sunk off-centre.
+    const dent = 1 + Math.sin(a * 3 + seed) * 0.012 * k + Math.sin(a * 5 + seed * 2) * 0.006 * k;
+    const sag = -Math.max(0, 1 - k) * 0.01 * (1 + 0.5 * Math.sin(a + seed));
+    return new THREE.Vector3(Math.sin(a) * ax0 * k * dent, (y * H) + sag * (y > 0.9 ? 1 : 0), Math.cos(a) * az0 * k * dent);
+  }, [3, 2]);
   const o = new THREE.Group();
-  o.add(new THREE.Mesh(dome, m.darkIron), new THREE.Mesh(merge(bands), m.bronze), new THREE.Mesh(merge(cheeks), m.darkIron));
-  return { obj: o, place: placeAt(new THREE.Vector3(h.c.x, h.brow - 0.012, h.c.z - 0.008)) };
+  o.add(new THREE.Mesh(g, headMats().felt(color)));
+  o.rotation.x = -0.06; // worn tipped back a little
+  return { obj: o, place: placeAt(new THREE.Vector3(h.c.x, y0, h.c.z)) };
+}
+
+/** Rivets: small domes at the given points, facing out from the axis. */
+function rivets(pts: THREE.Vector3[], r: number) {
+  return pts.map((p) => {
+    const g = new THREE.SphereGeometry(r, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2);
+    const n = new THREE.Vector3(p.x, 0, p.z).normalize();
+    g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n));
+    return g.translate(p.x, p.y, p.z);
+  });
+}
+
+/** A mail aventail hanging from the rim at the back and sides. */
+function aventail(sh: ReturnType<typeof headShell>, drop: number, open: number) {
+  const a0 = open, a1 = Math.PI * 2 - open;
+  return surface(8, 30, (t, s) => {
+    const a = a0 + (a1 - a0) * s;
+    const back = 0.5 - 0.5 * Math.cos(a); // 1 at the back
+    const d = drop * (0.55 + 0.45 * back);
+    const out = 0.006 + t * t * 0.03 + Math.sin(a * 14) * 0.002 * t;
+    return new THREE.Vector3(Math.sin(a) * (sh.ax(0) + out), -t * d, Math.cos(a) * (sh.az(0) + out));
+  }, [10, 2]);
+}
+
+/** Hinged cheek-guards, iron leaves following the line of the face. */
+function cheekGuards(sh: ReturnType<typeof headShell>, rimY: number) {
+  const plates: THREE.BufferGeometry[] = [], hinges: THREE.BufferGeometry[] = [], studs: THREE.Vector3[] = [];
+  for (const sx of [1, -1]) {
+    const ac = sx * (Math.PI / 2 - 0.42);
+    plates.push(surface(8, 6, (t, s) => {
+      // A rounded leaf: broad under the rim, narrowing to the jaw.
+      const w = 0.33 * (1 - 0.55 * t * t) * Math.sqrt(Math.max(0.05, 1 - Math.pow(Math.max(0, t - 0.8) / 0.2, 2)));
+      const a = ac + (s - 0.5) * w;
+      const y = rimY - 0.004 - t * 0.105;
+      const r = 1 + 0.06 - t * 0.12;
+      return new THREE.Vector3(Math.sin(a) * sh.ax(0) * r, y, Math.cos(a) * sh.az(0) * r);
+    }));
+    const hp = new THREE.Vector3(Math.sin(ac) * sh.ax(0) * 1.07, rimY - 0.006, Math.cos(ac) * sh.az(0) * 1.07);
+    const hinge = new THREE.CylinderGeometry(0.004, 0.004, 0.05, 6);
+    hinge.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(Math.cos(ac), 0, -Math.sin(ac))));
+    hinges.push(hinge.translate(hp.x, hp.y, hp.z));
+    studs.push(new THREE.Vector3(Math.sin(ac) * sh.ax(0) * 1.03, rimY - 0.06, Math.cos(ac) * sh.az(0) * 1.03));
+  }
+  return { plates: merge(plates), fittings: merge([...hinges, ...rivets(studs, 0.005)]) };
+}
+
+/**
+ * A Lombard Spangenhelm: iron segments riveted under gilt copper-alloy bands
+ * (the Spangen), a broad riveted brow band, a plume tube at the apex, hinged
+ * cheek-guards and a mail aventail. Or (kind 'lamellar') a helmet of narrow
+ * iron lamellae laced together under a crown plate, Avar fashion.
+ */
+export function makeHelmet(Ms: Measure, kind: 'spangen' | 'lamellar' = 'spangen') {
+  const m = headMats();
+  const h = Ms.head;
+  // The rim sits just above the eyebrows.
+  const y0 = h.brow + 0.03, H = h.top - y0 + (kind === 'spangen' ? 0.07 : 0.035);
+  // Fitted to the skull above the ears, not to the width across them.
+  const sh = headShell({ ...h, rx: h.rx - 0.008 }, y0, H, 0.016, kind === 'spangen' ? 0.85 : 0.3);
+  const o = new THREE.Group();
+  const iron: THREE.BufferGeometry[] = [], bronze: THREE.BufferGeometry[] = [], lace: THREE.BufferGeometry[] = [];
+  const studs: THREE.Vector3[] = [];
+  if (kind === 'spangen') {
+    iron.push(surface(24, 48, (t, s) => sh.at(t, s * Math.PI * 2), [4, 2]));
+    // Six bands over the seams, each with rivets down both edges.
+    for (let k = 0; k < 6; k++) {
+      const ak = (k / 6) * Math.PI * 2 + Math.PI / 6;
+      bronze.push(surface(16, 2, (t, s) => {
+        const tt = t * 0.93, w = (0.016 * (1 - 0.55 * tt)) / Math.max(0.05, sh.ax(tt));
+        return sh.at(tt, ak + (s - 0.5) * 2 * w, 0.003 + (1 - Math.abs(s - 0.5) * 2) * 0.0015);
+      }));
+      for (let i = 1; i < 9; i++) {
+        const t = i * 0.095, w = (0.011 * (1 - 0.55 * t)) / Math.max(0.05, sh.ax(t));
+        studs.push(sh.at(t, ak - w, 0.005), sh.at(t, ak + w, 0.005));
+      }
+    }
+    // The brow band, with a beaded lower edge.
+    bronze.push(surface(3, 64, (t, s) => sh.at(t * 0.16 - 0.01, s * Math.PI * 2, 0.003 + Math.sin(t * Math.PI) * 0.0012)));
+    bronze.push(at(new THREE.TorusGeometry(1, 0.003 / sh.ax(0), 4, 64), 0, -0.002, 0, Math.PI / 2).scale(sh.ax(0) + 0.004, 1, sh.az(0) + 0.004));
+    for (let k = 0; k < 24; k++) studs.push(sh.at(0.07, (k / 24) * Math.PI * 2, 0.007));
+    // The finial: a cap over the apex and a short plume tube.
+    const top = sh.at(0.93, 0);
+    bronze.push(lathe([[0.001, 0], [0.026, 0], [0.022, 0.008], [0.01, 0.016], [0.008, 0.02]], 14).translate(0, top.y - 0.004, 0));
+    bronze.push(lathe([[0.007, 0], [0.007, 0.03], [0.011, 0.036], [0.011, 0.04], [0.006, 0.04]], 10).translate(0, top.y + 0.016, 0));
+    const ck = cheekGuards(sh, 0);
+    o.add(new THREE.Mesh(ck.plates, m.iron), new THREE.Mesh(ck.fittings, m.bronze));
+    o.add(new THREE.Mesh(aventail(sh, 0.13, 1.25), m.mail));
+  } else {
+    // Some forty lamellae, each overlapping the next, laced in two rows.
+    const NL = 40, tTop = 0.78;
+    for (let k = 0; k < NL; k++) {
+      const ak = (k / NL) * Math.PI * 2, w = (Math.PI * 2 / NL) * 0.62;
+      iron.push(surface(10, 2, (t, s) => {
+        const tt = t * tTop + 0.0;
+        // Rounded ends; the leading edge sits proud of the one it overlaps.
+        const end = t > 0.9 ? Math.sqrt(Math.max(0, 1 - Math.pow((t - 0.9) / 0.1, 2))) : 1;
+        return sh.at(tt, ak + (s - 0.5) * 2 * w * end, 0.002 + s * 0.0045);
+      }, [0.3, 1]));
+    }
+    for (const t of [0.22, 0.6]) lace.push(surface(2, 64, (u, s) => sh.at(t + (u - 0.5) * 0.03, s * Math.PI * 2, 0.0075), [24, 1]));
+    // The crown plate and its knob.
+    iron.push(surface(8, 40, (t, s) => sh.at(tTop - 0.06 + t * (1 - tTop + 0.06), s * Math.PI * 2, 0.008 * (1 - t)), [2, 1]));
+    bronze.push(lathe([[0.001, 0], [0.016, 0], [0.012, 0.012], [0.004, 0.022], [0.001, 0.024]], 12).translate(0, H - 0.004, 0));
+    // A bronze-bound leather brow band.
+    bronze.push(surface(3, 64, (t, s) => sh.at(t * 0.12 - 0.012, s * Math.PI * 2, 0.0085)));
+    for (let k = 0; k < 20; k++) studs.push(sh.at(0.05, (k / 20) * Math.PI * 2, 0.01));
+    const ck = cheekGuards(sh, 0);
+    o.add(new THREE.Mesh(ck.plates, m.iron), new THREE.Mesh(ck.fittings, m.bronze));
+    o.add(new THREE.Mesh(aventail(sh, 0.14, 1.15), m.mail));
+  }
+  bronze.push(...rivets(studs, 0.0032));
+  o.add(new THREE.Mesh(merge(iron), m.iron), new THREE.Mesh(merge(bronze), m.bronze));
+  if (lace.length) o.add(new THREE.Mesh(merge(lace), m.lace));
+  o.rotation.x = -0.07; // the brow raised a little, the back down over the nape
+  return { obj: o, place: placeAt(new THREE.Vector3(h.c.x, y0, h.c.z)) };
 }
 
 // ------------------------------------------------------------------ arms

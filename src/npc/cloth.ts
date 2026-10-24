@@ -10,6 +10,8 @@ import type { Garment } from './garment';
 
 export const clothStats = { skin: 0, sim: 0, normals: 0, frames: 0 };
 
+const _kp = new THREE.Vector3(), _kt = new THREE.Vector3(), _sa = new THREE.Vector3(), _sd = new THREE.Vector3();
+
 type Cap = { a: THREE.Bone; b: THREE.Bone; r: number; pa: THREE.Vector3; pb: THREE.Vector3 };
 
 export class Clothing {
@@ -170,6 +172,23 @@ export class Clothing {
       arr[i * 3] = x; arr[i * 3 + 1] = y; arr[i * 3 + 2] = z;
     };
 
+    // A cloak hangs round the body: pulled taut it would cut straight through
+    // the tunic to the spine. Keep it no nearer the spine's line than its skinned place.
+    const sa = _sa.copy(caps[6].pa).lerp(caps[6].pb, 0.5), sd = _sd.copy(caps[7].pb).sub(sa).normalize();
+    const slack = 0.012 * this.scale;
+    const radial = (arr: Float32Array, o: number, out: THREE.Vector3) => {
+      out.set(arr[o] - sa.x, arr[o + 1] - sa.y, arr[o + 2] - sa.z);
+      return out.addScaledVector(sd, -out.dot(sd));
+    };
+    const kp = _kp, kt = _kt;
+    const keepOut = (i: number) => {
+      const o = i * 3;
+      const dp = radial(P, o, kp).length(), dt2 = radial(T, o, kt).length() - slack;
+      if (dp >= dt2 || dp < 1e-6) return;
+      kp.multiplyScalar(dt2 / dp - 1);
+      P[o] += kp.x; P[o + 1] += kp.y; P[o + 2] += kp.z;
+    };
+    const Ko = G.keepOut;
     const SUB = 2, h = dt / SUB, g = -9.8 * h * h;
     const D = G.maxD, Ed = G.edges, Rl = S.rest, St = G.stiff, ne = Rl.length, Cm = G.capMask, invM = S.invM, sc = this.scale;
     const { free, pinned } = S;
@@ -200,6 +219,7 @@ export class Clothing {
         const dx = P[o] - T[o], dy = P[o + 1] - T[o + 1], dz = P[o + 2] - T[o + 2];
         const d2 = dx * dx + dy * dy + dz * dz, md = D[i] * sc;
         if (d2 > md * md) { const q = md / Math.sqrt(d2); P[o] = T[o] + dx * q; P[o + 1] = T[o + 1] + dy * q; P[o + 2] = T[o + 2] + dz * q; }
+        if (Ko[i]) keepOut(i);
         collide(P, i, Cm[i]);
       }
       if (R && rp) {

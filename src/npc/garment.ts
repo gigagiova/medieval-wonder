@@ -33,6 +33,7 @@ export interface Garment {
   skinW: Float32Array;
   maxD: Float32Array; // tether radius per vertex (0 = pinned)
   capMask: Uint16Array; // which collision capsules a vertex can touch (bit per capsule)
+  keepOut: Uint8Array; // 1 = may not sink in towards the spine past where skinning puts it (cloaks)
   edges: Uint32Array;
   rest: Float32Array;
   stiff: Float32Array;
@@ -54,7 +55,7 @@ const HEAD = /^(Head|HeadTop_End|LeftEye|RightEye|Neck)$/;
 const ARMS = /Shoulder|Arm/;
 const FEET = /Foot|Toe/;
 const LEGS = /UpLeg|Leg/;
-type Cls = 'hand' | 'head' | 'arm' | 'leg' | 'foot' | 'torso';
+type Cls = 'hand' | 'head' | 'arm' | 'leg' | 'foot' | 'torso' | 'none';
 
 export function boneClassOf(mesh: THREE.SkinnedMesh): Cls[] {
   const si = mesh.geometry.attributes.skinIndex, sw = mesh.geometry.attributes.skinWeight;
@@ -254,18 +255,58 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
 
 interface FitSet { bvh: MeshBVH; geo: THREE.BufferGeometry; si: Float32Array; sw: Float32Array }
 
+/**
+ * The avatar's modern top is a suit: lapels and a shirt collar standing up
+ * round the neck, a bow tie, a rose in the buttonhole, buttons and cuffs.
+ * Clothes fitted over those come out lumpy and spiked, so they are left out
+ * of the body's shape (marked 'none'): every small piece, and whatever stands
+ * up round the base of the neck.
+ */
+function dropTrimmings(m: THREE.SkinnedMesh, cls: Cls[], neck: THREE.Vector3) {
+  const g = m.geometry, pos = g.attributes.position, idx = g.index!;
+  const key = new Map<string, number>(), weld = new Int32Array(pos.count);
+  for (let i = 0; i < pos.count; i++) {
+    const k = `${Math.round(pos.getX(i) * 1e4)},${Math.round(pos.getY(i) * 1e4)},${Math.round(pos.getZ(i) * 1e4)}`;
+    if (!key.has(k)) key.set(k, i);
+    weld[i] = key.get(k)!;
+  }
+  const parent = Int32Array.from({ length: pos.count }, (_, i) => i);
+  const find = (x: number): number => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  for (let t = 0; t < idx.count; t += 3) {
+    const a = find(weld[idx.getX(t)]), b = find(weld[idx.getX(t + 1)]), c = find(weld[idx.getX(t + 2)]);
+    parent[b] = a; parent[find(c)] = find(a);
+  }
+  const w = Array.from({ length: pos.count }, (_, i) => m.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(m.matrixWorld));
+  const lo = new Map<number, number>(), hi = new Map<number, number>();
+  for (let i = 0; i < pos.count; i++) {
+    const r = find(weld[i]);
+    lo.set(r, Math.min(lo.get(r) ?? Infinity, w[i].y));
+    hi.set(r, Math.max(hi.get(r) ?? -Infinity, w[i].y));
+  }
+  for (let i = 0; i < pos.count; i++) {
+    const r = find(weld[i]);
+    const small = hi.get(r)! - lo.get(r)! < 0.15;
+    const collar = w[i].y > neck.y - 0.03 && Math.hypot(w[i].x - neck.x, w[i].z - neck.z) < 0.13;
+    if (small || collar) cls[i] = 'none';
+  }
+}
+
 /** Bind-space world positions + skin data of the body meshes, split by region. */
 function bodySets(root: THREE.Object3D, full: THREE.Object3D) {
   const pos: number[] = [], si: number[] = [], sw: number[] = [], cls: Cls[] = [];
   const tris: number[][] = [];
   const v = new THREE.Vector3();
   // The untrimmed body (full) gives the shape; skin data are the same.
+  full.updateMatrixWorld(true);
+  let neck: THREE.Vector3 | null = null;
+  full.traverse((x) => { if (!neck && (x as THREE.Bone).isBone && canon(x.name) === 'Neck') neck = x.getWorldPosition(new THREE.Vector3()); });
   full.traverse((o) => {
     const m = o as THREE.SkinnedMesh;
     if (!m.isSkinnedMesh || /Eye|Teeth|Headwear/.test(m.name)) return;
     const g = m.geometry;
     const base = pos.length / 3;
     const c = boneClassOf(m);
+    if (/Outfit_Top/.test(m.name) && neck) dropTrimmings(m, c, neck);
     for (let i = 0; i < g.attributes.position.count; i++) {
       m.getVertexPosition(i, v);
       v.applyMatrix4(m.matrixWorld);
@@ -293,7 +334,8 @@ function bodySets(root: THREE.Object3D, full: THREE.Object3D) {
     arms: make((c) => c === 'arm' || c === 'hand'),
     upper: make((c) => c === 'torso' || c === 'head'),
     torso: make((c) => c === 'torso'),
-    all: make(() => true),
+    shoulders: make((c) => c === 'torso' || c === 'arm'),
+    all: make((c) => c !== 'none'),
   };
 }
 
@@ -302,7 +344,7 @@ class Grid {
   pos: number[] = [];
   uv: number[] = [];
   maxD: number[] = [];
-  region: number[] = []; // weights from: 0 trunk, 1 arms, 2 upper, 3 torso
+  region: number[] = []; // weights from: 0 trunk, 1 arms, 2 upper, 3 torso, 4 torso and arms (the yoke)
   group = G_TUNIC;
   cap = 0; // capsule mask for free vertices
   flip = false; // wound the other way, so faces point out of the body
@@ -331,6 +373,8 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   const neck = bone('Neck'), hips = bone('Hips'), spine2 = bone('Spine2');
   const knee = bone('LeftLeg').y, ankle = bone('LeftFoot').y;
   const yBelt = hips.y + 0.07, yTop = neck.y - 0.03;
+  // Above the armpits the tunic is a yoke over the shoulders, moving with the arms.
+  const yYoke = Math.min(bone('LeftArm').y, bone('RightArm').y) - 0.06;
   const yHem = spec.hem === 'ankle' ? Math.max(0.055, ankle * 0.72) : spec.hem === 'knee' ? knee - 0.07 : (knee + ankle) / 2 - 0.02;
   const smooth = (a: Float32Array, n: number, wrap: boolean, it: number) => {
     const b = new Float32Array(n);
@@ -346,7 +390,9 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
 
   // --- Tunic: rings from the collar to the hem.
   const NA = 40, NR = Math.max(20, Math.round(36 * (yTop - yHem) / (yTop - 0.075)));
-  const ringY = (r: number) => yTop + (yHem - yTop) * Math.pow(r / (NR - 1), 0.92);
+  // The first YOKE rows run from the collar to the armpits; the rest down to the hem.
+  const YOKE = 5, y1 = yYoke - 0.03;
+  const ringY = (r: number) => r < YOKE ? yTop + (yYoke + 0.005 - yTop) * (r / (YOKE - 1)) : y1 + (yHem - y1) * Math.pow((r - YOKE) / (NR - 1 - YOKE), 0.92);
   const tunic = new Grid(NR, NA, true);
   tunic.cap = CAP_SKIRT;
   const rad: Float32Array[] = [];
@@ -421,7 +467,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       tunic.uv.push((k / NA) * 4, y * 2.4);
       const free = y < yBelt - 0.04 ? Math.pow(ss(yBelt - 0.04, yHem, y), 0.85) : 0;
       tunic.maxD.push(skirtD * free);
-      tunic.region.push(0);
+      tunic.region.push(y > yYoke ? 4 : 0);
     }
   }
 
@@ -431,7 +477,8 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   for (const side of ['Left', 'Right']) {
     const p0 = bone(side + 'Arm'), p1 = bone(side + 'ForeArm'), p2 = bone(side + 'Hand');
     const dirIn = p0.clone().sub(p1).normalize();
-    const start = p0.clone().addScaledVector(dirIn, 0.05);
+    // The sleeve starts at the shoulder joint, under the tunic's yoke.
+    const start = p0.clone().addScaledVector(dirIn, -0.015);
     const end = bell ? p2.clone().addScaledVector(p2.clone().sub(p1).normalize(), 0.02) : p2.clone().addScaledVector(p2.clone().sub(p1).normalize(), -0.025);
     const pts = [start, p0, p1, end];
     const lens = [0];
@@ -530,7 +577,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   // --- Fit pass: push every garment vertex out of the body.
   const tmp = { point: new THREE.Vector3(), distance: 0, faceIndex: 0 } as { point: THREE.Vector3; distance: number; faceIndex: number };
   const tri = new THREE.Triangle(), nrm = new THREE.Vector3(), vv = new THREE.Vector3();
-  const setFor = (reg: number) => (reg === 0 ? S.trunk : reg === 1 ? S.arms : reg === 2 ? S.upper : S.torso);
+  const setFor = (reg: number) => (reg === 0 ? S.trunk : reg === 1 ? S.arms : reg === 2 ? S.upper : reg === 3 ? S.torso : S.shoulders);
   const fit = (g: Grid, minOff: number, skipAbove = Infinity) => {
     for (let i = 0; i < g.pos.length / 3; i++) {
       vv.fromArray(g.pos, i * 3);
@@ -568,10 +615,72 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       if (r0 < rb + minOff) vv.copy(c).addScaledVector(out, rb + minOff).toArray(g.pos, i * 3);
     }
   };
-  fitRadial(tunic, (i, c) => { const r = Math.floor(i / NA); return c.set(cen[r].x, ringY(r), cen[r].y); }, S.trunk, 0.018, 0.7);
+  {
+    // Rows of the yoke reach over the shoulders; the rest only the trunk.
+    const yoke = new Grid(0, NA, true), body = new Grid(0, NA, true);
+    tunic.pos.forEach((v, j) => (tunic.region[Math.floor(j / 3)] === 4 ? yoke : body).pos.push(v));
+    const rowOf = (off: number) => (i: number, c: THREE.Vector3) => { const r = Math.floor(i / NA) + off; return c.set(cen[r].x, ringY(r), cen[r].y); };
+    const nYoke = yoke.pos.length / 3 / NA;
+    fitRadial(yoke, rowOf(0), S.shoulders, 0.02, 0.7);
+    fitRadial(body, rowOf(nYoke), S.trunk, 0.018, 0.7);
+    tunic.pos = [...yoke.pos, ...body.pos];
+    // The neckline: the top row closes in round the base of the neck, a little lower in front.
+    const nk = bone('Neck'), neckR = new Float32Array(NA);
+    for (let k = 0; k < NA; k++) {
+      const a = (k / NA) * Math.PI * 2, d = new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
+      ray.set(o2.set(nk.x, nk.y + 0.015, nk.z).addScaledVector(d, 0.3), d.negate());
+      const hit = S.all.bvh.raycastFirst(ray, THREE.DoubleSide);
+      neckR[k] = hit && hit.distance < 0.27 ? 0.3 - hit.distance : 0.06;
+    }
+    smooth(neckR, NA, true, 2);
+    for (let k = 0; k < NA; k++) {
+      const a = (k / NA) * Math.PI * 2, rn = neckR[k] + 0.02;
+      tunic.pos.splice(k * 3, 3, nk.x + Math.sin(a) * rn, nk.y - 0.008 - 0.03 * Math.max(0, Math.cos(a)) ** 2, nk.z + Math.cos(a) * rn);
+    }
+    // Between it and the armpit row the yoke turns over the shoulder in a
+    // quarter ellipse, then is laid onto the body wherever that rises higher.
+    const N0 = new THREE.Vector3(), E0 = new THREE.Vector3(), down = new THREE.Vector3(0, -1, 0), d = new THREE.Vector3();
+    for (let r = 1; r < nYoke - 1; r++) {
+      const t = (r / (nYoke - 1)) * Math.PI / 2, h = Math.sin(t), v = 1 - Math.cos(t);
+      for (let k = 0; k < NA; k++) {
+        N0.fromArray(tunic.pos, k * 3);
+        E0.fromArray(tunic.pos, ((nYoke - 1) * NA + k) * 3);
+        tunic.pos.splice((r * NA + k) * 3, 3, N0.x + (E0.x - N0.x) * h, N0.y + (E0.y - N0.y) * v, N0.z + (E0.z - N0.z) * h);
+      }
+    }
+    for (let r = 0; r < nYoke; r++) {
+      const ys = new Float32Array(NA);
+      for (let k = 0; k < NA; k++) {
+        vv.fromArray(tunic.pos, (r * NA + k) * 3);
+        if (r > 0) {
+          // Out of the body, seen from the neck...
+          d.set(vv.x - nk.x, 0, vv.z - nk.z);
+          const rr = d.length();
+          d.divideScalar(rr || 1);
+          ray.set(o2.set(nk.x, vv.y, nk.z).addScaledVector(d, 0.6), d.clone().negate());
+          const hit = S.shoulders.bvh.raycastFirst(ray, THREE.DoubleSide);
+          if (hit && 0.6 - hit.distance + 0.018 > rr) vv.set(nk.x, vv.y, nk.z).addScaledVector(d, 0.6 - hit.distance + 0.018);
+        }
+        // ...and from above.
+        ray.set(o2.set(vv.x, vv.y + 0.4, vv.z), down);
+        const hit = S.shoulders.bvh.raycastFirst(ray, THREE.DoubleSide);
+        if (hit && hit.point.y + 0.016 > vv.y) vv.y = hit.point.y + 0.016;
+        vv.toArray(tunic.pos, (r * NA + k) * 3);
+        ys[k] = vv.y;
+      }
+      // Smoothed round, so no single column stands up in a spike.
+      smooth(ys, NA, true, 2);
+      for (let k = 0; k < NA; k++) tunic.pos[(r * NA + k) * 3 + 1] = ys[k];
+    }
+  }
   for (const g of sleeves) {
     const ax = (g as Grid & { axis: THREE.Vector3[] }).axis;
     fitRadial(g, (i, c) => c.copy(ax[Math.floor(i / g.cols)]), S.arms, bell ? 0.022 : 0.014, 0.16);
+    // Its top tucks in under the yoke rather than standing open above the shoulder.
+    for (const [r, k] of [[0, 0.55], [1, 0.85]]) for (let c = 0; c < g.cols; c++) {
+      const o = (r * g.cols + c) * 3;
+      vv.fromArray(g.pos, o).sub(ax[r]).multiplyScalar(k).add(ax[r]).toArray(g.pos, o);
+    }
   }
   // Keep the belt on the fitted cloth.
   for (let r = 0; r < NR; r++) for (let k = 0; k < NA; k++) {
@@ -658,11 +767,29 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       for (let c = 0; c < NC2; c++) {
         const a = a0 + (Math.PI * 2 - 2 * a0) * (c / (NC2 - 1));
         const fold = (Math.sin(a * 9 + fp + Math.sin(a * 2.3) * 1.4) * 0.6 + Math.sin(a * 5 + fp * 1.3) * 0.4) * t * (long ? 0.03 : 0.012);
-        const R = row[c] + 0.022 + t * (long ? 0.04 : 0.02) + fold;
+        // Ease over the belt and round the swinging upper arms.
+        const side = Math.exp(-Math.pow(Math.cos(a), 2) / 0.12) * (1 - t);
+        const R = row[c] + 0.022 + t * (long ? 0.04 : 0.02) + fold + 0.02 * Math.exp(-Math.pow((y - yBelt) / 0.05, 2)) + 0.025 * side;
         g.pos.push(cx + Math.sin(a) * R, y, cz + Math.cos(a) * R);
         g.uv.push((c / NC2) * 3, t * (long ? 3 : 1.6));
         g.maxD.push(r < 2 ? 0 : (long ? 0.3 : 0.1) * Math.pow(ss(0, 1, t), 0.8));
-        g.region.push(3);
+        g.region.push(y > yYoke - 0.03 ? 4 : 3);
+      }
+    }
+    // Over the shoulders it lies on the yoke, not in a level ring through it.
+    const down = new THREE.Vector3(0, -1, 0);
+    for (let r = 0; r < NR2 && g.pos[r * NC2 * 3 + 1] > yYoke - 0.08; r++) {
+      const ys = new Float32Array(NC2);
+      for (let c = 0; c < NC2; c++) {
+        vv.fromArray(g.pos, (r * NC2 + c) * 3);
+        ray.set(o2.set(vv.x, vv.y + 0.4, vv.z), down);
+        const hit = ubvh.raycastFirst(ray, THREE.DoubleSide);
+        ys[c] = hit ? Math.max(vv.y, hit.point.y + 0.02) : vv.y;
+      }
+      smooth(ys, NC2, false, 2);
+      for (let c = 0; c < NC2; c++) {
+        const o = (r * NC2 + c) * 3 + 1;
+        g.pos[o] = r === 0 ? ys[c] : Math.min(Math.max(ys[c], g.pos[o]), g.pos[o - NC2 * 3] - 0.012);
       }
     }
     cape = g;
@@ -780,6 +907,21 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     for (const [k, w] of m) m.set(k, w * (1 - t));
     m.set(headI, (m.get(headI) ?? 0) + t);
   }
+  // A neckline sits on the shoulders; it does not nod with the head.
+  {
+    const spineI = bones.findIndex((b) => canon(b.name) === 'Spine2');
+    const neckI = bones.findIndex((b) => canon(b.name) === 'Neck');
+    for (let i = 0; i < N; i++) {
+      if (region[i] === 2) continue;
+      const m = wmap[i];
+      for (const k of [neckI, headI]) {
+        const w = m.get(k);
+        if (!w || k < 0) continue;
+        m.delete(k);
+        m.set(spineI, (m.get(spineI) ?? 0) + w);
+      }
+    }
+  }
   const nb: number[][] = Array.from({ length: N }, () => []);
   for (let e = 0; e < ES.length; e++) if (ES[e] === 1) { nb[E[e * 2]].push(E[e * 2 + 1]); nb[E[e * 2 + 1]].push(E[e * 2]); }
   for (let it = 0; it < 3; it++) {
@@ -791,6 +933,24 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       return o;
     });
     for (let i = 0; i < N; i++) wmap[i] = next[i];
+  }
+  // Cloth on the inner side of a shoulder joint (the top of a sleeve, the
+  // yoke by the neck) must not swing with the upper arm: lowering the arm
+  // would lift it up round the neck. It goes with the collarbone instead.
+  for (const side of ['Left', 'Right']) {
+    const armI = bones.findIndex((b) => canon(b.name) === side + 'Arm');
+    const clavI = bones.findIndex((b) => canon(b.name) === side + 'Shoulder');
+    if (armI < 0 || clavI < 0) continue;
+    const j = bone(side + 'Arm'), T = bone(side + 'ForeArm').sub(j).normalize();
+    for (let i = 0; i < N; i++) {
+      const m = wmap[i], w = m.get(armI);
+      if (!w) continue;
+      const along = (bind[i * 3] - j.x) * T.x + (bind[i * 3 + 1] - j.y) * T.y + (bind[i * 3 + 2] - j.z) * T.z;
+      const t = ss(0.03, -0.03, along) * w;
+      if (t <= 0) continue;
+      m.set(armI, w - t);
+      m.set(clavI, (m.get(clavI) ?? 0) + t);
+    }
   }
   const skinI = new Uint16Array(N * 4), skinW = new Float32Array(N * 4);
   for (let i = 0; i < N; i++) {
@@ -832,9 +992,9 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     }
     rope = { root: knotI, n: 12, seg: 0.05 };
   }
-  const capMask = new Uint16Array(N);
-  for (let i = 0; i < N; i++) if (maxD[i] > 0) capMask[i] = capOf[i];
-  return { geo, bind, skinI, skinW, capMask, maxD: new Float32Array(maxD), edges: new Uint32Array(fe), rest: new Float32Array(fr), stiff: new Float32Array(fsf), rope, belt: beltInfo };
+  const capMask = new Uint16Array(N), keepOut = new Uint8Array(N);
+  for (let i = 0; i < N; i++) if (maxD[i] > 0) { capMask[i] = capOf[i]; keepOut[i] = capOf[i] === CAP_CLOAK || capOf[i] === CAP_SHAWL ? 1 : 0; }
+  return { geo, bind, skinI, skinW, capMask, keepOut, maxD: new Float32Array(maxD), edges: new Uint32Array(fe), rest: new Float32Array(fr), stiff: new Float32Array(fsf), rope, belt: beltInfo };
 }
 
 /**

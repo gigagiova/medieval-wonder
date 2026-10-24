@@ -118,12 +118,12 @@ function tailor(id: OutfitId): Outfit {
 
 // ------------------------------------------------------------------ a person
 
-interface Gear { lantern?: boolean; cap?: boolean; helmet?: boolean; shield?: 'back' | 'arm'; spear?: boolean; arms?: boolean; sticks?: boolean; bucket?: boolean; basket?: boolean; jar?: boolean }
+interface Gear { lantern?: boolean; cap?: boolean; helmet?: boolean | 'spangen' | 'lamellar'; shield?: 'back' | 'arm'; spear?: boolean; arms?: boolean; sticks?: boolean; bucket?: boolean; basket?: boolean; jar?: boolean }
 interface Held { obj: THREE.Object3D; kind: 'hang' | 'spear'; drop: number; swing: { a: number; v: number; b: number; w: number }; last: THREE.Vector3 }
 
 const ANIMS: ClipName[] = ['walk', 'idle', 'talk', 'bless', 'kneel'];
 const UP = new THREE.Vector3(0, 1, 0);
-const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 
 let rngSeed = 1;
 const mulberry = (a: number) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -240,8 +240,9 @@ export class Person {
   private equip(g: Gear) {
     const m = this.outfit.m, r = this.rnd;
     const on = (bone: string, obj: THREE.Object3D, place: THREE.Matrix4) => Props.hangOn(this.bones.get(bone)!, this.bindOf(bone), obj, place);
-    if (g.helmet) { const h = Props.makeHelmet(m); on('Head', h.obj, h.place); }
-    else if (g.cap) { const c = Props.makeCap(m, new THREE.Color(pick(r, [0x4a3e30, 0x3a3228, 0x5a4a36, 0x2e2a24]))); on('Head', c.obj, c.place); }
+    if (g.helmet) { const h = Props.makeHelmet(m, g.helmet === true ? 'spangen' : g.helmet); on('Head', h.obj, h.place); }
+    // Felt in the colours of undyed and walnut-dyed wool.
+    else if (g.cap) { const c = Props.makeCap(m, new THREE.Color(pick(r, [0x7e6a4e, 0x6e5a40, 0x8c7a5c, 0x5e4a34, 0x74603f]))); on('Head', c.obj, c.place); }
     const belt = this.outfit.garment.belt;
     if (g.arms) {
       on('Hips', Props.makeBeltFittings(belt, r() * 10), new THREE.Matrix4());
@@ -258,11 +259,11 @@ export class Person {
         const sp = m.bone('Spine2');
         on('Spine2', s, Props.placeAt(new THREE.Vector3(sp.x, sp.y - 0.06, sp.z - 0.21), new THREE.Quaternion().setFromEuler(new THREE.Euler(0.14, Math.PI, 0.05))));
       } else {
-        const a = m.bone('LeftForeArm'), b = m.bone('LeftHand');
-        const d = b.clone().sub(a).normalize();
-        const n = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 0, 1)).negate().normalize();
-        const c = a.clone().lerp(b, 0.6).addScaledVector(n, 0.09);
-        on('LeftForeArm', s, Props.placeAt(c, new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n)));
+        // Carried at his left side by the grip, face turned outwards, clear
+        // of his legs: hung from the hips, it stays put whatever his hands do.
+        const hp = m.bone('Hips');
+        const c = new THREE.Vector3(hp.x + 0.33, hp.y - 0.1, hp.z + 0.03);
+        on('Hips', s, Props.placeAt(c, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2 - 0.2, -0.08, 'YXZ'))));
       }
     }
     if (g.sticks) {
@@ -348,8 +349,14 @@ export class Person {
     const fwd = _v2.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
     for (const h of this.held) {
       if (h.kind === 'spear') {
-        h.obj.position.copy(_v);
-        h.obj.quaternion.setFromEuler(new THREE.Euler(0.1, this.yaw, -0.06, 'YXZ'));
+        // Upright in the right hand on the march; standing or talking, its
+        // butt is grounded by the right foot, so gestures never swing it
+        // across the body.
+        const sc = this.scale / this.kit.scale, walk = THREE.MathUtils.clamp((this.w.walk ?? 0) + (this.w.walkFormal ?? 0), 0, 1);
+        const rest = _v3.set(-Math.cos(this.yaw), 0, Math.sin(this.yaw)).multiplyScalar(0.3 * sc).addScaledVector(fwd, 0.08 * sc).add(this.pos);
+        rest.y = this.pos.y + 0.8 * sc;
+        h.obj.position.copy(rest).lerp(_v, walk);
+        h.obj.quaternion.setFromEuler(new THREE.Euler(0.06 * walk + 0.02, this.yaw, -0.06 + 0.03 * (1 - walk), 'YXZ'));
         continue;
       }
       const hv = _v.clone().sub(h.last).divideScalar(Math.max(dt, 1e-3));
@@ -387,7 +394,7 @@ export function makePerson(scene: THREE.Scene, role: Role, o: { outfit?: number;
   if (!gear) {
     const x = rnd();
     gear = role === 'monk' ? { lantern: x < 0.6 }
-      : role === 'soldier' ? { arms: true, spear: true, helmet: x < 0.6, cap: x >= 0.6, shield: id === 'soldierCloak' ? 'arm' : 'back' }
+      : role === 'soldier' ? { arms: true, spear: true, helmet: x < 0.4 ? 'spangen' : x < 0.65 ? 'lamellar' : false, cap: x >= 0.65, shield: id === 'soldierCloak' ? 'arm' : 'back' }
       : role === 'woman' ? { jar: x < 0.3, basket: x >= 0.3 && x < 0.65 }
       : { cap: id === 'peasantCloak', sticks: id === 'peasantHood' && x < 0.4, bucket: x >= 0.4 && x < 0.65, basket: x >= 0.65 && x < 0.8 };
   }
