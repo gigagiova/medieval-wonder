@@ -34,13 +34,16 @@ export class Builder {
   props: Prop[] = [];
 
   /** `fine`: geometry is already finely subdivided, so skip tessellation. */
-  add(g: THREE.BufferGeometry, m: MatName, matrix?: THREE.Matrix4, collide = true, fine = false) {
+  /** `raw`: geometry is already organic (e.g. carved SDF rock): no tessellation, no displacement. */
+  add(g: THREE.BufferGeometry, m: MatName, matrix?: THREE.Matrix4, collide = true, fine = false, raw = false) {
     let geo = g.clone();
     if (matrix) geo.applyMatrix4(matrix);
     for (const k of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(k)) geo.deleteAttribute(k);
     if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array((geo.attributes.position.count) * 2), 2));
-    if (!fine) geo = tessellate(geo, m);
-    displace(geo, m);
+    if (!raw) {
+      if (!fine) geo = tessellate(geo, m);
+      displace(geo, m);
+    }
     if (geo.index) geo = geo.toNonIndexed();
     if (!this.parts.has(m)) this.parts.set(m, []);
     this.parts.get(m)!.push(geo);
