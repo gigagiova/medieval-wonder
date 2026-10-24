@@ -158,5 +158,5 @@ export function ringGeo(rOut: number, rIn: number, h: number, depth = 0, seg = 2
 export function wellHead(b: Builder, m: MatName, x: number, y: number, z: number, rOut: number, h: number) {
   const rIn = rOut - 0.16;
   b.geo(m, ringGeo(rOut, rIn, h, 0.3), x, y, z, 0, true, 0, 0, false, new THREE.CylinderGeometry(rOut, rOut, h, 8, 1, true).translate(0, h / 2, 0));
-  b.add(new THREE.CircleGeometry(rIn + 0.02, 24).rotateX(-Math.PI / 2), 'iron', new THREE.Matrix4().makeTranslation(x, y + 0.08, z), false, true, true);
+  b.add(new THREE.CircleGeometry(rIn + 0.02, 24).rotateX(-Math.PI / 2), 'iron', new THREE.Matrix4().makeTranslation(x, y + 0.08, z), false, true);
 }
