@@ -16,7 +16,7 @@ export const MAT = {
 } as const;
 export type MatName = keyof typeof MAT;
 
-const BUMP = 0.012;
+const BUMP = 0.02;
 
 function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
@@ -44,8 +44,11 @@ function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
       )
       .replace(
         '#include <map_fragment>',
-        `Surf S = surface(vWPos, normalize(vWNrm));
-         diffuseColor.rgb *= S.alb;
+        `float occl;
+         vec3 nW = normalize(vWNrm);
+         vec3 pP = parallax(vWPos, nW, occl);
+         Surf S = surface(pP, nW);
+         diffuseColor.rgb *= S.alb * occl;
          totalEmissiveRadiance += S.emi;`,
       )
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = S.rough;')

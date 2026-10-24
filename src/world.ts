@@ -12,7 +12,7 @@ const R = (a: number, b: number) => a + (b - a) * rand();
 const STAIR_X = -36, STAIR_W = 3, STAIR_TOP = -52, STAIR_RUN = 0.35, STAIR_RISE = 0.25, DEPTH = -7;
 const STEPS = Math.round(-DEPTH / STAIR_RISE);
 const STAIR_END = STAIR_TOP - STEPS * STAIR_RUN;
-const HOLE_END = -56.2;
+const HOLE_END = -56;
 const CAT_X0 = -58, CAT_Z0 = -62, CELL = 4, COLS = 11, ROWS = 9;
 
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -29,17 +29,35 @@ export function buildWorld(scene: THREE.Scene) {
   return { collider, lamps: b.lamps, flames: b.flames };
 }
 
+// Dense grid inside and around the town (so it can be displaced into an
+// uneven surface), coarse rolling grid beyond. The stair opening is left out.
+function grid(x0: number, x1: number, step: number, y: number, skip: (cx: number, cz: number) => boolean) {
+  const n = Math.round((x1 - x0) / step);
+  const pos = new Float32Array((n + 1) * (n + 1) * 3);
+  const nor = new Float32Array((n + 1) * (n + 1) * 3);
+  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
+    const k = (j * (n + 1) + i) * 3;
+    pos[k] = x0 + i * step; pos[k + 1] = y; pos[k + 2] = x0 + j * step;
+    nor[k + 1] = 1;
+  }
+  const idx: number[] = [];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    if (skip(x0 + (i + 0.5) * step, x0 + (j + 0.5) * step)) continue;
+    const a = j * (n + 1) + i, b = a + 1, c = a + n + 1, d = c + 1;
+    idx.push(a, c, b, b, c, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  g.setIndex(idx);
+  return g;
+}
+
 function ground(b: Builder) {
-  const s = new THREE.Shape();
-  s.moveTo(-400, -400); s.lineTo(400, -400); s.lineTo(400, 400); s.lineTo(-400, 400); s.closePath();
-  const hole = new THREE.Path();
-  // Shape Y maps to world -Z after the rotation below.
-  const x0 = STAIR_X - STAIR_W / 2, x1 = STAIR_X + STAIR_W / 2;
-  hole.moveTo(x0, -STAIR_TOP); hole.lineTo(x1, -STAIR_TOP); hole.lineTo(x1, -HOLE_END); hole.lineTo(x0, -HOLE_END); hole.closePath();
-  s.holes.push(hole);
-  const g = new THREE.ShapeGeometry(s);
-  g.rotateX(-Math.PI / 2);
-  b.add(g, 'ground');
+  const IN = 100;
+  const hx0 = STAIR_X - STAIR_W / 2, hx1 = STAIR_X + STAIR_W / 2;
+  b.add(grid(-IN, IN, 0.5, 0, (x, z) => x > hx0 && x < hx1 && z < STAIR_TOP && z > HOLE_END), 'ground', undefined, true, true);
+  b.add(grid(-400, 400, 4, -0.04, (x, z) => Math.abs(x) < IN && Math.abs(z) < IN), 'ground', undefined, true, true);
 }
 
 function torch(b: Builder, x: number, y: number, z: number, ry: number, under = false) {
@@ -121,7 +139,7 @@ function townWall(b: Builder) {
   for (let k = 0; k < SEGS; k++) {
     const p = pts[k];
     const th = 12 + (k % 3 === 0 ? 3 : 0);
-    b.geo('bigstone', new THREE.CylinderGeometry(4.2, 4.6, th, 14), p.x, th / 2 - 0.5, p.y);
+    b.geo('bigstone', new THREE.CylinderGeometry(4.2, 4.6, th, 24), p.x, th / 2 - 0.5, p.y);
     if (k % 2 === 0) {
       b.geo('roof', new THREE.ConeGeometry(5.2, 6, 14), p.x, th - 0.5 + 3, p.y);
     } else {

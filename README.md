@@ -25,7 +25,12 @@ npm run build    # static site in dist/
 - **Lighting:** moonlight with shadows, plus a pool of 10 point lights reassigned each frame to the
   nearest torches, lanterns and candles (with flicker). Flames are procedural point sprites.
 - **Post:** bloom → ACES → custom grade (teal shadows / amber highlights), grain, vignette, fringe.
-- **Collision:** capsule vs. BVH (`three-mesh-bvh`).
+- **Nothing is flat** (`src/displace.ts`): every surface is subdivided, then pushed through one continuous
+  world-space vector field. Walls bulge and lean, roofs sag, wall bases ride the uneven ground, and the
+  catacombs look hand-hewn. Pieces that touch stay touching because the same point always moves the same way.
+  On top of that, parallax occlusion mapping gives real depth to cobbles, mortar joints, dented planks,
+  slates, plaster and rock.
+- **Collision:** capsule vs. BVH (`three-mesh-bvh`), built from the displaced geometry.
 - **Sound:** fully synthesized with WebAudio: wind, a chant drone near the church, bells, footsteps,
   echo in the catacombs.
 

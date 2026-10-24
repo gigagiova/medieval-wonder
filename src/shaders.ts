@@ -81,6 +81,46 @@ vec2 projUV(vec3 p, vec3 n){
   return p.xy;
 }
 
+// ---- Relief: per-material height fields (1 = proud surface, 0 = deepest) ----
+float hAshlar(vec2 uv, vec2 sz){
+  vec2 s = uv/sz;
+  float row = floor(s.y);
+  s.x += hash12(vec2(row,7.))*0.6;
+  vec2 id = floor(s); vec2 f = fract(s);
+  float rnd = hash12(id);
+  vec2 e = min(f,1.-f)*sz;
+  float edge = min(e.x,e.y) + (vnoise(vec3(uv*7.,1.))-.5)*0.035;
+  // Each block is pillowed, chipped and sits proud by a different amount.
+  float pillow = sqrt(clamp(edge/(0.05+0.04*rnd),0.,1.));
+  float face = 0.72 + 0.28*rnd - 0.18*vnoise(vec3(uv*4.,rnd*9.)) - 0.1*vnoise(vec3(uv*11.,rnd*3.));
+  return clamp(pillow*face, 0., 1.);
+}
+float hCobble(vec2 uv){
+  vec3 v = voronoi(uv*2.3);
+  float e = v.y - v.x;
+  return smoothstep(0.0, 0.42, e) * (0.65 + 0.35*v.z);
+}
+float hPlank(vec2 uv){
+  float id = floor(uv.x/0.22), fx = fract(uv.x/0.22);
+  float gap = smoothstep(0.0,0.08,fx)*smoothstep(1.0,0.92,fx);
+  float warp = 0.15*sin(fx*3.14159) * (0.5+hash12(vec2(id,4.)));
+  float dents = vnoise(vec3(uv.x*9., uv.y*2.5, id)) * 0.35 + vnoise(vec3(uv*vec2(20.,6.), id))*0.15;
+  return gap * (0.6 + warp - dents + 0.25);
+}
+float hSlate(vec2 uv){
+  vec3 v = voronoi(uv*vec2(3.5,6.));
+  return smoothstep(0.0,0.3,v.y-v.x)*(0.55+0.45*v.z);
+}
+float hRock(vec2 uv){
+  return vnoise(vec3(uv*1.7,2.))*0.55 + vnoise(vec3(uv*4.3,5.))*0.3 + vnoise(vec3(uv*13.,9.))*0.15;
+}
+float hPlaster(vec2 uv){
+  // Hand-trowelled daub over an uneven wall: lumps, ridges and a few gouges.
+  float lumps = vnoise(vec3(uv*1.6,1.))*0.45 + vnoise(vec3(uv*4.5,4.))*0.3 + vnoise(vec3(uv*13.,7.))*0.12;
+  float gouge = smoothstep(0.8,0.9,vnoise(vec3(uv*vec2(4.,9.),9.)));
+  return clamp(0.15 + lumps - gouge*0.15, 0., 1.);
+}
+
 Surf ashlar(vec3 p, vec3 n, vec2 sz, vec3 base, float rough){
   vec2 uv = projUV(p,n);
   vec2 s = uv/sz;
@@ -97,7 +137,7 @@ Surf ashlar(vec3 p, vec3 n, vec2 sz, vec3 base, float rough){
   Surf o;
   o.alb = base*tint*(0.65+0.6*rnd)*(0.7+0.6*g)*(1.-pits*0.35);
   o.alb = mix(base*0.3, o.alb, mortar);
-  o.h = mortar*(0.5+0.3*g) - pits*0.15 + sqrt(clamp(edge/0.07,0.,1.))*0.4;
+  o.h = hAshlar(uv, sz)*1.5 - pits*0.15 + g*0.2;
   o.rough = rough; o.emi = vec3(0.);
   return o;
 }
@@ -116,6 +156,92 @@ void weather(inout Surf s, vec3 p, vec3 n){
   s.rough = mix(s.rough, 0.4, grime*0.7);
 }
 
+float pomH(vec2 uv){
+#if MAT == 0
+  return hAshlar(uv, vec2(0.62,0.31));
+#elif MAT == 9
+  return hAshlar(uv, vec2(1.05,0.5));
+#elif MAT == 10
+  return hAshlar(uv, vec2(1.0,0.75));
+#elif MAT == 1
+  return hCobble(uv);
+#elif MAT == 3
+  return hPlank(uv);
+#elif MAT == 4
+  return hSlate(uv);
+#elif MAT == 5
+  return hRock(uv);
+#elif MAT == 2
+  return hPlaster(uv);
+#else
+  return 1.0;
+#endif
+}
+
+#if MAT == 0 || MAT == 9
+  #define POM_DEPTH 0.05
+#elif MAT == 10
+  #define POM_DEPTH 0.025
+#elif MAT == 1
+  #define POM_DEPTH 0.07
+#elif MAT == 3
+  #define POM_DEPTH 0.03
+#elif MAT == 4
+  #define POM_DEPTH 0.05
+#elif MAT == 5
+  #define POM_DEPTH 0.12
+#elif MAT == 2
+  #define POM_DEPTH 0.05
+#endif
+
+// Parallax occlusion: march the view ray into the height field in the
+// dominant-axis plane and return the world point it actually hits.
+vec3 parallax(vec3 p, vec3 n, out float occl){
+  occl = 1.0;
+#ifdef POM_DEPTH
+  float dist = length(cameraPosition - p);
+  float fade = 1.0 - smoothstep(9.0, 22.0, dist);
+  if (fade <= 0.0) return p;
+  float depth = POM_DEPTH * fade;
+  #if MAT == 1
+    // Mud and puddles fill the gaps between cobbles; open country is softer.
+    float r = length(p.xz);
+    float mud = smoothstep(0.5,0.7,fbm(vec3(p.xz*0.12,2.)));
+    depth *= mix(0.35, 1.0 - mud*0.8, 1.0 - smoothstep(84., 92., r));
+  #endif
+  vec3 an = abs(n); vec3 U, V, N;
+  if (an.y>an.x && an.y>an.z){ U=vec3(1,0,0); V=vec3(0,0,1); N=vec3(0,sign(n.y),0); }
+  else if (an.x>an.z){ U=vec3(0,0,1); V=vec3(0,1,0); N=vec3(sign(n.x),0,0); }
+  else { U=vec3(1,0,0); V=vec3(0,1,0); N=vec3(0,0,sign(n.z)); }
+  vec3 vd = normalize(cameraPosition - p);
+  vec3 vt = vec3(dot(vd,U), dot(vd,V), max(dot(vd,N), 0.2));
+  vec2 uv = vec2(dot(p,U), dot(p,V));
+  const int STEPS = 16;
+  float layer = 1.0/float(STEPS);
+  vec2 duv = -vt.xy/vt.z * depth * layer;
+  float cur = 1.0;
+  vec2 cuv = uv;
+  float h = pomH(cuv);
+  float ph = h, pl = cur;
+  for (int i=0;i<STEPS;i++){
+    if (h >= cur) break;
+    ph = h; pl = cur;
+    cuv += duv; cur -= layer;
+    h = pomH(cuv);
+  }
+  float a = h - cur, b = ph - pl;
+  float w = a/(a - b + 1e-5);
+  vec2 fuv = mix(cuv, cuv - duv, clamp(w,0.,1.));
+  vec2 off = fuv - uv;
+  float hit = mix(cur, pl, clamp(w,0.,1.));
+  // Crevices are darker: cheap cavity occlusion from how deep we hit.
+  occl = mix(1.0, 0.35 + 0.65*hit, fade);
+  return p + U*off.x + V*off.y - N*(1.0-hit)*depth;
+#else
+  return p;
+#endif
+}
+
 Surf surface(vec3 p, vec3 n){
   Surf s; s.emi = vec3(0.); s.rough = 0.9; s.h = 0.;
 #if MAT == 0
@@ -132,15 +258,15 @@ Surf surface(vec3 p, vec3 n){
   float cob = smoothstep(0.03,0.2,edge);
   vec3 cobC = vec3(0.13,0.12,0.11)*(0.55+0.8*vor.z);
   float mud = smoothstep(0.5,0.7,fbm(vec3(uv*0.12,2.)));
-  float inTown = 1.0 - smoothstep(66., 72., r);
-  float road = (1.0 - smoothstep(2.5,4.5,abs(uv.x + sin(uv.y*0.05)*2.))) * step(70., uv.y);
+  float inTown = 1.0 - smoothstep(84., 92., r);
+  float road = (1.0 - smoothstep(2.5,4.5,abs(uv.x + sin(uv.y*0.05)*2.))) * step(86., uv.y);
   vec3 mudC = vec3(0.075,0.055,0.04)*(0.6+0.7*fbm(vec3(uv*2.,5.)));
   vec3 grassC = vec3(0.04,0.05,0.025)*(0.5+0.9*fbm(vec3(uv*1.3,8.)));
   vec3 outC = mix(grassC, mudC, max(road, smoothstep(0.45,0.7,fbm(vec3(uv*0.3,1.)))));
   vec3 townC = mix(cobC*mix(0.25,1.,cob), mudC, mud);
   s.alb = mix(outC, townC, inTown);
   float hOut = fbm(vec3(uv*3.,0.));
-  float hTown = mix(cob*0.9 - vor.x*0.3, hOut*0.4, mud);
+  float hTown = mix(hCobble(uv)*1.5, hOut*0.4, mud);
   s.h = mix(hOut*0.6, hTown, inTown);
   float pud = smoothstep(0.6,0.64,fbm(vec3(uv*0.22,4.)) + (1.-inTown)*0.05);
   s.alb *= 1.-pud*0.55;
@@ -153,7 +279,9 @@ Surf surface(vec3 p, vec3 n){
   float patchM = smoothstep(0.64,0.67,fbm(vec3(uv*0.5,9.)));
   Surf st = ashlar(p,n,vec2(0.4,0.2),vec3(0.2,0.15,0.11),0.9);
   s.alb = mix(c, st.alb, patchM);
-  s.h = mix(0.6+g2*0.15, st.h*0.5, patchM);
+  float hp = hPlaster(uv);
+  s.alb *= 0.75 + 0.4*hp;
+  s.h = mix(hp*1.5, st.h*0.5, patchM);
   s.rough = 0.95;
   weather(s,p,n);
 #elif MAT == 3
@@ -163,7 +291,7 @@ Surf surface(vec3 p, vec3 n){
   float grain = vnoise(vec3(uv.x*55., uv.y*1.5, id*3.));
   float gap = smoothstep(0.0,0.06,fx)*smoothstep(1.0,0.94,fx);
   s.alb = vec3(0.1,0.06,0.032)*(0.55+0.7*grain)*(0.75+0.5*hash12(vec2(id,1.)))*mix(0.3,1.,gap);
-  s.h = gap*0.6 + grain*0.15; s.rough = 0.8;
+  s.h = hPlank(uv)*1.5 + grain*0.15; s.rough = 0.8;
 #elif MAT == 4
   vec2 uv = projUV(p,n);
   vec3 vor = voronoi(uv*vec2(3.5,6.));
@@ -171,7 +299,7 @@ Surf surface(vec3 p, vec3 n){
   s.alb = vec3(0.065,0.05,0.045)*(0.5+0.9*vor.z)*mix(0.3,1.,e);
   float moss = smoothstep(0.5,0.75,fbm(p*0.6));
   s.alb = mix(s.alb, vec3(0.04,0.05,0.02), moss*0.6);
-  s.h = e*0.5 + vor.x*0.4; s.rough = 0.75;
+  s.h = hSlate(uv)*1.5; s.rough = 0.75;
 #elif MAT == 5
   float g = fbm(p*1.6);
   float strata = sin(p.y*9. + g*5.)*0.5+0.5;

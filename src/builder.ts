@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { mat, type MatName } from './materials';
+import { tessellate, displace, TESS } from './displace';
 
 export type LampKind = 'torch' | 'lantern' | 'candle' | 'window';
 export interface Lamp {
@@ -24,11 +25,15 @@ export class Builder {
   lamps: Lamp[] = [];
   flames: { pos: THREE.Vector3; size: number }[] = [];
 
-  add(g: THREE.BufferGeometry, m: MatName, matrix?: THREE.Matrix4, collide = true) {
-    let geo = g.index ? g.toNonIndexed() : g.clone();
+  /** `fine`: geometry is already finely subdivided, so skip tessellation. */
+  add(g: THREE.BufferGeometry, m: MatName, matrix?: THREE.Matrix4, collide = true, fine = false) {
+    let geo = g.clone();
     if (matrix) geo.applyMatrix4(matrix);
     for (const k of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(k)) geo.deleteAttribute(k);
     if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array((geo.attributes.position.count) * 2), 2));
+    if (!fine) geo = tessellate(geo, m);
+    displace(geo, m);
+    if (geo.index) geo = geo.toNonIndexed();
     if (!this.parts.has(m)) this.parts.set(m, []);
     this.parts.get(m)!.push(geo);
     if (collide) this.collide(geo);
@@ -45,7 +50,9 @@ export class Builder {
     tmpE.set(rx, ry, rz, 'YXZ');
     tmpQ.setFromEuler(tmpE);
     tmpM.compose(new THREE.Vector3(x, y + h / 2, z), tmpQ, new THREE.Vector3(1, 1, 1));
-    this.add(new THREE.BoxGeometry(w, h, d), m, tmpM, collide);
+    const L = TESS[m] ?? 1e9;
+    const seg = (s: number) => Math.min(64, Math.max(1, Math.ceil(s / L)));
+    this.add(new THREE.BoxGeometry(w, h, d, seg(w), seg(h), seg(d)), m, tmpM, collide, true);
   }
 
   geo(m: MatName, g: THREE.BufferGeometry, x: number, y: number, z: number, ry = 0, collide = true, rx = 0, rz = 0) {

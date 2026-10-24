@@ -25,7 +25,11 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 900);
 scene.add(makeSky());
 
+// Let the title card paint before the (synchronous) world build.
+await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
+const t0 = performance.now();
 const { collider, lamps, flames } = buildWorld(scene);
+const buildMs = performance.now() - t0;
 
 // Moonlight and a faint sky fill.
 const moon = new THREE.DirectionalLight(0x8fa6d6, 0.8);
@@ -136,6 +140,7 @@ addEventListener('resize', () => {
 const overlay = document.getElementById('overlay')!;
 const regionEl = document.getElementById('region')!;
 const hintEl = document.getElementById('hint')!;
+document.querySelector('#overlay .enter')!.textContent = 'Enter';
 overlay.addEventListener('click', () => {
   overlay.classList.add('hidden');
   renderer.domElement.requestPointerLock?.()?.catch?.(() => {});
@@ -240,3 +245,4 @@ function frame() {
 }
 frame();
 (window as unknown as { __ready: boolean }).__ready = true;
+(window as unknown as { __stats: string }).__stats = `build ${buildMs.toFixed(0)}ms, ${renderer.info.render.triangles} tris, collider ${collider.geometry.attributes.position.count / 3} tris`;
