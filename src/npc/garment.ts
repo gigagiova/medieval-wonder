@@ -1,0 +1,727 @@
+import * as THREE from 'three';
+import { MeshBVH } from 'three-mesh-bvh';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { canon, withAtmos, matte } from './rig';
+
+// Clothes, made the way game characters are dressed: each garment is
+// generated around the body in its bind pose, pushed out of the body with
+// BVH closest-point queries, and given skin weights transferred from the
+// nearest body surface, so it follows every joint. Body parts it covers are
+// removed so nothing pokes through. Free parts (skirts, sleeve ends, hoods,
+// cloaks) are later simulated as cloth near the camera (see cloth.ts).
+
+export type HoodKind = 'cowl' | 'hood' | 'veil';
+export interface GarmentSpec {
+  hem: 'ankle' | 'calf' | 'knee';
+  flare: number; // skirt flare per metre below the belt
+  folds: number; // fold depth per metre below the belt
+  sleeve: 'bell' | 'fitted';
+  hood: HoodKind | null;
+  scapular?: boolean;
+  cape?: 'cloak' | 'shawl';
+  belt: 'rope' | 'leather' | 'sash';
+  tail?: boolean; // the rope's hanging end
+}
+
+/** Material groups of a garment. */
+export const G_TUNIC = 0, G_OVER = 1, G_BELT = 2, G_HEAD = 3;
+
+export interface Garment {
+  geo: THREE.BufferGeometry; // bind-space positions, normals, uv, color, skin attributes, groups
+  bind: Float32Array;
+  skinI: Uint16Array;
+  skinW: Float32Array;
+  maxD: Float32Array; // tether radius per vertex (0 = pinned)
+  capMask: Uint16Array; // which collision capsules a vertex can touch (bit per capsule)
+  edges: Uint32Array;
+  rest: Float32Array;
+  stiff: Float32Array;
+  rope: { root: number; n: number; seg: number } | null;
+  /** Where the belt sits, for fittings hung on it. */
+  belt: { y: number; cx: number; cz: number; r: (a: number) => number };
+}
+
+/** Body measurements in the bind pose (world-at-load units, metres). */
+export interface Measure {
+  bone: (n: string) => THREE.Vector3;
+  head: { c: THREE.Vector3; rx: number; rz: number; top: number; brow: number };
+}
+
+// ------------------------------------------------------------------ body
+
+const HANDS = /Hand|Thumb|Index|Middle|Ring|Pinky/;
+const HEAD = /^(Head|HeadTop_End|LeftEye|RightEye|Neck)$/;
+const ARMS = /Shoulder|Arm/;
+const FEET = /Foot|Toe/;
+const LEGS = /UpLeg|Leg/;
+type Cls = 'hand' | 'head' | 'arm' | 'leg' | 'foot' | 'torso';
+
+export function boneClassOf(mesh: THREE.SkinnedMesh): Cls[] {
+  const si = mesh.geometry.attributes.skinIndex, sw = mesh.geometry.attributes.skinWeight;
+  const names = mesh.skeleton.bones.map((b) => canon(b.name));
+  const cls: Cls[] = [];
+  for (let i = 0; i < si.count; i++) {
+    let best = 0, bw = -1;
+    for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > bw) { bw = w; best = si.getComponent(i, k); } }
+    const n = names[best];
+    cls.push(HANDS.test(n) ? 'hand' : HEAD.test(n) ? 'head' : ARMS.test(n) ? 'arm' : FEET.test(n) ? 'foot' : LEGS.test(n) ? 'leg' : 'torso');
+  }
+  return cls;
+}
+
+export function measure(root: THREE.Object3D): Measure {
+  root.updateMatrixWorld(true);
+  const bone = (n: string) => {
+    let o: THREE.Object3D | undefined;
+    root.traverse((x) => { if (!o && (x as THREE.Bone).isBone && canon(x.name) === n) o = x; });
+    return o!.getWorldPosition(new THREE.Vector3());
+  };
+  const neck = bone('Neck');
+  const box = new THREE.Box3(), v = new THREE.Vector3();
+  root.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh || /Eye|Teeth/.test(m.name)) return;
+    const cls = boneClassOf(m);
+    for (let i = 0; i < cls.length; i++) {
+      if (cls[i] !== 'head') continue;
+      m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld);
+      if (v.y > neck.y + 0.05) box.expandByPoint(v);
+    }
+  });
+  const c = box.getCenter(new THREE.Vector3());
+  const s = box.getSize(new THREE.Vector3());
+  return { bone, head: { c, rx: s.x / 2, rz: s.z / 2, top: box.max.y, brow: c.y + s.y * 0.12 } };
+}
+
+/**
+ * Strip the modern outfit. The man keeps head, beard, hands, his trousers as
+ * hose and his shoes; the woman keeps head, hands and feet. Everything else
+ * the clothes cover goes.
+ */
+export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard: boolean; wraps: boolean; m: Measure }) {
+  const leather = matte(0x2a1d14, 0.86);
+  root.traverse((x) => {
+    const m = x as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh) return;
+    m.frustumCulled = false;
+    if (/Outfit_Top|Headwear/.test(m.name) || (!o.beard && /Beard/.test(m.name))) { m.visible = false; return; }
+    const trim = kit === 'woman' || m.name === 'Wolf3D_Body';
+    if (trim) {
+      const cls = boneClassOf(m);
+      const idx = m.geometry.index!;
+      const skin: number[] = [], feet: number[] = [];
+      for (let t = 0; t < idx.count; t += 3) {
+        const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+        const ok = (i: number) => cls[i] === 'hand' || cls[i] === 'head';
+        if (ok(a) && ok(b) && ok(c)) skin.push(a, b, c);
+        else if (kit === 'woman' && cls[a] === 'foot' && cls[b] === 'foot' && cls[c] === 'foot') feet.push(a, b, c);
+      }
+      m.geometry = m.geometry.clone();
+      m.geometry.setIndex([...skin, ...feet]);
+      m.geometry.clearGroups();
+      m.geometry.addGroup(0, skin.length, 0);
+      if (feet.length) m.geometry.addGroup(skin.length, feet.length, 1);
+    }
+    const old = m.material as THREE.MeshStandardMaterial;
+    let nm: THREE.Material;
+    if (m.name === 'Wolf3D_Outfit_Footwear') nm = leather;
+    else if (m.name === 'Wolf3D_Outfit_Bottom') {
+      // Wool hose, with linen fasciae wound from ankle to knee on laymen.
+      const ankle = o.m.bone('LeftFoot').y + 0.03, knee = o.m.bone('LeftLeg').y + 0.02;
+      nm = withAtmos(new THREE.MeshStandardMaterial({ color: 0x2b241d, roughness: 0.97 }), o.wraps ? { wraps: { knee, ankle, color: new THREE.Color(0x8c8270) } } : {});
+    } else if (/Body|Head|^Mesh$/.test(m.name) || kit === 'woman') {
+      // Weathered skin: matte, slight wrap-around softness.
+      const s = old.clone();
+      s.roughness = 0.72;
+      s.metalness = 0;
+      if (kit === 'man') s.color = new THREE.Color(0.93, 0.84, 0.8);
+      else { s.roughness = 0.78; s.normalScale?.set(0.6, 0.6); }
+      nm = withAtmos(s, { skin: true });
+      nm.userData.skin = true;
+    } else nm = withAtmos(old.clone());
+    m.material = kit === 'woman' ? [nm, leather] : nm;
+  });
+}
+
+// ------------------------------------------------------------------ garment
+
+interface FitSet { bvh: MeshBVH; geo: THREE.BufferGeometry; si: Float32Array; sw: Float32Array }
+
+/** Bind-space world positions + skin data of the body meshes, split by region. */
+function bodySets(root: THREE.Object3D, full: THREE.Object3D) {
+  const pos: number[] = [], si: number[] = [], sw: number[] = [], cls: Cls[] = [];
+  const tris: number[][] = [];
+  const v = new THREE.Vector3();
+  // The untrimmed body (full) gives the shape; skin data are the same.
+  full.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh || /Eye|Teeth|Headwear/.test(m.name)) return;
+    const g = m.geometry;
+    const base = pos.length / 3;
+    const c = boneClassOf(m);
+    for (let i = 0; i < g.attributes.position.count; i++) {
+      m.getVertexPosition(i, v);
+      v.applyMatrix4(m.matrixWorld);
+      pos.push(v.x, v.y, v.z);
+      for (let k = 0; k < 4; k++) { si.push(g.attributes.skinIndex.getComponent(i, k)); sw.push(g.attributes.skinWeight.getComponent(i, k)); }
+      cls.push(c[i]);
+    }
+    const idx = g.index!;
+    for (let t = 0; t < idx.count; t += 3) tris.push([base + idx.getX(t), base + idx.getX(t + 1), base + idx.getX(t + 2)]);
+  });
+  void root;
+  const P = new Float32Array(pos);
+  const make = (keep: (c: Cls) => boolean): FitSet => {
+    const ix: number[] = [];
+    for (const [a, b, c] of tris) if (keep(cls[a]) && keep(cls[b]) && keep(cls[c])) ix.push(a, b, c);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(P, 3));
+    geo.setIndex(ix);
+    return { bvh: new MeshBVH(geo), geo, si: new Float32Array(si), sw: new Float32Array(sw) };
+  };
+  const leg = (c: Cls) => c === 'leg' || c === 'foot';
+  return {
+    P, cls,
+    trunk: make((c) => c === 'torso' || leg(c)),
+    arms: make((c) => c === 'arm' || c === 'hand'),
+    upper: make((c) => c === 'torso' || c === 'head'),
+    torso: make((c) => c === 'torso'),
+    all: make(() => true),
+  };
+}
+
+/** A grid surface: rows × cols vertices, optional wrap of columns. */
+class Grid {
+  pos: number[] = [];
+  uv: number[] = [];
+  maxD: number[] = [];
+  region: number[] = []; // weights from: 0 trunk, 1 arms, 2 upper, 3 torso
+  group = G_TUNIC;
+  cap = 0; // capsule mask for free vertices
+  constructor(public rows: number, public cols: number, public wrap: boolean) {}
+}
+
+/** GLSL-style smoothstep that also accepts reversed edges. */
+const ss = (e0: number, e1: number, x: number) => { const t = THREE.MathUtils.clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+
+// Capsules (see cloth.ts): 0-1 thighs, 2-3 shins, 4-5 feet, 6 pelvis, 7 torso, 8-9 upper arms, 10-11 forearms.
+const CAP_SKIRT = 0b000001111111, CAP_SLEEVE = 0b000010000000, CAP_CLOAK = 0b111111000011, CAP_SHAWL = 0b111110000000;
+
+const HOODS: Record<HoodKind, { off: number; minD: number; point: number; brim: number; cape: number; mid: number; top: number; drape: number }> = {
+  // The monk's cowl: deep, pointed, with a capelet.
+  cowl: { off: 0.055, minD: 0.1, point: 0.1, brim: 0.055, cape: 0.06, mid: 0.62, top: 0.1, drape: 0.05 },
+  // A layman's hood (cucullus) with a short shoulder cape.
+  hood: { off: 0.04, minD: 0.095, point: 0.07, brim: 0.03, cape: 0.05, mid: 0.6, top: 0.12, drape: 0.04 },
+  // A woman's veil: close round the head, falling over the shoulders.
+  veil: { off: 0.02, minD: 0.088, point: 0, brim: 0.006, cape: 0.035, mid: 0.7, top: 0.16, drape: 0.06 },
+};
+
+export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Measure, spec: GarmentSpec): Garment {
+  const S = bodySets(root, full);
+  const { P, cls } = S;
+  const bone = M.bone;
+  const neck = bone('Neck'), hips = bone('Hips'), spine2 = bone('Spine2');
+  const knee = bone('LeftLeg').y, ankle = bone('LeftFoot').y;
+  const yBelt = hips.y + 0.07, yTop = neck.y - 0.03;
+  const yHem = spec.hem === 'ankle' ? Math.max(0.055, ankle * 0.72) : spec.hem === 'knee' ? knee - 0.07 : (knee + ankle) / 2 - 0.02;
+  const smooth = (a: Float32Array, n: number, wrap: boolean, it: number) => {
+    const b = new Float32Array(n);
+    for (let k = 0; k < it; k++) {
+      for (let i = 0; i < n; i++) {
+        const l = wrap ? a[(i - 1 + n) % n] : a[Math.max(0, i - 1)], r = wrap ? a[(i + 1) % n] : a[Math.min(n - 1, i + 1)];
+        b[i] = (l + 2 * a[i] + r) / 4;
+      }
+      a.set(b);
+    }
+  };
+  const isTrunk = (c: Cls) => c === 'torso' || c === 'leg' || c === 'foot';
+
+  // --- Tunic: rings from the collar to the hem.
+  const NA = 40, NR = Math.max(20, Math.round(36 * (yTop - yHem) / (yTop - 0.075)));
+  const ringY = (r: number) => yTop + (yHem - yTop) * Math.pow(r / (NR - 1), 0.92);
+  const tunic = new Grid(NR, NA, true);
+  tunic.cap = CAP_SKIRT;
+  const rad: Float32Array[] = [];
+  const cen: THREE.Vector2[] = [];
+  for (let r = 0; r < NR; r++) {
+    const y = ringY(r);
+    const bins = new Float32Array(NA).fill(-1);
+    let cx = 0, cz = 0, cn = 0;
+    for (let i = 0; i < cls.length; i++) {
+      if (!isTrunk(cls[i]) || Math.abs(P[i * 3 + 1] - y) > 0.035) continue;
+      cx += P[i * 3]; cz += P[i * 3 + 2]; cn++;
+    }
+    const c = cn ? new THREE.Vector2(cx / cn, cz / cn) : new THREE.Vector2(hips.x, hips.z);
+    if (y < hips.y) c.set(hips.x, hips.z + 0.01);
+    cen.push(c);
+    for (let i = 0; i < cls.length; i++) {
+      if (!isTrunk(cls[i]) || Math.abs(P[i * 3 + 1] - y) > 0.035) continue;
+      const dx = P[i * 3] - c.x, dz = P[i * 3 + 2] - c.y;
+      const a = Math.atan2(dx, dz);
+      const k = ((Math.round((a / (Math.PI * 2)) * NA) % NA) + NA) % NA;
+      bins[k] = Math.max(bins[k], Math.hypot(dx, dz));
+    }
+    for (let k = 0; k < NA; k++) if (bins[k] < 0) {
+      let l = 1, rr = 1;
+      while (bins[(k - l + NA) % NA] < 0 && l < NA) l++;
+      while (bins[(k + rr) % NA] < 0 && rr < NA) rr++;
+      const a = bins[(k - l + NA) % NA], b = bins[(k + rr) % NA];
+      bins[k] = a < 0 || b < 0 ? 0.12 : a + (b - a) * (l / (l + rr));
+    }
+    smooth(bins, NA, true, 3);
+    rad.push(bins);
+  }
+  const hipProfile = new Float32Array(NA);
+  for (let r = 0; r < NR; r++) {
+    const y = ringY(r);
+    if (y < yBelt && y > hips.y - 0.22) for (let k = 0; k < NA; k++) hipProfile[k] = Math.max(hipProfile[k], rad[r][k]);
+  }
+  const fp = Math.random() * 6; // each garment folds its own way
+  for (let r = 0; r < NR; r++) {
+    const y = ringY(r);
+    const below = Math.max(0, yBelt - y);
+    for (let k = 0; k < NA; k++) {
+      let rr = rad[r][k];
+      const a = (k / NA) * Math.PI * 2;
+      if (y > yBelt + 0.02) {
+        const collar = THREE.MathUtils.smoothstep(y, yTop - 0.12, yTop);
+        const blouse = Math.exp(-Math.pow((y - (yBelt + 0.07)) / 0.06, 2)) * 0.035;
+        rr += THREE.MathUtils.lerp(0.04, 0.014, collar) + blouse;
+      } else if (y > yBelt - 0.03) {
+        rr += 0.01;
+      } else {
+        const back = 0.5 + 0.5 * Math.cos(a - Math.PI);
+        rr = Math.max(rr + 0.045, hipProfile[k] + 0.035 + below * (spec.flare + 0.05 * back));
+        const fold = Math.sin(a * 11 + Math.sin(a * 3.1 + fp) * 1.7 + fp) * 0.6 + Math.sin(a * 6 + 1.3 + fp * 0.7) * 0.4;
+        rr += fold * (0.006 + below * spec.folds);
+      }
+      rad[r][k] = rr;
+    }
+  }
+  for (let k = 0; k < NA; k++) {
+    const col = new Float32Array(NR);
+    for (let r = 0; r < NR; r++) col[r] = rad[r][k];
+    smooth(col, NR, false, 2);
+    for (let r = 0; r < NR; r++) rad[r][k] = col[r];
+  }
+  const skirtD = 0.33 * Math.min(1, (yBelt - yHem) / 0.9);
+  for (let r = 0; r < NR; r++) {
+    const y = ringY(r);
+    for (let k = 0; k < NA; k++) {
+      const a = (k / NA) * Math.PI * 2;
+      tunic.pos.push(cen[r].x + Math.sin(a) * rad[r][k], y, cen[r].y + Math.cos(a) * rad[r][k]);
+      tunic.uv.push((k / NA) * 4, y * 2.4);
+      const free = y < yBelt - 0.04 ? Math.pow(ss(yBelt - 0.04, yHem, y), 0.85) : 0;
+      tunic.maxD.push(skirtD * free);
+      tunic.region.push(0);
+    }
+  }
+
+  // --- Sleeves along the arm chains: wide bell sleeves, or fitted to the wrist.
+  const bell = spec.sleeve === 'bell';
+  const sleeves: Grid[] = [];
+  for (const side of ['Left', 'Right']) {
+    const p0 = bone(side + 'Arm'), p1 = bone(side + 'ForeArm'), p2 = bone(side + 'Hand');
+    const dirIn = p0.clone().sub(p1).normalize();
+    const start = p0.clone().addScaledVector(dirIn, 0.05);
+    const end = bell ? p2.clone().addScaledVector(p2.clone().sub(p1).normalize(), 0.02) : p2.clone().addScaledVector(p2.clone().sub(p1).normalize(), -0.025);
+    const pts = [start, p0, p1, end];
+    const lens = [0];
+    for (let i = 1; i < pts.length; i++) lens.push(lens[i - 1] + pts[i].distanceTo(pts[i - 1]));
+    const L = lens[lens.length - 1];
+    const NS = 13, NB = 14;
+    const g = new Grid(NS, NB, true);
+    g.cap = CAP_SLEEVE;
+    let prevU: THREE.Vector3 | null = null;
+    for (let r = 0; r < NS; r++) {
+      const s = (r / (NS - 1)) * L;
+      let i = 1;
+      while (i < pts.length - 1 && lens[i] < s) i++;
+      const t = (s - lens[i - 1]) / (lens[i] - lens[i - 1]);
+      const C = pts[i - 1].clone().lerp(pts[i], t);
+      const T = pts[i].clone().sub(pts[i - 1]).normalize();
+      const U: THREE.Vector3 = prevU ? prevU.clone().addScaledVector(T, -prevU.dot(T)).normalize() : new THREE.Vector3(0, 0, 1).addScaledVector(T, -T.z).normalize();
+      prevU = U;
+      const W = new THREE.Vector3().crossVectors(T, U);
+      const bins = new Float32Array(NB).fill(-1);
+      for (let k = 0; k < cls.length; k++) {
+        if (cls[k] !== 'arm' && (cls[k] !== 'hand' || !bell)) continue;
+        if (Math.sign(P[k * 3]) !== Math.sign(p0.x)) continue;
+        const d = new THREE.Vector3(P[k * 3] - C.x, P[k * 3 + 1] - C.y, P[k * 3 + 2] - C.z);
+        const along = d.dot(T);
+        if (Math.abs(along) > 0.035) continue;
+        d.addScaledVector(T, -along);
+        const a = Math.atan2(d.dot(W), d.dot(U));
+        const b = ((Math.round((a / (Math.PI * 2)) * NB) % NB) + NB) % NB;
+        bins[b] = Math.max(bins[b], d.length());
+      }
+      let mx = 0.04;
+      for (const b of bins) mx = Math.max(mx, b);
+      for (let b = 0; b < NB; b++) if (bins[b] < 0) bins[b] = mx;
+      smooth(bins, NB, true, 3);
+      const f = s / L;
+      for (let b = 0; b < NB; b++) {
+        const a = (b / NB) * Math.PI * 2;
+        const rr = bins[b] + (bell ? 0.03 + Math.pow(f, 2.2) * 0.09 : 0.018 + f * 0.004 + Math.sin(a * 3 + f * 9) * 0.003);
+        const p = C.clone().addScaledVector(U, Math.cos(a) * rr).addScaledVector(W, Math.sin(a) * rr);
+        g.pos.push(p.x, p.y, p.z);
+        g.uv.push((b / NB) * 3, f * 3);
+        g.maxD.push(bell ? 0.15 * THREE.MathUtils.smoothstep(f, 0.4, 1.0) : 0.02 * THREE.MathUtils.smoothstep(f, 0.75, 1.0));
+        g.region.push(1);
+      }
+    }
+    sleeves.push(g);
+  }
+
+  // --- Head covering: cowl, hood or veil, open round the face.
+  const ray = new THREE.Ray();
+  let hood: Grid | null = null;
+  if (spec.hood) {
+    const H = HOODS[spec.hood];
+    const Hc = M.head.c.clone();
+    Hc.z -= 0.01;
+    const NH = 22, NC = 32;
+    hood = new Grid(NH, NC, false);
+    hood.group = spec.hood === 'cowl' ? G_TUNIC : G_HEAD;
+    const th0 = -1.22, th1 = 1.5;
+    for (let r = 0; r < NH; r++) {
+      const th = th0 + (th1 - th0) * (r / (NH - 1));
+      const open = th < -0.62 ? 0.2 : th < -0.42 ? THREE.MathUtils.lerp(0.2, H.mid, (th + 0.62) / 0.2)
+        : th < 0.45 ? H.mid : THREE.MathUtils.lerp(H.mid, H.top, Math.min(1, (th - 0.45) / 0.7));
+      for (let c = 0; c < NC; c++) {
+        const ph = open + (Math.PI * 2 - 2 * open) * (c / (NC - 1));
+        const dir = new THREE.Vector3(Math.sin(ph) * Math.cos(th), Math.sin(th), Math.cos(ph) * Math.cos(th));
+        ray.set(Hc, dir);
+        const hit = S.all.bvh.raycastFirst(ray, THREE.DoubleSide);
+        let d = hit ? hit.distance : 0.13;
+        let off = th > -0.45 ? H.off : THREE.MathUtils.lerp(H.off * 0.75, H.off, (th + 1.22) / 0.77);
+        if (th > -0.45) d = Math.max(d, H.minD);
+        let dph = ph - Math.PI;
+        off += H.point * Math.exp(-(dph * dph) / 0.28 - Math.pow(th - 0.75, 2) / 0.1);
+        if (th < -0.5) off += (-0.5 - th) * H.cape + Math.sin(ph * 9 + 0.7) * 0.012 * (-0.5 - th);
+        const p = Hc.clone().addScaledVector(dir, d + off);
+        const edge = Math.min(c, NC - 1 - c);
+        if (th > -0.5) p.z += H.brim * Math.exp(-(edge * edge) / 3) * ss(-0.5, -0.2, th);
+        hood.pos.push(p.x, p.y, p.z);
+        hood.uv.push((c / NC) * 4, (r / NH) * 3);
+        const capelet = THREE.MathUtils.smoothstep(-th, 0.75, 1.2);
+        dph = Math.abs(ph - Math.PI);
+        hood.maxD.push(H.drape * capelet + (H.point ? 0.035 : 0) * Math.exp(-(dph * dph) / 0.3 - Math.pow(th - 0.8, 2) / 0.1));
+        hood.region.push(2);
+      }
+    }
+  }
+
+  // --- Fit pass: push every garment vertex out of the body.
+  const tmp = { point: new THREE.Vector3(), distance: 0, faceIndex: 0 } as { point: THREE.Vector3; distance: number; faceIndex: number };
+  const tri = new THREE.Triangle(), nrm = new THREE.Vector3(), vv = new THREE.Vector3();
+  const setFor = (reg: number) => (reg === 0 ? S.trunk : reg === 1 ? S.arms : reg === 2 ? S.upper : S.torso);
+  const fit = (g: Grid, minOff: number) => {
+    for (let i = 0; i < g.pos.length / 3; i++) {
+      vv.fromArray(g.pos, i * 3);
+      const fs = setFor(g.region[i]);
+      fs.bvh.closestPointToPoint(vv, tmp);
+      const ix = fs.geo.index!;
+      const a = ix.getX(tmp.faceIndex * 3), b = ix.getX(tmp.faceIndex * 3 + 1), c = ix.getX(tmp.faceIndex * 3 + 2);
+      tri.a.fromArray(P, a * 3); tri.b.fromArray(P, b * 3); tri.c.fromArray(P, c * 3);
+      tri.getNormal(nrm);
+      const dist = vv.clone().sub(tmp.point).dot(nrm);
+      if (dist < minOff) vv.copy(tmp.point).addScaledVector(nrm, minOff);
+      vv.toArray(g.pos, i * 3);
+    }
+  };
+  fit(tunic, 0.018);
+  sleeves.forEach((g) => fit(g, bell ? 0.022 : 0.014));
+  if (hood) fit(hood, spec.hood === 'veil' ? 0.016 : 0.03);
+
+  const tunicGeo = gridGeometry(tunic);
+  const tunicBVH = new MeshBVH(tunicGeo);
+
+  // --- Scapular: front and back panels over the tunic (monks).
+  const scap: Grid[] = [];
+  if (spec.scapular) for (const face of [1, -1]) {
+    const NX = 6, NY = 22;
+    const g = new Grid(NY, NX, false);
+    g.cap = CAP_SKIRT;
+    const yA = spine2.y + 0.02, yB = 0.34;
+    for (let r = 0; r < NY; r++) {
+      const y = yA + (yB - yA) * (r / (NY - 1));
+      for (let c = 0; c < NX; c++) {
+        const x = -0.165 + 0.33 * (c / (NX - 1));
+        ray.set(new THREE.Vector3(x, y, face * 1.2), new THREE.Vector3(0, 0, -face));
+        const hit = tunicBVH.raycastFirst(ray, THREE.DoubleSide);
+        const z = hit ? hit.point.z : face * 0.15;
+        const off = Math.abs(y - yBelt) < 0.06 ? 0.035 : 0.014;
+        g.pos.push(x, y, z + face * off);
+        g.uv.push(c / NX * 1.5, y * 4);
+        g.maxD.push(y < yBelt - 0.05 ? 0.2 * Math.pow(ss(yBelt - 0.05, yB, y), 0.8) : 0);
+        g.region.push(0);
+      }
+    }
+    g.group = G_OVER;
+    scap.push(g);
+  }
+
+  // --- Cloak (sagum) hanging from the shoulders down the back, or a shawl.
+  let cape: Grid | null = null;
+  if (spec.cape) {
+    const long = spec.cape === 'cloak';
+    const under = mergeGeometries([tunicGeo, ...sleeves.map(gridGeometry), ...(hood ? [gridGeometry(hood)] : []), S.all.geo.clone()].map((g) => {
+      const n = g.index ? g.toNonIndexed() : g;
+      for (const k of Object.keys(n.attributes)) if (k !== 'position') n.deleteAttribute(k);
+      return n;
+    }));
+    const ubvh = new MeshBVH(under);
+    const yT = neck.y - 0.045, yB = long ? knee + 0.06 : hips.y + 0.12;
+    const NR2 = long ? 28 : 16, NC2 = long ? 26 : 34;
+    const g = new Grid(NR2, NC2, false);
+    g.group = G_OVER;
+    g.cap = long ? CAP_CLOAK : CAP_SHAWL;
+    const cx = hips.x, cz = hips.z - 0.01;
+    const radii: number[][] = [];
+    for (let r = 0; r < NR2; r++) {
+      const t = r / (NR2 - 1);
+      const y = yT + (yB - yT) * Math.pow(t, 0.9);
+      const a0 = long ? THREE.MathUtils.lerp(0.36, 0.62, Math.pow(t, 0.6)) * Math.PI : THREE.MathUtils.lerp(0.16, 0.3, t) * Math.PI;
+      const row: number[] = [];
+      for (let c = 0; c < NC2; c++) {
+        const a = a0 + (Math.PI * 2 - 2 * a0) * (c / (NC2 - 1));
+        const dir = new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
+        ray.set(new THREE.Vector3(cx, y, cz).addScaledVector(dir, 1.2), dir.clone().negate());
+        const hit = ubvh.raycastFirst(ray, THREE.DoubleSide);
+        let R = hit ? Math.hypot(hit.point.x - cx, hit.point.z - cz) : 0.15;
+        // It hangs straight from the shoulder blades; it does not follow the small of the back.
+        if (r > 0) R = Math.max(R, radii[r - 1][c] - 0.004);
+        row.push(R);
+      }
+      radii.push(row);
+    }
+    for (let r = 0; r < NR2; r++) {
+      const t = r / (NR2 - 1);
+      const y = yT + (yB - yT) * Math.pow(t, 0.9);
+      const a0 = long ? THREE.MathUtils.lerp(0.36, 0.62, Math.pow(t, 0.6)) * Math.PI : THREE.MathUtils.lerp(0.16, 0.3, t) * Math.PI;
+      const row = Float32Array.from(radii[r]);
+      smooth(row, NC2, false, 2);
+      for (let c = 0; c < NC2; c++) {
+        const a = a0 + (Math.PI * 2 - 2 * a0) * (c / (NC2 - 1));
+        const fold = (Math.sin(a * 9 + fp + Math.sin(a * 2.3) * 1.4) * 0.6 + Math.sin(a * 5 + fp * 1.3) * 0.4) * t * (long ? 0.03 : 0.012);
+        const R = row[c] + 0.022 + t * (long ? 0.04 : 0.02) + fold;
+        g.pos.push(cx + Math.sin(a) * R, y, cz + Math.cos(a) * R);
+        g.uv.push((c / NC2) * 3, t * (long ? 3 : 1.6));
+        g.maxD.push(r < 2 ? 0 : (long ? 0.3 : 0.1) * Math.pow(ss(0, 1, t), 0.8));
+        g.region.push(3);
+      }
+    }
+    cape = g;
+  }
+
+  // --- Belt: a rope, a leather belt, or a wide sash.
+  const NT = 36, NTH = spec.belt === 'rope' ? 6 : 8;
+  const beltRing = new Grid(NTH, NT, true);
+  let beltInfo: Garment['belt'];
+  {
+    const rr = rad.map((row, r) => ({ row, y: ringY(r) }));
+    const ring = rr.reduce((m, x) => (Math.abs(x.y - yBelt) < Math.abs(m.y - yBelt) ? x : m));
+    const rc = cen[rr.indexOf(ring)];
+    const [ry, rz, gap] = spec.belt === 'rope' ? [0.011, 0.011, 0.013] : spec.belt === 'leather' ? [0.019, 0.005, 0.009] : [0.034, 0.01, 0.014];
+    const Rat = (a: number) => ring.row[((Math.round((a / (Math.PI * 2)) * NA) % NA) + NA) % NA] + gap;
+    for (let t = 0; t < NTH; t++) {
+      for (let k = 0; k < NT; k++) {
+        const a = (k / NT) * Math.PI * 2;
+        const ta = (t / NTH) * Math.PI * 2;
+        // Round for rope; a flattened, rounded rectangle for leather and cloth.
+        const cs = Math.cos(ta), sn = Math.sin(ta);
+        const e = spec.belt === 'rope' ? 1 : 0.35;
+        const R = Rat(a) + Math.sign(cs) * Math.pow(Math.abs(cs), e) * rz + (spec.belt === 'sash' ? Math.sin(a * 13 + t) * 0.002 : 0);
+        beltRing.pos.push(rc.x + Math.sin(a) * R, ring.y + Math.sign(sn) * Math.pow(Math.abs(sn), e) * ry, rc.y + Math.cos(a) * R);
+        beltRing.uv.push(k / NT * (spec.belt === 'rope' ? 30 : 8), t / NTH);
+        beltRing.maxD.push(0);
+        beltRing.region.push(0);
+      }
+    }
+    beltRing.group = G_BELT;
+    beltInfo = { y: ring.y, cx: rc.x, cz: rc.y, r: (a: number) => Rat(a) + rz };
+  }
+
+  // --- Assemble one geometry: positions, uvs, colours, index, groups, constraints.
+  const pieces: { g: Grid; wrapRows?: boolean }[] = [{ g: tunic }, ...sleeves.map((g) => ({ g })), ...(hood ? [{ g: hood }] : []), ...scap.map((g) => ({ g })), ...(cape ? [{ g: cape }] : []), { g: beltRing, wrapRows: true }];
+  const pos: number[] = [], uv: number[] = [], col: number[] = [], maxD: number[] = [], region: number[] = [], capOf: number[] = [];
+  const index: number[][] = [[], [], [], []];
+  const E: number[] = [], ES: number[] = [];
+  let ringStart = 0;
+  for (const { g, wrapRows } of pieces) {
+    const base = pos.length / 3;
+    if (g === beltRing) ringStart = base;
+    const n = g.pos.length / 3;
+    for (let i = 0; i < n; i++) {
+      pos.push(g.pos[i * 3], g.pos[i * 3 + 1], g.pos[i * 3 + 2]);
+      uv.push(g.uv[i * 2], g.uv[i * 2 + 1]);
+      // Mud and wear towards the hem.
+      const y = g.pos[i * 3 + 1];
+      const mud = g.group === G_BELT ? 0 : 1 - THREE.MathUtils.smoothstep(y, 0.06, 0.38);
+      col.push(1 - mud * 0.35, 1 - mud * 0.42, 1 - mud * 0.5);
+      maxD.push(g.maxD[i]);
+      region.push(g.region[i]);
+      capOf.push(g.cap);
+    }
+    const R = g.rows, C = g.cols;
+    const id = (r: number, c: number) => base + ((r + R) % R) * C + ((c + C) % C);
+    const cmax = g.wrap ? C : C - 1, rmax = wrapRows ? R : R - 1;
+    for (let r = 0; r < rmax; r++) for (let c = 0; c < cmax; c++) {
+      const a = id(r, c), b = id(r, c + 1), cc = id(r + 1, c), d = id(r + 1, c + 1);
+      index[g.group].push(a, cc, b, b, cc, d);
+    }
+    if (g === beltRing) continue; // rigid
+    for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+      const a = id(r, c);
+      if (g.wrap || c < C - 1) { E.push(a, id(r, c + 1)); ES.push(1); }
+      if (r < R - 1) { E.push(a, id(r + 1, c)); ES.push(1); }
+      if (r < R - 1 && (g.wrap || c < C - 1)) { E.push(a, id(r + 1, c + 1)); ES.push(0.6); E.push(id(r, c + 1), id(r + 1, c)); ES.push(0.6); }
+      if (g.wrap || c < C - 2) { E.push(a, id(r, c + 2)); ES.push(0.18); }
+      if (r < R - 2) { E.push(a, id(r + 2, c)); ES.push(0.18); }
+    }
+  }
+  const N = pos.length / 3;
+  const bind = new Float32Array(pos);
+
+  // --- Skin-weight transfer from the nearest body point (per region), then smoothing.
+  const wmap: Map<number, number>[] = [];
+  for (let i = 0; i < N; i++) {
+    vv.fromArray(bind, i * 3);
+    const fs = setFor(region[i]);
+    fs.bvh.closestPointToPoint(vv, tmp);
+    const ix = fs.geo.index!;
+    const vs = [ix.getX(tmp.faceIndex * 3), ix.getX(tmp.faceIndex * 3 + 1), ix.getX(tmp.faceIndex * 3 + 2)];
+    tri.a.fromArray(P, vs[0] * 3); tri.b.fromArray(P, vs[1] * 3); tri.c.fromArray(P, vs[2] * 3);
+    const bc = tri.getBarycoord(tmp.point, new THREE.Vector3()) ?? new THREE.Vector3(1 / 3, 1 / 3, 1 / 3);
+    const m = new Map<number, number>();
+    [bc.x, bc.y, bc.z].forEach((w, j) => {
+      for (let k = 0; k < 4; k++) {
+        const bi = fs.si[vs[j] * 4 + k], bw = fs.sw[vs[j] * 4 + k] * w;
+        if (bw > 0) m.set(bi, (m.get(bi) ?? 0) + bw);
+      }
+    });
+    wmap.push(m);
+  }
+  // The skirt hangs from the pelvis; the legs only push it about (via collisions).
+  const bones = (root.getObjectByProperty('isSkinnedMesh', true) as THREE.SkinnedMesh).skeleton.bones;
+  const hipsI = bones.findIndex((b) => canon(b.name) === 'Hips');
+  for (let i = 0; i < N; i++) {
+    const y = bind[i * 3 + 1];
+    if (region[i] !== 0 || y > yBelt) continue;
+    const t = 0.8 * ss(yBelt, yBelt - 0.3, y);
+    const m = wmap[i];
+    for (const [k, w] of m) m.set(k, w * (1 - t));
+    m.set(hipsI, (m.get(hipsI) ?? 0) + t);
+  }
+  const nb: number[][] = Array.from({ length: N }, () => []);
+  for (let e = 0; e < ES.length; e++) if (ES[e] === 1) { nb[E[e * 2]].push(E[e * 2 + 1]); nb[E[e * 2 + 1]].push(E[e * 2]); }
+  for (let it = 0; it < 3; it++) {
+    const next = wmap.map((m, i) => {
+      const o = new Map<number, number>();
+      const add = (src: Map<number, number>, f: number) => { for (const [k, w] of src) o.set(k, (o.get(k) ?? 0) + w * f); };
+      add(m, 2);
+      for (const j of nb[i]) add(wmap[j], 1);
+      return o;
+    });
+    for (let i = 0; i < N; i++) wmap[i] = next[i];
+  }
+  const skinI = new Uint16Array(N * 4), skinW = new Float32Array(N * 4);
+  for (let i = 0; i < N; i++) {
+    const top = [...wmap[i]].sort((a, b) => b[1] - a[1]).slice(0, 4);
+    const sum = top.reduce((s, x) => s + x[1], 0) || 1;
+    top.forEach(([k, w], j) => { skinI[i * 4 + j] = k; skinW[i * 4 + j] = w / sum; });
+  }
+
+  const fe: number[] = [], fr: number[] = [], fsf: number[] = [];
+  for (let e = 0; e < ES.length; e++) {
+    const a = E[e * 2], b = E[e * 2 + 1];
+    if (maxD[a] === 0 && maxD[b] === 0) continue;
+    fe.push(a, b);
+    fr.push(Math.hypot(bind[a * 3] - bind[b * 3], bind[a * 3 + 1] - bind[b * 3 + 1], bind[a * 3 + 2] - bind[b * 3 + 2]));
+    fsf.push(ES[e]);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uv), 2));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
+  geo.setAttribute('skinIndex', new THREE.BufferAttribute(skinI, 4));
+  geo.setAttribute('skinWeight', new THREE.BufferAttribute(skinW, 4));
+  const all: number[] = [];
+  index.forEach((ix, gi) => { if (ix.length) geo.addGroup(all.length, ix.length, gi); all.push(...ix); });
+  geo.setIndex(all);
+  geo.computeVertexNormals();
+
+  let rope: Garment['rope'] = null;
+  if (spec.tail) {
+    const knot = new THREE.Vector3(-0.09, yBelt - 0.01, 0);
+    ray.set(new THREE.Vector3(-0.09, yBelt, 1), new THREE.Vector3(0, 0, -1));
+    const hit = tunicBVH.raycastFirst(ray, THREE.DoubleSide);
+    knot.z = (hit ? hit.point.z : 0.15) + 0.03;
+    let knotI = ringStart, bd = Infinity;
+    for (let i = ringStart; i < N; i++) {
+      const d = (bind[i * 3] - knot.x) ** 2 + (bind[i * 3 + 1] - knot.y) ** 2 + (bind[i * 3 + 2] - knot.z) ** 2;
+      if (d < bd) { bd = d; knotI = i; }
+    }
+    rope = { root: knotI, n: 12, seg: 0.05 };
+  }
+  const capMask = new Uint16Array(N);
+  for (let i = 0; i < N; i++) if (maxD[i] > 0) capMask[i] = capOf[i];
+  return { geo, bind, skinI, skinW, capMask, maxD: new Float32Array(maxD), edges: new Uint32Array(fe), rest: new Float32Array(fr), stiff: new Float32Array(fsf), rope, belt: beltInfo };
+}
+
+/**
+ * Faces deep in a hood: bake how much of the sky each head vertex sees past
+ * the garment into vertex colours.
+ */
+export function bakeHeadShade(root: THREE.Object3D, garmentGeo: THREE.BufferGeometry) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', garmentGeo.attributes.position.clone());
+  g.setIndex(garmentGeo.index!.clone());
+  const bvh = new MeshBVH(g);
+  const dirs: THREE.Vector3[] = [];
+  for (let i = 0; i < 24; i++) {
+    const u = (i + 0.5) / 24, a = i * 2.39996;
+    const y = 0.15 + 0.85 * u, r = Math.sqrt(1 - y * y);
+    dirs.push(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r + 0.35).normalize());
+  }
+  const ray = new THREE.Ray(), v = new THREE.Vector3();
+  root.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh || !m.visible || /Footwear|Bottom/.test(m.name)) return;
+    const n = m.geometry.attributes.position.count;
+    const col = new Float32Array(n * 3).fill(1);
+    const cls = boneClassOf(m);
+    for (let i = 0; i < n; i++) {
+      if (cls[i] !== 'head') continue;
+      m.getVertexPosition(i, v);
+      v.applyMatrix4(m.matrixWorld);
+      let open = 0;
+      for (const d of dirs) {
+        ray.origin.copy(v).addScaledVector(d, 0.004);
+        ray.direction.copy(d);
+        if (!bvh.raycastFirst(ray, THREE.DoubleSide, 0, 0.7)) open++;
+      }
+      const k = 0.1 + 0.9 * Math.pow(open / dirs.length, 2.0);
+      col[i * 3] = k; col[i * 3 + 1] = k * 0.97; col[i * 3 + 2] = k * 0.95;
+    }
+    m.geometry = m.geometry.clone();
+    m.geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const mats = Array.isArray(m.material) ? m.material : [m.material];
+    for (const mm of mats) (mm as THREE.MeshStandardMaterial).vertexColors = true;
+  });
+}
+
+function gridGeometry(g: Grid) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(g.pos), 3));
+  const ix: number[] = [];
+  const R = g.rows, C = g.cols;
+  for (let r = 0; r < R - 1; r++) for (let c = 0; c < (g.wrap ? C : C - 1); c++) {
+    const a = r * C + c, b = r * C + ((c + 1) % C), cc = a + C, d = b + C;
+    ix.push(a, cc, b, b, cc, d);
+  }
+  geo.setIndex(ix);
+  return geo;
+}
