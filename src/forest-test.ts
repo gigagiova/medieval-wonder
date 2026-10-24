@@ -30,7 +30,7 @@ let keepOut = (x: number, z: number) => Math.abs(x - 3) < 7 && z > 60 && z < 200
 const b = new Builder();
 if (params.has('world')) {
   const w = await import('./world');
-  const res = w.buildWorld(scene);
+  const res = await w.buildWorld(scene);
   shared.uTown.value = res.townTex;
   const md = w.getMapData();
   const poly = md.wall;

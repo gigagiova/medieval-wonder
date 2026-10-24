@@ -121,8 +121,13 @@ export function getMapData() {
 /** The main lane, gate to abbey, as a polyline (for the monk's round). */
 export const mainLane = () => town.streets[0].pts;
 
-export function buildWorld(scene: THREE.Scene) {
+/** Progress callback for the title card; each await lets the page breathe. */
+export type Progress = (label: string, frac: number) => Promise<void>;
+const noProgress: Progress = async () => {};
+
+export async function buildWorld(scene: THREE.Scene, progress: Progress = noProgress) {
   const b = new Builder();
+  await progress('Surveying the old Roman walls', 0.02);
   const abbey = [V(-49, -71), V(-30, -76), V(-8, -72), V(-3, -52), V(-6, -29), V(-24, -26), V(-41, -33), V(-50, -48)];
   // Sites for the Roman baths (west) and the gastald's palace (east).
   const thermae = [V(-48, 12), V(-18, 12), V(-18, 36), V(-48, 36)];
@@ -133,15 +138,26 @@ export function buildWorld(scene: THREE.Scene) {
   setGroundExtra((x, z) => town.gutterAt(x, z));
   ground(b);
   townWall(b);
-  for (const lot of lotsFor(town)) buildHouse(b, lot);
+  await progress('Raising the houses', 0.1);
+  const lots = lotsFor(town);
+  for (let i = 0; i < lots.length; i++) {
+    buildHouse(b, lots[i]);
+    if (i % 120 === 119) await progress('Raising the houses', 0.1 + 0.3 * (i / lots.length));
+  }
   buildBridges(b, town);
+  await progress('Among the ruins of the forum', 0.42);
   roman(b);
   monastery(b);
+  await progress('Carving the catacombs', 0.48);
   buildCatacombs(b);
+  await progress('In the old baths', 0.56);
   buildBaths(b, scene);
+  await progress("At the gastald's palace", 0.6);
   buildPalace(b, scene);
+  await progress('Copying the codices', 0.64);
   buildLibrary(b, scene);
   outskirts(b);
+  await progress('The wood grows dark', 0.7);
   // The wood: dense, old and dead, right up to a cleared strip along the wall.
   const insideWall = (x: number, z: number) => {
     let c = false;
@@ -167,6 +183,7 @@ export function buildWorld(scene: THREE.Scene) {
   };
   buildForest(scene, b, { inside: insideWall, keepOut });
   mapMarks.trees.push(...treeSpots);
+  await progress('The fog gathers', 0.8);
   const { collider, cells } = b.build(scene);
   return { collider, cells, lamps: b.lamps, flames: b.flames, props: b.props, townTex: townTexture(town) };
 }

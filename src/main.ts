@@ -34,10 +34,18 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 900);
 scene.add(makeSky());
 
-// Let the title card paint before the (synchronous) world build.
-await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
+// Title card shows progress while the world is built in stages; any failure
+// is written on the card instead of leaving it hanging.
+const enterEl = document.querySelector('#overlay .enter')!;
+const progress = async (label: string, frac: number) => {
+  enterEl.textContent = `${label}… ${Math.round(frac * 100)}%`;
+  await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+};
+addEventListener('error', (e) => { enterEl.textContent = 'Something went wrong: ' + (e.message || e.error); });
+addEventListener('unhandledrejection', (e) => { enterEl.textContent = 'Something went wrong: ' + (e.reason?.message ?? e.reason); });
+await progress('Lighting the lamps', 0);
 const t0 = performance.now();
-const { collider, cells, lamps, flames, props, townTex } = buildWorld(scene);
+const { collider, cells, lamps, flames, props, townTex } = await buildWorld(scene, progress);
 shared.uTown.value = townTex;
 (window as unknown as { __camera: THREE.Camera }).__camera = camera;
 const bvh = new MeshBVH(collider.geometry);
@@ -116,7 +124,6 @@ scene.add(makeMotes());
 
 // Monks: rigged, animated bodies under cloth-simulated habits (Bullet soft
 // bodies), each carrying a horn lantern that feeds the light pool.
-await loadMonkAssets();
 function makeMonk(path: (t: number) => THREE.Vector3, rate: number) {
   const monk = createMonk(scene);
   const lamp: Lamp = { pos: new THREE.Vector3(), color: new THREE.Color(1, 0.5, 0.18), intensity: 0.5, under: false, seed: Math.random() * 50 };
@@ -154,7 +161,14 @@ const atrium = (t: number) => {
   const x = -15.5 + Math.sin(a) * 3.6 + Math.sin(a * 2.3) * 0.6, z = -35.5 + Math.cos(a) * 2.6;
   return new THREE.Vector3(x, terrain(x, z), z);
 };
-const monks = [makeMonk(onLane, 1), makeMonk(atrium, 1)];
+// The brothers arrive a little after you do: their models load and are
+// dressed in the background, never holding up the start.
+const monks: ((dt: number) => void)[] = [];
+const summonMonks = () => setTimeout(() => {
+  loadMonkAssets()
+    .then(() => { monks.push(makeMonk(onLane, 1)); setTimeout(() => monks.push(makeMonk(atrium, 1)), 300); })
+    .catch((e) => console.warn('monks unavailable', e));
+}, 500);
 
 const player = new Player(collider, SPAWN, camera, renderer.domElement);
 (window as unknown as { __teleport: (t: Teleport) => void }).__teleport = (t) => {
@@ -212,7 +226,11 @@ addEventListener('resize', () => {
 const overlay = document.getElementById('overlay')!;
 const regionEl = document.getElementById('region')!;
 const hintEl = document.getElementById('hint')!;
-document.querySelector('#overlay .enter')!.textContent = 'Enter';
+// Compile every shader before letting anyone in, without freezing the page.
+await progress('Mixing the pigments', 0.94);
+try { await renderer.compileAsync(scene, camera); } catch { /* compiled on first frame instead */ }
+enterEl.textContent = 'Enter';
+summonMonks();
 overlay.addEventListener('click', () => {
   overlay.classList.add('hidden');
   renderer.domElement.requestPointerLock?.()?.catch?.(() => {});
