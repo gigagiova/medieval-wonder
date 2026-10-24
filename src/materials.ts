@@ -1,49 +1,36 @@
 import * as THREE from 'three';
 import { NLAMP, noiseGLSL, atmosGLSL, surfaceGLSL } from './shaders';
 
-/**
- * A tiling 256² micro-detail texture for porous, coarse surfaces:
- * R pores (pits), G grain, B fine grit, A fibres (for wood).
- * Generated once with periodic noise, so it repeats seamlessly.
- */
-function makeMicro(): THREE.DataTexture {
-  const S = 256, data = new Uint8Array(S * S * 4);
-  let seed = 9;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const lattice = (f: number) => { const a = new Float32Array(f * f); for (let i = 0; i < a.length; i++) a[i] = rnd(); return a; };
-  const vn = (x: number, y: number, f: number, L: Float32Array) => {
-    const fx = (x / S) * f, fy = (y / S) * f, i = Math.floor(fx), j = Math.floor(fy);
-    let u = fx - i, v = fy - j; u = u * u * (3 - 2 * u); v = v * v * (3 - 2 * v);
-    const a = L[(j % f) * f + (i % f)], b = L[(j % f) * f + ((i + 1) % f)], c = L[((j + 1) % f) * f + (i % f)], d = L[((j + 1) % f) * f + ((i + 1) % f)];
-    return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
-  };
-  const oct = [8, 16, 32, 64, 128].map((f) => ({ f, L: lattice(f) }));
-  // Pores: periodic Worley over 40 random points per tile.
-  const P: [number, number, number][] = Array.from({ length: 90 }, () => [rnd() * S, rnd() * S, 0.4 + rnd() * 0.9]);
-  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-    let d1 = 1e9;
-    for (const [px, py, r] of P) {
-      let dx = Math.abs(x - px), dy = Math.abs(y - py);
-      dx = Math.min(dx, S - dx); dy = Math.min(dy, S - dy);
-      d1 = Math.min(d1, Math.hypot(dx, dy) / (6 * r));
-    }
-    const pore = Math.max(0, 1 - d1) ** 2;
-    const grain = vn(x, y, 16, oct[1].L) * 0.5 + vn(x, y, 32, oct[2].L) * 0.3 + vn(x, y, 64, oct[3].L) * 0.2;
-    const grit = vn(x, y, 128, oct[4].L) * 0.6 + rnd() * 0.4;
-    const fib = vn(x, y * 0.0625 + x * 0.02, 128, oct[4].L) * 0.7 + vn(x, y, 64, oct[3].L) * 0.3;
-    const k = (y * S + x) * 4;
-    data[k] = pore * 255; data[k + 1] = grain * 255; data[k + 2] = grit * 255; data[k + 3] = fib * 255;
-  }
-  const t = new THREE.DataTexture(data, S, S, THREE.RGBAFormat);
+// ---------------------------------------------------------------- textures
+// Photo-scanned CC0 PBR sets from Poly Haven (see public/textures/CREDITS.md
+// and tools/fetch-textures.ts). Each set: _a albedo (sRGB), _n normal
+// (OpenGL), _m packed (R ao, G roughness, B height). Loading starts at import.
+
+const loader = new THREE.TextureLoader();
+const pending: Promise<unknown>[] = [];
+function load(path: string, srgb: boolean): THREE.Texture {
+  let done: () => void = () => {};
+  pending.push(new Promise<void>((res) => { done = res; }));
+  // A missing texture must not hold up the world: resolve on error too.
+  const t = loader.load(path, () => done(), undefined, () => { console.warn('texture failed', path); done(); });
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.magFilter = THREE.LinearFilter;
-  t.minFilter = THREE.LinearMipmapLinearFilter;
-  t.generateMipmaps = true;
-  t.anisotropy = 1;
-  t.needsUpdate = true;
+  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  t.anisotropy = 4;
   return t;
 }
-const micro = makeMicro();
+export interface TexSet { a: THREE.Texture; n: THREE.Texture; m: THREE.Texture }
+const sets = new Map<string, TexSet>();
+/** A texture set by slot name ('cobble', 'rubble', 'bark', ...). */
+export function textureSet(slot: string): TexSet {
+  let s = sets.get(slot);
+  if (!s) {
+    s = { a: load(`textures/${slot}_a.webp`, true), n: load(`textures/${slot}_n.webp`, false), m: load(`textures/${slot}_m.webp`, false) };
+    sets.set(slot, s);
+  }
+  return s;
+}
+const noiseTex = load('textures/noise.png', false);
+noiseTex.anisotropy = 1;
 
 export const shared = {
   uTime: { value: 0 },
@@ -53,7 +40,7 @@ export const shared = {
   uUnder: { value: 0 },
   uMoonDir: { value: new THREE.Vector3(-0.92, 0.07, 0.38).normalize() },
   uTown: { value: null as THREE.Texture | null },
-  uMicro: { value: micro as THREE.Texture },
+  uNoise: { value: noiseTex as THREE.Texture },
 };
 
 
@@ -64,14 +51,53 @@ export const MAT = {
 } as const;
 export type MatName = keyof typeof MAT;
 
-const BUMP = 0.02;
+/**
+ * Per material: which texture set, metres per repeat, and gains. ALB scales
+ * the scanned albedo to sit right under the overcast dusk light; TINT pulls a
+ * scan towards the local stone (e.g. the quarry scan towards yellow tuff).
+ */
+interface MatCfg { set: string; tile: number; alb?: number; rough?: number; nrm?: number; moss?: number; tint?: [number, number, number] }
+const CFG: Partial<Record<number, MatCfg>> = {
+  0: { set: 'ashlar', tile: 2.0, alb: 0.72, moss: 0.7 },
+  1: { set: 'cobble', tile: 2.0 },
+  2: { set: 'plaster', tile: 2.3, alb: 0.7, moss: 0.4 },
+  3: { set: 'wood', tile: 2.0, alb: 0.75, moss: 0.3 },
+  4: { set: 'coppi', tile: 1.5, alb: 0.75, moss: 0.0 },
+  5: { set: 'tuff', tile: 1.8, alb: 0.9, moss: 0.0, tint: [1.15, 0.98, 0.72] },
+  9: { set: 'bigstone', tile: 3.0, alb: 0.7, moss: 0.8 },
+  10: { set: 'basoli', tile: 1.8, alb: 0.75, moss: 0.2 },
+  12: { set: 'brick', tile: 2.5, alb: 0.72, moss: 0.5 },
+  13: { set: 'rubble', tile: 2.12, alb: 0.72, moss: 0.6 },
+  14: { set: 'marble', tile: 1.8, alb: 0.65, moss: 0.5 },
+};
+const f = (x: number) => x.toFixed(4);
+
+/** Every texture any surface material needs, loaded. Await before entering the world. */
+export const texturesReady: Promise<void> = (() => {
+  for (const c of Object.values(CFG)) textureSet(c!.set);
+  textureSet('basoli'); textureSet('mud');
+  return Promise.all(pending).then(() => undefined);
+})();
 
 export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
-  (m as unknown as { defines: Record<string, number> }).defines = { MAT: id };
-  m.customProgramCacheKey = () => 'surf' + id;
+  const cfg = CFG[id];
+  const defines: Record<string, string | number> = { MAT: id };
+  const uniforms: Record<string, { value: unknown }> = {};
+  if (cfg) {
+    const t = textureSet(cfg.set);
+    Object.assign(defines, { TILE: f(cfg.tile), ALB_K: f(cfg.alb ?? 0.75), ROUGH_K: f(cfg.rough ?? 1), NRM_K: f(cfg.nrm ?? 1), MOSS: f(cfg.moss ?? 0.5) });
+    if (cfg.tint) defines.TINT = `vec3(${cfg.tint.map(f).join(',')})`;
+    Object.assign(uniforms, { tA: { value: t.a }, tN: { value: t.n }, tM: { value: t.m } });
+    if (id === MAT.ground) {
+      const b2 = textureSet('basoli'), b3 = textureSet('mud');
+      Object.assign(uniforms, { tA2: { value: b2.a }, tN2: { value: b2.n }, tM2: { value: b2.m }, tA3: { value: b3.a }, tN3: { value: b3.n }, tM3: { value: b3.m } });
+    }
+  }
+  (m as unknown as { defines: Record<string, string | number> }).defines = defines;
+  m.customProgramCacheKey = () => 'surf2-' + id;
   m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, shared);
+    Object.assign(sh.uniforms, shared, uniforms);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;')
       .replace(
@@ -92,17 +118,15 @@ export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
       )
       .replace(
         '#include <map_fragment>',
-        `float occl;
-         vec3 nW = normalize(vWNrm);
-         vec3 pP = parallax(vWPos, nW, occl);
-         Surf S = surface(pP, nW);
-         diffuseColor.rgb *= S.alb * occl;
+        `vec3 nW = normalize(vWNrm);
+         Surf S = surface(vWPos, nW);
+         diffuseColor.rgb *= S.alb * mix(1.0, S.ao, 0.85);
          totalEmissiveRadiance += S.emi;`,
       )
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = S.rough;')
       .replace(
         '#include <normal_fragment_maps>',
-        `#include <normal_fragment_maps>\n normal = bumpNormal(-vViewPosition, normal, S.h * ${BUMP.toFixed(4)} * (1.0 - smoothstep(10.0, 40.0, length(vViewPosition))));`,
+        `#include <normal_fragment_maps>\n normal = normalize(mat3(viewMatrix) * S.nrm) * faceDirection;`,
       )
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         reflectedLight.directSpecular *= SPEC_K;
@@ -143,8 +167,8 @@ export function makeSky(): THREE.Mesh {
         vec3 col = mix(vec3(0.2,0.205,0.215), vec3(0.11,0.115,0.13), smoothstep(-0.05,0.6,y));
         col *= 1.0 + 0.18 * pow(max(md,0.), 2.0) * (1.0 - smoothstep(0.0, 0.5, y));
         vec2 cuv = rd.xz/(max(y,0.0)+0.12);
-        float cl = fbm(vec3(cuv*0.6 + vec2(uTime*0.006,0.), uTime*0.004));
-        float cl2 = fbm(vec3(cuv*1.9 - vec2(uTime*0.01,0.), 3.));
+        float cl = texture2D(uNoise, cuv*0.15 + vec2(uTime*0.0015, 0.)).r;
+        float cl2 = texture2D(uNoise, cuv*0.47 - vec2(uTime*0.0025, 0.)).g;
         col *= 1.0 - (smoothstep(0.35,0.8,cl)*0.28 + smoothstep(0.5,0.85,cl2)*0.12)*smoothstep(0.0,0.25,y);
         gl_FragColor = vec4(applyAtmos(col, cameraPosition + rd*140.), 1.0);
         #include <tonemapping_fragment>
