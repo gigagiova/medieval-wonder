@@ -142,7 +142,7 @@ function stamp(H: F, ID: Int32Array, shapes: Shape[], noise: Noise, texelM: numb
       if (s.tilt) h += (lx * s.tilt[0] + ly * s.tilt[1]) * 0.5 * prof;
       const amp = s.rough2 ?? 0.002;
       h += amp * (0.7 * fbm(noise, u + s.seed * 0.37, v + s.seed * 0.61, 40, 5) + 0.35 * noise(u, v, 320)) * Math.min(1, prof * 3);
-      h -= amp * 0.8 * smooth(0.45, 0.8, noise(u + s.seed, v, 520)) * Math.min(1, prof * 4); // pits
+      h -= amp * 0.5 * smooth(0.62, 0.86, noise(u + s.seed, v, 420)) * Math.min(1, prof * 4); // pits
       const k = wrap(py) * N + wrap(px);
       if (h > H[k]) { H[k] = h; ID[k] = idx; }
     }
@@ -327,56 +327,70 @@ function cobble(): Baked {
   return { name: 'cobble', H, A, Rg, tileM, normalStrength: 1.0 };
 }
 
-/** Big polygonal basalt slabs of the Roman street, worn smooth, dirt in the joints. */
+/** Big polygonal basalt slabs of the Roman street (basoli), worn smooth and rocked out of level. */
 function basoli(): Baked {
   const tileM = 3.0, texel = tileM / N, r = rng(21), n = makeNoise(21);
-  const pts = scatter(r, 40, 0.3 / texel, 0.42 / texel, 0.02 / texel);
-  const H = field(), ID = new Int32Array(N * N).fill(-1);
-  // Voronoi slabs with rounded, chipped edges.
-  const cols = pts.map(() => jitter(lin(pick(r, ['#3c3b3a', '#454341', '#353534', '#4b4844'])), r, 0.12, 0.03));
+  const pts = scatter(r, 22, 0.36 / texel, 0.52 / texel, 0.03 / texel);
+  const H = field(), ID = new Int32Array(N * N).fill(-1), EDGE = field();
+  const cols = pts.map(() => jitter(lin(pick(r, ['#3a3937', '#43413e', '#34312e', '#4a4640', '#3e3c3a'])), r, 0.14, 0.04));
+  const tilt = pts.map(() => [(r() - 0.5) * 0.02, (r() - 0.5) * 0.02, (r() - 0.5) * 0.012]);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     let f1 = 1e9, f2 = 1e9, id = -1;
-    const wx = x + 14 * n(x / N, y / N, 6), wy = y + 14 * n(x / N + 0.5, y / N, 6);
+    const wx = x + 40 * fbm(n, x / N, y / N, 4, 3), wy = y + 40 * fbm(n, x / N + 0.5, y / N, 4, 3);
     for (let k = 0; k < pts.length; k++) {
-      let dx = Math.abs(pts[k].x - wx), dy = Math.abs(pts[k].y - wy);
-      dx = Math.min(dx, N - dx); dy = Math.min(dy, N - dy);
+      let dx = pts[k].x - wx, dy = pts[k].y - wy;
+      dx -= N * Math.round(dx / N); dy -= N * Math.round(dy / N);
       const d = Math.hypot(dx, dy);
       if (d < f1) { f2 = f1; f1 = d; id = k; } else if (d < f2) f2 = d;
     }
-    const edge = (f2 - f1) * texel; // metres from the joint (x2)
-    const gap = 0.012 + 0.01 * (n(x / N, y / N, 40) * 0.5 + 0.5);
+    const edge = (f2 - f1) * 0.5 * texel; // metres from the joint
+    const gap = 0.008 + 0.014 * (fbm(n, x / N, y / N, 16, 3) * 0.5 + 0.5);
     const i = y * N + x;
-    if (edge < gap) { H[i] = -0.03 + 0.008 * fbm(n, x / N, y / N, 64, 3); ID[i] = -1; continue; }
-    const round = smooth(gap, gap + 0.07, edge);
-    H[i] = -0.012 + 0.02 * Math.sqrt(round) + 0.004 * fbm(n, x / N + id, y / N, 12, 4) + 0.0015 * fbm(n, x / N, y / N, 120, 3);
+    EDGE[i] = edge;
+    if (edge < gap) { H[i] = -0.035 + 0.01 * fbm(n, x / N, y / N, 64, 3); continue; }
+    const round = smooth(gap, gap + 0.05 + 0.03 * n(x / N, y / N, 30), edge);
+    const p = pts[id];
+    let dx = x - p.x, dy = y - p.y;
+    dx -= N * Math.round(dx / N); dy -= N * Math.round(dy / N);
+    const t = tilt[id];
+    H[i] = -0.03 + 0.03 * Math.pow(round, 0.6) + (dx * t[0] + dy * t[1]) * texel * 0.3 + t[2]
+      + 0.004 * fbm(n, x / N + id, y / N, 10, 4) + 0.0012 * n(x / N, y / N, 260);
+    // A few cracks across slabs.
+    const crack = smooth(0.012, 0.0, Math.abs(fbm(n, x / N + id * 0.3, y / N, 5, 3))) * step(0.6, (id * 0.618) % 1);
+    H[i] -= crack * 0.006;
     ID[i] = id;
   }
   const A: [F, F, F] = [field(), field(), field()], Rg = field();
-  const dirt = lin('#4b3f31');
+  const dirt = lin('#3c3329'), moss = lin('#3b4126');
   for (let i = 0; i < N * N; i++) {
     const u = (i % N) / N, v = Math.floor(i / N) / N;
     let c: [number, number, number];
-    if (ID[i] < 0) { c = mixc(dirt, lin('#3a352c'), fbm(n, u, v, 30, 3) * 0.5 + 0.5); Rg[i] = 0.95; }
-    else {
+    if (ID[i] < 0) {
+      c = mixc(dirt, moss, smooth(0.4, 0.75, fbm(n, u + 2, v, 20, 4) * 0.5 + 0.5) * 0.8);
+      Rg[i] = 0.96;
+    } else {
       const base = cols[ID[i]];
-      const pits = smooth(0.55, 0.75, n(u, v, 200) * 0.5 + 0.5);
-      const k = (0.85 + 0.25 * fbm(n, u + 7, v, 20, 4)) * (1 - pits * 0.3);
-      c = [base[0] * k, base[1] * k, base[2] * k];
-      Rg[i] = lerp(0.58, 0.8, fbm(n, u + 2, v, 10, 3) * 0.5 + 0.5) + pits * 0.15;
+      const top = smooth(0.0, 0.06, EDGE[i]);
+      const vesic = smooth(0.62, 0.8, n(u, v, 300) * 0.5 + 0.5);
+      const mott = 0.82 + 0.3 * fbm(n, u * 1.3 + ID[i], v, 16, 5);
+      const k = mott * (1 - vesic * 0.35) * lerp(0.8, 1.08, top);
+      c = mixc([base[0] * k, base[1] * k, base[2] * k], lin('#6b6458'), (1 - top) * 0.25);
+      Rg[i] = lerp(0.82, 0.6, top) + vesic * 0.15;
     }
     A[0][i] = c[0]; A[1][i] = c[1]; A[2][i] = c[2];
   }
   grime(A, H, 0.8, [0.6, 0.55, 0.45]);
-  lichen(A, H, n, 0.06, lin('#55583c'), 4, 5);
+  lichen(A, H, n, 0.05, lin('#56593c'), 4, 5);
   return { name: 'basoli', H, A, Rg, tileM };
 }
+const step = (e: number, x: number) => (x < e ? 0 : 1);
 
 /** Packed earth and mud with pebbles and bits of straw. */
 function mud(): Baked {
   const tileM = 2.5, texel = tileM / N, r = rng(31), n = makeNoise(31);
   const H = fill((u, v) => 0.02 * fbm(n, u, v, 4, 6) + 0.004 * fbm(n, u + 3, v, 60, 3));
-  const pts = scatter(r, 260, 0.006 / texel, 0.03 / texel, 0.01 / texel);
-  const pal = ['#857b6c', '#6f6a63', '#9b8e79', '#5d5650'].map(lin);
+  const pts = scatter(r, 140, 0.008 / texel, 0.035 / texel, 0.02 / texel);
+  const pal = ['#6d655a', '#5c5752', '#7a6f60', '#4f4a45'].map(lin);
   const shapes: Shape[] = pts.map((p, i) => ({
     cx: p.x, cy: p.y, a: p.r * lerp(1, 1.5, r()), b: p.r, rot: r() * Math.PI,
     h: 0.0, base: -0.01, power: 0.5, irr: 0.2, col: jitter(pick(r, pal), r, 0.2), rough: 0.75, seed: i * 0.31,
@@ -394,7 +408,7 @@ function mud(): Baked {
     }, () => 0.96, (_i, _s, c) => c);
   // Straw: short pale strokes.
   const straw = lin('#9c8a5e');
-  for (let k = 0; k < 500; k++) {
+  for (let k = 0; k < 220; k++) {
     const x0 = r() * N, y0 = r() * N, a = r() * Math.PI, L = (0.03 + 0.06 * r()) / texel;
     for (let t = 0; t < L; t++) {
       const x = wrap(Math.round(x0 + Math.cos(a) * t)), y = wrap(Math.round(y0 + Math.sin(a) * t));
@@ -413,65 +427,65 @@ function mud(): Baked {
   return { name: 'mud', H, A, Rg, tileM, normalStrength: 0.8 };
 }
 
-/** River stones and broken brick laid in courses in lime mortar; every 4th course herringbone. */
+/** River stones and broken brick laid in rough courses in lime mortar; a herringbone course now and then. */
 function rubble(): Baked {
   const tileM = 2.0, texel = tileM / N, r = rng(41), n = makeNoise(41);
   const shapes: Shape[] = [];
-  const pal = ['#9c9384', '#8b8478', '#a39a88', '#7d786f', '#b0a48e', '#8e8068', '#776d62'].map(lin);
-  const brick = ['#8a5a44', '#7a4d3b', '#946450'].map(lin);
-  let y = 0, row = 0;
+  const pal = ['#8f887b', '#7f796f', '#9a907e', '#6f6b65', '#a49882', '#837563', '#6b6157', '#8a8273'].map(lin);
+  const brick = ['#7e5241', '#6f4738', '#8a5c48'].map(lin);
   const rowH: number[] = [];
-  while (y < N - 8) { const h = (0.09 + 0.07 * r()) / texel; rowH.push(h); y += h; }
-  const scale = N / y; // make the courses fit the tile exactly
+  let y = 0;
+  while (y < N) { const h = (0.1 + 0.08 * r()) / texel; rowH.push(h); y += h; }
+  const sc = N / y;
   y = 0;
-  for (const h0 of rowH) {
-    const h = h0 * scale;
-    const herring = row % 4 === 3;
-    let x = r() * N;
-    const xEnd = x + N;
-    let flip = 1;
-    const cw = herring ? null : course(r, () => (0.1 + 0.18 * r()) / texel);
-    if (cw) x = cw.x0;
-    let wi = 0;
-    while (herring ? x < xEnd - 4 : wi < cw!.w.length) {
-      if (herring) {
-        const L = (0.13 + 0.05 * r()) / texel, W = (0.035 + 0.012 * r()) / texel;
-        shapes.push({ cx: x, cy: y + h / 2, a: L / 2, b: W / 2, rot: flip * (0.75 + 0.15 * r()), h: 0.03 + 0.02 * r(), base: 0.0, power: 0.45, irr: 0.12,
-          col: jitter(r() < 0.25 ? pick(r, brick) : pick(r, pal), r, 0.15), rough: 0.85, seed: shapes.length * 0.11, rough2: 0.002 });
-        x += W * 1.55; flip = -flip;
-      } else {
-        const w = cw!.w[wi++];
-        const isBrick = r() < 0.12;
-        shapes.push({ cx: x + w / 2, cy: y + h / 2 + (r() - 0.5) * 0.12 * h, a: w / 2 * lerp(0.82, 0.95, r()), b: h / 2 * lerp(0.72, 0.9, r()), rot: (r() - 0.5) * 0.25,
-          h: 0.035 + 0.03 * r(), base: 0.0, power: isBrick ? 0.25 : lerp(0.35, 0.6, r()), irr: isBrick ? 0.05 : 0.14, rect: isBrick ? 0.8 : 0,
-          col: jitter(isBrick ? pick(r, brick) : pick(r, pal), r, 0.16), rough: isBrick ? 0.92 : 0.82, seed: shapes.length * 0.11,
-          tilt: [(r() - 0.5) * 0.015, (r() - 0.5) * 0.015], rough2: 0.0025 });
+  rowH.forEach((h0, row) => {
+    const h = h0 * sc;
+    const herring = row % 5 === 3;
+    if (herring) {
+      // Opus spicatum: flat stones leaning alternately left and right, touching.
+      const L = h * 1.25, W = L * 0.32;
+      const stepX = W / Math.sin(0.78) * 1.02;
+      const cnt = Math.round(N / stepX), sx = N / cnt;
+      for (let k = 0; k < cnt; k++) {
+        shapes.push({ cx: k * sx + sx / 2, cy: y + h / 2, a: L / 2, b: W / 2 * lerp(0.85, 1, r()), rot: (k % 2 ? 1 : -1) * (0.78 + (r() - 0.5) * 0.15),
+          h: 0.028 + 0.012 * r(), base: 0.004, power: 0.3, irr: 0.12, rect: r() < 0.3 ? 0.6 : 0.2,
+          col: jitter(r() < 0.3 ? pick(r, brick) : pick(r, pal), r, 0.14), rough: 0.86, seed: shapes.length * 0.11, rough2: 0.003 });
+      }
+    } else {
+      const row2 = course(r, () => (0.12 + 0.16 * r()) / texel);
+      let x = row2.x0;
+      for (const w of row2.w) {
+        const isBrick = r() < 0.12, angular = r() < 0.35;
+        shapes.push({ cx: x + w / 2, cy: y + h / 2 + (r() - 0.5) * 0.15 * h, a: w / 2 * lerp(0.86, 0.96, r()), b: h / 2 * lerp(0.74, 0.92, r()), rot: (r() - 0.5) * 0.22,
+          h: 0.03 + 0.03 * r(), base: 0.004, power: isBrick ? 0.2 : lerp(0.25, 0.45, r()), irr: isBrick ? 0.05 : lerp(0.12, 0.24, r()),
+          rect: isBrick ? 0.8 : angular ? 0.45 : 0.1,
+          col: jitter(isBrick ? pick(r, brick) : pick(r, pal), r, 0.14), rough: isBrick ? 0.92 : 0.84, seed: shapes.length * 0.11,
+          tilt: [(r() - 0.5) * 0.02, (r() - 0.5) * 0.015], rough2: 0.003 });
         x += w;
       }
     }
-    y += h; row++;
-  }
-  // Wrap shapes that cross the right edge.
-  const H = fill((u, v) => 0.006 + 0.006 * fbm(n, u, v, 30, 4) - 0.012 * smooth(0.55, 0.8, fbm(n, u + 5, v, 5, 4) * 0.5 + 0.5));
+    y += h;
+  });
+  // Mortar: recessed, uneven, washed out in places.
+  const H = fill((u, v) => 0.008 + 0.006 * fbm(n, u, v, 20, 4) - 0.012 * smooth(0.5, 0.8, fbm(n, u + 5, v, 6, 4) * 0.5 + 0.5));
   const ID = new Int32Array(N * N).fill(-1);
   stamp(H, ID, shapes, n, texel);
-  const mortar = lin('#b7ad98'), mortar2 = lin('#8f8574');
+  const mortar = lin('#a69d8a'), mortar2 = lin('#7d7466');
   const { A, Rg } = paint(H, ID, shapes,
-    (_i, u, v) => mixc(mortar, mortar2, smooth(0.3, 0.8, fbm(n, u + 2, v, 12, 5) * 0.5 + 0.5)),
+    (_i, u, v) => mixc(mortar, mortar2, smooth(0.25, 0.8, fbm(n, u + 2, v, 12, 5) * 0.5 + 0.5)),
     () => 0.97,
     (i, s, c, u, v) => {
       const top = clamp((H[i] - s.base) / (s.h - s.base));
-      const k = lerp(0.7, 1.05, Math.sqrt(top)) * (0.9 + 0.2 * fbm(n, u + s.seed, v, 48, 3));
+      const k = lerp(0.72, 1.04, Math.sqrt(top)) * (0.84 + 0.28 * fbm(n, u * 1.5 + s.seed, v * 1.5, 40, 4));
       return [c[0] * k, c[1] * k, c[2] * k];
     });
   grime(A, H, 0.85, [0.5, 0.47, 0.42]);
-  // Rain streaks: soft vertical darkening.
   for (let i = 0; i < N * N; i++) {
     const u = (i % N) / N, v = Math.floor(i / N) / N;
-    const st = smooth(0.2, 0.9, n(u * 3, v * 0.25, 24) * 0.5 + 0.5) * 0.25;
+    const st = smooth(0.35, 0.95, n(u * 3, v * 0.3, 16) * 0.5 + 0.5) * 0.2;
     for (let ch = 0; ch < 3; ch++) A[ch][i] *= 1 - st;
   }
-  lichen(A, H, n, 0.08, lin('#8a8a6a'), 7, 1);
+  lichen(A, H, n, 0.08, lin('#7e8064'), 7, 1);
   return { name: 'rubble', H, A, Rg, tileM };
 }
 
@@ -544,8 +558,8 @@ function ashlar(): Baked {
     const row = course(r, () => (0.45 + 0.5 * r()) / texel);
     let x = row.x0;
     for (const w of row.w) {
-      shapes.push({ cx: x + w / 2, cy: y + h / 2, a: w / 2 - joint, b: h / 2 - joint, rot: (r() - 0.5) * 0.01, h: 0.03 + 0.01 * r(), base: 0.006, power: 0.12, irr: 0.02, rect: 0.95,
-        col: jitter(pick(r, pal), r, 0.1), rough: 0.88, seed: shapes.length * 0.13, tilt: [(r() - 0.5) * 0.01, (r() - 0.5) * 0.01], rough2: 0.003 });
+      shapes.push({ cx: x + w / 2, cy: y + h / 2, a: w / 2 - joint, b: h / 2 - joint, rot: (r() - 0.5) * 0.012, h: 0.025 + 0.012 * r(), base: 0.012, power: 0.06, irr: 0.025, rect: 1,
+        col: jitter(pick(r, pal), r, 0.12, 0.05), rough: 0.88, seed: shapes.length * 0.13, tilt: [(r() - 0.5) * 0.014, (r() - 0.5) * 0.01], rough2: 0.0015 });
       x += w;
     }
     y += h;
@@ -561,8 +575,12 @@ function ashlar(): Baked {
     const ang = (s.seed * 7.1) % 1 * 0.8 - 0.4 + 0.8;
     const t = Math.sin((u * Math.cos(ang) + v * Math.sin(ang)) * N * 0.9 + 3 * n(u, v, 50));
     H[i] += 0.0007 * t;
-    const chip = smooth(0.66, 0.72, fbm(n, u + 4, v, 60, 3) * 0.5 + 0.5);
-    H[i] -= chip * 0.015 * (1 - clamp((H[i] - s.base) / (s.h - s.base)) * 0.5);
+    // Chipped arrises: only near the block edges, in ragged bites.
+    const nearEdge = 1 - clamp((H[i] - s.base) / (s.h - s.base) * 1.6);
+    const chip = smooth(0.5, 0.62, fbm(n, u + 4, v, 40, 4) * 0.5 + 0.5) * nearEdge;
+    H[i] -= chip * 0.02;
+    // Weathered, sugary surface.
+    H[i] += 0.0012 * fbm(n, u * 2 + s.seed, v * 2, 60, 3);
   }
   const mortar = lin('#9b927f');
   const { A, Rg } = paint(H, ID, shapes, () => mortar, () => 0.96, (_i, s, c, u, v) => {
@@ -580,45 +598,47 @@ function ashlar(): Baked {
   return { name: 'ashlar', H, A, Rg, tileM };
 }
 
-/** Catacomb tuff: soft porous yellow-brown rock, pick marks, strata, niter bloom. */
+/** Catacomb tuff: soft porous yellow-brown rock, scooped pick marks, strata, niter bloom. */
 function tuffSet(): Baked {
   const tileM = 2.5, texel = tileM / N, r = rng(71), n = makeNoise(71);
-  const H = fill((u, v) => 0.03 * fbm(n, u, v, 3, 6) + 0.006 * fbm(n, u + 1, v, 24, 4));
-  // Pick marks: short scooped gouges, roughly aligned per region.
-  for (let k = 0; k < 2600; k++) {
+  const H = fill((u, v) => 0.04 * fbm(n, u, v, 3, 6) + 0.008 * fbm(n, u + 1, v, 16, 4));
+  // Pick marks: broad shallow scoops in loose arcs (the swing of the mattock).
+  for (let k = 0; k < 520; k++) {
     const x0 = r() * N, y0 = r() * N;
-    const base = n(x0 / N, y0 / N, 3) * 1.2 + 0.7;
-    const a = base + (r() - 0.5) * 0.5;
-    const L = (0.04 + 0.05 * r()) / texel, W = (0.008 + 0.006 * r()) / texel, D = 0.004 + 0.004 * r();
-    for (let t = -W * 2; t <= L + W * 2; t++) for (let s2 = -W * 2; s2 <= W * 2; s2++) {
-      const x = wrap(Math.round(x0 + Math.cos(a) * t - Math.sin(a) * s2)), y = wrap(Math.round(y0 + Math.sin(a) * t + Math.cos(a) * s2));
-      const along = clamp(t / L), across = s2 / W;
-      const prof = Math.exp(-across * across) * Math.sin(Math.PI * along) * (t >= 0 && t <= L ? 1 : 0);
-      H[y * N + x] -= D * prof;
+    const a = n(x0 / N, y0 / N, 2) * 1.5 + 0.9 + (r() - 0.5) * 0.4;
+    const L = (0.05 + 0.07 * r()) / texel, W = (0.015 + 0.015 * r()) / texel, D = 0.004 + 0.005 * r();
+    for (let t = 0; t <= L; t++) for (let s2 = -W * 1.6; s2 <= W * 1.6; s2++) {
+      const bend = 0.002 * t * t / texel;
+      const x = wrap(Math.round(x0 + Math.cos(a) * t - Math.sin(a) * (s2 + bend))), y = wrap(Math.round(y0 + Math.sin(a) * t + Math.cos(a) * (s2 + bend)));
+      const across = s2 / W;
+      H[y * N + x] -= D * Math.exp(-across * across * 1.5) * Math.pow(Math.sin(Math.PI * t / L), 0.6);
     }
   }
-  // Pores.
-  for (let k = 0; k < 9000; k++) {
-    const x0 = Math.floor(r() * N), y0 = Math.floor(r() * N), rad = 1 + r() * 3;
-    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+  // Vesicles: pores of all sizes.
+  for (let k = 0; k < 5000; k++) {
+    const x0 = Math.floor(r() * N), y0 = Math.floor(r() * N), rad = 1 + Math.pow(r(), 3) * 7;
+    const R = Math.ceil(rad);
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
       const d = Math.hypot(dx, dy) / rad;
-      if (d < 1) H[wrap(y0 + dy) * N + wrap(x0 + dx)] -= 0.0015 * (1 - d * d);
+      if (d < 1) H[wrap(y0 + dy) * N + wrap(x0 + dx)] -= 0.0025 * Math.sqrt(1 - d * d) * rad / 3;
     }
   }
   const A: [F, F, F] = [field(), field(), field()], Rg = field();
-  const c1 = lin('#8a7451'), c2 = lin('#6e5a3d'), c3 = lin('#a08b63'), nit = lin('#b9b3a2');
+  const c1 = lin('#7b6646'), c2 = lin('#5e4c34'), c3 = lin('#8e7a56'), nit = lin('#a8a291'), dark = lin('#3d3226');
   for (let i = 0; i < N * N; i++) {
     const u = (i % N) / N, v = Math.floor(i / N) / N;
-    const strata = Math.sin(v * Math.PI * 2 * 7 + 2.5 * fbm(n, u, v, 4, 3)) * 0.5 + 0.5;
-    let c = mixc(c2, c1, fbm(n, u + 3, v, 6, 5) * 0.5 + 0.5);
-    c = mixc(c, c3, strata * 0.35);
-    const ni = smooth(0.58, 0.72, fbm(n, u + 8, v, 5, 5) * 0.5 + 0.5);
-    c = mixc(c, nit, ni * 0.5);
-    A[0][i] = c[0]; A[1][i] = c[1]; A[2][i] = c[2];
-    Rg[i] = 0.95;
+    const strata = Math.sin(v * Math.PI * 2 * 5 + 2.5 * fbm(n, u, v, 3, 3)) * 0.5 + 0.5;
+    let c = mixc(c2, c1, fbm(n, u + 3, v, 5, 5) * 0.5 + 0.5);
+    c = mixc(c, c3, strata * 0.3);
+    c = mixc(c, dark, smooth(0.55, 0.8, fbm(n, u + 6, v, 8, 4) * 0.5 + 0.5) * 0.4);
+    const ni = smooth(0.62, 0.78, fbm(n, u + 8, v, 4, 5) * 0.5 + 0.5) * smooth(0.3, 0.6, n(u, v, 90) * 0.5 + 0.5);
+    c = mixc(c, nit, ni * 0.45);
+    const k = 0.9 + 0.2 * n(u, v, 220);
+    A[0][i] = c[0] * k; A[1][i] = c[1] * k; A[2][i] = c[2] * k;
+    Rg[i] = 0.96;
   }
-  grime(A, H, 0.9, [0.55, 0.5, 0.45]);
-  return { name: 'tuff', H, A, Rg, tileM, aoStrength: 1.2 };
+  grime(A, H, 1.0, [0.5, 0.45, 0.4]);
+  return { name: 'tuff', H, A, Rg, tileM, aoStrength: 1.3 };
 }
 
 /** Lime-washed plaster over rubble: trowel waves, cracks, flaked patches, stains. */
@@ -627,14 +647,14 @@ function plaster(): Baked {
   const under = rubble(); // what shows where the plaster has fallen
   const H = fill((u, v) => 0.025 + 0.004 * fbm(n, u, v, 6, 5) + 0.0015 * fbm(n, u + 2, v, 40, 3));
   const A: [F, F, F] = [field(), field(), field()], Rg = field();
-  const lime = lin('#c9c1ae'), lime2 = lin('#a99e86'), ochre = lin('#b49a72');
+  const lime = lin('#b6ad98'), lime2 = lin('#958a75'), ochre = lin('#a68d68');
   for (let i = 0; i < N * N; i++) {
     const u = (i % N) / N, v = Math.floor(i / N) / N;
-    const loss = fbm(n, u + 5, v, 4, 6) * 0.5 + 0.5;
-    const lost = smooth(0.66, 0.68, loss);
+    const loss = fbm(n, u + 5 + 0.05 * n(u, v, 6), v, 3, 7) * 0.5 + 0.5 + 0.04 * n(u, v, 90);
+    const lost = smooth(0.6, 0.615, loss);
     const ux = (Math.floor(u * N * 0.8) % N + N) % N, vy = (Math.floor(v * N * 0.8) % N + N) % N; // rubble at a different scale
     const j = vy * N + ux;
-    const ridge = smooth(0.64, 0.66, loss) - lost; // thin raised lip at the break
+    const ridge = smooth(0.58, 0.6, loss) - lost; // thin raised lip at the break
     if (lost > 0.5) {
       H[i] = under.H[j] - 0.01;
       for (let ch = 0; ch < 3; ch++) A[ch][i] = under.A[ch][j];
@@ -667,118 +687,127 @@ function plaster(): Baked {
   // Damp rising from below and rain streaks.
   for (let i = 0; i < N * N; i++) {
     const u = (i % N) / N, v = Math.floor(i / N) / N;
-    const st = smooth(0.25, 0.9, n(u * 4, v * 0.25, 20) * 0.5 + 0.5) * 0.3;
-    for (let ch = 0; ch < 3; ch++) A[ch][i] *= 1 - st;
+    const st = smooth(0.35, 0.95, n(u * 3, v * 0.3, 14) * 0.5 + 0.5) * 0.18;
+    const blot = smooth(0.4, 0.9, fbm(n, u + 11, v, 5, 5) * 0.5 + 0.5) * 0.25;
+    for (let ch = 0; ch < 3; ch++) A[ch][i] *= (1 - st) * (1 - blot);
   }
   grime(A, H, 0.7, [0.5, 0.46, 0.42]);
   void texel; void r;
   return { name: 'plaster', H, A, Rg, tileM, normalStrength: 1.2 };
 }
 
-/** Weathered oak planks: open grain, checks and cracks, a few knots, silvered by rain. */
+/** Weathered oak planks: raised grain, checks and cracks, a few knots, silvered by rain. */
 function wood(): Baked {
   const tileM = 2.0, texel = tileM / N, r = rng(91), n = makeNoise(91);
   const H = field(), A: [F, F, F] = [field(), field(), field()], Rg = field();
-  // Planks across u; grain along v (texture v = up along the plank).
   const edges: number[] = [0];
   while (edges[edges.length - 1] < N) edges.push(edges[edges.length - 1] + (0.16 + 0.12 * r()) / texel);
   const sc = N / edges[edges.length - 1];
   for (let k = 0; k < edges.length; k++) edges[k] *= sc;
-  const tones = edges.map(() => jitter(lin(pick(r, ['#6e604f', '#5d5144', '#7a6a55', '#665a4c'])), r, 0.12));
-  const knots = Array.from({ length: 10 }, () => [r() * N, r() * N, (0.012 + 0.02 * r()) / texel]);
+  const tones = edges.map(() => jitter(lin(pick(r, ['#5f5242', '#514538', '#6a5b48', '#584c3f', '#4b4137'])), r, 0.12));
+  const knots = Array.from({ length: 9 }, () => [r() * N, r() * N, (0.012 + 0.018 * r()) / texel]);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const i = y * N + x, u = x / N, v = y / N;
     let p = 0;
     while (p < edges.length - 2 && x >= edges[p + 1]) p++;
     const fx = (x - edges[p]) / (edges[p + 1] - edges[p]);
-    const gap = smooth(0, 0.025, fx) * smooth(1, 0.975, fx);
-    // Knot distortion of the grain.
+    const gap = smooth(0, 0.03, fx) * smooth(1, 0.97, fx);
     let warp = 0, knotM = 0;
     for (const [kx, ky, kr] of knots) {
-      let dx = Math.abs(x - kx), dy = Math.abs(y - ky);
-      dx = Math.min(dx, N - dx); dy = Math.min(dy, N - dy);
+      let dx = x - kx, dy = y - ky;
+      dx -= N * Math.round(dx / N); dy -= N * Math.round(dy / N);
       const d = Math.hypot(dx * 1.8, dy) / kr;
-      warp += Math.exp(-d * d * 0.25) * 6 * Math.sign(x - kx);
-      knotM = Math.max(knotM, smooth(1.1, 0.6, d));
+      warp += Math.exp(-d * d * 0.2) * 0.012 * Math.sign(dx);
+      knotM = Math.max(knotM, smooth(1.1, 0.5, d));
     }
-    const g = u * N * 0.55 + 6 * fbm(n, u * 0.3 + p, v * 0.05, 8, 4) + warp;
-    const grain = Math.pow(Math.abs(Math.sin(g * Math.PI * 0.5)), 0.6);
-    const fine = fbm(n, u * 6 + p, v * 0.3, 30, 4);
-    const check = smooth(0.92, 0.97, Math.abs(n(u * 2 + p * 0.3, v * 0.15, 60))) * smooth(0.4, 0.6, n(u, v, 10) * 0.5 + 0.5);
-    H[i] = (gap * (0.012 + 0.003 * grain + 0.0015 * fine) - check * 0.004 - knotM * 0.002) * 1.0;
-    const c = tones[p];
-    const silver = smooth(0.2, 0.8, fbm(n, u + 4, v, 6, 4) * 0.5 + 0.5) * 0.45;
-    const k = (0.78 + 0.28 * grain) * (0.9 + 0.15 * fine) * (1 - knotM * 0.4) * (1 - check * 0.5) * lerp(0.35, 1, gap);
-    const cc = mixc(c, lin('#8a8478'), silver);
+    // Grain: long ridged streaks along v, at several scales.
+    const gu = u + warp + 0.004 * n(u, v, 6) + p * 0.37;
+    const g1 = 1 - Math.abs(n(gu, v * 0.06 + p * 0.1, 160));
+    const g2 = 1 - Math.abs(n(gu * 1.0 + 0.3, v * 0.08, 380));
+    const grain = Math.pow(g1, 3) * 0.6 + Math.pow(g2, 4) * 0.4;
+    const check = smooth(0.965, 0.995, 1 - Math.abs(n(gu * 0.5 + 0.1, v * 0.04, 40))) * smooth(0.3, 0.7, n(u + p, v, 6) * 0.5 + 0.5);
+    H[i] = gap * (0.012 + 0.0035 * grain) - check * 0.006 - knotM * 0.002 - (1 - gap) * 0.006;
+    const silver = smooth(0.1, 0.8, fbm(n, u + 4, v * 0.5, 5, 4) * 0.5 + 0.5) * 0.5;
+    const cc = mixc(tones[p], lin('#7d786d'), silver);
+    const k = (0.72 + 0.4 * grain) * (1 - knotM * 0.45) * (1 - check * 0.7) * lerp(0.3, 1, gap) * (0.9 + 0.15 * fbm(n, u, v, 20, 3));
     A[0][i] = cc[0] * k; A[1][i] = cc[1] * k; A[2][i] = cc[2] * k;
-    Rg[i] = 0.9 + 0.06 * grain;
+    Rg[i] = 0.88 + 0.08 * grain;
   }
   grime(A, H, 0.6, [0.55, 0.5, 0.45]);
-  return { name: 'wood', H, A, Rg, tileM };
+  lichen(A, H, n, 0.06, lin('#6f7356'), 6, 3);
+  return { name: 'wood', H, A, Rg, tileM, normalStrength: 1.3 };
 }
 
-/** Coppi: half-round terracotta tiles, canals and covers down the slope (v), lips at each course. */
+/** Coppi: half-round terracotta tiles in courses down the slope (+v is up-slope); each lower end overlaps the course below. */
 function coppi(): Baked {
   const tileM = 2.0, texel = tileM / N, r = rng(101), n = makeNoise(101);
   const H = field(), A: [F, F, F] = [field(), field(), field()], Rg = field();
-  const colW = 0.17 / texel;
-  const cols = Math.round(N / colW), cw = N / cols;
-  const rows = Math.round(N / (0.42 / texel)), rh = N / rows;
-  const tone = Array.from({ length: cols * rows }, () => jitter(lin(pick(r, ['#8d5338', '#9a6043', '#7c4a35', '#a46d4e', '#86553f', '#6f4636'])), r, 0.12, 0.06));
-  const shift = Array.from({ length: cols }, () => r() * rh);
+  const cols = Math.round(N / (0.17 / texel)), cw = N / cols;
+  const rows = Math.round(N / (0.4 / texel)), rh = N / rows;
+  const tone = Array.from({ length: cols * rows }, () => jitter(lin(pick(r, ['#86503a', '#935c43', '#764733', '#9c6a4e', '#7f523e', '#6b4434', '#8f6a55'])), r, 0.14, 0.06));
+  const jit = Array.from({ length: cols * rows }, () => [(r() - 0.5) * 0.08, (r() - 0.5) * 0.08, r()]);
+  const shift = Array.from({ length: cols }, () => Math.floor(r() * rows) * rh * 0.5 + r() * rh * 0.15);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const i = y * N + x, u = x / N, v = y / N;
-    const ci = Math.floor(x / cw), fx = (x - ci * cw) / cw;
+    const ci = Math.floor(x / cw);
     const cover = ci % 2 === 1;
-    const yy = (y + shift[ci]) % N;
-    const ri = Math.floor(yy / rh), fy = (yy - ri * rh) / rh;
-    // Each tile narrows towards its upper end; the lower end (lip) overlaps the next.
-    const taper = lerp(1.0, 0.86, fy);
-    const t = (fx - 0.5) / (0.5 * (cover ? 1.25 : 1.0) * taper);
+    const yy = ((y + shift[ci]) % N + N) % N;
+    const ri = Math.floor(yy / rh), fy = (yy - ri * rh) / rh; // fy 0 = lower end of the tile
+    const j = jit[(ri % rows) * cols + ci];
+    const fx = (x - ci * cw) / cw + j[0];
+    const taper = lerp(1.0, 0.82, fy); // narrower at the upper end
+    const t = (fx - 0.5) / (0.5 * (cover ? 1.3 : 1.05) * taper);
+    const inside = Math.abs(t) < 1;
     const prof = Math.sqrt(clamp(1 - t * t));
+    // Each tile rises from its upper end to its lower end (which rests on the course below).
+    const rise = (1 - fy) * 0.022;
     let h: number;
-    if (cover) h = Math.abs(t) < 1 ? 0.035 + 0.05 * prof : 0.0;
-    else h = 0.022 - 0.02 * prof;
-    const lip = smooth(0.9, 1.0, fy) * 0.006;
-    h += lip - fy * 0.006;
-    h += 0.0012 * fbm(n, u + ci, v, 60, 3);
+    if (cover) h = inside ? 0.03 + 0.045 * prof + rise : 0.004;
+    else h = (inside ? 0.024 - 0.02 * prof : 0.03) + rise * 0.8;
+    const broken = j[2] < 0.04 && fy > 0.5;
+    if (broken) h -= 0.02;
+    h += 0.0015 * fbm(n, u + ci, v, 60, 3) + 0.0008 * n(u, v, 300);
     H[i] = h;
     const c = tone[(ri % rows) * cols + ci];
-    const k = (0.85 + 0.2 * fbm(n, u + ci * 0.1, v, 30, 4)) * lerp(0.7, 1.05, cover ? prof : 1 - prof * 0.3);
+    const edge = smooth(0.0, 0.08, fy); // the exposed lower edge is darker (end grain, dirt)
+    const k = (0.84 + 0.22 * fbm(n, u + ci * 0.1, v, 24, 4)) * lerp(0.65, 1.05, cover ? prof : 1 - prof * 0.4) * lerp(0.7, 1, edge);
     A[0][i] = c[0] * k; A[1][i] = c[1] * k; A[2][i] = c[2] * k;
     Rg[i] = 0.9;
   }
-  grime(A, H, 0.9, [0.4, 0.38, 0.35]);
-  lichen(A, H, n, 0.16, lin('#9a9573'), 7, 4);
-  lichen(A, H, n, 0.08, lin('#b59a5c'), 13, 9);
-  lichen(A, H, n, 0.1, lin('#3c3f2a'), 5, 12);
+  grime(A, H, 1.0, [0.4, 0.37, 0.34]);
+  lichen(A, H, n, 0.14, lin('#8f8c6c'), 7, 4);
+  lichen(A, H, n, 0.07, lin('#a98f55'), 13, 9);
+  lichen(A, H, n, 0.1, lin('#363a25'), 5, 12);
   return { name: 'coppi', H, A, Rg, tileM };
 }
 
-/** Roman travertine / marble spolia: horizontal pore channels, weathered, rain-blackened. */
+/** Roman travertine / marble spolia: irregular vugs, weathered sugary surface, rain-blackened. */
 function travertine(): Baked {
   const tileM = 2.0, texel = tileM / N, r = rng(111), n = makeNoise(111);
-  const H = fill((u, v) => 0.004 * fbm(n, u, v, 6, 5));
-  for (let k = 0; k < 2200; k++) {
-    const x0 = r() * N, y0 = r() * N, L = (0.01 + 0.06 * r()) / texel, W = (0.002 + 0.005 * r()) / texel, D = 0.002 + 0.004 * r();
-    for (let t = 0; t < L; t++) for (let s2 = -W; s2 <= W; s2++) {
-      const x = wrap(Math.round(x0 + t)), y = wrap(Math.round(y0 + s2 + 1.5 * Math.sin(t * 0.05)));
-      const pr = Math.sin(Math.PI * t / L) * (1 - (s2 / W) ** 2);
+  const H = fill((u, v) => 0.006 * fbm(n, u, v, 4, 6) + 0.0012 * n(u, v, 200));
+  for (let k = 0; k < 700; k++) {
+    const x0 = r() * N, y0 = r() * N, L = (0.005 + 0.05 * Math.pow(r(), 2)) / texel, W = (0.002 + 0.006 * Math.pow(r(), 2)) / texel, D = 0.002 + 0.005 * r();
+    const sl = (r() - 0.5) * 0.3;
+    for (let t = -W; t < L + W; t++) for (let s2 = -W; s2 <= W; s2++) {
+      const x = wrap(Math.round(x0 + t)), y = wrap(Math.round(y0 + s2 + sl * t + 2 * n(t / N * 4 + k, k * 0.1, 8)));
+      const along = clamp(t / L);
+      const pr = Math.pow(Math.sin(Math.PI * along), 0.5) * clamp(1 - (s2 / W) ** 2);
       H[y * N + x] -= D * pr;
     }
   }
   const A: [F, F, F] = [field(), field(), field()], Rg = field();
-  const c1 = lin('#c3b597'), c2 = lin('#a7987a');
+  const c1 = lin('#b5a88d'), c2 = lin('#998b70');
   for (let i = 0; i < N * N; i++) {
     const u = (i % N) / N, v = Math.floor(i / N) / N;
-    const band = Math.sin(v * Math.PI * 2 * 9 + 1.5 * fbm(n, u, v, 3, 3)) * 0.5 + 0.5;
-    const c = mixc(c2, c1, band * 0.5 + 0.5 * (fbm(n, u + 2, v, 8, 4) * 0.5 + 0.5));
-    const st = smooth(0.3, 0.9, n(u * 4, v * 0.25, 20) * 0.5 + 0.5) * 0.45;
-    A[0][i] = c[0] * (1 - st); A[1][i] = c[1] * (1 - st); A[2][i] = c[2] * (1 - st);
-    Rg[i] = 0.82;
+    const band = Math.sin(v * Math.PI * 2 * 6 + 1.5 * fbm(n, u, v, 3, 3)) * 0.5 + 0.5;
+    const c = mixc(c2, c1, band * 0.4 + 0.6 * (fbm(n, u + 2, v, 6, 5) * 0.5 + 0.5));
+    const st = smooth(0.35, 0.95, n(u * 3, v * 0.3, 14) * 0.5 + 0.5) * 0.4;
+    const k = (1 - st) * (0.9 + 0.12 * n(u, v, 260));
+    A[0][i] = c[0] * k; A[1][i] = c[1] * k; A[2][i] = c[2] * k;
+    Rg[i] = 0.84;
   }
   grime(A, H, 1.0, [0.45, 0.42, 0.38]);
-  lichen(A, H, n, 0.1, lin('#8e8f6e'), 6, 6);
+  lichen(A, H, n, 0.1, lin('#878a69'), 6, 6);
   void texel;
   return { name: 'travertine', H, A, Rg, tileM };
 }
