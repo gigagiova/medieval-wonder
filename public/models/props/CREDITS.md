@@ -22,7 +22,6 @@ Fetched and packed by `tools/fetch-props.ts`.
 - [wooden_cutting_board](https://polyhaven.com/a/wooden_cutting_board)
 - [marble_bust_01](https://polyhaven.com/a/marble_bust_01)
 - [street_rat](https://polyhaven.com/a/street_rat)
-- [boulder_01](https://polyhaven.com/a/boulder_01)
 - [rock_07](https://polyhaven.com/a/rock_07)
 - [rock_09](https://polyhaven.com/a/rock_09)
 - [stone_01](https://polyhaven.com/a/stone_01)

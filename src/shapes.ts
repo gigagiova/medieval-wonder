@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import type { Builder } from './builder';
 import { rng } from './builder';
 import type { MatName } from './materials';
+import { Acc, Frame, box as kbox, voussoirs } from './arch/kit';
+import { tiledGable, tiledLeanTo } from './arch/roof';
 
 // Reusable architectural pieces. Everything takes a Builder and world coordinates.
 const rand = rng(4242);
@@ -29,6 +31,7 @@ export function arcade(b: Builder, m: MatName, L: number, h: number, depth: numb
 }
 
 /** Wall with a broken, jagged top: ruins and roofless shells. */
+let lastTops: { tops: number[]; n: number; L: number } | null = null;
 /** Solid wall block with a jagged top as indexed grids (cheap to bend). */
 function jaggedWall(L: number, h: number, depth: number, jag: number) {
   const step = 0.8;
@@ -50,6 +53,7 @@ function jaggedWall(L: number, h: number, depth: number, jag: number) {
     }
   };
   const X = (i: number) => -L / 2 + (i / n) * L;
+  lastTops = { tops, n, L };
   for (const [zz, flip] of [[depth / 2, false], [-depth / 2, true]] as const) {
     quadGrid((i, j) => [X(i), (tops[i] * j) / nv, zz], n, nv, flip);
   }
@@ -90,7 +94,30 @@ export function ruinGeo(L: number, h: number, depth: number, jag = 0.5, openW = 
 }
 export function ruin(b: Builder, m: MatName, L: number, h: number, depth: number, x: number, y: number, z: number, ry: number, jag = 0.5, openW = 0, spring = 0) {
   const proxy = openW <= 0 ? new THREE.BoxGeometry(L, h * (1 - jag / 2), depth).translate(0, (h * (1 - jag / 2)) / 2, 0) : undefined;
+  lastTops = null;
   b.geo(m, ruinGeo(L, h, depth, jag, openW, spring), x, y, z, ry, true, 0, 0, openW <= 0, proxy);
+  if (!lastTops || jag < 0.05) return;
+  // The broken top is not a clean line: loose blocks sit on it, some half
+  // fallen, and the fallen ones lie at the foot of the wall.
+  const { tops, n } = lastTops;
+  const c = Math.cos(ry), s = Math.sin(ry);
+  const acc = new Acc();
+  const blockM: MatName = m === 'brick' ? (rand() < 0.5 ? 'brick' : 'rubble') : m;
+  for (let i = 0; i <= n; i++) {
+    if (rand() > 0.55) continue;
+    const lx = -L / 2 + (i / n) * L + R(-0.2, 0.2), lz = R(-depth / 2 + 0.2, depth / 2 - 0.2);
+    const f = new Frame(new THREE.Vector3(x + lx * c + lz * s, y + tops[i] - 0.06, z - lx * s + lz * c),
+      new THREE.Vector3(Math.cos(ry + R(-0.4, 0.4)), R(-0.12, 0.12), -Math.sin(ry + R(-0.4, 0.4))).normalize(), new THREE.Vector3(0, 1, 0), new THREE.Vector3(Math.sin(ry), 0, Math.cos(ry)));
+    kbox(acc, blockM, f, 0, R(0.08, 0.16), 0, R(0.16, 0.32), R(0.08, 0.15), R(0.12, 0.25), 0.04);
+  }
+  for (let i = 0; i < L / 1.6; i++) {
+    if (rand() > 0.6) continue;
+    const lx = R(-L / 2, L / 2), lz = (rand() < 0.5 ? -1 : 1) * (depth / 2 + R(0.2, 1.4));
+    const f = new Frame(new THREE.Vector3(x + lx * c + lz * s, y > 1 ? 0 : y, z - lx * s + lz * c),
+      new THREE.Vector3(Math.cos(R(0, 6)), 0, Math.sin(R(0, 6))), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1));
+    kbox(acc, blockM, f, 0, 0.08, 0, R(0.15, 0.35), R(0.08, 0.16), R(0.12, 0.28), 0.05);
+  }
+  acc.flush(b);
 }
 
 /** Roman column, often reused (spolia): plinth, base torus, tapering shaft, impost capital. */
@@ -114,25 +141,16 @@ export function fallenDrum(b: Builder, x: number, z: number, r: number, len: num
 
 /** Low-pitched gable roof of coppi over a w × d footprint (ridge along local x). */
 export function gable(b: Builder, w: number, d: number, hr: number, x: number, y: number, z: number, ry: number, wallMat: MatName, over = 0.5) {
-  const s = new THREE.Shape();
-  s.moveTo(-d / 2, 0); s.lineTo(d / 2, 0); s.lineTo(0, hr); s.closePath();
-  const g = new THREE.ExtrudeGeometry(s, { depth: w, bevelEnabled: false });
-  g.translate(0, 0, -w / 2);
-  b.geo(wallMat, g, x, y, z, ry + Math.PI / 2, false);
-  const a = Math.atan2(hr, d / 2);
-  const run = d / 2 + over;
-  const L = run / Math.cos(a) + 0.15;
-  for (const s2 of [1, -1]) {
-    const cz = (run / 2) * s2, cy = y + hr - Math.tan(a) * run / 2 + 0.12;
-    const lx = Math.sin(ry) * cz, lz = Math.cos(ry) * cz;
-    b.box('roof', w + over * 1.6, 0.18, L, x + lx, cy - 0.1, z + lz, ry, false, a * s2);
-  }
+  const acc = new Acc();
+  tiledGable(b, acc, w, d, hr, x, y, z, ry, Math.max(0.25, over), { gableMat: wallMat });
+  acc.flush(b);
 }
 
-/** Single-slope roof (aisles, porticoes, cloister walks). Falls towards local +z. */
+/** Single-slope tiled roof (aisles, porticoes, cloister walks). Falls towards local +z. */
 export function leanTo(b: Builder, len: number, run: number, hHigh: number, hLow: number, x: number, z: number, ry: number) {
-  const a = Math.atan2(hHigh - hLow, run);
-  b.box('roof', len, 0.18, run / Math.cos(a) + 0.5, x, (hHigh + hLow) / 2 - 0.05, z, ry, false, a);
+  const acc = new Acc();
+  tiledLeanTo(acc, len, run, hHigh, hLow, x, z, ry);
+  acc.flush(b);
 }
 
 export function pyramidRoof(b: Builder, w: number, h: number, x: number, y: number, z: number) {
@@ -189,4 +207,39 @@ export function wellHead(b: Builder, m: MatName, x: number, y: number, z: number
       a + Math.PI / 2, false, R(-0.04, 0.04), R(-0.04, 0.04));
   }
   WELLS.push({ x, z, rIn, rOut });
+}
+
+/**
+ * Voussoir rings on both faces of an arched opening made with arcadeGeo:
+ * the opening (width openW, springing at `spring`) centred at (x, y, z),
+ * wall `depth` thick, rotated ry like Builder.geo.
+ */
+export function archRings(b: Builder, m: MatName, x: number, y: number, z: number, ry: number, depth: number, openW: number, spring: number, ring = 0.4, blk = 0.22, offU = 0) {
+  const acc = new Acc();
+  const X = new THREE.Vector3(Math.cos(ry), 0, -Math.sin(ry)), Z = new THREE.Vector3(Math.sin(ry), 0, Math.cos(ry));
+  for (const sd of [-1, 1]) {
+    const o = new THREE.Vector3(x, y, z).addScaledVector(Z, sd * depth / 2).addScaledVector(X, offU);
+    const f = new Frame(o, sd > 0 ? X.clone() : X.clone().negate(), new THREE.Vector3(0, 1, 0), Z.clone().multiplyScalar(sd));
+    voussoirs(acc, m, f, 0, spring, openW / 2, openW / 2 + ring, -0.12, 0.025, 0, Math.PI, blk);
+    // Imposts where the arch springs.
+    for (const side of [-1, 1]) kbox(acc, m === 'brick' ? 'stone' : m, f, side * (openW / 2 + 0.12), spring - 0.08, -0.05, 0.22, 0.08, 0.08, 0.01);
+  }
+  acc.flush(b);
+}
+
+/** Dressed quoins up the four corners of a box-shaped mass (w × d, rotated ry). */
+export function quoinBox(b: Builder, m: MatName, w: number, h: number, d: number, x: number, y: number, z: number, ry: number) {
+  const acc = new Acc();
+  const X = new THREE.Vector3(Math.cos(ry), 0, -Math.sin(ry)), Z = new THREE.Vector3(Math.sin(ry), 0, Math.cos(ry));
+  for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    const o = new THREE.Vector3(x, y, z).addScaledVector(X, sx * w / 2).addScaledVector(Z, sz * d / 2);
+    const f = new Frame(o, X, new THREE.Vector3(0, 1, 0), Z);
+    let v = 0;
+    for (let k = 0; v < h - 0.2; k++) {
+      const hgt = R(0.32, 0.46), la = k % 2 ? R(0.35, 0.5) : R(0.65, 0.9), lb = k % 2 ? R(0.65, 0.9) : R(0.35, 0.5);
+      kbox(acc, m, f, -sx * (la / 2 - 0.03), v + hgt / 2, -sz * (lb / 2 - 0.03), la / 2, hgt / 2 - 0.008, lb / 2, 0.012);
+      v += hgt;
+    }
+  }
+  acc.flush(b);
 }

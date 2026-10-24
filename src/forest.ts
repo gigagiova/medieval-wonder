@@ -3,6 +3,7 @@ import { Builder, rng } from './builder';
 import { shared } from './materials';
 import { noiseGLSL, atmosGLSL } from './shaders';
 import { field } from './displace';
+import { placeProp, commitProps, propsLoaded, type PropId } from './props';
 
 // The wood around the town: old oaks and chestnuts gone wild, thick gnarled
 // trunks on buttress roots, limbs that twist and fork and end in thorn-sharp
@@ -589,6 +590,10 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
     k.cols.push(new THREE.Color(t * R(0.95, 1.05), t, t * R(0.92, 1.0)));
   };
 
+  // Scanned ground cover (Poly Haven), when loaded. Returns false otherwise.
+  const scan = (id: PropId, x: number, z: number, s: number, ry: number, sink: number) =>
+    propsLoaded(id) && placeProp(null, id, x, sink * s, z, ry, s, { tilt: [R(-0.08, 0.08), R(-0.08, 0.08)] }) !== null;
+
   // Collision: a six-sided prism round the foot of each sizeable trunk.
   const colPos: number[] = [];
   const prism = (x: number, z: number, r: number) => {
@@ -620,9 +625,21 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
     dens *= 0.55 + 0.75 * (0.5 + 0.5 * Math.sin(x * 0.045 + 1.3) * Math.cos(z * 0.05 - 0.7));
     if (rand() > dens) {
       // Undergrowth in the gaps.
-      if (rand() < 0.3) { const bk = brambles[rand() < 0.5 ? 0 : 1]; place(bk, x, z, R(0.7, 1.5), R(0, 6.28), 0, 0, 0.05); }
-      else if (rand() < 0.05) { const lk = logs[rand() < 0.5 ? 0 : 1]; place(lk, x, z, R(0.8, 1.2), R(0, 6.28), 0, 0, 0.12); }
-      else if (rand() < 0.06) { const sk = stumps[rand() < 0.5 ? 0 : 1]; place(sk, x, z, R(0.8, 1.3), R(0, 6.28), 0, 0, 0.05); prism(x, z, 0.5); }
+      const u = rand();
+      if (u < 0.26) { const bk = brambles[rand() < 0.5 ? 0 : 1]; place(bk, x, z, R(0.7, 1.5), R(0, 6.28), 0, 0, 0.05); }
+      else if (u < 0.31) {
+        // A fallen trunk, scanned (or the procedural one).
+        const id: PropId = rand() < 0.5 ? 'dead_tree_trunk' : 'dead_tree_trunk_02';
+        if (!scan(id, x, z, R(1.0, 1.6), R(0, 6.28), -0.08)) { const lk = logs[rand() < 0.5 ? 0 : 1]; place(lk, x, z, R(0.8, 1.2), R(0, 6.28), 0, 0, 0.12); }
+      } else if (u < 0.36) {
+        const id: PropId = rand() < 0.5 ? 'tree_stump_01' : 'tree_stump_02';
+        if (!scan(id, x, z, R(0.7, 1.15), R(0, 6.28), -0.06)) { const sk = stumps[rand() < 0.5 ? 0 : 1]; place(sk, x, z, R(0.8, 1.3), R(0, 6.28), 0, 0, 0.05); }
+        prism(x, z, 0.55);
+      } else if (u < 0.42) {
+        scan(rand() < 0.5 ? 'rock_moss_set_01' : 'rock_moss_set_02', x, z, R(0.7, 1.5), R(0, 6.28), -0.1);
+      } else if (u < 0.5) {
+        scan((['nettle_plant', 'fern_02', 'weed_plant_02', 'shrub_02', 'dry_branches_medium_01', 'bark_debris_01'] as PropId[])[Math.floor(rand() * 6)], x, z, R(0.8, 1.3) * (rand() < 0.5 ? 1 : 3), R(0, 6.28), 0);
+      }
       continue;
     }
     const big = rand() < 0.07;
@@ -632,12 +649,22 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
     const s = big ? R(1.0, 1.35) : R(0.75, 1.2);
     place(e2.k, x, z, s, R(0, 6.28), R(-0.06, 0.06), R(-0.06, 0.06), big ? 0.25 : 0.15, e2.sp.r0 * 1.6 + 2);
     if (e2.sp.r0 * s > 0.15) prism(x, z, e2.sp.r0 * s * 0.95);
-    if (big) treeSpots.push(new THREE.Vector2(x, z));
+    if (big) {
+      treeSpots.push(new THREE.Vector2(x, z));
+      // Old trees heave their roots out of the ground and gather moss-grown stones.
+      const a = R(0, 6.28);
+      scan(rand() < 0.5 ? 'root_cluster_01' : 'pine_roots', x + Math.cos(a) * e2.sp.r0 * s * 0.6, z + Math.sin(a) * e2.sp.r0 * s * 0.6, R(0.8, 1.2), a, -0.05);
+      if (rand() < 0.5) scan('rock_moss_set_01', x + Math.cos(a + 2) * (e2.sp.r0 * s + 2), z + Math.sin(a + 2) * (e2.sp.r0 * s + 2), R(1.4, 2.2), R(0, 6.28), -0.15);
+    } else if (rand() < 0.12) {
+      const a = R(0, 6.28);
+      scan('root_cluster_02', x + Math.cos(a) * 0.6, z + Math.sin(a) * 0.6, R(1.2, 2.2), a, -0.03);
+    }
     // Toadstools and brambles at the roots.
     if (rand() < 0.35) { const a = R(0, 6.28), d = e2.sp.r0 * s * R(1.3, 2.4); place(shrooms, x + Math.cos(a) * d, z + Math.sin(a) * d, R(0.8, 1.6), R(0, 6.28), 0, 0, 0.02); }
     if (rand() < 0.4) { const a = R(0, 6.28), d = e2.sp.r0 * s + R(1.2, 2.8); place(brambles[rand() < 0.5 ? 0 : 1], x + Math.cos(a) * d, z + Math.sin(a) * d, R(0.6, 1.2), R(0, 6.28), 0, 0, 0.05); }
   }
 
+  commitProps(scene);
   if (colPos.length) {
     const cg = new THREE.BufferGeometry();
     cg.setAttribute('position', new THREE.Float32BufferAttribute(colPos, 3));

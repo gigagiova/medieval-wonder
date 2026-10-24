@@ -16,7 +16,7 @@ export const PROP_IDS = [
   'ceramic_pot', 'planter_pot_clay', 'wooden_bucket_01', 'wooden_bucket_02', 'folding_wooden_stool',
   'WoodenTable_01', 'treasure_chest', 'stone_fire_pit', 'wooden_axe', 'wooden_axe_02', 'cross_pein_hammer',
   'wooden_cutting_board', 'marble_bust_01', 'street_rat',
-  'boulder_01', 'rock_07', 'rock_09', 'stone_01', 'rock_moss_set_01', 'rock_moss_set_02',
+  'rock_07', 'rock_09', 'stone_01', 'rock_moss_set_01', 'rock_moss_set_02',
   'tree_stump_01', 'tree_stump_02', 'dead_tree_trunk', 'dead_tree_trunk_02', 'root_cluster_01',
   'root_cluster_02', 'pine_roots', 'bark_debris_01', 'dry_branches_medium_01', 'nettle_plant', 'fern_02',
   'grass_medium_02', 'shrub_02', 'weed_plant_02',
@@ -26,7 +26,7 @@ export const ALL_PROP_IDS: readonly PropId[] = PROP_IDS;
 
 /** How far each kind stays visible (m): small things vanish into the fog early. */
 const RANGE: Partial<Record<PropId, number>> = {
-  boulder_01: 120, rock_07: 90, rock_09: 90, stone_01: 60, rock_moss_set_01: 70, rock_moss_set_02: 70,
+  rock_07: 90, rock_09: 90, stone_01: 60, rock_moss_set_01: 70, rock_moss_set_02: 70,
   tree_stump_01: 90, tree_stump_02: 90, dead_tree_trunk: 100, dead_tree_trunk_02: 100,
   root_cluster_01: 70, root_cluster_02: 70, pine_roots: 70,
   nettle_plant: 32, fern_02: 32, grass_medium_02: 28, shrub_02: 36, weed_plant_02: 28,

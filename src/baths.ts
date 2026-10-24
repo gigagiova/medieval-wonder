@@ -6,6 +6,7 @@ import { noiseGLSL, atmosGLSL } from './shaders';
 import { arcadeGeo, ruinGeo, ruin, column, fallenDrum } from './shapes';
 import { brazier, lucerna } from './lights';
 import { displacePositions, terrain } from './displace';
+import { placeProp, commitProps, type PropId } from './props';
 
 // The thermae: an imperial bath hall four centuries old, abandoned for two,
 // quarried for its marble ever since. One groin-vaulted bay of the
@@ -40,6 +41,7 @@ export function buildBaths(b: Builder, scene: THREE.Scene): void {
   outerWalls(b);
   debris(b);
   mosaics(scene);
+  commitProps(scene);
 }
 
 // ------------------------------------------------------------------ platform
@@ -323,14 +325,16 @@ function niche(b: Builder, x: number, z: number) {
   const prof: THREE.Vector2[] = [
     [0.0, 0], [0.17, 0.0], [0.19, 0.25], [0.21, 0.5], [0.2, 0.7], [0.16, 0.86], [0.17, 1.0], [0.2, 1.18], [0.21, 1.32], [0.18, 1.42], [0.09, 1.5], [0.06, 1.6], [0.0, 1.62],
   ].map(([r, y]) => new THREE.Vector2(r, y));
-  const torso = new THREE.LatheGeometry(prof, 16);
-  torso.scale(1.25, 1, 0.72);
-  b.geo('marble', torso, x, FL + 0.9, z - 0.25, R(-0.15, 0.15), true);
-  for (const s of [-1, 1]) {
-    b.geo('marble', new THREE.CylinderGeometry(0.07, 0.08, 0.35, 8), x + s * 0.3, FL + 0.9 + 1.28, z - 0.25, 0, false, 0, s * 0.5);
+  // A Roman portrait bust (scan) left on the plinth; failing that, the torso.
+  if (!placeProp(null, 'marble_bust_01', x, FL + 0.9, z - 0.25, Math.PI + 0.25, 1.75, { collide: b })) {
+    const torso = new THREE.LatheGeometry(prof, 16);
+    torso.scale(1.25, 1, 0.72);
+    b.geo('marble', torso, x, FL + 0.9, z - 0.25, R(-0.15, 0.15), true);
+    for (const s of [-1, 1]) {
+      b.geo('marble', new THREE.CylinderGeometry(0.07, 0.08, 0.35, 8), x + s * 0.3, FL + 0.9 + 1.28, z - 0.25, 0, false, 0, s * 0.5);
+    }
+    b.box('marble', 0.18, 1.2, 0.18, x - 0.26, FL + 0.9 + 0.2, z - 0.05, 0.2, false, 0.1, 0.12);
   }
-  // A cloak fold falling from the left shoulder.
-  b.box('marble', 0.18, 1.2, 0.18, x - 0.26, FL + 0.9 + 0.2, z - 0.05, 0.2, false, 0.1, 0.12);
   // Somebody comes here: three lamps alight, and a skull at the statue's feet.
   lucerna(b, x - 0.5, FL + 0.9, z + 0.05, 0.4);
   lucerna(b, x + 0.45, FL + 0.9, z + 0.1, -0.2);
@@ -466,6 +470,45 @@ function debris(b: Builder) {
   for (let i = 0; i < 4; i++) b.box('marble', R(1.2, 1.8), 0.2, R(0.5, 0.8), -21.4 + R(-0.2, 0.2), FL + i * 0.2, 25.6 + R(-0.1, 0.1), R(-0.2, 0.2));
   // Stones outside, by the lane.
   fallenDrum(b, -16.6, 21.6, 0.45, 1.2, 0.9);
+  overgrowth(b);
+}
+
+/**
+ * Scanned rubble, mossy stones, weeds and a sapling or two: two centuries of
+ * nobody sweeping. Stones gather where the vault fell and along the walls,
+ * plants where water drips and soil collects.
+ */
+function overgrowth(b: Builder) {
+  const P = (id: PropId, x: number, y: number, z: number, ry: number, s: number, collide = false, tilt?: [number, number]) =>
+    placeProp(null, id, x, y, z, ry, s, { collide: collide ? b : undefined, tilt });
+  // Fallen-vault field: mossy stones and broken bits around the brick slabs.
+  for (let i = 0; i < 16; i++) {
+    const x = R(HX0 + 1.2, HX1 - 1.2), z = R(14.8, 23.5);
+    P('rock_moss_set_01', x, FL, z, R(0, 6), R(0.5, 0.9), false, [R(-0.2, 0.2), R(-0.2, 0.2)]);
+  }
+  for (let i = 0; i < 26; i++) {
+    const x = R(HX0 + 0.8, HX1 - 0.8), z = R(14.5, 24);
+    P(i % 3 ? 'rock_07' : 'rock_09', x, FL, z, R(0, 6), R(2.5, 6), false, [R(-0.5, 0.5), R(-0.5, 0.5)]);
+  }
+  for (let i = 0; i < 30; i++) P('stone_01', R(HX0 + 0.6, HX1 - 0.6), FL, R(14.5, 33), R(0, 6), R(3, 6));
+  // Along the foot of the walls and piers: weeds, nettles, ferns in the damp.
+  const edge: [number, number][] = [];
+  for (let z = 14.5; z < 34; z += R(0.8, 1.6)) { edge.push([HX0 + R(0.3, 0.8), z], [HX1 - R(0.3, 0.8), z]); }
+  for (let x = HX0 + 0.5; x < HX1; x += R(0.9, 1.6)) edge.push([x, 33.6 - R(0, 0.4)]);
+  edge.forEach(([x, z], i) => {
+    const r = rand();
+    if (r < 0.3) P('nettle_plant', x, FL, z, R(0, 6), R(3, 5));
+    else if (r < 0.55) P('weed_plant_02', x, FL, z, R(0, 6), R(2.5, 4));
+    else if (r < 0.72) P('fern_02', x, FL, z, R(0, 6), R(0.7, 1.1));
+    else if (r < 0.82) P('grass_medium_02', x, FL, z, R(0, 6), R(0.6, 0.9));
+    else if (r < 0.88 && i % 3 === 0) P('shrub_02', x, FL, z, R(0, 6), R(0.5, 0.8));
+  });
+  // Dead branches blown in, bark and twigs.
+  for (let i = 0; i < 10; i++) P('dry_branches_medium_01', R(HX0 + 1, HX1 - 1), FL, R(15, 33), R(0, 6), R(1, 1.6));
+  // Outside by the lane: a boulder of spolia core and weeds.
+  P('rock_moss_set_02', -17.2, 0, 17.4, 0.4, 1.4, true);
+  P('weed_plant_02', -17.6, 0, 19.2, 1.0, 3.5);
+  P('nettle_plant', -16.9, 0, 26.4, 2.0, 4);
 }
 
 function fallenDrumAt(b: Builder, x: number, y: number, z: number, r: number, len: number, ry: number) {

@@ -7,6 +7,7 @@ import { field } from './displace';
 import { arcadeGeo, gable } from './shapes';
 import { candle, lucerna, hornLantern, bracketLantern } from './lights';
 import { TEXTS, type Text, openCodex, isReading, spreadTexture, fontsReady } from './codex';
+import { placeProp, commitProps } from './props';
 
 // The abbey's book room: armarium and scriptorium in one long rubble hall.
 // As at Bobbio or Nonantola around 720, the codices lie flat in wooden
@@ -359,6 +360,13 @@ export function buildLibrary(b: Builder, scene: THREE.Scene) {
   b.box('iron', 0.012, H - 0.4 - 3.22, 0.012, -7.8, 3.22, -50.4, 0, false);
   bracketLantern(b, X0 - 0.02, 2.2, -48.7, -Math.PI / 2);
 
+  // Baskets of loose quires and offcuts, a water bucket for the scribes.
+  placeProp(null, 'wicker_basket_02', IX1 - 0.5, 0, -50.75, 0.4, 1.7, { collide: b, variant: 0 });
+  placeProp(null, 'wicker_basket_02', IX0 + 0.55, 0, -45.5, 2.1, 1.6, { collide: b, variant: 1 });
+  placeProp(null, 'wooden_bucket_01', IX1 - 0.55, 0, -47.6, 0.8, 0.85, { collide: b });
+  placeProp(null, 'folding_wooden_stool', -8.6, 0, -46.6, 2.6, 0.95, { collide: b });
+  commitProps(scene);
+
   addMeshes(parts, books, m, group);
   registerClosedBooks(group);
   refreshWhenFontsReady(group);
@@ -601,12 +609,15 @@ function desk(b: Builder, parts: Parts, m: ReturnType<typeof materials>, x: numb
     parts.add('wax', bx(0.13, 0.004, 0.085, 0, 0.007, 0), pm.clone().multiply(wm));
   }
   parts.add('iron', new THREE.CylinderGeometry(0.003, 0.002, 0.13, 5), pm.clone().multiply(M(0.1, 0.39, 0.02, 0, 0, Math.PI / 2 - 0.1)));
-  // Three-legged stool on the scribe's side.
+  // The scribe's stool: a folding X-frame stool (scan), or a turned three-legged one.
   const st = M(R(-0.08, 0.08), 0, D / 2 + 0.38, R(0, 2));
+  const sp = new THREE.Vector3().applyMatrix4(pm.clone().multiply(st));
+  if (placeProp(null, 'folding_wooden_stool', sp.x, sp.y, sp.z, ry + R(-0.3, 0.3), 0.95, { raw: true }) === null) {
   parts.add('wood', new THREE.CylinderGeometry(0.17, 0.17, 0.05, 12), pm.clone().multiply(st).multiply(M(0, 0.47, 0)));
   for (let i = 0; i < 3; i++) {
     const ang = (i / 3) * Math.PI * 2;
     parts.add('wood', new THREE.CylinderGeometry(0.018, 0.022, 0.48, 6), pm.clone().multiply(st).multiply(M(Math.sin(ang) * 0.11, 0.23, Math.cos(ang) * 0.11, 0, Math.cos(ang) * 0.15, -Math.sin(ang) * 0.15)));
+  }
   }
   // Candle on the desk's high corner (world coordinates before displacement, the Builder adds it).
   const cp = new THREE.Vector3(-W / 2 + 0.06, 0, -D / 2 + 0.05).applyMatrix4(M(x, topY + 0.1, z, ry));
@@ -681,6 +692,7 @@ function capsa(parts: Parts, x: number, z: number, anchor: Anchor) {
 }
 
 function chest(b: Builder, parts: Parts, x: number, z: number, anchor: Anchor) {
+  if (placeProp(null, 'treasure_chest', x, 0, z, -Math.PI / 2 + 0.04, 0.98, { collide: b }) !== null) return;
   const a = anchor(x, 0.3, z);
   const pm = M(x + a.x, a.y, z + a.z, -Math.PI / 2 + 0.04);
   parts.add('wood', bx(0.95, 0.5, 0.5, 0, 0.25, 0), pm);
