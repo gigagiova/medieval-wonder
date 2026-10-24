@@ -58,6 +58,26 @@ const EAST = wallAt(1.62);
 export const SPAWN = new THREE.Vector3(GATE.p.x + 1.5, 3, GATE.p.y + 30);
 
 let town: Town;
+const mapMarks = { trees: [] as THREE.Vector2[], tombs: [] as THREE.Vector2[], aqueduct: [] as THREE.Vector2[], arch: V(0, 0) };
+
+/** Everything the map needs: the town raster, the wall, streets, landmarks, surroundings. */
+export function getMapData() {
+  return {
+    grid: town.grid, n: Math.round(Math.sqrt(town.grid.length)), min: -100, res: 0.5,
+    codes: { free: 0, street: 1, reserved: 2, house: 3, outside: 4 },
+    wall: WALL, gate: GATE.p.clone(), eastGate: EAST.p.clone(),
+    streets: town.streets.map((s) => ({ pts: s.pts, w: s.w, main: s.main })),
+    landmarks: [
+      { name: 'Porta', x: GATE.p.x, z: GATE.p.y },
+      { name: 'Basilica', x: -17.3, z: -53 },
+      { name: 'Atrium', x: -16, z: -35 },
+      { name: 'Ossuarium', x: -36, z: -54.5 },
+      { name: 'Templum', x: 21, z: 6 },
+      { name: 'Arcus', x: mapMarks.arch.x, z: mapMarks.arch.y },
+    ],
+    trees: mapMarks.trees, tombs: mapMarks.tombs, aqueduct: mapMarks.aqueduct,
+  };
+}
 /** The main lane, gate to abbey, as a polyline (for the monk's round). */
 export const mainLane = () => town.streets[0].pts;
 
@@ -194,6 +214,7 @@ function roman(b: Builder) {
   const d = q.clone().sub(p).normalize();
   // Wall length across the lane: local x along the lane's normal.
   b.geo('marble', ruinGeo(9, 9.5, 2.6, 0.3, 3.6, 3.8), p.x, -0.3, p.y, Math.atan2(-d.x, -d.y));
+  mapMarks.arch.copy(p);
   well(b, s.pts[Math.floor(s.pts.length * 0.62)].x + 2.2, s.pts[Math.floor(s.pts.length * 0.62)].y + 0.5);
 }
 
@@ -418,6 +439,7 @@ function outskirts(b: Builder) {
     const x = Math.sin(a) * r, z = Math.cos(a) * r;
     if (Math.abs(x - GATE.p.x) < 14 && z > 0) continue;
     deadTree(b, x, z, R(4, 9));
+    mapMarks.trees.push(V(x, z));
   }
   // The aqueduct, long dry, striding in from the hills; whole spans have fallen.
   const a0 = V(78, -50), a1 = V(205, -150);
@@ -426,6 +448,7 @@ function outskirts(b: Builder) {
   dir.normalize();
   const ry = Math.atan2(-dir.y, dir.x);
   const bay = 6;
+  mapMarks.aqueduct.push(a0.clone(), a1.clone());
   for (let s = 0; s * bay * 3 < len; s++) {
     if (s % 4 === 2 || s % 7 === 5) {
       for (let k = 0; k < 3; k++) {
@@ -445,6 +468,7 @@ function outskirts(b: Builder) {
     const z = GATE.p.y + 8 + i * R(3.5, 5.5);
     const x = GATE.p.x + side * R(5.5, 15) + Math.sin(z * 0.05) * 2;
     if (inside(x, z)) continue;
+    mapMarks.tombs.push(V(x, z));
     const kind = rand();
     if (kind < 0.3) {
       const r = R(2.2, 3.4), h = R(2.5, 4.5);
