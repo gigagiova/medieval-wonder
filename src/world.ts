@@ -3,7 +3,7 @@ import { Builder, rng } from './builder';
 import type { MatName } from './materials';
 import { arcadeGeo, arcade, ruinGeo, ruin, column, fallenDrum, gable, leanTo, pyramidRoof, ringGeo, wellHead, WELLS } from './shapes';
 import { torch, brazier, hornLantern, bracketLantern, lucerna, polykandelon, candle } from './lights';
-import { layoutTown, lotsFor, buildHouse, buildBridges, townTexture, type Town } from './town';
+import { layoutTown, lotsFor, buildHouse, buildBridges, townTexture, BRIDGE_SPOTS, type Town } from './town';
 import { setGroundExtra } from './displace';
 import { buildCatacombs, CATACOMB_SPOTS } from './catacombs';
 import { buildForest, treeSpots } from './forest';
@@ -145,6 +145,7 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
     if (i % 120 === 119) await progress('Raising the houses', 0.1 + 0.3 * (i / lots.length));
   }
   buildBridges(b, town);
+  (globalThis as unknown as { __archSpots: unknown }).__archSpots = BRIDGE_SPOTS;
   await progress('Among the ruins of the forum', 0.42);
   roman(b);
   monastery(b);

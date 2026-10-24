@@ -343,7 +343,7 @@ export function buildHouse(b: Builder, lot: Lot) {
   const centre = e.clone().multiplyScalar(cu).addScaledVector(n, cv);
   const lenU = maxU - minU, lenV = maxV - minV;
   const gm: MatName = upper === 'wood' ? 'plaster' : upper;
-  const opts = { pitch: front ? 0.34 : 0.5, course: front ? 0.46 : 0.9, smoke: rand() < 0.18, gableMat: gm };
+  const opts = { pitch: front ? 0.37 : 0.55, course: front ? 0.52 : 1.0, smoke: rand() < 0.18, gableMat: gm };
   if (rand() < 0.16) {
     tiledLeanTo(acc, lenU + 0.5, lenV + 0.6, h + lenV * 0.28, h - 0.15, centre.x, centre.y, ryOf(e) + (rand() < 0.5 ? 0 : Math.PI), opts.pitch);
   } else if (lenU > lenV || rand() < 0.3) {
@@ -394,6 +394,9 @@ function backWindows(acc: Acc, c: V2[], base: number, h: number, m: MatName) {
  * Rooms bridging alleys on arches (pontili) and thin flying arches braced
  * between facing walls, wherever both sides of a lane are built up.
  */
+/** Where pontili stand (x, z, yaw looking along the lane), for debugging views. */
+export const BRIDGE_SPOTS: { x: number; z: number; yaw: number; pontile: boolean }[] = [];
+
 export function buildBridges(b: Builder, t: Town) {
   for (const s of t.streets) {
     const L = lengthOf(s.pts);
@@ -426,7 +429,9 @@ export function buildBridges(b: Builder, t: Town) {
           : Frame.facade(o.x + n.x * span, o.y + n.y * span, -ux, -uz, dz.x, dz.y);
       };
       const stoneM: MatName = rand() < 0.5 ? 'stone' : 'brick';
-      if (rand() < 0.55 && !s.main) {
+      const pont = rand() < 0.55 && !s.main;
+      BRIDGE_SPOTS.push({ x: a.p.x, z: a.p.y, yaw: Math.atan2(-a.d.x, -a.d.y), pontile: pont });
+      if (pont) {
         // Pontile: a room carried on a vaulted passage.
         const depth = R(2.2, 4.0), spring = R(2.4, 2.9), top = spring + s.w / 2 + R(2.6, 3.6);
         const m: MatName = rand() < 0.5 ? 'rubble' : 'brick';

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Builder } from '../builder';
 import type { MatName } from '../materials';
-import { Acc, Frame, R, chance, box, voussoirs, planks } from './kit';
+import { Acc, Frame, R, chance, box, voussoirs, planks, addBent } from './kit';
 import { tiledLeanTo } from './roof';
 import { torch, bracketLantern } from '../lights';
 
@@ -41,7 +41,7 @@ function panel(b: Builder, m: MatName, f: Frame, L: number, y0: number, y1: numb
   const g = new THREE.ExtrudeGeometry(s, { depth: T, bevelEnabled: false, curveSegments: 8 });
   g.translate(0, 0, -T + wOff);
   const M = new THREE.Matrix4().makeBasis(f.x, f.y, f.z).setPosition(f.o);
-  b.add(g, m, M, false, false);
+  addBent(b, g, m, M);
 }
 
 /** Planked leaf filling an opening at depth w (arched tops follow the arch). */

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Builder } from '../builder';
 import { rng } from '../builder';
 import type { MatName } from '../materials';
+import { field, tessellate } from '../displace';
 
 // A small kit for hand-built architecture: everything is emitted as raw
 // triangles into per-material accumulators and handed to the Builder in one
@@ -16,6 +17,10 @@ export const chance = (p: number) => rand() < p;
 type V3 = THREE.Vector3;
 const v3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const _a = v3(), _b = v3(), _n = v3(), _c = v3();
+
+/** Numeric key for a position on a 4 mm lattice (±250 m). */
+const key = (x: number, y: number, z: number) =>
+  ((Math.round(x * 250) + 65536) * 131072 + (Math.round(y * 250) + 65536)) * 131072 + (Math.round(z * 250) + 65536);
 
 export class Acc {
   private parts = new Map<MatName, number[]>();
@@ -54,15 +59,27 @@ export class Acc {
     for (const [a, b, cc, d] of F) this.quad(m, c[a], c[b], c[cc], c[d], ctr);
   }
 
-  /** Flush everything into the Builder (no collision; bent by the world field). */
+  /**
+   * Flush everything into the Builder (no collision). The pieces are bent by
+   * the world field here, once per distinct corner (blocks share many), and
+   * keep flat facets so every block reads as a block.
+   */
   flush(b: Builder) {
+    const cache = new Map<number, THREE.Vector3>();
+    const d = v3();
     for (const [m, a] of this.parts) {
       if (!a.length) continue;
+      for (let i = 0; i < a.length; i += 3) {
+        const k = key(a[i], a[i + 1], a[i + 2]);
+        let o = cache.get(k);
+        if (!o) { field(a[i], a[i + 1], a[i + 2], 'stone', d); o = d.clone(); cache.set(k, o); }
+        a[i] += o.x; a[i + 1] += o.y; a[i + 2] += o.z;
+      }
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(a, 3));
       g.computeVertexNormals();
       g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((a.length / 3) * 2), 2));
-      b.add(g, m, undefined, false, true);
+      b.add(g, m, undefined, false, true, true);
     }
     this.parts.clear();
   }
@@ -144,4 +161,24 @@ export function coppo(acc: Acc, m: MatName, p0: V3, p1: V3, up: V3, side: V3, r0
   const A = ring(p0, r0), B = ring(p1, r1);
   const below = v3().copy(p0).add(p1).multiplyScalar(0.5).addScaledVector(up, -1);
   for (let k = 0; k < seg; k++) acc.quad(m, A[k], A[k + 1], B[k + 1], B[k], below);
+}
+
+/**
+ * Add a plain-surfaced piece (wall panel, vault): subdivided like everything
+ * else, bent by the world field with a per-corner cache, original normals kept.
+ */
+export function addBent(b: Builder, g: THREE.BufferGeometry, m: MatName, M?: THREE.Matrix4) {
+  let geo = g.index ? g.toNonIndexed() : g;
+  if (M) geo.applyMatrix4(M);
+  geo = tessellate(geo, m);
+  const a = geo.attributes.position.array as Float32Array;
+  const cache = new Map<number, number[]>();
+  const d = v3();
+  for (let i = 0; i < a.length; i += 3) {
+    const k = key(a[i], a[i + 1], a[i + 2]);
+    let o = cache.get(k);
+    if (!o) { field(a[i], a[i + 1], a[i + 2], m, d); o = [d.x, d.y, d.z]; cache.set(k, o); }
+    a[i] += o[0]; a[i + 1] += o[1]; a[i + 2] += o[2];
+  }
+  b.add(geo, m, undefined, false, true, true);
 }
