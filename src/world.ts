@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Builder, rng } from './builder';
 import type { MatName } from './materials';
-import { arcadeGeo, arcade, ruinGeo, ruin, column, fallenDrum, gable, leanTo, pyramidRoof } from './shapes';
+import { arcadeGeo, arcade, ruinGeo, ruin, column, fallenDrum, gable, leanTo, pyramidRoof, ringGeo, wellHead } from './shapes';
 import { torch, brazier, hornLantern, bracketLantern, lucerna, polykandelon, candle } from './lights';
 import { layoutTown, lotsFor, buildHouse, buildBridges, townTexture, type Town } from './town';
 import { setGroundExtra } from './displace';
@@ -65,7 +65,7 @@ const NORTH = wallAt(Math.atan2(-20.3, -93.1));
 export const SPAWN = new THREE.Vector3(GATE.p.x + 1.5, 3, GATE.p.y + 30);
 
 let town: Town;
-const mapMarks = { trees: [] as THREE.Vector2[], tombs: [] as THREE.Vector2[], aqueduct: [] as THREE.Vector2[], arch: V(0, 0) };
+const mapMarks = { trees: [] as THREE.Vector2[], tombs: [] as THREE.Vector2[], aqueduct: [] as THREE.Vector2[], arch: V(0, 0), well: V(0, 0) };
 
 export interface Teleport { name: string; x: number; y: number; z: number; yaw: number }
 /** Places the map can send you to. y is eye height (above ground ones are dropped in from a little higher). */
@@ -89,6 +89,7 @@ export function getTeleports(): Teleport[] {
     { name: 'Catacumbae', x: cs.stairBottom.x, y: cs.stairBottom.y + 0.2, z: cs.stairBottom.z, yaw: 0 },
     { name: 'Crypta', x: cs.crypt.x, y: cs.crypt.y + 0.2, z: cs.crypt.z, yaw: 0.9 },
     above('Aquaeductus', 92, -66, 140, -100),
+    above('Puteus', mapMarks.well.x - 2.4, mapMarks.well.y - 0.6, mapMarks.well.x, mapMarks.well.y),
     above('Palatium', PALACE_SPOT.x, PALACE_SPOT.z, PALACE_SPOT.x, PALACE_SPOT.z - 10),
     { name: 'Thermae', x: BATHS_SPOT.x, z: BATHS_SPOT.z, y: terrain(BATHS_SPOT.x, BATHS_SPOT.z) + 1.4 + 2.2, yaw: BATHS_SPOT.yaw },
     above('Porta Septentrionalis', NORTH.p.x - 0.5, NORTH.p.y - 6, -20.3, -93.1),
@@ -306,9 +307,9 @@ function roman(b: Builder) {
 }
 
 function well(b: Builder, x: number, z: number) {
+  mapMarks.well.set(x, z);
   // A reused Roman puteal: a marble drum, and a crooked wooden frame.
-  b.geo('marble', new THREE.CylinderGeometry(0.7, 0.75, 0.85, 20, 2, true), x, 0.42, z);
-  b.geo('marble', new THREE.TorusGeometry(0.7, 0.08, 6, 20), x, 0.85, z, 0, true, Math.PI / 2);
+  wellHead(b, 'marble', x, 0, z, 0.75, 0.88);
   b.box('wood', 0.15, 2.2, 0.15, x + 0.85, 0, z + 0.1, 0, true, 0, 0.06);
   b.box('wood', 0.15, 2.1, 0.15, x - 0.8, 0, z - 0.1, 0, true, 0.04, 0);
   b.box('wood', 2.1, 0.13, 0.13, x, 2.08, z, 0.08, false);
@@ -410,7 +411,8 @@ function church(b: Builder) {
   ruin(b, 'rubble', 5, 3.2, 0.8, -20.5, -0.3, az1, 0.05, 0.6);
   for (let i = 0; i < 2; i++) column(b, -10.6 - i * 2.4, -0.3, az1 - 0.8, 3.3, 0.22, i === 1 ? 0.6 : 0);
   // The cantharus, the fountain of the atrium, long dry.
-  b.geo('marble', new THREE.CylinderGeometry(1.0, 0.8, 0.7, 18, 2, true), -16.5, 0.05, -35.5);
+  b.geo('marble', ringGeo(1.0, 0.86, 0.72), -16.5, -0.05, -35.5);
+  b.geo('marble', new THREE.CircleGeometry(0.9, 24).rotateX(-Math.PI / 2), -16.5, 0.12, -35.5, 0, false);
   brazier(b, -14.2, -32.5);
   hornLantern(b, -11.2, 2.4, -38.5);
 }

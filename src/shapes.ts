@@ -138,3 +138,25 @@ export function leanTo(b: Builder, len: number, run: number, hHigh: number, hLow
 export function pyramidRoof(b: Builder, w: number, h: number, x: number, y: number, z: number) {
   b.geo('roof', new THREE.ConeGeometry(w * 0.74, h, 4, 3), x, y + h / 2, z, Math.PI / 4, false);
 }
+
+/**
+ * A thick-walled drum (well-head, basin, bowl): outer face, rounded rim and
+ * inner face, as one lathe. `depth` extends the inner face below y = 0 (a shaft).
+ */
+export function ringGeo(rOut: number, rIn: number, h: number, depth = 0, seg = 28) {
+  const t = rOut - rIn, r = t * 0.45;
+  const pts: THREE.Vector2[] = [new THREE.Vector2(rIn, -depth), new THREE.Vector2(rIn, h - r)];
+  for (let i = 1; i < 6; i++) {
+    const a = Math.PI - (i / 6) * Math.PI;
+    pts.push(new THREE.Vector2(rIn + t / 2 + Math.cos(a) * t / 2, h - r + Math.sin(a) * r));
+  }
+  pts.push(new THREE.Vector2(rOut, h - r), new THREE.Vector2(rOut * 1.03, 0));
+  return new THREE.LatheGeometry(pts, seg);
+}
+
+/** A well: thick drum with a dark water surface down the shaft. */
+export function wellHead(b: Builder, m: MatName, x: number, y: number, z: number, rOut: number, h: number) {
+  const rIn = rOut - 0.16;
+  b.geo(m, ringGeo(rOut, rIn, h, 0.3), x, y, z, 0, true, 0, 0, false, new THREE.CylinderGeometry(rOut, rOut, h, 8, 1, true).translate(0, h / 2, 0));
+  b.add(new THREE.CircleGeometry(rIn + 0.02, 24).rotateX(-Math.PI / 2), 'iron', new THREE.Matrix4().makeTranslation(x, y + 0.08, z), false, true, true);
+}

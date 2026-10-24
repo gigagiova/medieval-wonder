@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=UnifrakturMaguntia&display=swap" rel="stylesheet" />
 <style>
+  /* Respect the hidden attribute even where a rule sets display. */
+  [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #050608; color: #d8c9a8; font-family: 'IM Fell English', Georgia, serif; }
   canvas { display: block; }
   #overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2rem;

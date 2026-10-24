@@ -9,7 +9,7 @@ import { shared, mat, MAT, makeSurfaceMaterial, makeSky, makeMotes } from './mat
 import { makeFire } from './fire';
 import { makeBones } from './bones';
 import { NLAMP } from './shaders';
-import { buildWorld, SPAWN, regionName, mainLane, type Teleport } from './world';
+import { buildWorld, SPAWN, regionName, mainLane, getTeleports, type Teleport } from './world';
 import { terrain } from './displace';
 import { Player } from './player';
 import { Soundscape } from './audio';
@@ -21,7 +21,7 @@ import type { Lamp, Cell, PropKind } from './builder';
 
 const params = new URLSearchParams(location.search);
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -171,7 +171,15 @@ const summonMonks = () => setTimeout(() => {
 }, 500);
 
 const player = new Player(collider, SPAWN, camera, renderer.domElement);
+// Screenshot hooks: ?shot=…&hold waits for a teleport before counting frames.
+let held = params.has('hold');
+Object.assign(window, {
+  __teleports: getTeleports,
+  __setPitch: (p: number) => { player.pitch = p; },
+});
 (window as unknown as { __teleport: (t: Teleport) => void }).__teleport = (t) => {
+  held = false;
+  frames = 0;
   player.pos.set(t.x, t.y, t.z);
   player.vel.set(0, 0, 0);
   player.yaw = t.yaw;
@@ -328,12 +336,40 @@ function cull(isUnder: boolean) {
   cullStats.occluded = occ;
 }
 
+// Adaptive resolution: keep the frame time near 1/45 s by scaling the internal
+// render resolution between 0.55x and 1.5x CSS pixels (never above the screen's).
+const maxRatio = Math.min(devicePixelRatio, 1.5);
+let ratio = Math.min(devicePixelRatio, 1);
+let slow = 0, fast = 0, settle = 0;
+const frameTimes: number[] = [];
+function adaptResolution(frameDt: number) {
+  frameTimes.push(frameDt);
+  if (frameTimes.length < 20) return;
+  const avg = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
+  frameTimes.length = 0;
+  if (settle-- > 0) return;
+  if (avg > 1 / 40) { slow++; fast = 0; } else if (avg < 1 / 55) { fast++; slow = 0; } else { slow = fast = 0; }
+  let next = ratio;
+  if (slow >= 1) next = Math.max(0.55, ratio * (avg > 1 / 20 ? 0.75 : 0.88));
+  else if (fast >= 3) next = Math.min(maxRatio, ratio * 1.1);
+  if (Math.abs(next - ratio) > 0.02) {
+    ratio = next;
+    renderer.setPixelRatio(ratio);
+    composer.setPixelRatio(ratio);
+    renderer.setSize(innerWidth, innerHeight);
+    composer.setSize(innerWidth, innerHeight);
+    settle = 2;
+    slow = fast = 0;
+  }
+}
+
 const clock = new THREE.Clock();
 let fps = 60;
 let frames = 0;
 function frame() {
   frames++;
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const rawDt = clock.getDelta();
+  const dt = Math.min(rawDt, 0.05);
   const t = clock.elapsedTime;
   shared.uTime.value = t;
   grade.uniforms.uTime.value = t;
@@ -400,9 +436,10 @@ function frame() {
 
   cull(isUnder);
   audio?.update(dt, under, Math.hypot(player.pos.x - 0, player.pos.z + 45));
+  if (!params.has('shot')) adaptResolution(rawDt);
   composer.render(dt);
   if (params.has('debug')) document.title = `${fps.toFixed(0)} fps · cells ${cullStats.visible}/${cullStats.total} · occluded ${cullStats.occluded} · ${renderer.info.render.calls} calls`;
-  if (params.has('shot') && frames > 12) { (window as unknown as { __done: boolean }).__done = true; return; }
+  if (params.has('shot') && !held && frames > 12) { (window as unknown as { __done: boolean }).__done = true; return; }
   requestAnimationFrame(frame);
 }
 frame();

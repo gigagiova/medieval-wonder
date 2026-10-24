@@ -4,7 +4,7 @@ import type { MatName } from './materials';
 import { shared } from './materials';
 import { noiseGLSL, atmosGLSL } from './shaders';
 import { displace } from './displace';
-import { arcadeGeo, arcade, ruin, column, gable, leanTo, pyramidRoof } from './shapes';
+import { arcadeGeo, arcade, ruin, column, gable, leanTo, pyramidRoof, wellHead } from './shapes';
 import { torch, brazier, hornLantern, bracketLantern, lucerna, candle } from './lights';
 
 // The seat of the gastald, the king's man in the city: a late-Roman house
@@ -463,8 +463,7 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
   leanTo(b, 12.4, 1.5, 6.3, 5.6, 40.2, hz + 0.85, 0);
   b.box('iron', 0.9, 1.9, 0.62, 37.8, 3.6, hz, 0, false);
   // The well: a Roman puteal, its rim grooved by ropes.
-  b.geo('marble', new THREE.CylinderGeometry(0.62, 0.68, 0.85, 22, 2, true), 37.4, 0.35, -25.4);
-  b.geo('marble', new THREE.TorusGeometry(0.63, 0.07, 6, 22), 37.4, 0.8, -25.4, 0, false, Math.PI / 2);
+  wellHead(b, 'marble', 37.4, -0.08, -25.4, 0.68, 0.9);
   b.box('wood', 0.13, 2.1, 0.13, 38.1, -0.1, -25.3, 0, true, 0, 0.05);
   b.box('wood', 0.13, 2.0, 0.13, 36.7, -0.1, -25.5, 0, true, 0.04);
   b.box('wood', 1.7, 0.12, 0.12, 37.4, 1.95, -25.4, 0.1, false);

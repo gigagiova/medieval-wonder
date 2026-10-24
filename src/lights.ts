@@ -22,8 +22,9 @@ export function brazier(b: Builder, x: number, z: number, y = 0) {
     const a = (i / 3) * Math.PI * 2;
     b.box('iron', 0.05, 1.05, 0.05, x + Math.sin(a) * 0.22, y, z + Math.cos(a) * 0.22, a, true, -0.25);
   }
-  b.geo('iron', new THREE.CylinderGeometry(0.42, 0.24, 0.3, 14, 1, true), x, y + 1.1, z, 0, true);
-  b.geo('iron', new THREE.TorusGeometry(0.42, 0.025, 5, 16), x, y + 1.25, z, 0, false, Math.PI / 2);
+  // Bowl: a thin iron lathe, inside and out.
+  const bowl = new THREE.LatheGeometry([new THREE.Vector2(0.001, 0.0), new THREE.Vector2(0.24, 0.0), new THREE.Vector2(0.42, 0.3), new THREE.Vector2(0.44, 0.31), new THREE.Vector2(0.4, 0.3), new THREE.Vector2(0.22, 0.03), new THREE.Vector2(0.001, 0.03)], 16);
+  b.geo('iron', bowl, x, y + 0.95, z, 0, true);
   b.geo('ember', new THREE.CylinderGeometry(0.38, 0.3, 0.12, 14), x, y + 1.14, z, 0, false);
   b.lamp('brazier', v(x, y + 1.2, z));
 }
