@@ -9,6 +9,7 @@ import { shared, mat, makeSky } from './materials';
 import { NLAMP } from './shaders';
 import { makeFire } from './fire';
 import { field } from './displace';
+import { loadProps } from './props';
 
 // Dev page: the gastald's palace alone. ?cam=x,y,z,yaw,pitch
 const q = new URLSearchParams(location.search);
@@ -22,6 +23,7 @@ scene.add(makeSky());
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 600);
 const def = `${PALACE_SPOT.x},1.7,${PALACE_SPOT.z},${PALACE_SPOT.yaw},0.05`;
 const [x, y, z, yaw, pitch] = (q.get('cam') ?? def).split(',').map(Number);
+await loadProps();
 const t0 = performance.now();
 const b = new Builder();
 buildPalace(b, scene);

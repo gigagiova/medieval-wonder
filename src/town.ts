@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 import { Builder, rng } from './builder';
 import type { MatName } from './materials';
-import { arcadeGeo, gable, leanTo } from './shapes';
-import { torch, bracketLantern, brazier } from './lights';
+import { arcadeGeo } from './shapes';
+import { brazier } from './lights';
+import { Acc, Frame, box as kbox, voussoirs } from './arch/kit';
+import { tiledGable, tiledLeanTo } from './arch/roof';
+import { facade } from './arch/facade';
 import { terrain } from './displace';
 
 // The packed Lombard town: a few crooked lanes and many narrow alleys,
@@ -212,6 +215,7 @@ function markQuad(t: Town, c: V2[]) {
 }
 
 export function lotsFor(t: Town): Lot[] {
+  townRef = t;
   const lots: Lot[] = [];
   // Frontages along every street, both sides, wall to wall.
   for (const s of t.streets) {
@@ -271,12 +275,13 @@ const WALL_STEP = 0.8;
  * Walls of a prism over polygon c, from y0 to y0 + h, as indexed grids (one per
  * side, so corners stay creased) that the displacement field can bend.
  */
-function prismWalls(c: V2[], y0: number, h: number, step = WALL_STEP) {
+function prismWalls(c: V2[], y0: number, h: number, step = WALL_STEP, skip = -1) {
   let cx = 0, cz = 0;
   for (const p of c) { cx += p.x / c.length; cz += p.y / c.length; }
   const pos: number[] = [], idx: number[] = [];
   const nv = Math.max(1, Math.ceil(h / step));
   for (let k = 0; k < c.length; k++) {
+    if (k === skip) continue;
     const a = c[k], b = c[(k + 1) % c.length];
     const L = a.distanceTo(b);
     if (L < 0.05) continue;
@@ -305,14 +310,26 @@ function prismWalls(c: V2[], y0: number, h: number, step = WALL_STEP) {
 
 /** A packed town house built on a (possibly skewed) quad footprint. */
 export function buildHouse(b: Builder, lot: Lot) {
-  const { c, h } = lot;
+  const { h } = lot;
+  let c = lot.c;
   const base = -0.3;
   const lower: MatName = rand() < 0.7 ? 'rubble' : 'brick';
   const upper: MatName = rand() < 0.45 ? lower : (['rubble', 'brick', 'plaster', 'wood'] as MatName[])[Math.floor(rand() * 4)];
   const h1 = Math.min(h, R(2.8, 3.6));
-  // One plain prism (8 triangles) is the whole house as far as collision goes.
-  b.add(prismWalls(c, base, h1 - base), lower, undefined, true, true, false, prismWalls(c, base, h - base, 1e9));
-  if (h > h1 + 0.5) b.add(prismWalls(c, h1, h - h1), upper, undefined, false, true);
+  const acc = new Acc();
+  const front = lot.front;
+  // One plain prism is the whole house as far as collision goes. The street
+  // front is a separate thick panel with real openings (see facade()).
+  b.add(prismWalls(c, base, h1 - base, WALL_STEP, front ? 0 : -1), lower, undefined, true, true, false, prismWalls(c, base, h - base, 1e9));
+  if (h > h1 + 0.5) b.add(prismWalls(c, h1, h - h1, WALL_STEP, front ? 0 : -1), upper, undefined, false, true);
+  let jetty = 0;
+  if (front) {
+    const width = streetWidthNear(front.a.clone().lerp(front.b, 0.5).addScaledVector(front.out, 0.6));
+    jetty = facade(b, acc, { a: front.a, b: front.b, out: front.out, base, h1, h: Math.max(h, h1 + 0.01), lower, upper, street: width, lamp: rand() < 0.2 });
+    if (jetty > 0) c = [c[0].clone().addScaledVector(front.out, jetty), c[1].clone().addScaledVector(front.out, jetty), c[2], c[3]];
+  } else {
+    backWindows(acc, c, base, h, lower);
+  }
   // Roof over the footprint's oriented bounds, ridge along or across the street.
   const e = c[1].clone().sub(c[0]).normalize();
   const n = V(-e.y, e.x);
@@ -325,90 +342,51 @@ export function buildHouse(b: Builder, lot: Lot) {
   const cu = (minU + maxU) / 2, cv = (minV + maxV) / 2;
   const centre = e.clone().multiplyScalar(cu).addScaledVector(n, cv);
   const lenU = maxU - minU, lenV = maxV - minV;
-  const roofMat: MatName = upper === 'wood' ? 'wood' : rand() < 0.15 ? lower : upper;
-  if (rand() < 0.2) {
-    leanTo(b, lenU + 0.3, lenV, h + lenV * 0.3, h - 0.1, centre.x, centre.y, ryOf(e) + (rand() < 0.5 ? 0 : Math.PI));
+  const gm: MatName = upper === 'wood' ? 'plaster' : upper;
+  const opts = { pitch: front ? 0.34 : 0.5, course: front ? 0.46 : 0.9, smoke: rand() < 0.18, gableMat: gm };
+  if (rand() < 0.16) {
+    tiledLeanTo(acc, lenU + 0.5, lenV + 0.6, h + lenV * 0.28, h - 0.15, centre.x, centre.y, ryOf(e) + (rand() < 0.5 ? 0 : Math.PI), opts.pitch);
   } else if (lenU > lenV || rand() < 0.3) {
-    gable(b, lenU, lenV, lenV * R(0.17, 0.26), centre.x, h, centre.y, ryOf(e), roofMat, R(0.3, 0.6));
+    tiledGable(b, acc, lenU, lenV, lenV * R(0.17, 0.26), centre.x, h, centre.y, ryOf(e), R(0.32, 0.55), opts);
   } else {
-    gable(b, lenV, lenU, lenU * R(0.17, 0.26), centre.x, h, centre.y, ryOf(n), roofMat, R(0.3, 0.6));
+    tiledGable(b, acc, lenV, lenU, lenU * R(0.17, 0.26), centre.x, h, centre.y, ryOf(n), R(0.32, 0.55), opts);
   }
-  // Putlog holes: the rows of square scaffold holes every Italian rubble wall has.
+  acc.flush(b);
+}
+
+/** Width of the street around a point (for pentices and stairs). */
+let townRef: Town | null = null;
+function streetWidthNear(p: V2) {
+  if (!townRef) return 2;
+  let best = 2;
+  let bd = Infinity;
+  for (const s of townRef.streets) for (let i = 0; i < s.pts.length - 1; i++) {
+    const d = distSeg(p, s.pts[i], s.pts[i + 1]);
+    if (d < bd) { bd = d; best = s.w; }
+  }
+  return best;
+}
+
+/** Back buildings: a few small dark windows and putlog holes on their walls. */
+function backWindows(acc: Acc, c: V2[], base: number, h: number, m: MatName) {
+  let cx = 0, cz = 0;
+  for (const p of c) { cx += p.x / 4; cz += p.y / 4; }
   for (let k = 0; k < 4; k++) {
-    if (rand() < 0.5) continue;
+    if (rand() < 0.45) continue;
     const a = c[k], bb = c[(k + 1) % 4];
-    const len = a.distanceTo(bb);
-    const ed = bb.clone().sub(a).normalize();
-    for (let y = 1.6 + R(-0.2, 0.2); y < h - 0.6; y += R(1.4, 1.9)) {
-      for (let u = R(0.4, 1.2); u < len - 0.4; u += R(1.3, 2.4)) {
-        if (rand() < 0.5) continue;
-        const pp = a.clone().addScaledVector(ed, u);
-        b.box('iron', 0.13, 0.13, 0.3, pp.x, y, pp.y, ryOf(ed), false);
-      }
+    const L = a.distanceTo(bb);
+    if (L < 1.5) continue;
+    const e = bb.clone().sub(a).normalize();
+    let out = V(-e.y, e.x);
+    if (out.dot(V(a.x - cx, a.y - cz)) < 0) out = out.negate();
+    const f = Frame.facade(a.x, a.y, e.x, e.y, out.x, out.y);
+    for (let i = 0; i < Math.max(1, Math.floor(L / 3)); i++) {
+      if (rand() < 0.4) continue;
+      const u = R(0.5, L - 0.5), v = R(1.4, Math.max(1.5, h - 1.2));
+      kbox(acc, 'iron', f, u, v, 0.006, R(0.18, 0.3), R(0.25, 0.4), 0.01);
+      kbox(acc, m === 'brick' ? 'stone' : 'wood', f, u, v + 0.3, 0.03, 0.4, 0.07, 0.04, 0.01);
     }
-  }
-  if (!lot.front) return;
-  // Street front: an arched doorway, a few small windows at odd places.
-  const F = lot.front;
-  const fl = F.a.distanceTo(F.b);
-  const fe = F.b.clone().sub(F.a).normalize();
-  const ry = ryOf(fe);
-  const out = F.out;
-  const at = (u: number, o: number) => F.a.clone().addScaledVector(fe, u).addScaledVector(out, o);
-  const du = R(0.9, Math.max(1.0, fl - 0.9));
-  const dp = at(du, 0.05);
-  const archMat: MatName = rand() < 0.6 ? 'brick' : 'marble';
-  const dw = R(0.95, 1.25), spring = R(1.7, 2.0);
-  b.geo(archMat, arcadeGeo(dw + 0.7, spring + dw / 2 + 0.45, 0.32, 1, dw, spring), dp.x, -0.1, dp.y, ry, false, 0, 0, true);
-  const dd = at(du, -0.06);
-  b.box('wood', dw + 0.05, spring + dw / 2 - 0.05, 0.1, dd.x, -0.1, dd.y, ry, false);
-  if (rand() < 0.18) {
-    const tp = at(Math.min(fl - 0.3, du + dw / 2 + 0.5), 0.05);
-    if (rand() < 0.6) bracketLantern(b, tp.x, 2.2, tp.y, Math.atan2(out.x, out.y));
-    else torch(b, tp.x, 2.4, tp.y, Math.atan2(out.x, out.y));
-  }
-  const floors: number[] = [];
-  for (let y = h1 + R(0.8, 1.3); y < h - 1.1; y += R(2.4, 3.0)) floors.push(y);
-  for (const fy of floors) {
-    const nw = Math.max(1, Math.floor(fl / R(2.2, 3.4)));
-    for (let i = 0; i < nw; i++) {
-      if (rand() < 0.25) continue;
-      const u = R(0.5, fl - 0.5);
-      const wp = at(u, 0.04);
-      const glow = rand() < 0.3;
-      const ww = R(0.45, 0.7), wh = R(0.65, 0.95);
-      if (rand() < 0.5) {
-        b.geo('brick', arcadeGeo(ww + 0.35, wh + ww / 2 + 0.25, 0.2, 1, ww, wh), wp.x, fy - 0.1, wp.y, ry, false, 0, 0, true);
-      } else {
-        b.box('marble', ww + 0.25, 0.14, 0.24, wp.x, fy - 0.2, wp.y, ry, false);
-        b.box('wood', ww + 0.3, 0.16, 0.2, wp.x, fy + wh, wp.y, ry, false);
-      }
-      const sp = at(u, -0.02);
-      b.box(glow ? 'window' : 'wood', ww, wh, 0.07, sp.x, fy - 0.1, sp.y, ry, false);
-      if (glow && rand() < 0.3) {
-        const lp = at(u, 0.6);
-        b.lamp('window', new THREE.Vector3(lp.x, fy + 0.3, lp.y));
-      }
-    }
-  }
-  // Ground-floor slit for light and air.
-  if (fl > 3 && rand() < 0.5) {
-    const u = du < fl / 2 ? R(du + dw, fl - 0.4) : R(0.4, du - dw);
-    const sp = at(u, -0.02);
-    b.box('iron', 0.18, 0.55, 0.12, sp.x, 1.3, sp.y, ry, false);
-  }
-  // Spolia: a reused Roman block set in the wall.
-  if (rand() < 0.2) {
-    const sp = at(R(0.3, fl - 0.3), 0.02);
-    b.box('marble', R(0.5, 1.1), R(0.3, 0.5), 0.2, sp.x, R(0.3, h1 - 0.5), sp.y, ry + R(-0.04, 0.04), false);
-  }
-  // A wooden balcony on the upper floor, now and then.
-  if (floors.length && rand() < 0.12) {
-    const u = R(1, Math.max(1.2, fl - 1));
-    const bp = at(u, 0.45);
-    b.box('wood', Math.min(2.4, fl - 0.4), 0.1, 0.8, bp.x, floors[0] - 0.3, bp.y, ry, false);
-    const rp = at(u, 0.8);
-    b.box('wood', Math.min(2.4, fl - 0.4), 0.06, 0.05, rp.x, floors[0] + 0.6, rp.y, ry, false);
+    void base;
   }
 }
 
@@ -436,21 +414,50 @@ export function buildBridges(b: Builder, t: Town) {
       if (!probe(1) || !probe(-1)) continue;
       const ry = ryOf(n);
       const span = s.w + 2.0;
+      const acc = new Acc();
+      // Frame on the bridge's face: u across the lane, w along the lane.
+      const mk = (side: number, depth: number) => {
+        const o = a.p.clone().addScaledVector(n, -span / 2).addScaledVector(a.d, side * depth / 2);
+        const dz = a.d.clone().multiplyScalar(side);
+        // Keep it right-handed: u × up must point along w.
+        const ux = n.x, uz = n.y;
+        const rh = (uz * 1 - 0) * 0 + (-uz) * dz.x + ux * dz.y; // (u × up)·w with up = y
+        return rh >= 0 ? Frame.facade(o.x, o.y, ux, uz, dz.x, dz.y)
+          : Frame.facade(o.x + n.x * span, o.y + n.y * span, -ux, -uz, dz.x, dz.y);
+      };
+      const stoneM: MatName = rand() < 0.5 ? 'stone' : 'brick';
       if (rand() < 0.55 && !s.main) {
-        // Pontile: a room on an arch.
-        const depth = R(2.2, 4.2), spring = R(2.4, 3.0), top = spring + s.w / 2 + R(2.6, 3.8);
-        b.geo(rand() < 0.5 ? 'rubble' : 'brick', arcadeGeo(span, top, depth, 1, s.w + 0.15, spring), a.p.x, -0.2, a.p.y, ry);
-        gable(b, span, depth, 0.7, a.p.x, top - 0.2, a.p.y, ry, 'brick', 0.35);
-        for (const sd of [-1, 1]) {
-          if (rand() < 0.5) continue;
-          const wp = a.p.clone().addScaledVector(a.d, sd * (depth / 2 + 0.03));
-          b.box(rand() < 0.4 ? 'window' : 'wood', 0.5, 0.7, 0.06, wp.x + n.x * R(-0.4, 0.4), top - 1.6, wp.y + n.y * R(-0.4, 0.4), ry, false);
+        // Pontile: a room carried on a vaulted passage.
+        const depth = R(2.2, 4.0), spring = R(2.4, 2.9), top = spring + s.w / 2 + R(2.6, 3.6);
+        const m: MatName = rand() < 0.5 ? 'rubble' : 'brick';
+        b.geo(m, arcadeGeo(span, top, depth, 1, s.w + 0.1, spring), a.p.x, -0.2, a.p.y, ry);
+        for (const side of [-1, 1]) {
+          const f = mk(side, depth);
+          voussoirs(acc, stoneM, f, span / 2, spring - 0.2 + 0.2, (s.w + 0.1) / 2, (s.w + 0.1) / 2 + R(0.32, 0.45), -0.08, 0.02, 0, Math.PI, stoneM === 'brick' ? 0.075 : 0.2);
+          // Corbel course under the room, a window with shutters.
+          const yb = spring + s.w / 2 + 0.55;
+          for (let u = 0.25; u < span - 0.2; u += R(0.38, 0.5)) kbox(acc, stoneM, f, u, yb, 0.08, 0.08, 0.1, 0.1, 0.01);
+          kbox(acc, 'stone', f, span / 2, yb + 0.15, 0.06, span / 2, 0.06, 0.08, 0.01);
+          if (rand() < 0.75) {
+            const ww = R(0.45, 0.65), u0 = R(0.6, span - 0.6 - ww), v0 = yb + R(0.7, 1.1);
+            kbox(acc, rand() < 0.35 ? 'window' : 'iron', f, u0 + ww / 2, v0 + 0.35, -0.12, ww / 2, 0.38, 0.01);
+            voussoirs(acc, 'brick', f, u0 + ww / 2, v0 + 0.7, ww / 2, ww / 2 + 0.22, -0.05, 0.015, 0, Math.PI, 0.075);
+            kbox(acc, 'stone', f, u0 + ww / 2, v0 - 0.05, 0.02, ww / 2 + 0.1, 0.05, 0.12, 0.01);
+            for (const half of [0, 1]) kbox(acc, 'wood', f, u0 + ww * (0.25 + half * 0.5), v0 + 0.35, -0.05, ww / 4 - 0.01, 0.36, 0.025, 0.004);
+          }
         }
+        tiledGable(b, acc, span, depth, 0.7, a.p.x, top - 0.2, a.p.y, ry, 0.35, { gableMat: m, pitch: 0.36 });
       } else {
-        // Flying arch bracing the two walls apart.
+        // Flying arch of voussoirs bracing the two walls apart, with a thin spandrel.
         const y0 = R(3.4, 5.8);
-        b.geo('brick', arcadeGeo(span - 0.6, s.w / 2 + R(0.5, 0.9), R(0.4, 0.6), 1, s.w + 0.05, 0.01), a.p.x, y0, a.p.y, ry, false);
+        const depth = R(0.45, 0.65);
+        const f = mk(1, depth);
+        const r0 = (s.w + 0.1) / 2;
+        const f2 = new Frame(f.o.clone().setY(y0), f.x, f.y, f.z);
+        voussoirs(acc, rand() < 0.6 ? 'brick' : 'stone', f2, span / 2, 0, r0, r0 + 0.38, -depth, 0, 0, Math.PI, rand() < 0.6 ? 0.075 : 0.22);
+        b.geo('rubble', arcadeGeo(span - 0.4, r0 + 0.7, depth * 0.85, 1, s.w + 0.86, 0.01), a.p.x, y0, a.p.y, ry, false);
       }
+      acc.flush(b);
     }
   }
 }

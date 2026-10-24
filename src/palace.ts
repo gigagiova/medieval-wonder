@@ -6,6 +6,7 @@ import { noiseGLSL, atmosGLSL } from './shaders';
 import { displace } from './displace';
 import { arcadeGeo, arcade, ruin, column, gable, leanTo, pyramidRoof, wellHead } from './shapes';
 import { torch, brazier, hornLantern, bracketLantern, lucerna, candle } from './lights';
+import { placeProp, commitProps, type PropId } from './props';
 
 // The seat of the gastald, the king's man in the city: a late-Roman house
 // taken over and rebuilt piecemeal. Ranges of rooms in river stone and
@@ -232,7 +233,14 @@ function spear(b: Builder, x: number, z: number, lean: number, ry: number) {
   b.geo('iron', hd, x, 0, z, ry, false, lean);
 }
 
+/** A scanned prop, or (if the scans are not loaded) nothing: returns success. */
+function prop(b: Builder, id: PropId, x: number, y: number, z: number, ry: number, s = 1, collide = false, stretch?: [number, number, number], tilt?: [number, number]) {
+  return placeProp(null, id, x, y, z, ry, s, { collide: collide ? b : undefined, stretch, tilt }) !== null;
+}
+
 function bench(b: Builder, x: number, z: number, len: number, ry: number) {
+  // A plain old plank bench (scan), stretched to the wall's length.
+  if (prop(b, 'WoodenTable_01', x, 0, z, ry, 1, true, [len / 1.8, 0.85, 0.62])) return;
   b.box('wood', len, 0.08, 0.38, x, 0.4, z, ry, false);
   const ex = Math.cos(ry), ez = -Math.sin(ry);
   for (const s of [-0.42, 0.42]) b.box('wood', 0.08, 0.42, 0.32, x + ex * s * len, 0, z + ez * s * len, ry);
@@ -240,6 +248,7 @@ function bench(b: Builder, x: number, z: number, len: number, ry: number) {
 
 /** An iron-bound chest. */
 function chest(b: Builder, x: number, z: number, ry: number, w = 1.1) {
+  if (prop(b, 'treasure_chest', x, 0, z, ry, w / 0.96, true)) return;
   b.box('wood', w, 0.62, 0.62, x, 0, z, ry);
   for (const s of [-0.32, 0, 0.32]) b.box('iron', 0.05, 0.66, 0.66, x + Math.cos(ry) * s * w, 0, z - Math.sin(ry) * s * w, ry, false);
 }
@@ -289,13 +298,29 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
   b.geo('ground', new THREE.SphereGeometry(1.1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), 29.8, -0.2, -14.6, 0, false);
   b.geo('wood', new THREE.TorusGeometry(0.62, 0.05, 5, 16), 36.6, 0.66, -15.95, 0.2, false, 0.1);
   for (let i = 0; i < 8; i++) b.box('wood', 0.04, 1.2, 0.04, 36.6, 0.06, -15.95, 0.2, false, 0, (i / 8) * Math.PI);
+  // Tubs, buckets, a basket of feed.
+  prop(b, 'wooden_bucket_02', 31.2, 0, -14.9, 0.4, 1, true);
+  prop(b, 'wooden_bucket_01', 32.0, 0, -15.4, 1.2, 1, true);
+  prop(b, 'wooden_bucket_01', 34.6, 0, -12.0, 2.1, 0.95, false, undefined, [0.25, 1.2]);
+  prop(b, 'wicker_basket_02', 35.2, 0, -15.6, 0.7, 1.6, true);
+  prop(b, 'wooden_axe_02', 29.1, 0, -11.7, 1.4, 1, false, undefined, [0.25, 0]);
+  prop(b, 'cross_pein_hammer', 33.4, 0.95, -11.42, 0.2, 1, false, undefined, [Math.PI / 2, 0]);
   bracketLantern(b, 33.9, 2.2, fz - 0.28, Math.PI);
   // Storeroom: jars (dolia), sacks, a beam fallen from the loft.
-  for (let i = 0; i < 5; i++) {
-    const x = R(42.2, 46), z = R(-15.6, -11.3);
-    b.geo('clay', new THREE.CylinderGeometry(0.28, 0.2, 0.8, 12), x, 0.38, z);
-    b.geo('clay', new THREE.SphereGeometry(0.31, 12, 8), x, 0.6, z, 0, false);
-  }
+  const jars: [number, number][] = [[42.6, -15.2], [43.5, -15.4], [44.6, -15.1], [42.5, -12.0], [45.6, -11.6], [45.7, -14.2]];
+  jars.forEach(([x, z], i) => {
+    const ok = i % 2
+      ? prop(b, 'ceramic_pot', x, 0, z, R(0, 6), R(1.3, 1.6), true)
+      : prop(b, 'wine_barrel_01', x, 0, z, R(0, 6), R(0.8, 0.95), true);
+    if (!ok) {
+      b.geo('clay', new THREE.CylinderGeometry(0.28, 0.2, 0.8, 12), x, 0.38, z);
+      b.geo('clay', new THREE.SphereGeometry(0.31, 12, 8), x, 0.6, z, 0, false);
+    }
+  });
+  prop(b, 'wine_barrel_01', 43.4, 0, -11.4, 0.2, 0.8, true, undefined, [Math.PI / 2, 0]);
+  prop(b, 'wicker_basket_02', 44.9, 0, -12.9, 2.0, 1.5, true);
+  prop(b, 'planter_pot_clay', 42.4, 0, -13.6, 0.5, 1.9);
+  prop(b, 'planter_pot_clay', 42.9, 0, -13.2, 2.4, 1.6, false, undefined, [1.4, 0.2]);
   b.box('wood', 0.22, 0.22, 4.2, 43.7, 0.3, -13.4, 0.5, false, 0.3);
 
   // ---- The tower: a squat Lombard addition at the front-east corner.
@@ -312,7 +337,11 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
   b.box('wood', 0.06, 4.6, 0.06, 47.6, -0.1, -11.5, 0, false, 0.18);
   b.box('wood', 0.06, 4.6, 0.06, 48.1, -0.1, -11.5, 0, false, 0.18);
   for (let r = 0; r < 12; r++) b.box('wood', 0.56, 0.04, 0.04, 47.85, 0.25 + r * 0.36, -11.5 + r * 0.065, 0, false);
-  for (let i = 0; i < 3; i++) b.geo('wood', new THREE.CylinderGeometry(0.33, 0.33, 0.85, 12), 50.4 - i * 0.75, 0.12, -14.9 + (i % 2) * 0.3);
+  for (let i = 0; i < 3; i++) {
+    if (!prop(b, 'wine_barrel_01', 50.4 - i * 0.78, 0, -14.9 + (i % 2) * 0.3, R(0, 6), 0.9, true)) {
+      b.geo('wood', new THREE.CylinderGeometry(0.33, 0.33, 0.85, 12), 50.4 - i * 0.75, 0.12, -14.9 + (i % 2) * 0.3);
+    }
+  }
   for (let i = 0; i < 4; i++) spear(b, 51.1, -11.9 + i * 0.32, -0.12, Math.PI / 2);
   lucerna(b, 49.6, 0.95, -15.2, 0);
 
@@ -339,6 +368,8 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
   bench(b, 47.6, -24.6, 1.6, Math.PI / 2);
   b.box('slab', 3.9, 0.06, 6.6, 48.6, -0.25, -22.75, 0, false);
   // Store at the back of the east range: amphorae lying in sand.
+  prop(b, 'ceramic_pot', 49.6, 0, -28.3, 0.3, 1.4, true);
+  prop(b, 'wooden_bucket_01', 47.4, 0, -27.9, 1.0, 1);
   for (let i = 0; i < 4; i++) {
     const g = new THREE.CylinderGeometry(0.16, 0.05, 1.0, 10);
     b.geo('clay', g, 48.6 + R(-1, 1), 0.18, -27.8 + R(-0.8, 0.8), R(0, 3), false, 0, Math.PI / 2 + R(-0.2, 0.2));
@@ -350,8 +381,14 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
   wall(b, 'rubble', 28.5, -24.2, wx, -24.1, 5.6, t, [{ u: 2.6, w: 0.95, s: 1.8 }]);
   gable(b, 13.6, 5.2, 1.1, 30.75, 5.4, -22.9, Math.PI / 2 - 0.012, 'rubble', 0.5);
   // Guardroom: a table, benches, spears racked, shields on the wall, a brazier.
-  b.box('wood', 1.9, 0.07, 0.85, 30.6, 0.78, -20.0, 0.1, false);
-  for (const s of [-0.75, 0.75]) b.box('wood', 0.1, 0.78, 0.7, 30.6 + s, 0, -20.0, 0.1);
+  if (!prop(b, 'WoodenTable_01', 30.6, 0, -20.0, 0.1, 1, true, [1.05, 1.42, 1.25])) {
+    b.box('wood', 1.9, 0.07, 0.85, 30.6, 0.78, -20.0, 0.1, false);
+    for (const s of [-0.75, 0.75]) b.box('wood', 0.1, 0.78, 0.7, 30.6 + s, 0, -20.0, 0.1);
+  }
+  prop(b, 'wooden_bowl_01', 30.2, 0.79, -19.9, 0.4);
+  prop(b, 'carved_wooden_plate', 31.1, 0.79, -20.2, 1.1);
+  prop(b, 'folding_wooden_stool', 31.3, 0, -21.0, 0.5, 1, true);
+  prop(b, 'wooden_axe', 29.1, 0, -21.6, Math.PI / 2, 1, false, undefined, [0.22, 0]);
   bench(b, 30.5, -19.0, 1.8, 0.1);
   for (let i = 0; i < 5; i++) spear(b, 29.05, -17.4 - i * 0.35, 0.1, Math.PI / 2);
   for (let i = 0; i < 3; i++) shield(b, 28.85, 2.1, -18.4 - i * 1.6, 1, 0, R(0.38, 0.44));
@@ -381,10 +418,18 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
     b.box('slab', R(0.8, 1.3), 0.08, R(0.7, 1.2), x + 0.5, -0.06, z + 0.45, R(-0.06, 0.06), false);
   }
   // Central hearth: a ring of stones round the embers, smoke going up to the roof.
-  for (let i = 0; i < 11; i++) {
-    const a = (i / 11) * Math.PI * 2;
-    b.box('stone', R(0.3, 0.42), R(0.18, 0.26), 0.3, hearth.x + Math.sin(a) * 0.85, -0.05, hearth.z + Math.cos(a) * 0.72, a);
+  if (!prop(b, 'stone_fire_pit', hearth.x, -0.06, hearth.z, 0.4, 1.25, false)) {
+    for (let i = 0; i < 11; i++) {
+      const a = (i / 11) * Math.PI * 2;
+      b.box('stone', R(0.3, 0.42), R(0.18, 0.26), 0.3, hearth.x + Math.sin(a) * 0.85, -0.05, hearth.z + Math.cos(a) * 0.72, a);
+    }
   }
+  // Firewood stacked by the hearth, a pot warming at its edge.
+  prop(b, 'dead_tree_trunk', hearth.x - 1.6, 0, hearth.z + 0.9, 0.3, 0.38);
+  prop(b, 'dead_tree_trunk', hearth.x - 1.5, 0.1, hearth.z + 1.05, 0.25, 0.36);
+  prop(b, 'dead_tree_trunk', hearth.x - 1.65, 0.18, hearth.z + 0.95, 0.35, 0.34);
+  prop(b, 'ceramic_pot', hearth.x + 1.15, 0, hearth.z - 0.5, 1.7, 1.1);
+  prop(b, 'wooden_bucket_01', hearth.x + 1.5, 0, hearth.z + 0.7, 0.6, 0.95);
   b.geo('ember', new THREE.CylinderGeometry(0.72, 0.78, 0.1, 16), hearth.x, 0.02, hearth.z, 0, false);
   b.lamp('brazier', v(hearth.x, 0.1, hearth.z));
   b.box('iron', 0.05, 1.0, 0.05, hearth.x - 0.7, 0, hearth.z, 0, false);
@@ -400,8 +445,14 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
     b.box('wood', 0.07, 0.6, 0.07, 45.45, 0.23, -32.5 + s, 0, false);
   }
   b.geo('cloth', new THREE.BoxGeometry(0.6, 0.12, 0.62), 45.72, 0.78, -32.5, 0.04, false);
-  b.box('wood', 1.3, 0.06, 0.7, 44.6, 0.98, -31.2, 0.06, false);
-  for (const s of [-0.5, 0.5]) b.box('wood', 0.08, 0.75, 0.6, 44.6 + s, 0.23, -31.2, 0.06);
+  if (!prop(b, 'WoodenTable_01', 44.6, 0.23, -31.2, 0.06, 1, true, [0.72, 1.4, 1.1])) {
+    b.box('wood', 1.3, 0.06, 0.7, 44.6, 0.98, -31.2, 0.06, false);
+    for (const s of [-0.5, 0.5]) b.box('wood', 0.08, 0.75, 0.6, 44.6 + s, 0.23, -31.2, 0.06);
+  }
+  prop(b, 'wooden_bowl_01', 44.75, 1.0, -31.05, 0.8);
+  prop(b, 'wooden_cutting_board', 44.3, 1.0, -31.35, 0.2);
+  prop(b, 'carved_wooden_plate', 44.95, 1.0, -31.4, 2.0);
+  chest(b, 46.05, -34.2, Math.PI / 2 + 0.06, 0.95);
   candle(b, 44.3, 1.04, -31.0, 0.4);
   candle(b, 44.85, 1.04, -31.35, 0.3);
   hanging(b, scene, 46.3, -32.5, 3.4, 3.0, 4.6, -1, 0);
@@ -415,6 +466,11 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
     b.box('wood', 0.06, 0.06, 0.25, x, 2.5, -35.05, 0, false);
   }
   for (let i = 0; i < 4; i++) spear(b, 33.62, -30.6 - i * 0.4, 0.14, Math.PI / 2);
+  prop(b, 'folding_wooden_stool', 41.6, 0, -31.0, 0.7, 1, true);
+  prop(b, 'folding_wooden_stool', 36.0, 0, -31.3, 2.3, 1, true);
+  prop(b, 'wicker_basket_02', 34.2, 0, -34.6, 0.3, 1.5, true);
+  prop(b, 'wine_barrel_01', 34.1, 0, -30.4, 1.3, 0.9, true);
+  prop(b, 'wooden_axe_02', 33.75, 0, -34.0, Math.PI / 2, 1, false, undefined, [0.2, 0]);
   // Lights: lucernae on brackets along the walls, a horn lantern by the door.
   lucerna(b, 34.6, 1.9, -35.0, 0);
   lucerna(b, 41.4, 1.9, -35.0, 0);
@@ -438,6 +494,10 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
   for (let i = 0; i < 3; i++) b.box('wood', 0.2, 0.2, R(3, 4.5), R(29.6, 32.3), R(0, 0.9), R(-34.5, -30.8), R(0, 3), true, R(-0.5, 0.5), R(-0.2, 0.2));
   b.geo('clay', new THREE.CylinderGeometry(0.22, 0.14, 0.7, 10), 29.4, 0.2, -34.6, 0.3, false, 1.3);
   b.geo('ground', new THREE.SphereGeometry(1.4, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), 31.4, -0.35, -33.4, 0, true);
+  for (let i = 0; i < 4; i++) prop(b, 'wooden_barrels_01', R(29.4, 32.4), 0, R(-34.6, -30.4), R(0, 6), 1, false, undefined, undefined);
+  prop(b, 'rock_moss_set_02', 30.2, 0, -31.2, 0.4, 1.4);
+  prop(b, 'rock_moss_set_02', 32.0, 0, -34.2, 2.2, 1.2);
+  for (let i = 0; i < 6; i++) prop(b, i % 2 ? 'nettle_plant' : 'weed_plant_02', R(29.3, 32.5), 0, R(-34.8, -30.2), R(0, 6), R(2.5, 4));
 
   // ---- The courtyard: what is left of a peristyle.
   // Portico on reused columns along the west side and the front range.
@@ -476,10 +536,17 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
   b.box('stone', 1.9, 0.55, 0.6, 45.2, -0.1, -20.6, Math.PI / 2 + 0.07);
   b.box('marble', 0.7, 0.5, 0.7, 42.3, -0.1, -17.6, 0.3);
   brazier(b, 42.4, -24.0);
+  prop(b, 'wooden_bucket_01', 38.4, 0, -24.6, 0.3, 1, true);
+  prop(b, 'wooden_bucket_02', 36.2, 0, -26.5, 1.1, 0.9, true);
+  prop(b, 'wine_barrel_01', 45.6, 0, -18.9, 0.5, 0.9, true);
+  prop(b, 'wine_barrel_01', 45.9, 0, -19.8, 2.0, 0.85, true);
+  prop(b, 'street_rat', 44.8, 0, -19.4, 2.4, 1.1);
+  for (let i = 0; i < 8; i++) prop(b, i % 3 ? 'weed_plant_02' : 'nettle_plant', R(35.6, 46), 0, R(-28.8, -19), R(0, 6), R(2.5, 3.5));
   hornLantern(b, 35.3, 2.7, -21.6);
   hornLantern(b, 40.4, 2.7, -17.6);
   // Floors under cover.
   b.box('slab', 4.4, 0.06, 13.0, 30.8, -0.24, -22.8, 0, false);
   b.box('slab', 9.0, 0.06, 5.6, 33.0, -0.24, -13.4, 0, false);
   b.box('slab', 4.8, 0.06, 5.6, 44.1, -0.24, -13.4, 0, false);
+  commitProps(scene);
 }
