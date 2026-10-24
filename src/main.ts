@@ -218,14 +218,41 @@ Object.assign(window, {
   __teleports: getTeleports,
   __setPitch: (p: number) => { player.pitch = p; },
 });
+/** First floor below (x, y, z) within `depth` m, or null. */
+const downRay = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+function floorBelow(x: number, y: number, z: number, depth: number): number | null {
+  downRay.origin.set(x, y, z);
+  const h = bvh.raycastFirst(downRay, THREE.DoubleSide, 0, depth);
+  return h ? h.point.y : null;
+}
+// Teleports always land on a floor: the eye goes 1.65 m above the first
+// surface under the target. If there is none within 6 m, look a little higher
+// and around before giving up (and then stay where you are).
 (window as unknown as { __teleport: (t: Teleport) => void }).__teleport = (t) => {
   held = false;
   frames = 0;
-  player.pos.set(t.x, t.y, t.z);
+  let land: [number, number, number] | null = null;
+  search: for (const lift of [0.3, 1.5, 3]) for (const [dx, dz] of [[0, 0], [0.6, 0], [-0.6, 0], [0, 0.6], [0, -0.6], [1.2, 1.2], [-1.2, -1.2]]) {
+    const f = floorBelow(t.x + dx, t.y + lift, t.z + dz, 6 + lift);
+    if (f !== null) { land = [t.x + dx, f + 1.65, t.z + dz]; break search; }
+  }
+  if (!land) { console.warn('teleport: no floor under', t.name); return; }
+  player.pos.set(...land);
   player.vel.set(0, 0, 0);
   player.yaw = t.yaw;
   player.pitch = 0;
+  lastSafe.set(...land);
 };
+// Falls: remember the last place the player stood; if they ever drop below
+// anything walkable, put them back there.
+const lastSafe = new THREE.Vector3().copy(SPAWN);
+let safeTimer = 0;
+function guardFall(dt: number) {
+  safeTimer += dt;
+  if (player.onGround && safeTimer > 0.5) { lastSafe.copy(player.pos); safeTimer = 0; }
+  if (player.pos.y < -25) { player.pos.copy(lastSafe); player.vel.set(0, 0, 0); }
+}
+Object.assign(window, { __probe: (x: number, y: number, z: number) => floorBelow(x, y, z, 50) });
 initMap();
 let audio: Soundscape | null = null;
 player.onStep = (run) => audio?.step(run, player.pos.y < -2);
@@ -439,6 +466,7 @@ function frame() {
   renderer.info.reset();
 
   if (!isReading()) player.update(dt);
+  guardFall(dt);
   pushOutOfSecretDoor(player.pos);
   updateLibrary(camera);
   for (const m of monks) m(dt);

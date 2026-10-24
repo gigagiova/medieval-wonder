@@ -100,6 +100,8 @@ export function getTeleports(): Teleport[] {
     above('Ossuarium', -36, -50.2, -36, -56),
     { name: 'Catacumbae', x: cs.stairBottom.x, y: cs.stairBottom.y + 0.2, z: cs.stairBottom.z, yaw: 0 },
     { name: 'Crypta', x: cs.crypt.x, y: cs.crypt.y + 0.2, z: cs.crypt.z, yaw: 0.9 },
+    // At the head of the martyr's stair inside the cella, looking down it.
+    { name: 'Cella Memoriae', x: cs.cellaTop.x, y: cs.cellaTop.y + 0.2, z: cs.cellaTop.z, yaw: Math.PI },
     above('Aquaeductus', 92, -66, 140, -100),
     above('Puteus', mapMarks.well.x - 2.4, mapMarks.well.y - 0.6, mapMarks.well.x, mapMarks.well.y),
     above('Palatium', PALACE_SPOT.x, PALACE_SPOT.z, PALACE_SPOT.x, PALACE_SPOT.z - 10),
@@ -596,7 +598,7 @@ function cellaMemoriae(b: Builder) {
     const [ax, az] = P(Math.sin(a) * 2.3, -3.2 + Math.cos(a) * 2.3);
     b.box('rubble', 1.3, R(1.6, 2.8), 0.7, ax, -0.2, az, ry + a);
   }
-  const [tx, tz] = P(1.9, 3.2);
+  const [tx, tz] = P(1.9, 3.88);
   torch(b, tx, 2.2, tz, ry);
 }
 
