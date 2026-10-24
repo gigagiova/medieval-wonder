@@ -1,0 +1,31 @@
+{
+  "name": "medieval-wonder",
+  "version": "1.0.0",
+  "description": "Whimsy",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gigagiova/medieval-wonder.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/gigagiova/medieval-wonder/issues"
+  },
+  "homepage": "https://github.com/gigagiova/medieval-wonder#readme",
+  "dependencies": {
+    "three": "^0.180.0",
+    "three-mesh-bvh": "^0.9.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0",
+    "typescript": "^7.0.2",
+    "vite": "^6.4.5"
+  },
+  "private": true,
+  "type": "module"
+}
