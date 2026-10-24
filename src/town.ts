@@ -8,6 +8,15 @@ import { tiledGable, tiledLeanTo } from './arch/roof';
 import { facade } from './arch/facade';
 import { terrain } from './displace';
 
+// ART DIRECTION. Early-medieval Lombard Italy built from the bones of a
+// Roman town: the alleys of Spello, Bevagna, Civita di Bagnoregio, Bobbio,
+// Cividale. Heavy, rough, hand-made, asymmetric masonry; deep shadows in thick
+// walls; few, small openings with deep reveals; arches of separate voussoirs;
+// timber where stone ran out; everything patched, reused, sagging. Under a
+// grey overcast dusk the eye reads silhouette and depth before texture, so
+// every element must show THICKNESS and LAYERS: reveals, sills, lintels,
+// quoins, jetties, tile courses, rafter ends. No two houses alike.
+//
 // The packed Lombard town: a few crooked lanes and many narrow alleys,
 // houses wall to wall on every side, rooms bridging the alleys on arches.
 // Everything is laid out on a 0.5 m occupancy raster so nothing intrudes
