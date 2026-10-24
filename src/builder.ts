@@ -1,7 +1,15 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { mat, type MatName } from './materials';
-import { tessellate, displace, TESS } from './displace';
+import { tessellate, displace, field, TESS } from './displace';
+
+// Point features (lamps, flames, props) move with the same field as the walls
+// they hang on, so nothing floats off a bulging wall or the sloping ground.
+const fv = new THREE.Vector3();
+function follow(p: THREE.Vector3) {
+  field(p.x, p.y, p.z, 'stone', fv);
+  return p.add(fv);
+}
 import type { FireKind, FireSource } from './fire';
 
 export type LampKind = 'torch' | 'brazier' | 'lantern' | 'oil' | 'candle' | 'window' | 'poly';
@@ -66,11 +74,11 @@ export class Builder {
     this.add(new THREE.BoxGeometry(w, h, d, seg(w), seg(h), seg(d)), m, tmpM, collide, true);
   }
 
-  geo(m: MatName, g: THREE.BufferGeometry, x: number, y: number, z: number, ry = 0, collide = true, rx = 0, rz = 0) {
+  geo(m: MatName, g: THREE.BufferGeometry, x: number, y: number, z: number, ry = 0, collide = true, rx = 0, rz = 0, fine = false) {
     tmpE.set(rx, ry, rz, 'YXZ');
     tmpQ.setFromEuler(tmpE);
     tmpM.compose(new THREE.Vector3(x, y, z), tmpQ, new THREE.Vector3(1, 1, 1));
-    this.add(g, m, tmpM, collide);
+    this.add(g, m, tmpM, collide, fine);
   }
 
   /** A light source; `pos` is the base of the flame, the light sits a little above it. */
@@ -85,6 +93,7 @@ export class Builder {
       poly: { c: new THREE.Color(1.0, 0.6, 0.3), i: 1.5, f: null, lift: 0 },
     }[kind];
     const fk = fire === undefined ? (cfg.f as FireKind | null) : fire;
+    pos = follow(pos.clone());
     const lp = pos.clone();
     lp.y += cfg.lift * scale;
     this.lamps.push({ pos: lp, color: cfg.c, intensity: cfg.i, under, seed: Math.random() * 100 });
@@ -93,13 +102,13 @@ export class Builder {
 
   /** A flame without its own light (e.g. the cups of a polykandelon). */
   flame(kind: FireKind, pos: THREE.Vector3, scale = 1) {
-    this.flames.push({ pos: pos.clone(), kind, scale });
+    this.flames.push({ pos: follow(pos.clone()), kind, scale });
   }
 
   prop(kind: PropKind, x: number, y: number, z: number, ry = 0, rx = 0, rz = 0, s = 1) {
     tmpE.set(rx, ry, rz, 'YXZ');
     tmpQ.setFromEuler(tmpE);
-    const m = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), tmpQ, new THREE.Vector3(s, s, s));
+    const m = new THREE.Matrix4().compose(follow(new THREE.Vector3(x, y, z)), tmpQ, new THREE.Vector3(s, s, s));
     this.props.push({ kind, matrix: m, under: y < -2.5 });
   }
 

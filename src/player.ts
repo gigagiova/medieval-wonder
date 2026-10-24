@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 import { Joystick, Pad } from './joystick';
+import { Tilt } from './tilt';
 
 const RADIUS = 0.35;
 const EYE = 1.65;
 const GRAVITY = 22;
+const DEBUG = new URLSearchParams(location.search).has('debug');
 
 // First-person capsule controller against a static BVH collider.
 export class Player {
@@ -20,6 +22,10 @@ export class Player {
   private bvh: MeshBVH;
   private joy: Joystick;
   private pad = new Pad();
+  private tilt = new Tilt();
+  /** Yaw added on top of the device heading while tilt-look is on (drag still turns you). */
+  private tiltYaw = 0;
+  private tiltWas = false;
   private seg = new THREE.Line3();
   private box = new THREE.Box3();
   private a = new THREE.Vector3();
@@ -41,6 +47,7 @@ export class Player {
   }
 
   private look(dx: number, dy: number) {
+    if (this.tilt.active) { this.tiltYaw -= dx * 0.0022; return; }
     this.yaw -= dx * 0.0022;
     this.pitch = THREE.MathUtils.clamp(this.pitch - dy * 0.0022, -1.45, 1.45);
   }
@@ -54,6 +61,16 @@ export class Player {
     if (tl.x || tl.y) this.look(tl.x * 1.6, tl.y * 1.6);
     this.yaw -= pad.lookX * 2.8 * dt;
     this.pitch = THREE.MathUtils.clamp(this.pitch - pad.lookY * 2.0 * dt, -1.45, 1.45);
+    // Tilt-look: the phone's attitude drives the view. On enabling, re-centre
+    // so the current heading maps to the current yaw.
+    const t = this.tilt.read(dt);
+    if (t) {
+      if (!this.tiltWas) this.tiltYaw = this.yaw - t.yaw;
+      this.tiltYaw -= pad.lookX * 2.8 * dt;
+      this.yaw = t.yaw + this.tiltYaw;
+      this.pitch = THREE.MathUtils.clamp(t.pitch, -1.45, 1.45);
+    }
+    this.tiltWas = !!t;
 
     // Move: keyboard + on-screen stick + gamepad, summed and clamped to 1.
     const run = k.has('ShiftLeft') || k.has('ShiftRight') || this.joy.run || pad.run;
@@ -89,6 +106,7 @@ export class Player {
     this.camera.position.copy(this.pos);
     this.camera.position.y += Math.abs(Math.sin(this.stepPhase)) * 0.06 * this.bob - 0.03 * this.bob;
     this.camera.rotation.set(this.pitch, this.yaw, Math.sin(this.stepPhase) * 0.004 * this.bob, 'YXZ');
+    if (DEBUG) (window as unknown as { __player: Player }).__player = this;
   }
 
   private substep(dt: number) {

@@ -29,7 +29,44 @@ export function arcade(b: Builder, m: MatName, L: number, h: number, depth: numb
 }
 
 /** Wall with a broken, jagged top: ruins and roofless shells. */
+/** Solid wall block with a jagged top as indexed grids (cheap to bend). */
+function jaggedWall(L: number, h: number, depth: number, jag: number) {
+  const step = 0.8;
+  const n = Math.max(3, Math.round(L / step));
+  const tops: number[] = [];
+  let y = h * R(1 - jag, 1);
+  for (let i = 0; i <= n; i++) {
+    y = THREE.MathUtils.clamp(y + R(-0.9, 0.9) * h * 0.15, h * (1 - jag), h);
+    tops.push(y);
+  }
+  const nv = Math.max(1, Math.ceil(h / step));
+  const pos: number[] = [], idx: number[] = [];
+  const quadGrid = (pt: (i: number, j: number) => [number, number, number], ni: number, nj: number, flip: boolean) => {
+    const base = pos.length / 3;
+    for (let j = 0; j <= nj; j++) for (let i = 0; i <= ni; i++) pos.push(...pt(i, j));
+    for (let j = 0; j < nj; j++) for (let i = 0; i < ni; i++) {
+      const a = base + j * (ni + 1) + i, b = a + 1, c = a + ni + 1, d = c + 1;
+      if (flip) idx.push(a, d, b, a, c, d); else idx.push(a, b, d, a, d, c);
+    }
+  };
+  const X = (i: number) => -L / 2 + (i / n) * L;
+  for (const [zz, flip] of [[depth / 2, false], [-depth / 2, true]] as const) {
+    quadGrid((i, j) => [X(i), (tops[i] * j) / nv, zz], n, nv, flip);
+  }
+  // Broken top, then the two ends.
+  quadGrid((i, j) => [X(i), tops[i], depth / 2 - depth * j], n, 1, false);
+  quadGrid((i, j) => [-L / 2, (tops[0] * j) / nv, -depth / 2 + depth * i], 1, nv, false);
+  quadGrid((i, j) => [L / 2, (tops[n] * j) / nv, -depth / 2 + depth * i], 1, nv, true);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(pos.length), 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
+  g.setIndex(idx);
+  return g;
+}
+
 export function ruinGeo(L: number, h: number, depth: number, jag = 0.5, openW = 0, spring = 0) {
+  if (openW <= 0) return jaggedWall(L, h, depth, jag);
   const s = new THREE.Shape();
   s.moveTo(-L / 2, 0);
   if (openW > 0) {
@@ -52,7 +89,7 @@ export function ruinGeo(L: number, h: number, depth: number, jag = 0.5, openW = 
   return g;
 }
 export function ruin(b: Builder, m: MatName, L: number, h: number, depth: number, x: number, y: number, z: number, ry: number, jag = 0.5, openW = 0, spring = 0) {
-  b.geo(m, ruinGeo(L, h, depth, jag, openW, spring), x, y, z, ry);
+  b.geo(m, ruinGeo(L, h, depth, jag, openW, spring), x, y, z, ry, true, 0, 0, openW <= 0);
 }
 
 /** Roman column, often reused (spolia): plinth, base torus, tapering shaft, impost capital. */

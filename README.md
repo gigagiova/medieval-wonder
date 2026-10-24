@@ -1,17 +1,17 @@
 # Medieval Wonder — *Abbatia Nebularum*
 
-A walkable, fog-drowned Lombard town of the 8th century living inside the shell of a Roman one:
-late-Roman brick walls patched with river stone, the basalt-paved cardo and decumanus, a forum of
-fallen columns, a broken triumphal arch, a dry aqueduct and roadside tombs outside the gate. In the
-middle stands a Benedictine abbey: an early-Christian basilica on reused marble columns, a cloister,
-a library tower, and an ossuary chapel whose stair leads down into catacombs.
+A walkable Lombard town of around AD 750 at dusk on a foggy, overcast day, packed inside what is left
+of a Roman circuit. Houses of river cobble and reused Roman brick stand wall to wall along a couple of
+crooked lanes and dozens of 1.3–2 m alleys. Rooms bridge the alleys on arches (*pontili*), and flying
+arches brace facing walls apart. The old forum temple has houses grown against it, and a Roman arch
+straddles the main lane. In the north-west stands the abbey: an early-Christian basilica on mismatched
+spolia columns with a half-fallen atrium, and an ossuary chapel whose stair leads down into catacombs
+carved out of the rock. Outside the gate are a dry aqueduct and tombs along the road.
 
-Lighting follows the period: no street lamps, but braziers at gates and squares, pitch torches,
-Roman-type horn lanterns, clay *lucernae*, and bronze *polykandela* with glass oil cups in the church.
-No downloaded assets (the sandbox it was built in could not reach asset hosts): all geometry,
-including the sculpted skulls and bones, is generated in code, and every surface is a custom shader.
-Drop CC0 `skull.glb`, `femur.glb`, `humerus.glb`, `tibia.glb` into `public/models/` and `loadBones()`
-will use them instead.
+Nothing is flat or symmetric. Every surface is bent by a continuous displacement field and carries
+parallax relief. The catacombs are a single carved surface (an SDF polygonized with surface nets), with
+loculi, arched burial niches, side chambers and a crypt. Lighting follows the period: braziers, pitch
+torches, Roman horn lanterns, clay *lucernae*, and *polykandela* in the church. There is no street lighting.
 
 ```sh
 npm install
@@ -19,7 +19,7 @@ npm run dev      # http://localhost:5173
 npm run build    # static site in dist/
 ```
 
-**Controls:** click to enter · WASD or on-screen stick to walk · Shift (or push the stick to the edge) to hasten · mouse look / drag / right-half touch drag · F lantern · Space jump · gamepad: left stick move, right stick look, triggers run, A jump, X/Y lantern.
+**Controls** (on phones: on-screen stick, drag right half to look, tilt button for looking by moving the phone; tilt needs a normally hosted page such as GitHub Pages, as the claude.ai artifact frame blocks motion sensors): click to enter · WASD or on-screen stick to walk · Shift (or push the stick to the edge) to hasten · mouse look / drag / right-half touch drag · F lantern · Space jump · gamepad: left stick move, right stick look, triggers run, A jump, X/Y lantern.
 
 ## How it's made
 
@@ -39,6 +39,12 @@ npm run build    # static site in dist/
   On top of that, parallax occlusion mapping gives real depth to cobbles, mortar joints, dented planks,
   slates, plaster and rock.
 - **Collision:** capsule vs. BVH (`three-mesh-bvh`), built from the displaced geometry.
+- **Town** (`src/town.ts`): streets are random walks rasterized onto a 0.5 m occupancy grid. Lots are packed
+  along every frontage with irregular depths, and every leftover scrap of land gets a back building.
+  Pontili and flying arches go wherever both sides of an alley are built. A texture of the grid tells the
+  ground shader where the river cobbles, the surviving Roman basalt paving and the central gutter are.
+- **Catacombs** (`src/catacombs.ts`): one signed distance field of carved air (galleries along meandering
+  polylines, a stair, side chambers, loculi, lamp niches, collapses), spatially hashed, sampled on a 0.2 m grid.
 - **Fire** (`src/fire.ts`): instanced upright billboards with domain-warped noise mapped through a
   blackbody ramp, layered tongues, and rising embers.
 - **Bones** (`src/bones.ts`): signed-distance-field anatomy polygonized with marching cubes, baked

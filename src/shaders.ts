@@ -53,7 +53,8 @@ vec3 applyAtmos(vec3 col, vec3 wpos){
   float fogAmt = 1.0 - exp(-od);
   vec3 fogC = mix(uFogCol, vec3(0.012,0.009,0.007), uUnder);
   float md = max(dot(rd, uMoonDir), 0.0);
-  fogC += vec3(0.10,0.13,0.18) * (pow(md, 6.0)*0.5 + pow(md, 60.0)) * (1.0 - uUnder);
+  // Dusk: the fog towards the set sun is faintly warm.
+  fogC += vec3(0.16,0.08,0.035) * (pow(md, 4.0)*0.8 + pow(md, 30.0)) * (1.0 - uUnder);
   // Closed-form integral of 1/(h^2+t^2) along the view ray for every lamp:
   // cheap volumetric halos that actually wrap around geometry edges.
   vec3 scat = vec3(0.0);
@@ -64,7 +65,7 @@ vec3 applyAtmos(vec3 col, vec3 wpos){
     float a = (atan((L - t0)/h) - atan(-t0/h)) / h;
     scat += uLampCol[i] * a * exp(-dens*0.8*clamp(t0, 0.0, L));
   }
-  scat *= 0.022 * mix(0.5, 1.5, n);
+  scat *= mix(0.011, 0.022, uUnder) * mix(0.5, 1.5, n);
   return mix(col, fogC, fogAmt) + scat;
 }
 `;
@@ -73,7 +74,9 @@ vec3 applyAtmos(vec3 col, vec3 wpos){
 export const surfaceGLSL = /* glsl */ `
 struct Surf { vec3 alb; float rough; float h; vec3 emi; };
 
-float groundY(vec3 p){ return p.y < -2.5 ? -7.0 : 0.0; }
+uniform sampler2D uTown; // R main lane, G street, B gutter, A terrain height
+vec4 townAt(vec2 xz){ return texture2D(uTown, (xz + 100.)/200.); }
+float groundY(vec3 p){ return p.y < -2.5 ? -7.0 : townAt(p.xz).a*4. - 1.5; }
 vec2 projUV(vec3 p, vec3 n){
   vec3 an=abs(n);
   if(an.y>an.x && an.y>an.z) return p.xz;
@@ -124,11 +127,12 @@ float hPlaster(vec2 uv){
   return clamp(0.15 + lumps - gouge*0.15, 0., 1.);
 }
 
-// Roman cardo / decumanus and the road out of the south gate.
+// 0 = mud / yard, 1 = river-cobble alley, 2 = surviving Roman basalt paving.
 float roadMask(vec2 xz){
-  float cardo = (1.-smoothstep(3.0,3.8,abs(xz.x))) * step(-9., xz.y);
-  float decu = (1.-smoothstep(3.0,3.8,abs(xz.y-30.))) * (1.-smoothstep(88.,92.,abs(xz.x)));
-  return max(cardo, decu);
+  vec4 t = townAt(xz);
+  if (t.g < 0.5) return 0.;
+  float patchy = smoothstep(0.45, 0.6, vnoise(vec3(xz*0.22, 4.)));
+  return (t.r > 0.35 && patchy > 0.5) ? 2. : 1.;
 }
 // Basoli: big polygonal basalt slabs of the Roman street, worn and sunken.
 float hBasoli(vec2 uv){
@@ -233,7 +237,7 @@ float pomH(vec2 uv){
 #elif MAT == 10
   return hAshlar(uv, vec2(1.0,0.75));
 #elif MAT == 1
-  return gRoad > 0.5 ? hBasoli(uv) : hMud(uv);
+  return gRoad > 1.5 ? hBasoli(uv) : gRoad > 0.5 ? hCobble(uv) : hMud(uv);
 #elif MAT == 3
   return hPlank(uv);
 #elif MAT == 4
@@ -268,9 +272,9 @@ float pomH(vec2 uv){
 #elif MAT == 2
   #define POM_DEPTH 0.05
 #elif MAT == 12
-  #define POM_DEPTH 0.035
+  #define POM_DEPTH 0.025
 #elif MAT == 13
-  #define POM_DEPTH 0.07
+  #define POM_DEPTH 0.04
 #elif MAT == 14
   #define POM_DEPTH 0.03
 #endif
@@ -286,17 +290,22 @@ vec3 parallax(vec3 p, vec3 n, out float occl){
   float depth = POM_DEPTH * fade;
   gN = n;
   #if MAT == 1
-    gRoad = step(0.5, roadMask(p.xz)) * step(-2.5, p.y);
+    gRoad = p.y > -2.5 ? roadMask(p.xz) : 0.;
     depth *= gRoad > 0.5 ? 1.0 : 0.6;
   #endif
   vec3 an = abs(n); vec3 U, V, N;
+  // On curved surfaces the projection axis flips; fade the relief out near
+  // those flips so no seams appear.
+  float hi = max(an.x, max(an.y, an.z)), lo3 = min(an.x, min(an.y, an.z));
+  float mid = an.x + an.y + an.z - hi - lo3;
+  depth *= smoothstep(0.05, 0.25, hi - mid);
   if (an.y>an.x && an.y>an.z){ U=vec3(1,0,0); V=vec3(0,0,1); N=vec3(0,sign(n.y),0); }
   else if (an.x>an.z){ U=vec3(0,0,1); V=vec3(0,1,0); N=vec3(sign(n.x),0,0); }
   else { U=vec3(1,0,0); V=vec3(0,1,0); N=vec3(0,0,sign(n.z)); }
   vec3 vd = normalize(cameraPosition - p);
   vec3 vt = vec3(dot(vd,U), dot(vd,V), max(dot(vd,N), 0.2));
   vec2 uv = vec2(dot(p,U), dot(p,V));
-  const int STEPS = 16;
+  const int STEPS = 20;
   float layer = 1.0/float(STEPS);
   vec2 duv = -vt.xy/vt.z * depth * layer;
   float cur = 1.0;
@@ -332,30 +341,36 @@ Surf surface(vec3 p, vec3 n){
   s = ashlar(p, n, vec2(1.0,0.75), vec3(0.16,0.15,0.14), 0.78);
 #elif MAT == 1
   vec2 uv = p.xz;
-  float r = length(uv);
-  float inTown = 1.0 - smoothstep(84., 92., r);
-  float road = roadMask(uv) * step(-2.5, p.y);
-  float outRoad = (1.0 - smoothstep(2.5,3.5,abs(uv.x + sin(uv.y*0.05)*2.))) * step(86., uv.y);
-  road = max(road, outRoad);
-  // Basoli: dark basalt slabs, polished only a little by centuries of feet.
+  vec4 tw = townAt(uv);
+  float rm = p.y > -2.5 ? roadMask(uv) : 0.;
+  float inTown = smoothstep(0.0, 0.1, tw.g + step(length(uv), 80.));
+  // Basalt basoli: dark, big, sunken, lifted by roots.
   vec3 vb = voronoi(uv*1.25);
-  float eb = smoothstep(0.0,0.1,vb.y-vb.x);
-  vec3 basC = vec3(0.085,0.085,0.09)*(0.6+0.6*vb.z)*mix(0.25,1.,eb)*(0.8+0.4*fbm(vec3(uv*4.,vb.z*7.)));
-  // Mud, trampled straw, field stones; grass and weeds where nobody walks.
+  vec3 basC = vec3(0.075,0.075,0.08)*(0.6+0.6*vb.z)*mix(0.25,1.,smoothstep(0.0,0.1,vb.y-vb.x))*(0.8+0.4*fbm(vec3(uv*4.,vb.z*7.)));
+  // River cobbles, set in earth, mossy between.
+  vec3 vc = voronoi(uv*2.3);
+  float ce = smoothstep(0.03,0.2,vc.y-vc.x);
+  vec3 cobC = mix(vec3(0.12,0.11,0.1), vec3(0.17,0.15,0.12), vc.z)*(0.6+0.5*hash12(floor(uv*2.3)+vc.z));
+  cobC = mix(vec3(0.045,0.05,0.03), cobC, ce);
+  // Mud, straw, weeds in yards and outside the walls.
   vec3 vm = voronoi(uv*1.6);
   float stone = step(0.72, vm.z) * smoothstep(0.32,0.12,vm.x);
-  vec3 mudC = vec3(0.07,0.052,0.036)*(0.55+0.8*fbm(vec3(uv*1.7,5.)));
-  mudC = mix(mudC, vec3(0.12,0.11,0.1)*(0.6+0.6*vm.z), stone);
-  float weeds = smoothstep(0.45,0.7,fbm(vec3(uv*0.35,8.))) * (1.-road);
-  vec3 grassC = vec3(0.035,0.045,0.022)*(0.5+0.9*fbm(vec3(uv*2.3,8.)));
-  vec3 c = mix(mudC, grassC, max(weeds*0.8, 1.-inTown));
-  s.alb = mix(c, basC, road);
-  s.h = mix(hMud(uv), hBasoli(uv), road)*1.5;
-  // Standing water in the ruts: dull, not mirrors.
-  float pud = smoothstep(0.66,0.7,fbm(vec3(uv*0.22,4.))) * (1.-road*0.6);
-  s.alb *= 1.-pud*0.5;
-  s.rough = mix(mix(0.96,0.85,road), 0.32, pud);
-  s.h *= 1.-pud;
+  vec3 mudC = vec3(0.1,0.078,0.055)*(0.55+0.8*fbm(vec3(uv*1.7,5.)));
+  mudC = mix(mudC, vec3(0.15,0.14,0.12)*(0.6+0.6*vm.z), stone);
+  float weeds = smoothstep(0.45,0.7,fbm(vec3(uv*0.35,8.)));
+  vec3 grassC = vec3(0.06,0.07,0.04)*(0.5+0.9*fbm(vec3(uv*2.3,8.)));
+  vec3 c = mix(mudC, grassC, weeds*0.8);
+  c = rm > 1.5 ? basC : rm > 0.5 ? cobC : c;
+  // Dirt drifted against the walls, the alley worn smooth in the middle.
+  s.alb = c;
+  s.h = (rm > 1.5 ? hBasoli(uv) : rm > 0.5 ? hCobble(uv) : hMud(uv))*1.5;
+  float gut = tw.b * step(0.5, tw.g);
+  s.alb *= 1. - gut*0.45;
+  float pud = smoothstep(0.66,0.7,fbm(vec3(uv*0.22,4.))) * (1.-step(0.5,rm)*0.5) + gut*0.5;
+  pud = clamp(pud,0.,1.);
+  s.alb *= 1.-pud*0.4;
+  s.rough = mix(rm > 0.5 ? 0.86 : 0.96, 0.4, pud);
+  s.h *= 1.-pud*0.7;
 #elif MAT == 2
   vec2 uv = projUV(p,n);
   float g = fbm(vec3(uv*1.2,0.)); float g2 = fbm(vec3(uv*9.,3.));

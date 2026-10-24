@@ -9,7 +9,8 @@ import { shared, mat, MAT, makeSurfaceMaterial, makeSky, makeMotes } from './mat
 import { makeFire } from './fire';
 import { makeBones } from './bones';
 import { NLAMP } from './shaders';
-import { buildWorld, SPAWN, regionName } from './world';
+import { buildWorld, SPAWN, regionName, mainLane } from './world';
+import { terrain } from './displace';
 import { Player } from './player';
 import { Soundscape } from './audio';
 import type { Lamp, Cell, PropKind } from './builder';
@@ -18,10 +19,10 @@ const params = new URLSearchParams(location.search);
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.3;
+renderer.toneMappingExposure = 1.25;
 renderer.info.autoReset = false;
 document.body.appendChild(renderer.domElement);
 
@@ -32,20 +33,26 @@ scene.add(makeSky());
 // Let the title card paint before the (synchronous) world build.
 await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
 const t0 = performance.now();
-const { collider, cells, lamps, flames, props } = buildWorld(scene);
+// Phones get coarser meshes, a lower render resolution, no motes.
+const LOW = matchMedia('(pointer: coarse)').matches || params.has('low');
+if (LOW) renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
+const { collider, cells, lamps, flames, props, townTex } = buildWorld(scene, LOW);
+shared.uTown.value = townTex;
 const bvh = new MeshBVH(collider.geometry);
 (collider.geometry as unknown as { boundsTree: MeshBVH }).boundsTree = bvh;
 const buildMs = performance.now() - t0;
 
 // Moonlight and a faint sky fill.
-const moon = new THREE.DirectionalLight(0x7d98c4, 0.6);
-moon.castShadow = true;
+// Overcast dusk: the sun is just down; light comes from the whole sky,
+// a little warmer from the west. No hard shadows.
+const moon = new THREE.DirectionalLight(0xffb48a, 0.6);
+moon.castShadow = false;
 moon.shadow.mapSize.set(2048, 2048);
 Object.assign(moon.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 300 });
 moon.shadow.bias = -0.0006;
 moon.shadow.normalBias = 0.04;
 scene.add(moon, moon.target);
-const hemi = new THREE.HemisphereLight(0x2a3a48, 0x0a0806, 0.3);
+const hemi = new THREE.HemisphereLight(0x9aa6b8, 0x3a3026, 2.1);
 scene.add(hemi);
 
 // A fixed pool of point lights reassigned every frame to the nearest lamps.
@@ -137,17 +144,29 @@ function makeMonk(path: (t: number) => THREE.Vector3, speed: number) {
     box.getWorldPosition(lamp.pos);
   };
 }
-const cloisterLoop = (t: number) => {
-  const per = 4 * 19, u = ((t * 1.1) % per + per) % per, side = Math.floor(u / 19), f = u % 19;
-  const x0 = -25.5, z0 = -35.5, s = 19;
-  const pts = [[x0 + f, z0], [x0 + s, z0 + f], [x0 + s - f, z0 + s], [x0, z0 + s - f]];
-  return new THREE.Vector3(pts[side][0], 0, pts[side][1]);
+// One monk walks the lane between the gate and the abbey, back and forth;
+// another paces the atrium.
+const lane = mainLane();
+const laneLen = lane.reduce((a, p, i) => (i ? a + p.distanceTo(lane[i - 1]) : 0), 0);
+const onLane = (t: number) => {
+  let s = (Math.asin(Math.sin(t * 0.02)) / (Math.PI / 2) * 0.5 + 0.5) * laneLen * 0.9 + laneLen * 0.05;
+  for (let i = 1; i < lane.length; i++) {
+    const d = lane[i].distanceTo(lane[i - 1]);
+    if (s <= d) {
+      const p = lane[i - 1].clone().lerp(lane[i], s / d);
+      return new THREE.Vector3(p.x + 0.45, terrain(p.x, p.y), p.y);
+    }
+    s -= d;
+  }
+  const e = lane[lane.length - 1];
+  return new THREE.Vector3(e.x, terrain(e.x, e.y), e.y);
 };
-const streetRound = (t: number) => {
-  const u = Math.sin(t * 0.035);
-  return new THREE.Vector3(1.5 + Math.sin(t * 0.3) * 0.3, 0, 30 + u * 50);
+const atrium = (t: number) => {
+  const a = t * 0.12;
+  const x = -15.5 + Math.sin(a) * 3.6 + Math.sin(a * 2.3) * 0.6, z = -35.5 + Math.cos(a) * 2.6;
+  return new THREE.Vector3(x, terrain(x, z), z);
 };
-const monks = [makeMonk(cloisterLoop, 1), makeMonk(streetRound, 1)];
+const monks = [makeMonk(onLane, 1), makeMonk(atrium, 1)];
 
 const player = new Player(collider, SPAWN, camera, renderer.domElement);
 let audio: Soundscape | null = null;
@@ -311,7 +330,7 @@ function frame() {
   const under = THREE.MathUtils.smoothstep(-camY, 1.0, 4.0);
   shared.uUnder.value = under;
   moon.intensity = 0.6 * (1 - under);
-  hemi.intensity = 0.3 * (1 - under) + 0.02;
+  hemi.intensity = 2.1 * (1 - under) + 0.015;
   moon.position.copy(camera.position).addScaledVector(shared.uMoonDir.value, 120);
   moon.target.position.copy(camera.position);
   moon.position.x = Math.round(moon.position.x); moon.position.z = Math.round(moon.position.z);

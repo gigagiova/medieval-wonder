@@ -35,23 +35,35 @@
 <div id="hint">It is dark. Press F to light your lantern.</div>
 <style>
   canvas { touch-action: none; }
-  #joy { position: fixed; left: max(28px, env(safe-area-inset-left, 0px)); bottom: max(28px, env(safe-area-inset-bottom, 0px));
-    width: 132px; height: 132px; border-radius: 50%; touch-action: none; user-select: none; -webkit-user-select: none; z-index: 5;
-    background: radial-gradient(circle, rgba(30,22,14,0.10) 0%, rgba(30,22,14,0.35) 62%, rgba(20,14,8,0.5) 100%);
-    border: 2px solid rgba(176,132,74,0.45); box-shadow: inset 0 0 18px rgba(0,0,0,0.6), 0 0 14px rgba(0,0,0,0.5);
-    opacity: 0.55; transition: opacity 0.6s; cursor: grab; }
-  #joy::before { content: ''; position: absolute; inset: 22%; border-radius: 50%; border: 1px dashed rgba(216,201,168,0.18); }
-  #joy-knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; border-radius: 50%; transform: translate(-50%, -50%);
-    background: radial-gradient(circle at 38% 32%, #d9b878 0%, #9a6f36 45%, #4a3018 100%);
-    box-shadow: 0 3px 10px rgba(0,0,0,0.7), inset 0 -3px 6px rgba(0,0,0,0.45); border: 1px solid rgba(40,26,12,0.8); pointer-events: none; }
-  #joy.held { opacity: 0.9; cursor: grabbing; }
+  /* Movement stick: bottom-left, clear of the safe-area insets in both orientations. */
+  #joy { position: fixed; left: max(24px, calc(env(safe-area-inset-left, 0px) + 16px)); bottom: max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px));
+    width: 140px; height: 140px; border-radius: 50%; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; z-index: 5;
+    background: radial-gradient(circle, rgba(24,17,10,0.25) 0%, rgba(24,17,10,0.5) 60%, rgba(14,10,6,0.7) 100%);
+    border: 3px solid rgba(201,154,86,0.8); box-shadow: inset 0 0 20px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.6), 0 0 18px rgba(0,0,0,0.6);
+    opacity: 0.75; transition: opacity 0.6s; cursor: grab; }
+  #joy::before { content: ''; position: absolute; inset: 20%; border-radius: 50%; border: 1px dashed rgba(230,210,170,0.35); }
+  #joy-knob { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; border-radius: 50%; transform: translate(-50%, -50%);
+    background: radial-gradient(circle at 38% 32%, #e8c88a 0%, #a8773a 45%, #4a3018 100%);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.75), inset 0 -3px 6px rgba(0,0,0,0.45); border: 1px solid rgba(40,26,12,0.9); pointer-events: none; }
+  #joy.held { opacity: 1; cursor: grabbing; }
   #joy.held #joy-knob { transition: none; }
   #joy:not(.held) #joy-knob { transition: transform 0.18s ease-out; }
   body.locked:not(.touch) #joy { opacity: 0; pointer-events: none; }
-  body.touch #joy { opacity: 0.7; width: 150px; height: 150px; }
+  body.touch #joy { opacity: 0.85; width: 156px; height: 156px; }
+  /* Tilt-to-look toggle: phones only, top-right. */
+  #tilt { display: none; position: fixed; z-index: 5; top: max(18px, calc(env(safe-area-inset-top, 0px) + 12px)); right: max(18px, calc(env(safe-area-inset-right, 0px) + 12px));
+    width: 54px; height: 54px; border-radius: 50%; padding: 0; cursor: pointer; touch-action: manipulation;
+    background: radial-gradient(circle at 38% 32%, rgba(60,42,22,0.85), rgba(14,10,6,0.85)); border: 2px solid rgba(201,154,86,0.75);
+    box-shadow: 0 0 14px rgba(0,0,0,0.6); color: #d9b878; opacity: 0.8; }
+  #tilt svg { width: 28px; height: 28px; display: block; margin: auto; }
+  #tilt.on { background: radial-gradient(circle at 38% 32%, #e8c88a 0%, #a8773a 50%, #4a3018 100%); color: #1c1208; opacity: 1; }
+  #tilt.off { opacity: 0.35; filter: grayscale(1); cursor: not-allowed; }
+  #tilt:focus-visible { outline: 2px solid #e8c88a; outline-offset: 3px; }
+  body.touch #tilt { display: block; }
   #overlay { z-index: 10; }
 </style>
 <div id="joy" aria-label="Movement stick"><div id="joy-knob"></div></div>
+<button id="tilt" type="button" aria-pressed="false" title="Tilt to look" aria-label="Tilt to look"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="5" width="12" height="22" rx="2.5" transform="rotate(-18 16 16)"/><path d="M4 12a12 12 0 0 1 3-6M28 20a12 12 0 0 1-3 6"/></svg></button>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
