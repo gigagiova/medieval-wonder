@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { loadGltf } from './gltf';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Builder } from './builder';
 import { field } from './displace';
@@ -114,7 +115,7 @@ export function loadProps(ids: readonly PropId[] = PROP_IDS): Promise<void> {
   const todo = ids.filter((id) => !variants.has(id));
   const p = Promise.all(todo.map(async (id) => {
     try {
-      const gltf = await loader.loadAsync(`models/props/${id}.json`);
+      const gltf = await loadGltf(`models/props/${id}.json`, loader);
       const scene = gltf.scene;
       scene.updateMatrixWorld(true);
       const list: Variant[] = [];

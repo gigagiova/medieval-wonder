@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { loadGltf } from './gltf';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { Lamp } from './builder';
 import { isReading } from './codex';
@@ -68,7 +69,7 @@ export const npcDebug = { prof: { anim: 0, logic: 0, frames: 0 }, cloth: clothSt
 export function loadNpcAssets(): Promise<void> {
   loading ??= (async () => {
     const loader = new GLTFLoader();
-    const get = (u: string) => loader.loadAsync(u);
+    const get = (u: string) => loadGltf(u, loader);
     const [man, woman, tpose, ual] = await Promise.all([get(DIR + 'man.json'), get(DIR + 'woman.json'), get(DIR + 'tpose.json'), get(DIR + 'ual.json')]);
     // Michelle is bound in a T-pose; lower her arms first, as the man's are.
     relaxArms(woman.scene, 0.92);
