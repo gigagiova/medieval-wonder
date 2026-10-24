@@ -354,9 +354,9 @@ Surf surface(vec3 p, vec3 n){
   cobC = mix(vec3(0.045,0.05,0.03), cobC, ce);
   // Mud, straw, weeds in yards and outside the walls.
   vec3 vm = voronoi(uv*1.6);
-  float stone = step(0.72, vm.z) * smoothstep(0.32,0.12,vm.x);
+  float stone = step(0.8, vm.z) * smoothstep(0.22,0.08,vm.x);
   vec3 mudC = vec3(0.1,0.078,0.055)*(0.55+0.8*fbm(vec3(uv*1.7,5.)));
-  mudC = mix(mudC, vec3(0.15,0.14,0.12)*(0.6+0.6*vm.z), stone);
+  mudC = mix(mudC, vec3(0.1,0.095,0.085)*(0.7+0.4*vm.z), stone*0.8);
   float weeds = smoothstep(0.45,0.7,fbm(vec3(uv*0.35,8.)));
   vec3 grassC = vec3(0.06,0.07,0.04)*(0.5+0.9*fbm(vec3(uv*2.3,8.)));
   vec3 c = mix(mudC, grassC, weeds*0.8);
