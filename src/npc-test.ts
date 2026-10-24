@@ -100,31 +100,35 @@ if (view === 'lineup') {
   if (view === 'talk') {
     // Stand in front of the gate guards.
     const g = npcDebug.people.find((p) => p.role === 'soldier')!;
-    player.pos.set(g.pos.x + 0.2, g.pos.y + 1.6, g.pos.z + 1.6);
+    const f = new THREE.Vector3(Math.sin(g.yaw), 0, Math.cos(g.yaw));
+    player.pos.set(g.pos.x + f.x * 2.1 + 0.3, g.pos.y + 1.6, g.pos.z + f.z * 2.1);
     yaw = Math.atan2(g.pos.x - player.pos.x, g.pos.z - player.pos.z);
   }
-  let pressed = false;
   step = (dt) => {
-    camera.position.copy(player.pos);
-    camera.rotation.set(-0.08, yaw + Math.PI, 0, 'YXZ');
+    if (view === 'town') place(); else { camera.position.copy(player.pos); camera.rotation.set(-0.08, yaw + Math.PI, 0, 'YXZ'); }
     camera.updateMatrixWorld();
     updateTownsfolk(dt, camera, player);
   };
   place = () => {
     if (view === 'town') {
-      camera.position.set(14, 12, -38);
-      camera.lookAt(2, 0, -14);
+      const v = (params.get('cam') ?? '5,4.5,-40,0,0.5,-26').split(',').map(Number);
+      camera.position.set(v[0], v[1], v[2]);
+      camera.lookAt(v[3], v[4], v[5]);
     } else {
       camera.position.copy(player.pos);
       camera.rotation.set(-0.12, yaw + Math.PI, 0, 'YXZ');
-      if (!pressed) { pressed = true; document.getElementById('talkbtn')?.click(); }
+
     }
   };
 }
 
 const n = Math.round(T * 60);
 const ts = performance.now();
-for (let i = 0; i < n; i++) step(1 / 60);
+for (let i = 0; i < n; i++) {
+  // The talk view speaks up a second in, then watches the reply.
+  if (view === 'talk' && i === 60) document.getElementById('talkbtn')?.click();
+  step(1 / 60);
+}
 const simMs = performance.now() - ts;
 place();
 lampsToLights();

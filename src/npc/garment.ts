@@ -197,9 +197,13 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
       const cls = boneClassOf(m);
       const idx = m.geometry.index!;
       const skin: number[] = [], feet: number[] = [];
+      // The base of the neck and the top of the chest show in the collar.
+      const collar = o.m.bone('Neck').y - 0.1, w = new THREE.Vector3();
+      const high = new Uint8Array(cls.length);
+      for (let i = 0; i < cls.length; i++) if (cls[i] === 'torso') high[i] = m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld).y > collar ? 1 : 0;
       for (let t = 0; t < idx.count; t += 3) {
         const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
-        const ok = (i: number) => cls[i] === 'hand' || cls[i] === 'head';
+        const ok = (i: number) => cls[i] === 'hand' || cls[i] === 'head' || high[i] === 1;
         if (ok(a) && ok(b) && ok(c)) skin.push(a, b, c);
         else if (kit === 'woman' && cls[a] === 'foot' && cls[b] === 'foot' && cls[c] === 'foot') feet.push(a, b, c);
       }
@@ -208,6 +212,21 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
       m.geometry.clearGroups();
       m.geometry.addGroup(0, skin.length, 0);
       if (feet.length) m.geometry.addGroup(skin.length, feet.length, 1);
+    }
+    if (m.name === 'Wolf3D_Outfit_Bottom') {
+      // Trousers become close-fitting hose: pull them in above the knee so they
+      // stay inside a short tunic's skirt.
+      const knee = o.m.bone('LeftLeg').y, g = (m.geometry = m.geometry.clone());
+      const p = g.attributes.position, n = g.attributes.normal, v = new THREE.Vector3();
+      const inv = m.matrixWorld.clone().invert(), w = new THREE.Vector3();
+      for (let i = 0; i < p.count; i++) {
+        m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld);
+        const k = THREE.MathUtils.smoothstep(w.y, knee - 0.05, knee + 0.15) * 0.016;
+        if (k <= 0) continue;
+        v.fromBufferAttribute(n, i).normalize();
+        p.setXYZ(i, p.getX(i) - v.x * k, p.getY(i) - v.y * k, p.getZ(i) - v.z * k);
+      }
+      void inv;
     }
     const old = m.material as THREE.MeshStandardMaterial;
     let nm: THREE.Material;
@@ -589,12 +608,17 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       }
       radii.push(row);
     }
+    for (let c = 0; c < NC2; c++) {
+      const col = Float32Array.from(radii.map((row) => row[c]));
+      smooth(col, NR2, false, 2);
+      radii.forEach((row, r) => { row[c] = Math.max(row[c], col[r]); });
+    }
     for (let r = 0; r < NR2; r++) {
       const t = r / (NR2 - 1);
       const y = yT + (yB - yT) * Math.pow(t, 0.9);
       const a0 = long ? THREE.MathUtils.lerp(0.36, 0.62, Math.pow(t, 0.6)) * Math.PI : THREE.MathUtils.lerp(0.16, 0.3, t) * Math.PI;
       const row = Float32Array.from(radii[r]);
-      smooth(row, NC2, false, 2);
+      smooth(row, NC2, false, 5);
       for (let c = 0; c < NC2; c++) {
         const a = a0 + (Math.PI * 2 - 2 * a0) * (c / (NC2 - 1));
         const fold = (Math.sin(a * 9 + fp + Math.sin(a * 2.3) * 1.4) * 0.6 + Math.sin(a * 5 + fp * 1.3) * 0.4) * t * (long ? 0.03 : 0.012);

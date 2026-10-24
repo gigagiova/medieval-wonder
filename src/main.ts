@@ -9,7 +9,7 @@ import { shared, mat, MAT, makeSurfaceMaterial, makeSky, makeMotes, texturesRead
 import { makeFire } from './fire';
 import { makeBones } from './bones';
 import { NLAMP } from './shaders';
-import { buildWorld, SPAWN, regionName, mainLane, getTeleports, type Teleport } from './world';
+import { buildWorld, SPAWN, regionName, getTeleports, getMapData, type Teleport } from './world';
 import { terrain } from './displace';
 import { Player } from './player';
 import { Soundscape } from './audio';
@@ -17,7 +17,7 @@ import { initMap } from './map';
 import { loadProps } from './props';
 import { updateLibrary, pushOutOfSecretDoor } from './library';
 import { isReading } from './codex';
-import { loadMonkAssets, createMonk } from './monk';
+import { loadNpcAssets, spawnTownsfolk, updateTownsfolk, pushOutOfTownsfolk } from './npc';
 import type { Lamp, Cell, PropKind } from './builder';
 
 const params = new URLSearchParams(location.search);
@@ -163,52 +163,12 @@ function updateBones(showAbove: boolean, showUnder: boolean) {
 }
 scene.add(makeMotes());
 
-// Monks: rigged, animated bodies under cloth-simulated habits (Bullet soft
-// bodies), each carrying a horn lantern that feeds the light pool.
-function makeMonk(path: (t: number) => THREE.Vector3, rate: number) {
-  const monk = createMonk(scene);
-  const lamp: Lamp = { pos: new THREE.Vector3(), color: new THREE.Color(1, 0.5, 0.18), intensity: 0.5, under: false, seed: Math.random() * 50 };
-  lamps.push(lamp);
-  let t = Math.random() * 100;
-  const prev = path(t);
-  return (dt: number) => {
-    t += dt * rate;
-    const p = path(t), q = path(t + 0.05);
-    const speed = dt > 0 ? p.distanceTo(prev) / dt : 0;
-    prev.copy(p);
-    monk.update(dt, p, Math.atan2(q.x - p.x, q.z - p.z), Math.min(speed, 2));
-    lamp.pos.copy(monk.lanternWorldPos);
-  };
-}
-// One monk walks the lane between the gate and the abbey, back and forth;
-// another paces the atrium.
-const lane = mainLane();
-const laneLen = lane.reduce((a, p, i) => (i ? a + p.distanceTo(lane[i - 1]) : 0), 0);
-const onLane = (t: number) => {
-  let s = (Math.asin(Math.sin(t * 0.02)) / (Math.PI / 2) * 0.5 + 0.5) * laneLen * 0.9 + laneLen * 0.05;
-  for (let i = 1; i < lane.length; i++) {
-    const d = lane[i].distanceTo(lane[i - 1]);
-    if (s <= d) {
-      const p = lane[i - 1].clone().lerp(lane[i], s / d);
-      return new THREE.Vector3(p.x + 0.45, terrain(p.x, p.y), p.y);
-    }
-    s -= d;
-  }
-  const e = lane[lane.length - 1];
-  return new THREE.Vector3(e.x, terrain(e.x, e.y), e.y);
-};
-const atrium = (t: number) => {
-  const a = t * 0.12;
-  const x = -15.5 + Math.sin(a) * 3.6 + Math.sin(a * 2.3) * 0.6, z = -35.5 + Math.cos(a) * 2.6;
-  return new THREE.Vector3(x, terrain(x, z), z);
-};
-// The brothers arrive a little after you do: their models load and are
-// dressed in the background, never holding up the start.
-const monks: ((dt: number) => void)[] = [];
-const summonMonks = () => setTimeout(() => {
-  loadMonkAssets()
-    .then(() => { monks.push(makeMonk(onLane, 1)); setTimeout(() => monks.push(makeMonk(atrium, 1)), 300); })
-    .catch((e) => console.warn('monks unavailable', e));
+// Townsfolk (monks, peasants, Lombard soldiers) arrive a little after you do:
+// their models load and are dressed in the background, never holding up the start.
+const summonTownsfolk = () => setTimeout(() => {
+  loadNpcAssets()
+    .then(() => spawnTownsfolk(scene, { streets: getMapData().streets, ground: terrain, lamps, places: getMapData().landmarks }))
+    .catch((e) => console.warn('townsfolk unavailable', e));
 }, 500);
 
 const player = new Player(collider, SPAWN, camera, renderer.domElement);
@@ -327,7 +287,7 @@ await envLoaded;
 await progress('Mixing the pigments', 0.94);
 try { await renderer.compileAsync(scene, camera); } catch { /* compiled on first frame instead */ }
 enterEl.textContent = 'Enter';
-summonMonks();
+summonTownsfolk();
 overlay.addEventListener('click', () => {
   overlay.classList.add('hidden');
   renderer.domElement.requestPointerLock?.()?.catch?.(() => {});
@@ -469,7 +429,8 @@ function frame() {
   guardFall(dt);
   pushOutOfSecretDoor(player.pos);
   updateLibrary(camera);
-  for (const m of monks) m(dt);
+  pushOutOfTownsfolk(player.pos);
+  updateTownsfolk(dt, camera, player);
 
   const camY = camera.position.y;
   const under = THREE.MathUtils.smoothstep(-camY, 1.0, 4.0);

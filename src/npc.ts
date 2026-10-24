@@ -251,7 +251,7 @@ export class Person {
       on('Hips', Props.makeSeax(), Props.placeAt(new THREE.Vector3(belt.cx + Math.sin(aS) * rS, belt.y - 0.04, belt.cz + Math.cos(aS) * rS), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, aS, 0.08))));
     }
     if (g.shield) {
-      const paint = new THREE.Color(pick(r, [0x7a3a2a, 0x9a8a70, 0x4a5462, 0x6a5a3a, 0x8a4a30]));
+      const paint = new THREE.Color(pick(r, [0x7a3a2a, 0x8a7c64, 0x46505e, 0x6e6040, 0x7e5236]));
       const s = Props.makeShield(paint);
       if (g.shield === 'back') {
         const sp = m.bone('Spine2');
@@ -386,9 +386,9 @@ export function makePerson(scene: THREE.Scene, role: Role, o: { outfit?: number;
   if (!gear) {
     const x = rnd();
     gear = role === 'monk' ? { lantern: x < 0.6 }
-      : role === 'soldier' ? { arms: true, spear: true, helmet: x < 0.5, shield: id === 'soldierCloak' ? 'arm' : 'back' }
+      : role === 'soldier' ? { arms: true, spear: true, helmet: x < 0.6, cap: x >= 0.6, shield: id === 'soldierCloak' ? 'arm' : 'back' }
       : role === 'woman' ? { jar: x < 0.3, basket: x >= 0.3 && x < 0.65 }
-      : { cap: id === 'peasantCloak' && rnd() < 0.8, sticks: id === 'peasantHood' && x < 0.4, bucket: x >= 0.4 && x < 0.65, basket: x >= 0.65 && x < 0.8 };
+      : { cap: id === 'peasantCloak', sticks: id === 'peasantHood' && x < 0.4, bucket: x >= 0.4 && x < 0.65, basket: x >= 0.65 && x < 0.8 };
   }
   const p = new Person(scene, outfit, role, rnd, gear);
   npcDebug.people.push(p);
@@ -532,7 +532,7 @@ class Town {
       const n = new THREE.Vector2(-c.tz, c.tx);
       const half = Math.max(0.8, st.w / 2 - 0.55);
       const face = Math.atan2(gate.x - c.x, gate.z - c.z);
-      for (const k of [1, -1]) plan.push({ role: 'soldier', kind: 'post', at: new THREE.Vector3(c.x + n.x * half * k, 0, c.z + n.y * half * k), yaw: face + Math.PI });
+      for (const k of [1, -1]) plan.push({ role: 'soldier', kind: 'post', at: new THREE.Vector3(c.x + n.x * half * k, 0, c.z + n.y * half * k), yaw: face });
       // Townsfolk chatting inside the gate.
       const s2 = sp.s < st.L / 2 ? Math.min(st.L, sp.s + 9) : Math.max(0, sp.s - 9);
       const g = pointAt(st, s2);
@@ -860,7 +860,10 @@ function makeUI() {
   #speech .la { margin: 0 0 8px; font-size: 19px; font-style: italic; line-height: 1.35; }
   #speech .en { margin: 0; font-size: 15px; line-height: 1.35; opacity: 0.78; }
   body.touch #speech { bottom: max(196px, calc(env(safe-area-inset-bottom, 0px) + 188px)); }
-  @media (max-width: 480px) { #speech .la { font-size: 17px; } #speech .en { font-size: 14px; } }`;
+  @media (max-width: 480px) { #speech .la { font-size: 17px; } #speech .en { font-size: 14px; } }
+  /* Short screens (landscape phones, small windows): up top, out of the speaker's way. */
+  @media (max-height: 520px) { #speech, body.touch #speech { bottom: auto; top: max(12px, env(safe-area-inset-top, 0px)); width: min(520px, calc(100vw - 180px)); padding: 9px 14px 10px; }
+    #speech .who { font-size: 15px; margin-bottom: 3px; } #speech .la { font-size: 15px; margin-bottom: 4px; } #speech .en { font-size: 13px; } }`;
   document.head.appendChild(style);
   const btn = document.createElement('button');
   btn.id = 'talkbtn';

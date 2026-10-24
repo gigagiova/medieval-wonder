@@ -11,7 +11,7 @@ import type { Measure, Garment } from './garment';
 let M: ReturnType<typeof makeMats> | null = null;
 function makeMats() {
   const wood = textureSet('wood');
-  const tex = (c: number, r = 0.85) => withAtmos(new THREE.MeshStandardMaterial({ color: c, roughness: r, map: wood.a, normalMap: wood.n, normalScale: new THREE.Vector2(0.6, 0.6), side: THREE.DoubleSide }));
+  const tex = (c: number, r = 0.85) => withAtmos(new THREE.MeshStandardMaterial({ color: c, roughness: r, normalMap: wood.n, normalScale: new THREE.Vector2(0.6, 0.6), side: THREE.DoubleSide }));
   const D = { side: THREE.DoubleSide };
   return {
     iron: matte(0x3a3836, 0.55, 0.65, D),
@@ -19,8 +19,8 @@ function makeMats() {
     bronze: matte(0x5a4426, 0.5, 0.7, D),
     leather: matte(0x3a2618, 0.8, 0, D),
     darkLeather: matte(0x22160e, 0.82, 0, D),
-    ash: tex(0x9a8670, 0.8),
-    board: tex(0xb09a80, 0.9),
+    ash: tex(0x7e6a52, 0.8),
+    board: tex(0xffffff, 0.9),
     felt: matte(0x4a3e30, 1, 0, D),
     linen: matte(0x9a917e, 0.95, 0, D),
   };
@@ -196,17 +196,17 @@ export function makeSpatha() {
 /** A scramasax in a leather sheath, worn across the belt. Origin at the centre; blade along +X. */
 export function makeSeax() {
   const m = propMats();
-  const sh = new THREE.BoxGeometry(0.36, 0.055, 0.016, 6, 1, 1);
+  const sh = new THREE.BoxGeometry(0.3, 0.05, 0.016, 6, 1, 1);
   const p = sh.attributes.position;
   for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), t = (x + 0.18) / 0.36;
+    const x = p.getX(i), t = (x + 0.15) / 0.3;
     // Single-edged: the back straight, the edge sweeping up to the point.
     if (p.getY(i) < 0) p.setY(i, -0.0275 + t * t * 0.03);
     p.setZ(i, p.getZ(i) * (1 - t * 0.4));
   }
   sh.computeVertexNormals();
-  sh.translate(0.04, 0, 0);
-  const grip = new THREE.CylinderGeometry(0.014, 0.016, 0.13, 7).rotateZ(Math.PI / 2).translate(-0.205, 0.008, 0);
+  sh.translate(0.03, 0, 0);
+  const grip = new THREE.CylinderGeometry(0.014, 0.016, 0.13, 7).rotateZ(Math.PI / 2).translate(-0.175, 0.008, 0);
   const studs: THREE.BufferGeometry[] = [];
   for (let k = 0; k < 4; k++) studs.push(at(new THREE.SphereGeometry(0.006, 6, 4), -0.09 + k * 0.08, 0.02, 0.009));
   const o = new THREE.Group();
