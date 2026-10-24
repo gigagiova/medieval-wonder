@@ -5,7 +5,13 @@
 // 720s: the Vulgate, the Rule of Benedict, Gregory's Dialogues, Isidore,
 // Boethius.
 
-export interface Text { id: string; rubric: string; body: string }
+export interface Text {
+  id: string; rubric: string; body: string;
+  /** Greek texts are written in a Greek majuscule face. */
+  greek?: boolean;
+  /** A full-page figure on the second leaf. */
+  figure?: 'ouroboros';
+}
 
 export const TEXTS: Text[] = [
   {
@@ -53,6 +59,33 @@ Usus litterarum repertus propter memoriam rerum. Nam ne oblivione fugiant, litte
     body: `Carmina qui quondam studio florente peregi, flebilis heu maestos cogor inire modos. Ecce mihi lacerae dictant scribenda Camenae et veris elegi fletibus ora rigant.
 Haec dum mecum tacitus ipse reputarem querimoniamque lacrimabilem stili officio signarem, adstitisse mihi supra verticem visa est mulier reverendi admodum vultus, oculis ardentibus et ultra communem hominum valentiam perspicacibus.`,
   },
+  // --- the hidden cabinet: Graeco-Egyptian alchemy, come up from Byzantine Italy.
+  {
+    id: 'chrysopoeia',
+    greek: true,
+    figure: 'ouroboros',
+    rubric: 'ΧΡΥΣΟΠΟΙΙΑ ΚΛΕΟΠΑΤΡΑΣ',
+    body: `ΕΝ ΤΟ ΠΑΝ ΚΑΙ ΔΙ ΑΥΤΟΥ ΤΟ ΠΑΝ ΚΑΙ ΕΙΣ ΑΥΤΟ ΤΟ ΠΑΝ ΚΑΙ ΕΙ ΜΗ ΕΧΟΙ ΤΟ ΠΑΝ ΟΥΔΕΝ ΕΣΤΙ ΤΟ ΠΑΝ.
+Ο ΟΦΙΣ Ο ΕΙΣ.
+Unum est omne, et per ipsum omne, et in ipsum omne; et si omne non habeat, nihil est omne. Serpens unus.`,
+  },
+  {
+    id: 'physika',
+    greek: true,
+    figure: 'ouroboros',
+    rubric: 'ΔΗΜΟΚΡΙΤΟΥ ΦΥΣΙΚΑ ΚΑΙ ΜΥΣΤΙΚΑ',
+    body: `Η ΦΥΣΙΣ ΤΗ ΦΥΣΕΙ ΤΕΡΠΕΤΑΙ ΚΑΙ Η ΦΥΣΙΣ ΤΗΝ ΦΥΣΙΝ ΝΙΚΑ ΚΑΙ Η ΦΥΣΙΣ ΤΗΝ ΦΥΣΙΝ ΚΡΑΤΕΙ.
+Natura natura delectatur, et natura naturam vincit, et natura naturam continet.
+ΕΝ ΤΟ ΠΑΝ.`,
+  },
+  {
+    id: 'compositiones',
+    rubric: 'Incipiunt compositiones ad tingenda musiva et pellis',
+    // A short recipe in the manner of the Lucca collection (c. 800), not a transcription.
+    body: `De auri petalo. Accipe aurum purum et tunde in petala tenuia, et pone inter pergamenam, et iterum tunde donec fiat tenuissimum.
+De colore viridi. Accipe aes et pone in vas cum aceto acerrimo, et obline et pone in fimo per dies triginta; et invenies viride.
+De cinnabari. Accipe argentum vivum et sulphur, et commisce in olla, et coque in igne lento donec rubeat.`,
+  },
 ];
 
 // Nomina sacra: written contracted under a bar.
@@ -65,10 +98,12 @@ const NOMINA: Record<string, string> = {
 
 interface Tok { t: string; bar?: boolean; red?: boolean; big?: boolean }
 interface Line { toks: Tok[]; indent: number }
-interface Page { cols: Line[][]; initial?: string; rubric?: string; explicit?: boolean }
+interface Page { cols: Line[][]; initial?: string; rubric?: string; explicit?: boolean; figure?: boolean; font: string }
 
 const LINES = 24;
 const PAGE_ASPECT = 1.38; // height / width
+
+const fontOf = (t: Text) => (t.greek ? '"Cardo", "Times New Roman", serif' : '"Uncial Antiqua", serif');
 
 function tokenize(word: string): Tok {
   const bare = word.replace(/[.,;:?!]/g, '').toLowerCase();
@@ -107,13 +142,15 @@ export function paginate(text: Text, cols: number): Page[] {
   const f = frame(cols);
   const ctx = m();
   const S = 1000; // measure at 1000 px per page width
-  ctx.font = `${f.fs * S}px "Uncial Antiqua", serif`;
+  const font = fontOf(text);
+  ctx.font = `${f.fs * S}px ${font}`;
   const space = ctx.measureText(' ').width / S;
   const initLines = 5;
   const initW = f.pitch * initLines * 0.92;
   const pages: Page[] = [];
-  let page: Page = { cols: Array.from({ length: cols }, () => []), rubric: text.rubric, initial: text.body[0] };
+  let page: Page = { cols: Array.from({ length: cols }, () => []), rubric: text.rubric, initial: text.body[0], font };
   pages.push(page);
+  let figureDone = !text.figure;
   let col = 0;
   // The rubric takes the first two lines of the first column.
   page.cols[0].push({ toks: [], indent: 0 }, { toks: [], indent: 0 });
@@ -122,7 +159,11 @@ export function paginate(text: Text, cols: number): Page[] {
     if (page.cols[col].length >= LINES) {
       col++;
       if (col >= cols) {
-        page = { cols: Array.from({ length: cols }, () => []) };
+        if (!figureDone) {
+          pages.push({ cols: Array.from({ length: cols }, () => []), figure: true, font });
+          figureDone = true;
+        }
+        page = { cols: Array.from({ length: cols }, () => []), font };
         pages.push(page);
         col = 0;
       }
@@ -153,6 +194,7 @@ export function paginate(text: Text, cols: number): Page[] {
     });
   });
   page.explicit = true;
+  if (!figureDone) pages.push({ cols: Array.from({ length: cols }, () => []), figure: true, font });
   layoutCache.set(key, pages);
   return pages;
 }
@@ -230,11 +272,11 @@ function parchment(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 /** A decorated initial: interlace in orpiment and verdigris, red-lead dots around it. */
-function initial(letter: string, size: number): HTMLCanvasElement {
+function initial(letter: string, size: number, family = '"Uncial Antiqua", serif'): HTMLCanvasElement {
   const pad = size * 0.25;
   const S = Math.ceil(size + pad * 2);
   const mk = () => { const c = document.createElement('canvas'); c.width = c.height = S; return c; };
-  const font = `${size}px "Uncial Antiqua", serif`;
+  const font = `${size}px ${family}`;
   const glyph = (c: HTMLCanvasElement, stroke = 0) => {
     const x = c.getContext('2d')!;
     x.font = font;
@@ -301,6 +343,84 @@ function initial(letter: string, size: number): HTMLCanvasElement {
 
 const initialCache = new Map<string, HTMLCanvasElement>();
 
+/**
+ * The serpent biting its tail, after the Chrysopoeia of Cleopatra: upper half
+ * dark, lower half pale, ΕΝ ΤΟ ΠΑΝ written in its circle.
+ */
+function ouroboros(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, seed: number) {
+  const r = rng(seed);
+  const cx = x + w * 0.52, cy = y + h * 0.46, R0 = w * 0.3, bw = w * 0.07;
+  ctx.save();
+  ctx.lineCap = 'round';
+  // Body: drawn as many short segments so it can taper and change colour.
+  const a0 = Math.PI * 0.95, a1 = a0 + Math.PI * 2 * 0.93;
+  const N = 140;
+  for (let i = 0; i < N; i++) {
+    const t = i / N, a = a0 + (a1 - a0) * t, an = a0 + (a1 - a0) * (i + 1.2) / N;
+    const thick = bw * (0.35 + 0.65 * Math.min(1, (1 - t) * 3)) * (t < 0.05 ? 0.6 + t * 8 : 1);
+    const upper = Math.sin(a) < 0; // canvas y down: sin < 0 is the upper half
+    ctx.strokeStyle = upper ? '#2f4a2a' : '#c9a24a';
+    ctx.lineWidth = thick;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * R0, cy + Math.sin(a) * R0);
+    ctx.lineTo(cx + Math.cos(an) * R0, cy + Math.sin(an) * R0);
+    ctx.stroke();
+  }
+  // Scales and the ink outline.
+  ctx.strokeStyle = 'rgba(30,20,12,0.85)';
+  ctx.lineWidth = Math.max(1, w * 0.004);
+  for (const off of [-1, 1]) {
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const t = i / N, a = a0 + (a1 - a0) * t;
+      const thick = bw * (0.35 + 0.65 * Math.min(1, (1 - t) * 3)) * (t < 0.05 ? 0.6 + t * 8 : 1);
+      const rr = R0 + off * thick / 2;
+      if (i === 0) ctx.moveTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); else ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+    }
+    ctx.stroke();
+  }
+  for (let i = 4; i < N - 8; i += 3) {
+    const a = a0 + (a1 - a0) * (i / N);
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(a) * R0, cy + Math.sin(a) * R0, bw * 0.22, a + Math.PI * 0.2, a + Math.PI * 0.8);
+    ctx.stroke();
+  }
+  // Head with open jaws taking the tail.
+  const hx = cx + Math.cos(a0) * R0, hy = cy + Math.sin(a0) * R0;
+  ctx.fillStyle = '#2f4a2a';
+  ctx.beginPath();
+  ctx.ellipse(hx - bw * 0.2, hy + bw * 0.2, bw * 0.95, bw * 0.62, a0 + Math.PI / 2 + 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#a83a22';
+  ctx.beginPath();
+  ctx.arc(hx - bw * 0.45, hy + bw * 0.05, bw * 0.12, 0, Math.PI * 2);
+  ctx.fill();
+  // Inscription inside, and the long one beneath.
+  ctx.fillStyle = INK;
+  ctx.textAlign = 'center';
+  ctx.font = `${w * 0.075}px "Cardo", serif`;
+  ctx.fillText('ΕΝ ΤΟ', cx, cy - w * 0.015);
+  ctx.fillText('ΠΑΝ', cx, cy + w * 0.07);
+  ctx.font = `${w * 0.036}px "Cardo", serif`;
+  ctx.fillStyle = '#a83a22';
+  ctx.fillText('Ο ΟΦΙΣ Ο ΕΙΣ', cx, cy + R0 + bw + w * 0.07);
+  ctx.textAlign = 'left';
+  // A little apparatus sketched in the margin: a cucurbit and its ambix.
+  ctx.strokeStyle = 'rgba(61,38,22,0.8)';
+  ctx.lineWidth = Math.max(1, w * 0.003);
+  const ax = x + w * 0.2, ay = y + h * 0.82;
+  ctx.beginPath();
+  ctx.ellipse(ax, ay, w * 0.045, w * 0.055, 0, 0, Math.PI * 2);
+  ctx.moveTo(ax - w * 0.02, ay - w * 0.05); ctx.lineTo(ax - w * 0.02, ay - w * 0.09);
+  ctx.moveTo(ax + w * 0.02, ay - w * 0.05); ctx.lineTo(ax + w * 0.02, ay - w * 0.09);
+  ctx.ellipse(ax, ay - w * 0.11, w * 0.035, w * 0.025, 0, 0, Math.PI * 2);
+  ctx.moveTo(ax + w * 0.03, ay - w * 0.11); ctx.lineTo(ax + w * 0.12, ay - w * 0.06);
+  ctx.stroke();
+  void r;
+  ctx.restore();
+}
+
 /** Draw one page (index `p` of `pages`) into the rectangle, written up to fraction `upto`. */
 export function drawPage(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, pages: Page[], p: number, cols: number, left: boolean, seed: number, upto = 1) {
   const f = frame(cols);
@@ -308,6 +428,7 @@ export function drawPage(ctx: CanvasRenderingContext2D, x: number, y: number, w:
   parchment(ctx, x, y, w, h, seed * 131 + p * 7, left);
   const page = pages[p];
   if (!page) return;
+  if (page.figure) { ouroboros(ctx, x, y, w, h, seed + p); return; }
   const r = rng(seed * 977 + p);
   const inner = left ? f.outer : f.inner; // verso: outer margin on the left
   const bx = x + inner * w, by = y + f.top * w;
@@ -343,13 +464,13 @@ export function drawPage(ctx: CanvasRenderingContext2D, x: number, y: number, w:
       ctx.globalAlpha = 0.8 + r() * 0.2;
       for (const tok of line.toks) {
         const size = tok.big ? fs * 1.25 : fs;
-        ctx.font = `${size}px "Uncial Antiqua", serif`;
+        ctx.font = `${size}px ${page.font}`;
         ctx.fillStyle = tok.red ? RED : INK;
         if (tok.red && tok.big) {
           ctx.fillStyle = r() < 0.5 ? RED : GREEN;
           ctx.fillText(tok.t[0], xx, ly);
           const w0 = ctx.measureText(tok.t[0]).width;
-          ctx.font = `${fs}px "Uncial Antiqua", serif`;
+          ctx.font = `${fs}px ${page.font}`;
           ctx.fillStyle = INK;
           ctx.fillText(tok.t.slice(1), xx + w0, ly);
           xx += w0 + ctx.measureText(tok.t.slice(1) + ' ').width;
@@ -368,7 +489,7 @@ export function drawPage(ctx: CanvasRenderingContext2D, x: number, y: number, w:
   // Rubric in red lead, and the great initial on the first page.
   if (page.rubric) {
     ctx.fillStyle = RED;
-    ctx.font = `${fs * 0.95}px "Uncial Antiqua", serif`;
+    ctx.font = `${fs * 0.95}px ${page.font}`;
     const words = page.rubric.toUpperCase().split(' ');
     let line = '', ly = by + 0.82 * f.pitch * w;
     for (const wd of words) {
@@ -384,13 +505,13 @@ export function drawPage(ctx: CanvasRenderingContext2D, x: number, y: number, w:
   if (page.initial) {
     const size = f.pitch * w * 5.2;
     const key = page.initial + Math.round(size);
-    let img = initialCache.get(key);
-    if (!img) { img = initial(page.initial, size); initialCache.set(key, img); }
+    let img = initialCache.get(key + page.font);
+    if (!img) { img = initial(page.initial, size, page.font); initialCache.set(key + page.font, img); }
     ctx.drawImage(img, bx - size * 0.32, by + f.pitch * w * 1.75 - size * 0.25);
   }
   if (page.explicit && upto >= 1) {
     ctx.fillStyle = RED;
-    ctx.font = `${fs}px "Uncial Antiqua", serif`;
+    ctx.font = `${fs}px ${page.font}`;
     const lastCol = page.cols[page.cols.length - 1].length ? page.cols.length - 1 : 0;
     const ln = page.cols[lastCol].length;
     if (ln < LINES) ctx.fillText('EXPLICIT', bx + lastCol * (f.colW + f.gap) * w, by + (ln + 0.82) * f.pitch * w);
@@ -423,11 +544,11 @@ function ensureFonts() {
   if (!document.querySelector('link[data-uncial]')) {
     const l = document.createElement('link');
     l.rel = 'stylesheet';
-    l.href = 'https://fonts.googleapis.com/css2?family=Uncial+Antiqua&display=swap';
+    l.href = 'https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Cardo&display=swap';
     l.dataset.uncial = '1';
     document.head.appendChild(l);
   }
-  return document.fonts.load('40px "Uncial Antiqua"').catch(() => []);
+  return Promise.all([document.fonts.load('40px "Uncial Antiqua"'), document.fonts.load('40px "Cardo"', 'ΕΝ')]).catch(() => []);
 }
 export const fontsReady = () => ensureFonts();
 
