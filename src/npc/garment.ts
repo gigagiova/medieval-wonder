@@ -305,6 +305,7 @@ class Grid {
   region: number[] = []; // weights from: 0 trunk, 1 arms, 2 upper, 3 torso
   group = G_TUNIC;
   cap = 0; // capsule mask for free vertices
+  flip = false; // wound the other way, so faces point out of the body
   constructor(public rows: number, public cols: number, public wrap: boolean) {}
 }
 
@@ -437,8 +438,10 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     for (let i = 1; i < pts.length; i++) lens.push(lens[i - 1] + pts[i].distanceTo(pts[i - 1]));
     const L = lens[lens.length - 1];
     const NS = 13, NB = 14;
-    const g = new Grid(NS, NB, true);
+    const g = new Grid(NS, NB, true) as Grid & { axis: THREE.Vector3[] };
+    g.axis = [];
     g.cap = CAP_SLEEVE;
+    g.flip = true;
     let prevU: THREE.Vector3 | null = null;
     for (let r = 0; r < NS; r++) {
       const s = (r / (NS - 1)) * L;
@@ -450,6 +453,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       const U: THREE.Vector3 = prevU ? prevU.clone().addScaledVector(T, -prevU.dot(T)).normalize() : new THREE.Vector3(0, 0, 1).addScaledVector(T, -T.z).normalize();
       prevU = U;
       const W = new THREE.Vector3().crossVectors(T, U);
+      g.axis.push(C);
       const bins = new Float32Array(NB).fill(-1);
       for (let k = 0; k < cls.length; k++) {
         if (cls[k] !== 'arm' && (cls[k] !== 'hand' || !bell)) continue;
@@ -490,6 +494,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     const NH = 22, NC = 32;
     hood = new Grid(NH, NC, false);
     hood.group = spec.hood === 'cowl' ? G_TUNIC : G_HEAD;
+    hood.flip = true;
     const th0 = -1.22, th1 = 1.5;
     for (let r = 0; r < NH; r++) {
       const th = th0 + (th1 - th0) * (r / (NH - 1));
@@ -541,8 +546,38 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       vv.toArray(g.pos, i * 3);
     }
   };
-  fit(tunic, 0.018);
-  sleeves.forEach((g) => fit(g, bell ? 0.022 : 0.014));
+  // Tubes (the tunic, the sleeves) are pushed out along their own radius, to
+  // the outermost body surface a ray from outside meets. The closest-point
+  // normal is no use here: the body's outfit is layered, with inward-facing
+  // linings, and near the cut-away shoulders the closest face can point any
+  // way, which threw single vertices across their neighbours (shards).
+  const out = new THREE.Vector3(), o2 = new THREE.Vector3();
+  const fitRadial = (g: Grid, centre: (i: number, c: THREE.Vector3) => THREE.Vector3, fs: FitSet, minOff: number, reach: number) => {
+    const c = new THREE.Vector3();
+    for (let i = 0; i < g.pos.length / 3; i++) {
+      vv.fromArray(g.pos, i * 3);
+      centre(i, c);
+      out.copy(vv).sub(c);
+      const r0 = out.length();
+      if (r0 < 1e-6) continue;
+      out.divideScalar(r0);
+      ray.set(o2.copy(c).addScaledVector(out, reach), out.clone().negate());
+      const hit = fs.bvh.raycastFirst(ray, THREE.DoubleSide);
+      if (!hit) continue;
+      const rb = reach - hit.distance;
+      if (r0 < rb + minOff) vv.copy(c).addScaledVector(out, rb + minOff).toArray(g.pos, i * 3);
+    }
+  };
+  fitRadial(tunic, (i, c) => { const r = Math.floor(i / NA); return c.set(cen[r].x, ringY(r), cen[r].y); }, S.trunk, 0.018, 0.7);
+  for (const g of sleeves) {
+    const ax = (g as Grid & { axis: THREE.Vector3[] }).axis;
+    fitRadial(g, (i, c) => c.copy(ax[Math.floor(i / g.cols)]), S.arms, bell ? 0.022 : 0.014, 0.16);
+  }
+  // Keep the belt on the fitted cloth.
+  for (let r = 0; r < NR; r++) for (let k = 0; k < NA; k++) {
+    const o = (r * NA + k) * 3;
+    rad[r][k] = Math.hypot(tunic.pos[o] - cen[r].x, tunic.pos[o + 2] - cen[r].y);
+  }
   // A head kept without its skull has nothing to push the hood out of above the jaw.
   if (hood) fit(hood, spec.hood === 'veil' ? 0.016 : 0.03, M.head.skull ? Infinity : bone('Head').y);
 
@@ -571,6 +606,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       }
     }
     g.group = G_OVER;
+    g.flip = face < 0;
     scap.push(g);
   }
 
@@ -657,6 +693,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       }
     }
     beltRing.group = G_BELT;
+    beltRing.flip = true;
     beltInfo = { y: ring.y, cx: rc.x, cz: rc.y, r: (a: number) => Rat(a) + rz };
   }
 
@@ -686,7 +723,8 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     const cmax = g.wrap ? C : C - 1, rmax = wrapRows ? R : R - 1;
     for (let r = 0; r < rmax; r++) for (let c = 0; c < cmax; c++) {
       const a = id(r, c), b = id(r, c + 1), cc = id(r + 1, c), d = id(r + 1, c + 1);
-      index[g.group].push(a, cc, b, b, cc, d);
+      if (g.flip) index[g.group].push(a, b, cc, b, d, cc);
+      else index[g.group].push(a, cc, b, b, cc, d);
     }
     if (g === beltRing) continue; // rigid
     for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
