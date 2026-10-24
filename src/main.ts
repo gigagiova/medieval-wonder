@@ -17,7 +17,8 @@ import { initMap } from './map';
 import { loadProps } from './props';
 import { updateLibrary, pushOutOfSecretDoor } from './library';
 import { isReading } from './codex';
-import { loadNpcAssets, spawnTownsfolk, updateTownsfolk, pushOutOfTownsfolk } from './npc';
+import { loadNpcAssets, spawnTownsfolk, updateTownsfolk, pushOutOfTownsfolk, npcDebug } from './npc';
+Object.assign(window, { __npc: npcDebug });
 import type { Lamp, Cell, PropKind } from './builder';
 
 const params = new URLSearchParams(location.search);
