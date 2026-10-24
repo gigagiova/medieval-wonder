@@ -177,7 +177,8 @@ export function placeProp(_scene: THREE.Scene | null, id: PropId, x: number, y: 
   if (!list || !list.length) return null;
   const vi = (opts.variant ?? Math.abs(Math.floor(x * 7.31 + z * 3.17))) % list.length;
   const p = new THREE.Vector3(x, y, z);
-  if (!opts.raw) { field(x, y, z, 'stone', fv); p.add(fv); }
+  // Follow the same bend as the ground (and as walls near it) at this point.
+  if (!opts.raw) { field(x, y, z, y < 0.5 && y > -0.5 ? 'ground' : 'stone', fv); p.add(fv); }
   e.set(opts.tilt?.[0] ?? 0, ry, opts.tilt?.[1] ?? 0, 'YXZ');
   q.setFromEuler(e);
   const s = new THREE.Vector3(scale, scale, scale);
@@ -230,7 +231,9 @@ export function commitProps(scene: THREE.Scene) {
   if (!ticker) {
     // A tiny invisible mesh whose onBeforeRender culls the chunks by distance
     // from whichever camera renders the scene.
-    ticker = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial());
+    const empty = new THREE.BufferGeometry();
+    empty.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+    ticker = new THREE.Mesh(empty, new THREE.MeshBasicMaterial());
     ticker.frustumCulled = false;
     let n = 0;
     ticker.onBeforeRender = (_r, _s, camera) => {

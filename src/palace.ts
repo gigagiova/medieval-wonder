@@ -57,17 +57,43 @@ function win(b: Builder, x: number, y: number, z: number, ry: number, t: number,
 // ------------------------------------------------------------- custom paint
 
 /** Matte custom material whose colour comes from `paint(uv, soot)` and which goes through the world fog. */
+// Real lime plaster (scanned) under the paint: its grain, trowel marks and
+// relief show through, as a fresco is painted into the wet plaster itself.
+let plasterTex: { a: THREE.Texture; n: THREE.Texture } | null = null;
+function plaster() {
+  if (plasterTex) return plasterTex;
+  const tl = new THREE.TextureLoader();
+  const a = tl.load('textures/plaster_a.webp'), n = tl.load('textures/plaster_n.webp');
+  a.colorSpace = THREE.SRGBColorSpace;
+  for (const t of [a, n]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(0.55, 0.55); t.anisotropy = 4; }
+  return (plasterTex = { a, n });
+}
+
 function paintMaterial(key: string, paintGLSL: string): THREE.MeshStandardMaterial {
-  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, side: THREE.DoubleSide });
+  const P = plaster();
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, side: THREE.DoubleSide, normalMap: P.n });
+  m.normalScale.set(1.1, 1.1);
   m.customProgramCacheKey = () => 'palace-' + key;
+  if (key === 'fresco') (m as unknown as { defines: Record<string, string> }).defines = { SHOW_STONES: '' };
   m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, shared);
+    Object.assign(sh.uniforms, shared, { tPlaster: { value: P.a } });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float soot;\nvarying vec3 vWPos;\nvarying vec2 vPUv;\nvarying float vSoot;')
       .replace('#include <project_vertex>', '#include <project_vertex>\n vWPos = (modelMatrix * vec4(transformed,1.0)).xyz;\n vPUv = uv;\n vSoot = soot;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vWPos;\nvarying vec2 vPUv;\nvarying float vSoot;\n${noiseGLSL}\n${atmosGLSL}\n${paintGLSL}`)
-      .replace('#include <map_fragment>', 'diffuseColor.rgb *= paint(vPUv, vSoot);')
+      .replace('#include <common>', `#include <common>\nuniform sampler2D tPlaster;\nvarying vec3 vWPos;\nvarying vec2 vPUv;\nvarying float vSoot;\n${noiseGLSL}\n${atmosGLSL}\n${paintGLSL}`)
+      .replace('#include <map_fragment>', `vec2 puv = vPUv * 0.55;
+        vec3 pl = texture2D(tPlaster, puv).rgb;
+        vec3 plMean = texture2D(tPlaster, puv, 7.0).rgb;
+        float plL = dot(pl, vec3(0.299, 0.587, 0.114)), mL = dot(plMean, vec3(0.299, 0.587, 0.114));
+        // The paint lies in the plaster: its grain modulates the colour; where the
+        // render has fallen away the stones of the wall show through, unpainted.
+        vec3 painted = paint(vPUv, vSoot) * clamp(1.0 + 2.2 * (plL - mL), 0.55, 1.4);
+        #ifdef SHOW_STONES
+          float stone = smoothstep(0.07, 0.15, length(pl - plMean)) * step(plL, mL);
+          painted = mix(painted, pl * 1.1 * (1.0 - vSoot * 0.6), stone * 0.85);
+        #endif
+        diffuseColor.rgb *= painted;`)
       .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.directSpecular *= 0.2;\n reflectedLight.indirectSpecular *= 0.2;')
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = applyAtmos(gl_FragColor.rgb, vWPos);');
   };
@@ -466,6 +492,24 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
     b.box('wood', 0.06, 0.06, 0.25, x, 2.5, -35.05, 0, false);
   }
   for (let i = 0; i < 4; i++) spear(b, 33.62, -30.6 - i * 0.4, 0.14, Math.PI / 2);
+  // A long trestle table on the far side of the hearth, set for the evening:
+  // wooden bowls and trenchers, a pot, a basket, a knife board.
+  if (prop(b, 'WoodenTable_01', 42.6, 0, -33.9, 0.03, 1, true, [1.25, 1.45, 1.2])) {
+    const top = 0.8;
+    prop(b, 'carved_wooden_plate', 41.7, top, -33.8, 0.3);
+    prop(b, 'carved_wooden_plate', 42.6, top, -33.65, 1.2);
+    prop(b, 'carved_wooden_plate', 43.5, top, -34.0, 2.5);
+    prop(b, 'wooden_bowl_01', 42.15, top, -34.1, 0.7);
+    prop(b, 'wooden_bowl_01', 43.1, top, -33.7, 2.2, 0.9);
+    prop(b, 'ceramic_pot', 42.6, top, -34.15, 0.9, 0.7);
+    prop(b, 'wooden_cutting_board', 41.3, top, -34.15, 0.1);
+    prop(b, 'wicker_basket_02', 43.9, top, -34.1, 1.6, 1.0);
+  }
+  prop(b, 'folding_wooden_stool', 41.6, 0, -33.1, 0.7, 1, true);
+  prop(b, 'folding_wooden_stool', 43.4, 0, -33.15, 2.9, 1, true);
+  prop(b, 'wooden_bucket_02', 45.2, 0, -35.0, 0.5, 0.9, true);
+  prop(b, 'wine_barrel_01', 45.4, 0, -30.3, 1.1, 0.9, true);
+  prop(b, 'wine_barrel_01', 44.7, 0, -30.1, 2.3, 0.85, true);
   prop(b, 'folding_wooden_stool', 41.6, 0, -31.0, 0.7, 1, true);
   prop(b, 'folding_wooden_stool', 36.0, 0, -31.3, 2.3, 1, true);
   prop(b, 'wicker_basket_02', 34.2, 0, -34.6, 0.3, 1.5, true);

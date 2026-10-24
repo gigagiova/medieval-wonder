@@ -7,6 +7,7 @@ import { shared, makeSky, makeSurfaceMaterial, MAT } from './materials';
 import { Builder } from './builder';
 import { buildForest } from './forest';
 import { field } from './displace';
+import { loadProps } from './props';
 
 // Dev page: ?cam=x,y,z,yaw,pitch [&world] [&frames=n]
 const params = new URLSearchParams(location.search);
@@ -27,6 +28,7 @@ scene.add(dl);
 const t0 = performance.now();
 let inside = (x: number, z: number) => Math.hypot(x, z) < 72;
 let keepOut = (x: number, z: number) => Math.abs(x - 3) < 7 && z > 60 && z < 200;
+await loadProps();
 const b = new Builder();
 if (params.has('world')) {
   const w = await import('./world');

@@ -9,6 +9,7 @@ import { Builder } from './builder';
 import { buildBaths, BATHS_SPOT } from './baths';
 import { makeFire } from './fire';
 import { terrain } from './displace';
+import { loadProps } from './props';
 
 // Dev page for the thermae: ?cam=x,y,z,yaw,pitch (y above local ground) [&frames=n]
 const params = new URLSearchParams(location.search);
@@ -27,6 +28,7 @@ dl.position.set(-0.9, 0.3, 0.4);
 scene.add(dl);
 
 const t0 = performance.now();
+await loadProps();
 const b = new Builder();
 // Ground around the site.
 const gg = new THREE.PlaneGeometry(120, 120, 120, 120).rotateX(-Math.PI / 2).translate(-33, 0, 24);

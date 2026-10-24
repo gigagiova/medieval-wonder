@@ -10,6 +10,7 @@ import { makeFire } from './fire';
 import { buildLibrary, updateLibrary, pushOutOfSecretDoor, setSecretDoor } from './library';
 import { TEXTS, openCodex, fontsReady } from './codex';
 import { field } from './displace';
+import { loadProps } from './props';
 
 // Dev page: the library alone.
 //   ?cam=x,y,z,yaw,pitch   camera (eye height ~1.65 above the floor)
@@ -40,6 +41,7 @@ const [x, y, z, yaw, pitch] = (q.get('cam') ?? '-7.9,1.7,-45.4,0,-0.05').split('
 const off = field(x, 0.5, z, 'wood', new THREE.Vector3());
 camera.position.set(x + off.x, y + off.y, z + off.z);
 camera.rotation.set(pitch, yaw, 0, 'YXZ');
+await loadProps();
 const b = new Builder();
 const t0 = performance.now();
 const group = buildLibrary(b, scene);
