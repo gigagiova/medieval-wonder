@@ -256,24 +256,23 @@ export function lotsFor(t: Town): Lot[] {
 
 const ryOf = (e: V2) => Math.atan2(-e.y, e.x); // local +x → e
 
-/** Mesh resolution of house walls in metres (coarser on phones). */
-export let WALL_STEP = 0.8;
-export function setQuality(low: boolean) { WALL_STEP = low ? 1.25 : 0.8; }
+/** Mesh resolution of house walls in metres. */
+const WALL_STEP = 0.8;
 
 /**
  * Walls of a prism over polygon c, from y0 to y0 + h, as indexed grids (one per
  * side, so corners stay creased) that the displacement field can bend.
  */
-function prismWalls(c: V2[], y0: number, h: number) {
+function prismWalls(c: V2[], y0: number, h: number, step = WALL_STEP) {
   let cx = 0, cz = 0;
   for (const p of c) { cx += p.x / c.length; cz += p.y / c.length; }
   const pos: number[] = [], idx: number[] = [];
-  const nv = Math.max(1, Math.ceil(h / WALL_STEP));
+  const nv = Math.max(1, Math.ceil(h / step));
   for (let k = 0; k < c.length; k++) {
     const a = c[k], b = c[(k + 1) % c.length];
     const L = a.distanceTo(b);
     if (L < 0.05) continue;
-    const nu = Math.max(1, Math.ceil(L / WALL_STEP));
+    const nu = Math.max(1, Math.ceil(L / step));
     const ex = (b.x - a.x) / L, ez = (b.y - a.y) / L;
     // Triangle (p00, p10, p11) faces (-ez, 0, ex); flip if that points inward.
     const mx = (a.x + b.x) / 2 - cx, mz = (a.y + b.y) / 2 - cz;
@@ -303,8 +302,9 @@ export function buildHouse(b: Builder, lot: Lot) {
   const lower: MatName = rand() < 0.7 ? 'rubble' : 'brick';
   const upper: MatName = rand() < 0.45 ? lower : (['rubble', 'brick', 'plaster', 'wood'] as MatName[])[Math.floor(rand() * 4)];
   const h1 = Math.min(h, R(2.8, 3.6));
-  b.add(prismWalls(c, base, h1 - base), lower, undefined, true, true);
-  if (h > h1 + 0.5) b.add(prismWalls(c, h1, h - h1), upper, undefined, true, true);
+  // One plain prism (8 triangles) is the whole house as far as collision goes.
+  b.add(prismWalls(c, base, h1 - base), lower, undefined, true, true, false, prismWalls(c, base, h - base, 1e9));
+  if (h > h1 + 0.5) b.add(prismWalls(c, h1, h - h1), upper, undefined, false, true);
   // Roof over the footprint's oriented bounds, ridge along or across the street.
   const e = c[1].clone().sub(c[0]).normalize();
   const n = V(-e.y, e.x);
@@ -351,7 +351,7 @@ export function buildHouse(b: Builder, lot: Lot) {
   const dp = at(du, 0.05);
   const archMat: MatName = rand() < 0.6 ? 'brick' : 'marble';
   const dw = R(0.95, 1.25), spring = R(1.7, 2.0);
-  b.geo(archMat, arcadeGeo(dw + 0.7, spring + dw / 2 + 0.45, 0.32, 1, dw, spring), dp.x, -0.1, dp.y, ry, true, 0, 0, true);
+  b.geo(archMat, arcadeGeo(dw + 0.7, spring + dw / 2 + 0.45, 0.32, 1, dw, spring), dp.x, -0.1, dp.y, ry, false, 0, 0, true);
   const dd = at(du, -0.06);
   b.box('wood', dw + 0.05, spring + dw / 2 - 0.05, 0.1, dd.x, -0.1, dd.y, ry, false);
   if (rand() < 0.18) {

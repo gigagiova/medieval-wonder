@@ -1,4 +1,4 @@
-// On-screen thumbstick (bottom-left) plus drag-to-look on the right half of
+// On-screen thumbstick (bottom-right) plus drag-to-look anywhere else on
 // the screen. Pointer Events, so the same code serves touch and mouse, and
 // several fingers at once (one moving, one looking).
 
@@ -57,10 +57,10 @@ export class Joystick {
     this.base.addEventListener('pointercancel', release);
     this.base.addEventListener('lostpointercapture', release);
 
-    // Touch look: any finger that lands on the right half of the canvas.
+    // Touch look: any finger that lands on the canvas. The stick and the
+    // buttons are separate elements, so their touches never reach it.
     canvas.addEventListener('pointerdown', (e) => {
       if (e.pointerType !== 'touch' || this.lookId !== null) return;
-      if (e.clientX < innerWidth / 2) return;
       this.lookId = e.pointerId;
       this.lastLook = { x: e.clientX, y: e.clientY };
       canvas.setPointerCapture?.(e.pointerId);

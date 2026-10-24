@@ -13,6 +13,7 @@ import { buildWorld, SPAWN, regionName, mainLane } from './world';
 import { terrain } from './displace';
 import { Player } from './player';
 import { Soundscape } from './audio';
+import { initMap } from './map';
 import type { Lamp, Cell, PropKind } from './builder';
 
 const params = new URLSearchParams(location.search);
@@ -22,7 +23,7 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.25;
+renderer.toneMappingExposure = 1.4;
 renderer.info.autoReset = false;
 document.body.appendChild(renderer.domElement);
 
@@ -33,11 +34,10 @@ scene.add(makeSky());
 // Let the title card paint before the (synchronous) world build.
 await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
 const t0 = performance.now();
-// Phones get coarser meshes, a lower render resolution, no motes.
-const LOW = matchMedia('(pointer: coarse)').matches || params.has('low');
-if (LOW) renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
-const { collider, cells, lamps, flames, props, townTex } = buildWorld(scene, LOW);
+const { collider, cells, lamps, flames, props, townTex } = buildWorld(scene);
 shared.uTown.value = townTex;
+(window as unknown as { __camera: THREE.Camera }).__camera = camera;
+initMap();
 const bvh = new MeshBVH(collider.geometry);
 (collider.geometry as unknown as { boundsTree: MeshBVH }).boundsTree = bvh;
 const buildMs = performance.now() - t0;
@@ -45,14 +45,14 @@ const buildMs = performance.now() - t0;
 // Moonlight and a faint sky fill.
 // Overcast dusk: the sun is just down; light comes from the whole sky,
 // a little warmer from the west. No hard shadows.
-const moon = new THREE.DirectionalLight(0xffb48a, 0.6);
+const moon = new THREE.DirectionalLight(0xc4ccd6, 0.5);
 moon.castShadow = false;
 moon.shadow.mapSize.set(2048, 2048);
 Object.assign(moon.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 300 });
 moon.shadow.bias = -0.0006;
 moon.shadow.normalBias = 0.04;
 scene.add(moon, moon.target);
-const hemi = new THREE.HemisphereLight(0x9aa6b8, 0x3a3026, 2.1);
+const hemi = new THREE.HemisphereLight(0xb4bcc6, 0x4a4842, 3.0);
 scene.add(hemi);
 
 // A fixed pool of point lights reassigned every frame to the nearest lamps.
@@ -192,14 +192,13 @@ const grade = new ShaderPass({
       vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
       float l = dot(col, vec3(0.299,0.587,0.114));
       // Cold, sick-green shadows; fire stays warm; blacks crushed.
-      vec3 shadowTint = mix(vec3(0.78,1.0,1.05), vec3(1.05,0.9,0.78), uUnder);
+      // Grey overcast: cool neutral shadows, no warm push; firelight keeps its own colour.
+      vec3 shadowTint = mix(vec3(0.95,1.0,1.04), vec3(1.05,0.92,0.8), uUnder);
       col = mix(col*shadowTint, col, smoothstep(0.0,0.3,l));
-      col = mix(col, col*vec3(1.15,0.98,0.78), smoothstep(0.3,0.9,l));
-      col = max(col - 0.006, 0.0) * 1.02;
-      col = mix(col, col*col*(3.0-2.0*col), 0.4);
-      float sat = mix(0.62, 1.0, smoothstep(0.15, 0.6, l));
+      col = mix(col, col*col*(3.0-2.0*col), 0.22);
+      float sat = mix(0.6, 0.85, smoothstep(0.15, 0.6, l));
       col = mix(vec3(dot(col, vec3(0.299,0.587,0.114))), col, sat);
-      col *= 1.0 - r*1.6;
+      col *= 1.0 - r*0.9;
       col += (h(vUv*uRes + fract(uTime*7.13)*391.) - 0.5) * 0.045;
       gl_FragColor = vec4(max(col, 0.0), 1.0);
     }`,
@@ -329,8 +328,8 @@ function frame() {
   const camY = camera.position.y;
   const under = THREE.MathUtils.smoothstep(-camY, 1.0, 4.0);
   shared.uUnder.value = under;
-  moon.intensity = 0.6 * (1 - under);
-  hemi.intensity = 2.1 * (1 - under) + 0.015;
+  moon.intensity = 0.5 * (1 - under);
+  hemi.intensity = 3.0 * (1 - under) + 0.015;
   moon.position.copy(camera.position).addScaledVector(shared.uMoonDir.value, 120);
   moon.target.position.copy(camera.position);
   moon.position.x = Math.round(moon.position.x); moon.position.z = Math.round(moon.position.z);

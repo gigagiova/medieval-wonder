@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Map test</title>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=UnifrakturMaguntia&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #050608; color: #d8c9a8; font-family: 'IM Fell English', Georgia, serif; }
+  canvas { display: block; }
+  #overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2rem;
+    background: radial-gradient(ellipse at center, rgba(10,9,8,0.55), rgba(3,3,4,0.92)); cursor: pointer; transition: opacity 0.8s; text-align: center; padding: 16px; }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  #overlay h1 { font-family: 'UnifrakturMaguntia', serif; font-weight: 400; font-size: clamp(2.6rem, 8vw, 5.5rem); margin: 0; color: #e8d3a0; text-shadow: 0 0 30px rgba(255,140,50,0.35); }
+  #overlay p { margin: 0; font-style: italic; opacity: 0.8; max-width: 34rem; line-height: 1.5; }
+  #overlay .keys { font-style: normal; font-size: 0.95rem; opacity: 0.6; letter-spacing: 0.04em; }
+  #overlay .enter { margin-top: 1rem; font-size: 1.2rem; letter-spacing: 0.3em; text-transform: uppercase; animation: pulse 3s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+  #region { position: fixed; top: 12%; width: 100%; text-align: center; font-family: 'UnifrakturMaguntia', serif; font-size: clamp(1.8rem, 5vw, 3rem);
+    color: #e6d2a2; opacity: 0; transition: opacity 2s; pointer-events: none; text-shadow: 0 0 20px #000, 0 0 40px rgba(255,120,40,0.25); }
+  #region.show { opacity: 0.85; }
+  #hint { position: fixed; bottom: 8%; width: 100%; text-align: center; font-style: italic; opacity: 0; transition: opacity 1.5s; pointer-events: none; }
+  #hint.show { opacity: 0.7; }
+</style><style>
+  canvas { touch-action: none; }
+  /* Movement stick: bottom-right, clear of the safe-area insets in both orientations. */
+  #joy { position: fixed; right: max(24px, calc(env(safe-area-inset-right, 0px) + 16px)); bottom: max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px));
+    width: 140px; height: 140px; border-radius: 50%; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; z-index: 5;
+    background: radial-gradient(circle, rgba(24,17,10,0.25) 0%, rgba(24,17,10,0.5) 60%, rgba(14,10,6,0.7) 100%);
+    border: 3px solid rgba(201,154,86,0.8); box-shadow: inset 0 0 20px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.6), 0 0 18px rgba(0,0,0,0.6);
+    opacity: 0.75; transition: opacity 0.6s; cursor: grab; }
+  #joy::before { content: ''; position: absolute; inset: 20%; border-radius: 50%; border: 1px dashed rgba(230,210,170,0.35); }
+  #joy-knob { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; border-radius: 50%; transform: translate(-50%, -50%);
+    background: radial-gradient(circle at 38% 32%, #e8c88a 0%, #a8773a 45%, #4a3018 100%);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.75), inset 0 -3px 6px rgba(0,0,0,0.45); border: 1px solid rgba(40,26,12,0.9); pointer-events: none; }
+  #joy.held { opacity: 1; cursor: grabbing; }
+  #joy.held #joy-knob { transition: none; }
+  #joy:not(.held) #joy-knob { transition: transform 0.18s ease-out; }
+  body.locked:not(.touch) #joy { opacity: 0; pointer-events: none; }
+  body.touch #joy { opacity: 0.85; width: 156px; height: 156px; }
+  /* Tilt-to-look toggle: phones only, top-right. */
+  #tilt { display: none; position: fixed; z-index: 5; top: max(18px, calc(env(safe-area-inset-top, 0px) + 12px)); right: max(84px, calc(env(safe-area-inset-right, 0px) + 78px));
+    width: 54px; height: 54px; border-radius: 50%; padding: 0; cursor: pointer; touch-action: manipulation;
+    background: radial-gradient(circle at 38% 32%, rgba(60,42,22,0.85), rgba(14,10,6,0.85)); border: 2px solid rgba(201,154,86,0.75);
+    box-shadow: 0 0 14px rgba(0,0,0,0.6); color: #d9b878; opacity: 0.8; }
+  #tilt svg { width: 28px; height: 28px; display: block; margin: auto; }
+  #tilt.on { background: radial-gradient(circle at 38% 32%, #e8c88a 0%, #a8773a 50%, #4a3018 100%); color: #1c1208; opacity: 1; }
+  #tilt.off { opacity: 0.35; filter: grayscale(1); cursor: not-allowed; }
+  #tilt:focus-visible { outline: 2px solid #e8c88a; outline-offset: 3px; }
+  body.touch #tilt { display: block; }
+  #overlay { z-index: 10; }
+  /* Map button (top-right) and the map itself. */
+  #mapbtn { position: fixed; z-index: 5; top: max(18px, calc(env(safe-area-inset-top, 0px) + 12px)); right: max(18px, calc(env(safe-area-inset-right, 0px) + 12px));
+    width: 54px; height: 54px; border-radius: 50%; padding: 0; cursor: pointer; touch-action: manipulation;
+    background: radial-gradient(circle at 38% 32%, #e8c88a 0%, #a8773a 50%, #4a3018 100%); border: 2px solid rgba(40,26,12,0.9);
+    box-shadow: 0 3px 12px rgba(0,0,0,0.6), inset 0 -3px 6px rgba(0,0,0,0.4); color: #2a1a0a; opacity: 0.85; transition: opacity 0.3s, transform 0.15s; }
+  #mapbtn:hover { opacity: 1; }
+  #mapbtn:active { transform: scale(0.94); }
+  #mapbtn svg { width: 30px; height: 30px; display: block; margin: auto; }
+  #mapbtn:focus-visible { outline: 2px solid #e8c88a; outline-offset: 3px; }
+  #mapov { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(12,10,8,0.55), rgba(4,4,5,0.88)); opacity: 0; pointer-events: none; transition: opacity 0.35s; }
+  #mapov.open { opacity: 1; pointer-events: auto; }
+  #mapov .sheet { position: relative; transform: scale(0.96) rotate(-0.6deg); transition: transform 0.35s; filter: drop-shadow(0 12px 30px rgba(0,0,0,0.7)); }
+  #mapov.open .sheet { transform: scale(1) rotate(-0.6deg); }
+  #mapov canvas { display: block; position: absolute; left: 0; top: 0; }
+  #mapov .close { position: absolute; top: max(14px, calc(env(safe-area-inset-top, 0px) + 10px)); right: max(16px, calc(env(safe-area-inset-right, 0px) + 12px));
+    width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(201,154,86,0.75); background: rgba(20,14,8,0.8); color: #e8d3a0;
+    font: 26px/1 'IM Fell English', Georgia, serif; cursor: pointer; }
+  #mapov .hint { position: absolute; bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 8px)); width: 100%; text-align: center;
+    font-style: italic; font-size: 0.9rem; color: #d8c9a8; opacity: 0.6; pointer-events: none; }
+</style>
+<style>body { background: #2b2f36; }</style>
+</head><body>
+<div id="joy" aria-label="Movement stick"><div id="joy-knob"></div></div>
+<button id="mapbtn" type="button" title="Map (M)" aria-label="Open the map" aria-expanded="false"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 8l7-3 10 3 7-3v19l-7 3-10-3-7 3z" fill="rgba(250,235,200,0.55)"/><path d="M11 5v19M21 8v19"/><path d="M7 19c3-1 5-6 8-5s4 4 9 1" stroke-dasharray="1.6 2"/><path d="M23.5 11.5l2 2m0-2l-2 2" stroke="#7a1a10"/></svg></button>
+<div id="mapov" role="dialog" aria-modal="true" aria-label="Map of the town"><div class="sheet"><canvas id="mapcv"></canvas><canvas id="mapme"></canvas></div><button class="close" type="button" aria-label="Close the map">×</button><div class="hint">M or Esc to close</div></div>
+<script type="module" src="/src/map-test.ts"></script>
+</body></html>

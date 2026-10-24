@@ -96,10 +96,7 @@ export function field(x: number, y: number, z: number, m: MatName, out: THREE.Ve
 export const TESS: Partial<Record<MatName, number>> = {
   stone: 0.7, bigstone: 0.9, brick: 1.0, rubble: 0.9, marble: 0.6, plaster: 0.8, roof: 0.9, wood: 0.9, rock: 0.6, slab: 0.8, ground: 0.8,
 };
-/** Phones: coarser meshes everywhere (the shader relief carries the detail). */
-export function setLowQuality() {
-  for (const k of Object.keys(TESS) as MatName[]) TESS[k] = TESS[k]! * 1.5;
-}
+
 
 /**
  * Split every triangle into n² smaller ones (n from its longest edge), in one
@@ -149,6 +146,16 @@ export function tessellate(g: THREE.BufferGeometry, m: MatName): THREE.BufferGeo
   out.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(total * 6), 2));
   return out;
 }
+
+/** Positions only (collision proxies): one field evaluation per vertex. */
+export function displacePositions(g: THREE.BufferGeometry, m: MatName) {
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    field(pos.getX(i), pos.getY(i), pos.getZ(i), m, pv);
+    pos.setXYZ(i, pos.getX(i) + pv.x, pos.getY(i) + pv.y, pos.getZ(i) + pv.z);
+  }
+}
+const pv = new THREE.Vector3();
 
 const s0 = new THREE.Vector3(), d0 = new THREE.Vector3(), d1 = new THREE.Vector3(), n = new THREE.Vector3(), j = new THREE.Vector3();
 export function displace(g: THREE.BufferGeometry, m: MatName) {

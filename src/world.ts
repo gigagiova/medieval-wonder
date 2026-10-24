@@ -3,8 +3,8 @@ import { Builder, rng } from './builder';
 import type { MatName } from './materials';
 import { arcadeGeo, arcade, ruinGeo, ruin, column, fallenDrum, gable, leanTo, pyramidRoof } from './shapes';
 import { torch, brazier, hornLantern, bracketLantern, lucerna, polykandelon, candle } from './lights';
-import { layoutTown, lotsFor, buildHouse, buildBridges, townTexture, setQuality, type Town } from './town';
-import { setGroundExtra, setLowQuality } from './displace';
+import { layoutTown, lotsFor, buildHouse, buildBridges, townTexture, type Town } from './town';
+import { setGroundExtra } from './displace';
 import { buildCatacombs } from './catacombs';
 
 // A Lombard town around AD 750, packed inside what is left of a Roman circuit.
@@ -81,9 +81,7 @@ export function getMapData() {
 /** The main lane, gate to abbey, as a polyline (for the monk's round). */
 export const mainLane = () => town.streets[0].pts;
 
-export function buildWorld(scene: THREE.Scene, low = false) {
-  if (low) { setLowQuality(); setQuality(true); }
-  GROUND_STEP = low ? 0.9 : 0.6;
+export function buildWorld(scene: THREE.Scene) {
   const b = new Builder();
   const abbey = [V(-49, -71), V(-30, -76), V(-8, -72), V(-3, -52), V(-6, -29), V(-24, -26), V(-41, -33), V(-50, -48)];
   const temple = [V(12, -3), V(27, -6), V(30, 15), V(15, 18)];
@@ -386,18 +384,18 @@ function skullShelf(b: Builder, x: number, y: number, z: number, ry: number, len
 
 // ---------------------------------------------------------------- ground
 
-function grid(x0: number, x1: number, step: number, y: number, skip: (cx: number, cz: number) => boolean) {
+function grid(x0: number, x1: number, step: number, y: number, skip: (cx: number, cz: number) => boolean, z0 = x0) {
   const n = Math.round((x1 - x0) / step);
   const pos = new Float32Array((n + 1) * (n + 1) * 3);
   const nor = new Float32Array((n + 1) * (n + 1) * 3);
   for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
     const k = (j * (n + 1) + i) * 3;
-    pos[k] = x0 + i * step; pos[k + 1] = y; pos[k + 2] = x0 + j * step;
+    pos[k] = x0 + i * step; pos[k + 1] = y; pos[k + 2] = z0 + j * step;
     nor[k + 1] = 1;
   }
   const idx: number[] = [];
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    if (skip(x0 + (i + 0.5) * step, x0 + (j + 0.5) * step)) continue;
+    if (skip(x0 + (i + 0.5) * step, z0 + (j + 0.5) * step)) continue;
     const a = j * (n + 1) + i, b = a + 1, c = a + n + 1, d = c + 1;
     idx.push(a, c, b, b, c, d);
   }
@@ -408,12 +406,17 @@ function grid(x0: number, x1: number, step: number, y: number, skip: (cx: number
   return g;
 }
 
-let GROUND_STEP = 0.6;
+const GROUND_STEP = 0.6;
 function ground(b: Builder) {
   const IN = 96;
   const hx0 = STAIR_X - STAIR_W / 2, hx1 = STAIR_X + STAIR_W / 2;
-  b.add(grid(-IN, IN, GROUND_STEP, 0, (x, z) => x > hx0 && x < hx1 && z < STAIR_TOP && z > HOLE_END), 'ground', undefined, true, true);
-  b.add(grid(-400, 400, 4, -0.04, (x, z) => Math.abs(x) < IN - 2 && Math.abs(z) < IN - 2), 'ground', undefined, true, true);
+  const hole = (x: number, z: number) => x > hx0 && x < hx1 && z < STAIR_TOP && z > HOLE_END;
+  b.add(grid(-IN, IN, GROUND_STEP, 0, hole), 'ground', undefined, false, true);
+  b.add(grid(-400, 400, 4, -0.04, (x, z) => Math.abs(x) < IN - 2 && Math.abs(z) < IN - 2), 'ground', undefined, false, true);
+  // Walkable ground for collision: 4 m cells, lined up so the stair opening
+  // (x -38..-34, z -56..-52) is exactly one 4 x 4 cell, plus 10 m cells beyond.
+  b.collideShape(grid(-98, 98, 4, 0, (x, z) => x > -38 && x < -34 && z > -56 && z < -52, -96), 'ground');
+  b.collideShape(grid(-200, 200, 10, -0.04, (x, z) => Math.abs(x) < 95 && Math.abs(z) < 95), 'ground');
 }
 
 

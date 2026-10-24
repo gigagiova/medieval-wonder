@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { mat, type MatName } from './materials';
-import { tessellate, displace, field, TESS } from './displace';
+import { tessellate, displace, displacePositions, field, TESS } from './displace';
 
 // Point features (lamps, flames, props) move with the same field as the walls
 // they hang on, so nothing floats off a bulging wall or the sloping ground.
@@ -43,7 +43,18 @@ export class Builder {
 
   /** `fine`: geometry is already finely subdivided, so skip tessellation. */
   /** `raw`: geometry is already organic (e.g. carved SDF rock): no tessellation, no displacement. */
-  add(g: THREE.BufferGeometry, m: MatName, matrix?: THREE.Matrix4, collide = true, fine = false, raw = false) {
+  /**
+   * Collision never uses the render mesh: it uses `proxy` (or the piece's own
+   * un-tessellated shape), bent by the same field so it stays in place.
+   */
+  add(g: THREE.BufferGeometry, m: MatName, matrix?: THREE.Matrix4, collide = true, fine = false, raw = false, proxy?: THREE.BufferGeometry) {
+    if (collide) {
+      let c = (proxy ?? g).clone();
+      if (matrix) c.applyMatrix4(matrix);
+      if (c.index) c = c.toNonIndexed();
+      if (!raw) displacePositions(c, m);
+      this.collide(c);
+    }
     let geo = g.clone();
     if (matrix) geo.applyMatrix4(matrix);
     for (const k of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(k)) geo.deleteAttribute(k);
@@ -55,7 +66,13 @@ export class Builder {
     if (geo.index) geo = geo.toNonIndexed();
     if (!this.parts.has(m)) this.parts.set(m, []);
     this.parts.get(m)!.push(geo);
-    if (collide) this.collide(geo);
+  }
+
+  /** A collision-only shape, bent by the world field like everything else. */
+  collideShape(g: THREE.BufferGeometry, m: MatName) {
+    const c = g.index ? g.toNonIndexed() : g.clone();
+    displacePositions(c, m);
+    this.collide(c);
   }
 
   collide(geo: THREE.BufferGeometry) {
@@ -71,14 +88,14 @@ export class Builder {
     tmpM.compose(new THREE.Vector3(x, y + h / 2, z), tmpQ, new THREE.Vector3(1, 1, 1));
     const L = TESS[m] ?? 1e9;
     const seg = (s: number) => Math.min(64, Math.max(1, Math.ceil(s / L)));
-    this.add(new THREE.BoxGeometry(w, h, d, seg(w), seg(h), seg(d)), m, tmpM, collide, true);
+    this.add(new THREE.BoxGeometry(w, h, d, seg(w), seg(h), seg(d)), m, tmpM, collide, true, false, collide ? new THREE.BoxGeometry(w, h, d) : undefined);
   }
 
-  geo(m: MatName, g: THREE.BufferGeometry, x: number, y: number, z: number, ry = 0, collide = true, rx = 0, rz = 0, fine = false) {
+  geo(m: MatName, g: THREE.BufferGeometry, x: number, y: number, z: number, ry = 0, collide = true, rx = 0, rz = 0, fine = false, proxy?: THREE.BufferGeometry) {
     tmpE.set(rx, ry, rz, 'YXZ');
     tmpQ.setFromEuler(tmpE);
     tmpM.compose(new THREE.Vector3(x, y, z), tmpQ, new THREE.Vector3(1, 1, 1));
-    this.add(g, m, tmpM, collide, fine);
+    this.add(g, m, tmpM, collide, fine, false, proxy);
   }
 
   /** A light source; `pos` is the base of the flame, the light sits a little above it. */

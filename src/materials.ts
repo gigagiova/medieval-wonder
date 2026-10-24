@@ -5,7 +5,7 @@ export const shared = {
   uTime: { value: 0 },
   uLampPos: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3(0, -999, 0)) },
   uLampCol: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3()) },
-  uFogCol: { value: new THREE.Color(0.105, 0.11, 0.122) },
+  uFogCol: { value: new THREE.Color(0.15, 0.155, 0.165) },
   uUnder: { value: 0 },
   uMoonDir: { value: new THREE.Vector3(-0.92, 0.07, 0.38).normalize() },
   uTown: { value: null as THREE.Texture | null },
@@ -88,18 +88,15 @@ export function makeSky(): THREE.Mesh {
       void main(){
         vec3 rd = normalize(vWPos - cameraPosition);
         float y = rd.y;
-        // Overcast dusk: a lid of cloud, the last light bleeding in low in the west.
+        // Overcast dusk: an even grey lid of cloud, slightly brighter towards
+        // the horizon and in the west where the light is going. No colour.
         float md = dot(rd, uMoonDir);
-        vec3 col = mix(vec3(0.15,0.15,0.16), vec3(0.06,0.07,0.085), smoothstep(-0.05,0.5,y));
-        float glow = pow(max(md,0.), 3.0) * (1.0 - smoothstep(0.0, 0.35, y));
-        col += vec3(0.36,0.17,0.08) * glow * 0.9 + vec3(0.25,0.12,0.06) * pow(max(md,0.), 18.0) * 0.8;
+        vec3 col = mix(vec3(0.2,0.205,0.215), vec3(0.11,0.115,0.13), smoothstep(-0.05,0.6,y));
+        col *= 1.0 + 0.18 * pow(max(md,0.), 2.0) * (1.0 - smoothstep(0.0, 0.5, y));
         vec2 cuv = rd.xz/(max(y,0.0)+0.12);
-        float cl = fbm(vec3(cuv*0.7 + vec2(uTime*0.006,0.), uTime*0.004));
-        float cl2 = fbm(vec3(cuv*2.1 - vec2(uTime*0.012,0.), 3.));
-        float dark = smoothstep(0.35,0.75,cl)*0.55 + smoothstep(0.5,0.8,cl2)*0.25;
-        col *= 1.0 - dark*smoothstep(0.0,0.2,y);
-        // Thinner cloud near the sun lets a seam of colour through.
-        col += vec3(0.3,0.14,0.07) * glow * smoothstep(0.55,0.3,cl) * 0.7;
+        float cl = fbm(vec3(cuv*0.6 + vec2(uTime*0.006,0.), uTime*0.004));
+        float cl2 = fbm(vec3(cuv*1.9 - vec2(uTime*0.01,0.), 3.));
+        col *= 1.0 - (smoothstep(0.35,0.8,cl)*0.28 + smoothstep(0.5,0.85,cl2)*0.12)*smoothstep(0.0,0.25,y);
         gl_FragColor = vec4(applyAtmos(col, cameraPosition + rd*140.), 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>

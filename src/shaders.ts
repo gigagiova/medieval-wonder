@@ -53,8 +53,8 @@ vec3 applyAtmos(vec3 col, vec3 wpos){
   float fogAmt = 1.0 - exp(-od);
   vec3 fogC = mix(uFogCol, vec3(0.012,0.009,0.007), uUnder);
   float md = max(dot(rd, uMoonDir), 0.0);
-  // Dusk: the fog towards the set sun is faintly warm.
-  fogC += vec3(0.16,0.08,0.035) * (pow(md, 4.0)*0.8 + pow(md, 30.0)) * (1.0 - uUnder);
+  // Dusk: the fog is a touch brighter where the light is going. Grey, never warm.
+  fogC *= 1.0 + 0.12 * pow(md, 3.0) * (1.0 - uUnder);
   // Closed-form integral of 1/(h^2+t^2) along the view ray for every lamp:
   // cheap volumetric halos that actually wrap around geometry edges.
   vec3 scat = vec3(0.0);

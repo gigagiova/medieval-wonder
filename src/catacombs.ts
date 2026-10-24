@@ -276,7 +276,7 @@ function sampleField() {
 }
 
 /** Surface nets on the sampled grid. The solid is where val < 0 (rock); normals point into the air. */
-function mesh(val: Float32Array, nx: number, ny: number, nz: number) {
+function mesh(val: Float32Array, nx: number, ny: number, nz: number, cell = CELL) {
   const id = (i: number, j: number, k: number) => i + nx * (j + ny * k);
   const cid = (i: number, j: number, k: number) => i + (nx - 1) * (j + (ny - 1) * k);
   const vmap = new Int32Array((nx - 1) * (ny - 1) * (nz - 1)).fill(-1);
@@ -301,7 +301,7 @@ function mesh(val: Float32Array, nx: number, ny: number, nz: number) {
       n++;
     }
     vmap[cid(i, j, k)] = pos.length / 3;
-    pos.push(DOM.x0 + (i + sx / n) * CELL, DOM.y0 + (j + sy / n) * CELL, DOM.z0 + (k + sz / n) * CELL);
+    pos.push(DOM.x0 + (i + sx / n) * cell, DOM.y0 + (j + sy / n) * cell, DOM.z0 + (k + sz / n) * cell);
     // Gradient over the cell (rock -> air).
     const gx = (cv[1] - cv[0]) + (cv[3] - cv[2]) + (cv[5] - cv[4]) + (cv[7] - cv[6]);
     const gy = (cv[2] - cv[0]) + (cv[3] - cv[1]) + (cv[6] - cv[4]) + (cv[7] - cv[5]);
@@ -615,7 +615,20 @@ export function buildCatacombs(b: Builder): void {
   // Carve and mesh.
   const { val, nx, ny, nz } = sampleField();
   const geo = mesh(val, nx, ny, nz);
-  b.add(geo, 'rock', undefined, true, true, true);
+  b.add(geo, 'rock', undefined, false, true, true);
+  // Collision proxy: the same field 3x coarser, max-pooled so no passage closes.
+  const f = 3;
+  const cx = Math.floor((nx - 1) / f) + 1, cy = Math.floor((ny - 1) / f) + 1, cz = Math.floor((nz - 1) / f) + 1;
+  const cv = new Float32Array(cx * cy * cz);
+  for (let k = 0; k < cz; k++) for (let j = 0; j < cy; j++) for (let i = 0; i < cx; i++) {
+    let m = -Infinity;
+    for (let dk = -1; dk <= 1; dk++) for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      const ii = Math.min(nx - 1, Math.max(0, i * f + di)), jj = Math.min(ny - 1, Math.max(0, j * f + dj)), kk = Math.min(nz - 1, Math.max(0, k * f + dk));
+      m = Math.max(m, val[ii + nx * (jj + ny * kk)]);
+    }
+    cv[i + cx * (j + cy * k)] = m;
+  }
+  b.collide(mesh(cv, cx, cy, cz, CELL * f).toNonIndexed());
 }
 
 /** Handy test positions (eye height). */
