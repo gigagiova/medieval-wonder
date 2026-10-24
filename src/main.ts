@@ -4,12 +4,15 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
-import { shared, mat, makeSky, makeFlames, makeMotes } from './materials';
+import { MeshBVH } from 'three-mesh-bvh';
+import { shared, mat, MAT, makeSurfaceMaterial, makeSky, makeMotes } from './materials';
+import { makeFire } from './fire';
+import { makeBones } from './bones';
 import { NLAMP } from './shaders';
 import { buildWorld, SPAWN, regionName } from './world';
 import { Player } from './player';
 import { Soundscape } from './audio';
-import type { Lamp } from './builder';
+import type { Lamp, Cell, PropKind } from './builder';
 
 const params = new URLSearchParams(location.search);
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -18,7 +21,8 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.35;
+renderer.toneMappingExposure = 1.3;
+renderer.info.autoReset = false;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -28,18 +32,20 @@ scene.add(makeSky());
 // Let the title card paint before the (synchronous) world build.
 await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
 const t0 = performance.now();
-const { collider, lamps, flames } = buildWorld(scene);
+const { collider, cells, lamps, flames, props } = buildWorld(scene);
+const bvh = new MeshBVH(collider.geometry);
+(collider.geometry as unknown as { boundsTree: MeshBVH }).boundsTree = bvh;
 const buildMs = performance.now() - t0;
 
 // Moonlight and a faint sky fill.
-const moon = new THREE.DirectionalLight(0x8fa6d6, 0.8);
+const moon = new THREE.DirectionalLight(0x7d98c4, 0.6);
 moon.castShadow = true;
 moon.shadow.mapSize.set(2048, 2048);
 Object.assign(moon.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 300 });
 moon.shadow.bias = -0.0006;
 moon.shadow.normalBias = 0.04;
 scene.add(moon, moon.target);
-const hemi = new THREE.HemisphereLight(0x32405a, 0x0c0906, 0.35);
+const hemi = new THREE.HemisphereLight(0x2a3a48, 0x0a0806, 0.3);
 scene.add(hemi);
 
 // A fixed pool of point lights reassigned every frame to the nearest lamps.
@@ -53,7 +59,50 @@ const lantern = new THREE.PointLight(0xffa860, 0, 14, 2);
 scene.add(lantern);
 let lanternOn = false;
 
-scene.add(makeFlames(flames));
+// Fire, split by zone so the whole underground can be switched off at once.
+const fireAbove = makeFire(flames.filter((f) => f.pos.y > -2.5));
+const fireUnder = makeFire(flames.filter((f) => f.pos.y <= -2.5));
+scene.add(fireAbove, fireUnder);
+
+// Bones: sculpted geometry, one instanced draw per kind and zone.
+// Two levels of detail; instances are re-sorted into near / far / culled
+// every few frames by distance and view direction.
+const bonesHi = makeBones(1), bonesLo = makeBones(2.6);
+const boneMat = makeSurfaceMaterial(MAT.bone);
+boneMat.vertexColors = true;
+boneMat.customProgramCacheKey = () => 'bone-vc';
+const boneGroups: { kind: PropKind; list: typeof props; pos: THREE.Vector3[]; hi: THREE.InstancedMesh; lo: THREE.InstancedMesh }[] = [];
+for (const kind of ['skull', 'femur', 'humerus', 'tibia'] as PropKind[]) {
+  const list = props.filter((p) => p.kind === kind);
+  if (!list.length) continue;
+  const mk = (g: THREE.BufferGeometry) => {
+    const im = new THREE.InstancedMesh(g, boneMat, list.length);
+    im.count = 0;
+    im.frustumCulled = false;
+    im.receiveShadow = true;
+    scene.add(im);
+    return im;
+  };
+  boneGroups.push({ kind, list, pos: list.map((p) => new THREE.Vector3().setFromMatrixPosition(p.matrix)), hi: mk(bonesHi[kind]), lo: mk(bonesLo[kind]) });
+}
+const camDir = new THREE.Vector3(), toP = new THREE.Vector3();
+function updateBones(showAbove: boolean, showUnder: boolean) {
+  camera.getWorldDirection(camDir);
+  for (const g of boneGroups) {
+    let nh = 0, nl = 0;
+    g.list.forEach((p, i) => {
+      if (!(p.under ? showUnder : showAbove)) return;
+      toP.subVectors(g.pos[i], camera.position);
+      const d = toP.length();
+      if (d > 26 || (d > 2 && toP.dot(camDir) < -0.3 * d)) return;
+      if (d < 5) g.hi.setMatrixAt(nh++, p.matrix);
+      else g.lo.setMatrixAt(nl++, p.matrix);
+    });
+    g.hi.count = nh; g.lo.count = nl;
+    g.hi.instanceMatrix.needsUpdate = true;
+    g.lo.instanceMatrix.needsUpdate = true;
+  }
+}
 scene.add(makeMotes());
 
 // Hooded monks carrying lanterns on fixed rounds.
@@ -64,12 +113,19 @@ function makeMonk(path: (t: number) => THREE.Vector3, speed: number) {
   const hood = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), mat('cloth'));
   hood.position.y = 1.62;
   hood.scale.set(1, 1.2, 1.1);
-  const box = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.26, 0.2), mat('window'));
-  box.position.set(0.32, 0.95, 0.25);
+  // A Roman-type horn lantern carried at the hip.
+  const box = new THREE.Group();
+  const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.22, 10, 1, true), mat('horn'));
+  const lid = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), mat('bronze'));
+  lid.position.y = 0.11;
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.025, 10), mat('bronze'));
+  base.position.y = -0.12;
+  box.add(horn, lid, base);
+  box.position.set(0.32, 0.85, 0.25);
   for (const m of [robe, hood]) m.castShadow = true;
   g.add(robe, hood, box);
   scene.add(g);
-  const lamp: Lamp = { pos: new THREE.Vector3(), color: new THREE.Color(1, 0.55, 0.22), intensity: 0.7, under: false, seed: Math.random() * 50 };
+  const lamp: Lamp = { pos: new THREE.Vector3(), color: new THREE.Color(1, 0.5, 0.18), intensity: 0.5, under: false, seed: Math.random() * 50 };
   lamps.push(lamp);
   let t = Math.random() * 100;
   return (dt: number) => {
@@ -116,12 +172,15 @@ const grade = new ShaderPass({
       vec2 off = c * r * 0.018;
       vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
       float l = dot(col, vec3(0.299,0.587,0.114));
-      vec3 shadowTint = mix(vec3(0.82,0.98,1.18), vec3(1.05,0.92,0.8), uUnder);
-      col = mix(col*shadowTint + vec3(0.0,0.004,0.01)*(1.0-uUnder), col, smoothstep(0.0,0.35,l));
-      col = mix(col, col*vec3(1.12,1.0,0.82), smoothstep(0.35,0.9,l));
-      col = mix(col, col*col*(3.0-2.0*col), 0.25);
-      col = mix(vec3(l), col, 0.88);
-      col *= 1.0 - r*1.25;
+      // Cold, sick-green shadows; fire stays warm; blacks crushed.
+      vec3 shadowTint = mix(vec3(0.78,1.0,1.05), vec3(1.05,0.9,0.78), uUnder);
+      col = mix(col*shadowTint, col, smoothstep(0.0,0.3,l));
+      col = mix(col, col*vec3(1.15,0.98,0.78), smoothstep(0.3,0.9,l));
+      col = max(col - 0.006, 0.0) * 1.02;
+      col = mix(col, col*col*(3.0-2.0*col), 0.4);
+      float sat = mix(0.62, 1.0, smoothstep(0.15, 0.6, l));
+      col = mix(vec3(dot(col, vec3(0.299,0.587,0.114))), col, sat);
+      col *= 1.0 - r*1.6;
       col += (h(vUv*uRes + fract(uTime*7.13)*391.) - 0.5) * 0.045;
       gl_FragColor = vec4(max(col, 0.0), 1.0);
     }`,
@@ -170,6 +229,69 @@ if (params.has('shot')) {
   if (params.has('lantern')) lanternOn = true;
 }
 
+// ---- Culling ----------------------------------------------------------------
+// 1. Zones: the earth is the biggest occluder. Underground cells are hidden
+//    above ground and vice versa, except around the ossuary stair.
+// 2. Distance: past ~120 m the fog has swallowed everything.
+// 3. Occlusion: rays from the eye to the cell's bounds against the collision
+//    BVH; a cell whose every ray is blocked twice in a row is hidden.
+// Three.js frustum-culls each cell's meshes on top of this.
+const ray = new THREE.Ray();
+const pts: THREE.Vector3[] = Array.from({ length: 10 }, () => new THREE.Vector3());
+const cen = new THREE.Vector3(), hit = new THREE.Vector3(), eye = new THREE.Vector3();
+let rr = 0;
+const cullStats = { visible: 0, occluded: 0, total: cells.length };
+function occluded(c: Cell): boolean {
+  if (c.box.distanceToPoint(eye) < 3) return false;
+  const b = c.box;
+  b.getCenter(cen);
+  let k = 0;
+  for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) pts[k++].set(x, y, z).lerp(cen, 0.08);
+  pts[8].copy(cen);
+  pts[9].set(cen.x, b.max.y - 0.3, cen.z);
+  for (const p of pts) {
+    ray.origin.copy(eye);
+    ray.direction.subVectors(p, eye).normalize();
+    // Only the path up to the cell's bounds matters, not the cell's own walls.
+    const entry = ray.intersectBox(b, hit) ? hit.distanceTo(eye) : eye.distanceTo(p);
+    const h = bvh.raycastFirst(ray, THREE.DoubleSide, 0, Math.max(0, entry - 0.2));
+    if (!h) return false;
+  }
+  return true;
+}
+function cull(isUnder: boolean) {
+  eye.copy(camera.position);
+  const nearStair = Math.abs(eye.x + 36) < 7 && eye.z < -46 && eye.z > -66;
+  const showUnder = isUnder || nearStair || eye.y < -0.5;
+  const showAbove = !isUnder || nearStair || eye.y > -3.5;
+  fireAbove.visible = showAbove;
+  fireUnder.visible = showUnder;
+  if ((rr & 3) === 0) updateBones(showAbove, showUnder);
+  const live: Cell[] = [];
+  for (const c of cells) {
+    const zoneOk = c.under ? showUnder : showAbove;
+    const near = c.box.distanceToPoint(eye) < 120;
+    if (zoneOk && near) live.push(c);
+    else c.occluded = 0;
+    c.visible = zoneOk && near;
+  }
+  // Re-test a slice of the live cells each frame.
+  const per = Math.max(4, Math.ceil(live.length / 6));
+  for (let i = 0; i < per && live.length; i++) {
+    const c = live[(rr++) % live.length];
+    c.occluded = occluded(c) ? c.occluded + 1 : 0;
+  }
+  let vis = 0, occ = 0;
+  for (const c of cells) {
+    const show = c.visible && c.occluded < 2;
+    if (c.visible && !show) occ++;
+    if (show) vis++;
+    for (const m of c.meshes) m.visible = show;
+  }
+  cullStats.visible = vis;
+  cullStats.occluded = occ;
+}
+
 const clock = new THREE.Clock();
 let fps = 60;
 let frames = 0;
@@ -180,6 +302,7 @@ function frame() {
   shared.uTime.value = t;
   grade.uniforms.uTime.value = t;
   fps += (1 / Math.max(dt, 1e-3) - fps) * 0.05;
+  renderer.info.reset();
 
   player.update(dt);
   for (const m of monks) m(dt);
@@ -187,8 +310,8 @@ function frame() {
   const camY = camera.position.y;
   const under = THREE.MathUtils.smoothstep(-camY, 1.0, 4.0);
   shared.uUnder.value = under;
-  moon.intensity = 0.8 * (1 - under);
-  hemi.intensity = 0.5 * (1 - under) + 0.02;
+  moon.intensity = 0.6 * (1 - under);
+  hemi.intensity = 0.3 * (1 - under) + 0.02;
   moon.position.copy(camera.position).addScaledVector(shared.uMoonDir.value, 120);
   moon.target.position.copy(camera.position);
   moon.position.x = Math.round(moon.position.x); moon.position.z = Math.round(moon.position.z);
@@ -237,12 +360,13 @@ function frame() {
   if (regionTimer < 0) regionEl.classList.remove('show');
   hintEl.classList.toggle('show', isUnder && !lanternOn);
 
+  cull(isUnder);
   audio?.update(dt, under, Math.hypot(player.pos.x - 0, player.pos.z + 45));
   composer.render(dt);
-  if (params.has('debug')) document.title = `${fps.toFixed(0)} fps`;
+  if (params.has('debug')) document.title = `${fps.toFixed(0)} fps · cells ${cullStats.visible}/${cullStats.total} · occluded ${cullStats.occluded} · ${renderer.info.render.calls} calls`;
   if (params.has('shot') && frames > 12) { (window as unknown as { __done: boolean }).__done = true; return; }
   requestAnimationFrame(frame);
 }
 frame();
 (window as unknown as { __ready: boolean }).__ready = true;
-(window as unknown as { __stats: string }).__stats = `build ${buildMs.toFixed(0)}ms, ${renderer.info.render.triangles} tris, collider ${collider.geometry.attributes.position.count / 3} tris`;
+(window as unknown as { __stats: () => string }).__stats = () => `build ${buildMs.toFixed(0)}ms, ${renderer.info.render.triangles} tris drawn, ${renderer.info.render.calls} calls, cells ${cullStats.visible}/${cullStats.total} visible, ${cullStats.occluded} occluded`;

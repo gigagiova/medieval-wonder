@@ -1,9 +1,17 @@
 # Medieval Wonder — *Abbatia Nebularum*
 
-A walkable, fog-drowned 8th-century walled town in the browser: a Benedictine abbey with church,
-cloister and a towered *Aedificium*, an ossuary chapel whose stair leads down into catacombs, and
-lamp-lit streets. No downloaded assets: all geometry is generated in code and every surface,
-the fog, the sky and the flames are custom shaders.
+A walkable, fog-drowned Lombard town of the 8th century living inside the shell of a Roman one:
+late-Roman brick walls patched with river stone, the basalt-paved cardo and decumanus, a forum of
+fallen columns, a broken triumphal arch, a dry aqueduct and roadside tombs outside the gate. In the
+middle stands a Benedictine abbey: an early-Christian basilica on reused marble columns, a cloister,
+a library tower, and an ossuary chapel whose stair leads down into catacombs.
+
+Lighting follows the period: no street lamps, but braziers at gates and squares, pitch torches,
+Roman-type horn lanterns, clay *lucernae*, and bronze *polykandela* with glass oil cups in the church.
+No downloaded assets (the sandbox it was built in could not reach asset hosts): all geometry,
+including the sculpted skulls and bones, is generated in code, and every surface is a custom shader.
+Drop CC0 `skull.glb`, `femur.glb`, `humerus.glb`, `tibia.glb` into `public/models/` and `loadBones()`
+will use them instead.
 
 ```sh
 npm install
@@ -11,7 +19,7 @@ npm run dev      # http://localhost:5173
 npm run build    # static site in dist/
 ```
 
-**Controls:** click to enter · WASD walk · Shift hasten · mouse look (or drag) · F lantern · Space jump · Esc pause.
+**Controls:** click to enter · WASD or on-screen stick to walk · Shift (or push the stick to the edge) to hasten · mouse look / drag / right-half touch drag · F lantern · Space jump · gamepad: left stick move, right stick look, triggers run, A jump, X/Y lantern.
 
 ## How it's made
 
@@ -31,6 +39,14 @@ npm run build    # static site in dist/
   On top of that, parallax occlusion mapping gives real depth to cobbles, mortar joints, dented planks,
   slates, plaster and rock.
 - **Collision:** capsule vs. BVH (`three-mesh-bvh`), built from the displaced geometry.
+- **Fire** (`src/fire.ts`): instanced upright billboards with domain-warped noise mapped through a
+  blackbody ramp, layered tongues, and rising embers.
+- **Bones** (`src/bones.ts`): signed-distance-field anatomy polygonized with marching cubes, baked
+  occlusion in vertex colours, two levels of detail, instanced.
+- **Culling:** the world is merged into 36 m cells per material and per zone. Each frame, cells are
+  culled by zone (underground vs. street level, which handles the biggest occluder, the earth itself),
+  by fog distance, and by occlusion: rays from the eye to each cell's bounds against the collision
+  BVH, with hysteresis. Three.js frustum-culls what remains.
 - **Sound:** fully synthesized with WebAudio: wind, a chant drone near the church, bells, footsteps,
   echo in the catacombs.
 

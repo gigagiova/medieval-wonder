@@ -5,7 +5,7 @@ export const shared = {
   uTime: { value: 0 },
   uLampPos: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3(0, -999, 0)) },
   uLampCol: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3()) },
-  uFogCol: { value: new THREE.Color(0.018, 0.024, 0.034) },
+  uFogCol: { value: new THREE.Color(0.016, 0.022, 0.026) },
   uUnder: { value: 0 },
   uMoonDir: { value: new THREE.Vector3(-0.35, 0.45, -0.82).normalize() },
 };
@@ -13,12 +13,13 @@ export const shared = {
 export const MAT = {
   stone: 0, ground: 1, plaster: 2, wood: 3, roof: 4, rock: 5, bone: 6,
   iron: 7, window: 8, bigstone: 9, slab: 10, cloth: 11,
+  brick: 12, rubble: 13, marble: 14, ember: 15, horn: 16, clay: 17, bronze: 18,
 } as const;
 export type MatName = keyof typeof MAT;
 
 const BUMP = 0.02;
 
-function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
+export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
   (m as unknown as { defines: Record<string, number> }).defines = { MAT: id };
   m.customProgramCacheKey = () => 'surf' + id;
@@ -108,56 +109,6 @@ export function makeSky(): THREE.Mesh {
   sky.frustumCulled = false;
   sky.renderOrder = -1;
   return sky;
-}
-
-// Billboarded procedural flames rendered as point sprites.
-export function makeFlames(points: { pos: THREE.Vector3; size: number }[]): THREE.Points {
-  const g = new THREE.BufferGeometry();
-  const pos = new Float32Array(points.length * 3);
-  const seed = new Float32Array(points.length);
-  const size = new Float32Array(points.length);
-  points.forEach((p, i) => {
-    pos.set([p.pos.x, p.pos.y + p.size * 0.3, p.pos.z], i * 3);
-    seed[i] = Math.random();
-    size[i] = p.size;
-  });
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
-  g.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
-  const m = new THREE.ShaderMaterial({
-    uniforms: { ...shared, uScale: { value: 600 } },
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    vertexShader: /* glsl */ `
-      uniform float uScale;
-      attribute float aSeed; attribute float aSize;
-      varying float vSeed; varying float vFade;
-      void main(){
-        vec4 mv = modelViewMatrix*vec4(position,1.);
-        gl_Position = projectionMatrix*mv;
-        gl_PointSize = aSize*uScale/max(-mv.z,0.1);
-        vSeed = aSeed; vFade = exp(-length(mv.xyz)*0.03);
-      }`,
-    fragmentShader: /* glsl */ `
-      uniform float uTime;
-      varying float vSeed; varying float vFade;
-      ${noiseGLSL}
-      void main(){
-        vec2 uv = vec2(gl_PointCoord.x-0.5, 1.0-gl_PointCoord.y);
-        float t = uTime*3.5 + vSeed*20.;
-        float n = vnoise2(vec2(uv.x*5.+vSeed*9., uv.y*3.5 - t));
-        float x = uv.x + (n-0.5)*0.22*uv.y;
-        float w = 0.2*(1.0-uv.y)*(0.75+0.5*n) + 0.015;
-        float body = smoothstep(1.0,0.25,abs(x)/w) * smoothstep(0.0,0.12,uv.y) * smoothstep(0.95,0.35,uv.y + n*0.25);
-        vec3 col = mix(vec3(1.0,0.28,0.04), vec3(1.0,0.82,0.45), smoothstep(0.35,1.0,body)*(1.0-uv.y));
-        float glow = exp(-length(vec2(uv.x, uv.y-0.25))*7.0)*0.35;
-        gl_FragColor = vec4(col*(body*2.6+glow)*vFade, 1.0);
-      }`,
-  });
-  const pts = new THREE.Points(g, m);
-  pts.frustumCulled = false;
-  return pts;
 }
 
 // Slow drifting motes around the camera, lit only by the fog colour and lamps.

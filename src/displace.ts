@@ -40,7 +40,7 @@ export function groundBump(x: number, z: number) {
   return 0.09 * noise(x / 3.1, 7.7, z / 3.1) + 0.035 * noise(x / 1.2, 3.3, z / 1.2) + out * 0.9 * noise(x / 22, 1.1, z / 22);
 }
 
-const AMP: Partial<Record<MatName, number>> = { bone: 0.3, cloth: 0 };
+const AMP: Partial<Record<MatName, number>> = { bone: 0.3, cloth: 0, marble: 0.5, horn: 0.2, clay: 0.1, bronze: 0.2, ember: 0.2 };
 
 export function field(x: number, y: number, z: number, m: MatName, out: THREE.Vector3) {
   const a = (AMP[m] ?? 1) * (1.6 - 0.6 * THREE.MathUtils.smoothstep(y, -4, -2));
@@ -70,7 +70,7 @@ export function field(x: number, y: number, z: number, m: MatName, out: THREE.Ve
 }
 
 export const TESS: Partial<Record<MatName, number>> = {
-  stone: 0.6, bigstone: 0.7, plaster: 0.6, roof: 0.6, wood: 0.5, rock: 0.35, slab: 0.6, ground: 0.6,
+  stone: 0.6, bigstone: 0.7, brick: 0.7, rubble: 0.6, marble: 0.5, plaster: 0.6, roof: 0.6, wood: 0.5, rock: 0.35, slab: 0.6, ground: 0.6,
 };
 
 const tess = new TessellateModifier(0.5, 8);

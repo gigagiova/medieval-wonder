@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
+import { Joystick, Pad } from './joystick';
 
 const RADIUS = 0.35;
 const EYE = 1.65;
@@ -17,41 +18,53 @@ export class Player {
   stepPhase = 0;
   onStep?: (run: boolean) => void;
   private bvh: MeshBVH;
+  private joy: Joystick;
+  private pad = new Pad();
   private seg = new THREE.Line3();
   private box = new THREE.Box3();
   private a = new THREE.Vector3();
   private b = new THREE.Vector3();
 
   constructor(collider: THREE.Mesh, spawn: THREE.Vector3, private camera: THREE.PerspectiveCamera, dom: HTMLElement) {
-    this.bvh = new MeshBVH(collider.geometry);
+    this.bvh = (collider.geometry as unknown as { boundsTree?: MeshBVH }).boundsTree ?? new MeshBVH(collider.geometry);
     this.pos = spawn.clone();
     addEventListener('keydown', (e) => this.keys.add(e.code));
     addEventListener('keyup', (e) => this.keys.delete(e.code));
     addEventListener('blur', () => this.keys.clear());
-    const look = (dx: number, dy: number) => {
-      this.yaw -= dx * 0.0022;
-      this.pitch = THREE.MathUtils.clamp(this.pitch - dy * 0.0022, -1.45, 1.45);
-    };
+    this.joy = new Joystick(dom);
     document.addEventListener('mousemove', (e) => {
-      if (document.pointerLockElement === dom || (e.buttons & 1)) look(e.movementX, e.movementY);
+      if (document.pointerLockElement === dom) this.look(e.movementX, e.movementY);
+      // Drag-to-look fallback where pointer lock is unavailable; not while steering the stick.
+      else if ((e.buttons & 1) && !this.joy.active && e.target === dom) this.look(e.movementX, e.movementY);
     });
-    // Touch: drag to look, hold two fingers to walk.
-    let last: Touch | null = null;
-    dom.addEventListener('touchstart', (e) => { last = e.touches[0]; if (e.touches.length > 1) this.keys.add('KeyW'); }, { passive: true });
-    dom.addEventListener('touchmove', (e) => {
-      const t = e.touches[0];
-      if (last) look((t.clientX - last.clientX) * 2, (t.clientY - last.clientY) * 2);
-      last = t;
-    }, { passive: true });
-    dom.addEventListener('touchend', (e) => { if (e.touches.length < 2) this.keys.delete('KeyW'); last = null; });
+    dom.style.touchAction = 'none';
+  }
+
+  private look(dx: number, dy: number) {
+    this.yaw -= dx * 0.0022;
+    this.pitch = THREE.MathUtils.clamp(this.pitch - dy * 0.0022, -1.45, 1.45);
   }
 
   update(dt: number) {
     const k = this.keys;
-    const run = k.has('ShiftLeft') || k.has('ShiftRight');
-    const speed = run ? 6.0 : 2.9;
-    const f = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
-    const s = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
+    const pad = this.pad;
+    pad.poll();
+    // Look: touch drag (scaled up for small screens) and the right stick.
+    const tl = this.joy.takeLook();
+    if (tl.x || tl.y) this.look(tl.x * 1.6, tl.y * 1.6);
+    this.yaw -= pad.lookX * 2.8 * dt;
+    this.pitch = THREE.MathUtils.clamp(this.pitch - pad.lookY * 2.0 * dt, -1.45, 1.45);
+
+    // Move: keyboard + on-screen stick + gamepad, summed and clamped to 1.
+    const run = k.has('ShiftLeft') || k.has('ShiftRight') || this.joy.run || pad.run;
+    let f = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
+    let s = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
+    const kl = Math.hypot(f, s);
+    if (kl > 1) { f /= kl; s /= kl; }
+    f += this.joy.y + pad.y;
+    s += this.joy.x + pad.x;
+    const mag = Math.min(1, Math.hypot(f, s));
+    const speed = mag * (run ? 6.0 : 2.9);
     const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     const wish = fwd.multiplyScalar(f).add(right.multiplyScalar(s));
@@ -59,7 +72,7 @@ export class Player {
     const accel = this.onGround ? 12 : 2;
     this.vel.x += (wish.x - this.vel.x) * Math.min(1, accel * dt);
     this.vel.z += (wish.z - this.vel.z) * Math.min(1, accel * dt);
-    if (this.onGround && k.has('Space')) { this.vel.y = 5.5; this.onGround = false; }
+    if (this.onGround && (k.has('Space') || pad.jump)) { this.vel.y = 5.5; this.onGround = false; }
 
     const steps = 5;
     for (let i = 0; i < steps; i++) this.substep(dt / steps);

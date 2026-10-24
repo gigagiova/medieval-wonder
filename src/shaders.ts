@@ -82,6 +82,9 @@ vec2 projUV(vec3 p, vec3 n){
 }
 
 // ---- Relief: per-material height fields (1 = proud surface, 0 = deepest) ----
+vec3 gN = vec3(0.,1.,0.);   // surface normal, for direction-aware patterns (roof tiles)
+float gRoad = 0.;           // 1 on the old Roman paving
+
 float hAshlar(vec2 uv, vec2 sz){
   vec2 s = uv/sz;
   float row = floor(s.y);
@@ -121,6 +124,72 @@ float hPlaster(vec2 uv){
   return clamp(0.15 + lumps - gouge*0.15, 0., 1.);
 }
 
+// Roman cardo / decumanus and the road out of the south gate.
+float roadMask(vec2 xz){
+  float cardo = (1.-smoothstep(3.0,3.8,abs(xz.x))) * step(-9., xz.y);
+  float decu = (1.-smoothstep(3.0,3.8,abs(xz.y-30.))) * (1.-smoothstep(88.,92.,abs(xz.x)));
+  return max(cardo, decu);
+}
+// Basoli: big polygonal basalt slabs of the Roman street, worn and sunken.
+float hBasoli(vec2 uv){
+  vec3 v = voronoi(uv*1.25);
+  float e = v.y - v.x;
+  return smoothstep(0.0, 0.16, e) * (0.75 + 0.25*v.z) - 0.12*vnoise(vec3(uv*3.,v.z*9.));
+}
+// Trodden mud with scattered field stones.
+float hMud(vec2 uv){
+  vec3 v = voronoi(uv*1.6);
+  float stone = step(0.72, v.z) * smoothstep(0.32, 0.12, v.x);
+  return 0.35 + 0.2*vnoise(vec3(uv*2.,1.)) + 0.1*vnoise(vec3(uv*9.,2.)) + stone*0.45;
+}
+// Roman brick bands alternating with courses of squared tuff (opus mixtum).
+float hBrick(vec2 uv){
+  float band = mod(uv.y, 1.25);
+  if (band < 0.55) {
+    // brick courses: 4.5 cm bricks, thick 2.5 cm mortar
+    float row = floor(uv.y/0.07);
+    float fy = fract(uv.y/0.07);
+    float x = uv.x/0.42 + hash12(vec2(row,3.))*0.5;
+    float fx = fract(x);
+    float m = smoothstep(0.0,0.2,fy)*smoothstep(1.0,0.62,fy) * smoothstep(0.0,0.04,fx)*smoothstep(1.0,0.96,fx);
+    float worn = hash12(vec2(floor(x),row));
+    return m*(0.75+0.25*worn) - 0.15*vnoise(vec3(uv*20.,row));
+  }
+  return hAshlar(uv + vec2(0.,0.2), vec2(0.3,0.11))*0.95;
+}
+// River cobbles laid in mortar, every third course in herringbone (opus spicatum).
+float hRubble(vec2 uv){
+  float course = floor(uv.y/0.16);
+  vec2 q = uv;
+  if (mod(course,3.) == 1.) {
+    float s = mod(floor(uv.x/0.12),2.)*2.-1.;
+    q = vec2(uv.x + s*(fract(uv.y/0.16)-0.5)*0.12, uv.y);
+    vec3 v = voronoi(q*vec2(9.,5.));
+    return smoothstep(0.0,0.3,v.y-v.x)*(0.7+0.3*v.z);
+  }
+  vec3 v = voronoi(vec2(uv.x*5.5, uv.y*6.25 + course*0.37));
+  return smoothstep(0.02,0.38,v.y-v.x)*(0.6+0.4*v.z);
+}
+// Coppi: half-round terracotta tiles running down the slope, canal and cover.
+float hCoppi(vec2 uv){
+  vec2 nh = gN.xz; float l = length(nh);
+  nh = l > 0.05 ? nh/l : vec2(0.,1.);
+  float along = dot(uv, nh), across = dot(uv, vec2(-nh.y, nh.x));
+  float t = across/0.17; float ci = floor(t); float f = fract(t);
+  float prof = sqrt(max(0., 1. - (2.*f-1.)*(2.*f-1.)));
+  float cover = mod(ci,2.);
+  float rowf = fract(along/0.42 + hash12(vec2(ci,5.))*0.25);
+  float lip = smoothstep(0.82,1.0,rowf)*0.18;
+  float h = cover > 0.5 ? 0.45 + 0.55*prof : 0.35*(1.-prof);
+  float broken = step(0.93, hash12(vec2(ci, floor(along/0.42))));
+  return h + lip - broken*0.3;
+}
+// Weathered travertine / marble spolia: pitted, eroded, streaked.
+float hMarble(vec2 uv){
+  float pits = smoothstep(0.55,0.75,vnoise(vec3(uv*vec2(9.,26.),1.)));
+  return 0.8 - pits*0.6 + 0.2*vnoise(vec3(uv*3.,4.));
+}
+
 Surf ashlar(vec3 p, vec3 n, vec2 sz, vec3 base, float rough){
   vec2 uv = projUV(p,n);
   vec2 s = uv/sz;
@@ -153,7 +222,7 @@ void weather(inout Surf s, vec3 p, vec3 n){
   float moss = smoothstep(0.55,0.72,fbm(p*0.7+3.)) * (1.-smoothstep(0.,2.5,y));
   moss += smoothstep(0.5,0.95,n.y)*smoothstep(0.4,0.6,fbm(p*1.3));
   s.alb = mix(s.alb, vec3(0.035,0.05,0.018), clamp(moss,0.,1.)*0.8*(1.-under));
-  s.rough = mix(s.rough, 0.4, grime*0.7);
+  s.rough = mix(s.rough, 0.7, grime*0.5);
 }
 
 float pomH(vec2 uv){
@@ -164,11 +233,17 @@ float pomH(vec2 uv){
 #elif MAT == 10
   return hAshlar(uv, vec2(1.0,0.75));
 #elif MAT == 1
-  return hCobble(uv);
+  return gRoad > 0.5 ? hBasoli(uv) : hMud(uv);
 #elif MAT == 3
   return hPlank(uv);
 #elif MAT == 4
-  return hSlate(uv);
+  return hCoppi(uv);
+#elif MAT == 12
+  return hBrick(uv);
+#elif MAT == 13
+  return hRubble(uv);
+#elif MAT == 14
+  return hMarble(uv);
 #elif MAT == 5
   return hRock(uv);
 #elif MAT == 2
@@ -187,11 +262,17 @@ float pomH(vec2 uv){
 #elif MAT == 3
   #define POM_DEPTH 0.03
 #elif MAT == 4
-  #define POM_DEPTH 0.05
+  #define POM_DEPTH 0.07
 #elif MAT == 5
   #define POM_DEPTH 0.12
 #elif MAT == 2
   #define POM_DEPTH 0.05
+#elif MAT == 12
+  #define POM_DEPTH 0.035
+#elif MAT == 13
+  #define POM_DEPTH 0.07
+#elif MAT == 14
+  #define POM_DEPTH 0.03
 #endif
 
 // Parallax occlusion: march the view ray into the height field in the
@@ -203,11 +284,10 @@ vec3 parallax(vec3 p, vec3 n, out float occl){
   float fade = 1.0 - smoothstep(9.0, 22.0, dist);
   if (fade <= 0.0) return p;
   float depth = POM_DEPTH * fade;
+  gN = n;
   #if MAT == 1
-    // Mud and puddles fill the gaps between cobbles; open country is softer.
-    float r = length(p.xz);
-    float mud = smoothstep(0.5,0.7,fbm(vec3(p.xz*0.12,2.)));
-    depth *= mix(0.35, 1.0 - mud*0.8, 1.0 - smoothstep(84., 92., r));
+    gRoad = step(0.5, roadMask(p.xz)) * step(-2.5, p.y);
+    depth *= gRoad > 0.5 ? 1.0 : 0.6;
   #endif
   vec3 an = abs(n); vec3 U, V, N;
   if (an.y>an.x && an.y>an.z){ U=vec3(1,0,0); V=vec3(0,0,1); N=vec3(0,sign(n.y),0); }
@@ -245,32 +325,36 @@ vec3 parallax(vec3 p, vec3 n, out float occl){
 Surf surface(vec3 p, vec3 n){
   Surf s; s.emi = vec3(0.); s.rough = 0.9; s.h = 0.;
 #if MAT == 0
-  s = ashlar(p, n, vec2(0.62,0.31), vec3(0.26,0.23,0.19), 0.85); weather(s,p,n);
+  s = ashlar(p, n, vec2(0.62,0.31), vec3(0.26,0.23,0.19), 0.93); weather(s,p,n);
 #elif MAT == 9
-  s = ashlar(p, n, vec2(1.05,0.5), vec3(0.2,0.2,0.19), 0.9); weather(s,p,n);
+  s = ashlar(p, n, vec2(1.05,0.5), vec3(0.2,0.2,0.19), 0.95); weather(s,p,n);
 #elif MAT == 10
-  s = ashlar(p, n, vec2(1.0,0.75), vec3(0.16,0.15,0.14), 0.55);
+  s = ashlar(p, n, vec2(1.0,0.75), vec3(0.16,0.15,0.14), 0.78);
 #elif MAT == 1
   vec2 uv = p.xz;
   float r = length(uv);
-  vec3 vor = voronoi(uv*2.3);
-  float edge = vor.y - vor.x;
-  float cob = smoothstep(0.03,0.2,edge);
-  vec3 cobC = vec3(0.13,0.12,0.11)*(0.55+0.8*vor.z);
-  float mud = smoothstep(0.5,0.7,fbm(vec3(uv*0.12,2.)));
   float inTown = 1.0 - smoothstep(84., 92., r);
-  float road = (1.0 - smoothstep(2.5,4.5,abs(uv.x + sin(uv.y*0.05)*2.))) * step(86., uv.y);
-  vec3 mudC = vec3(0.075,0.055,0.04)*(0.6+0.7*fbm(vec3(uv*2.,5.)));
-  vec3 grassC = vec3(0.04,0.05,0.025)*(0.5+0.9*fbm(vec3(uv*1.3,8.)));
-  vec3 outC = mix(grassC, mudC, max(road, smoothstep(0.45,0.7,fbm(vec3(uv*0.3,1.)))));
-  vec3 townC = mix(cobC*mix(0.25,1.,cob), mudC, mud);
-  s.alb = mix(outC, townC, inTown);
-  float hOut = fbm(vec3(uv*3.,0.));
-  float hTown = mix(hCobble(uv)*1.5, hOut*0.4, mud);
-  s.h = mix(hOut*0.6, hTown, inTown);
-  float pud = smoothstep(0.6,0.64,fbm(vec3(uv*0.22,4.)) + (1.-inTown)*0.05);
-  s.alb *= 1.-pud*0.55;
-  s.rough = mix(mix(0.92,0.75,inTown*cob), 0.05, pud);
+  float road = roadMask(uv) * step(-2.5, p.y);
+  float outRoad = (1.0 - smoothstep(2.5,3.5,abs(uv.x + sin(uv.y*0.05)*2.))) * step(86., uv.y);
+  road = max(road, outRoad);
+  // Basoli: dark basalt slabs, polished only a little by centuries of feet.
+  vec3 vb = voronoi(uv*1.25);
+  float eb = smoothstep(0.0,0.1,vb.y-vb.x);
+  vec3 basC = vec3(0.085,0.085,0.09)*(0.6+0.6*vb.z)*mix(0.25,1.,eb)*(0.8+0.4*fbm(vec3(uv*4.,vb.z*7.)));
+  // Mud, trampled straw, field stones; grass and weeds where nobody walks.
+  vec3 vm = voronoi(uv*1.6);
+  float stone = step(0.72, vm.z) * smoothstep(0.32,0.12,vm.x);
+  vec3 mudC = vec3(0.07,0.052,0.036)*(0.55+0.8*fbm(vec3(uv*1.7,5.)));
+  mudC = mix(mudC, vec3(0.12,0.11,0.1)*(0.6+0.6*vm.z), stone);
+  float weeds = smoothstep(0.45,0.7,fbm(vec3(uv*0.35,8.))) * (1.-road);
+  vec3 grassC = vec3(0.035,0.045,0.022)*(0.5+0.9*fbm(vec3(uv*2.3,8.)));
+  vec3 c = mix(mudC, grassC, max(weeds*0.8, 1.-inTown));
+  s.alb = mix(c, basC, road);
+  s.h = mix(hMud(uv), hBasoli(uv), road)*1.5;
+  // Standing water in the ruts: dull, not mirrors.
+  float pud = smoothstep(0.66,0.7,fbm(vec3(uv*0.22,4.))) * (1.-road*0.6);
+  s.alb *= 1.-pud*0.5;
+  s.rough = mix(mix(0.96,0.85,road), 0.32, pud);
   s.h *= 1.-pud;
 #elif MAT == 2
   vec2 uv = projUV(p,n);
@@ -291,15 +375,19 @@ Surf surface(vec3 p, vec3 n){
   float grain = vnoise(vec3(uv.x*55., uv.y*1.5, id*3.));
   float gap = smoothstep(0.0,0.06,fx)*smoothstep(1.0,0.94,fx);
   s.alb = vec3(0.1,0.06,0.032)*(0.55+0.7*grain)*(0.75+0.5*hash12(vec2(id,1.)))*mix(0.3,1.,gap);
-  s.h = hPlank(uv)*1.5 + grain*0.15; s.rough = 0.8;
+  s.h = hPlank(uv)*1.5 + grain*0.15; s.rough = 0.92;
 #elif MAT == 4
+  // Coppi: sun-faded terracotta, each tile a slightly different firing.
   vec2 uv = projUV(p,n);
-  vec3 vor = voronoi(uv*vec2(3.5,6.));
-  float e = smoothstep(0.02,0.12,vor.y-vor.x);
-  s.alb = vec3(0.065,0.05,0.045)*(0.5+0.9*vor.z)*mix(0.3,1.,e);
-  float moss = smoothstep(0.5,0.75,fbm(p*0.6));
-  s.alb = mix(s.alb, vec3(0.04,0.05,0.02), moss*0.6);
-  s.h = hSlate(uv)*1.5; s.rough = 0.75;
+  gN = n;
+  float hc = hCoppi(uv);
+  vec2 nh = n.xz; float l = length(nh); nh = l > 0.05 ? nh/l : vec2(0.,1.);
+  float ci = floor(dot(uv, vec2(-nh.y,nh.x))/0.17), ri = floor(dot(uv,nh)/0.42);
+  float tile = hash12(vec2(ci,ri));
+  s.alb = mix(vec3(0.16,0.07,0.04), vec3(0.2,0.12,0.07), tile)*(0.55+0.5*hc)*(0.8+0.3*fbm(vec3(uv*5.,tile)));
+  float lichen = smoothstep(0.55,0.75,fbm(p*0.9+2.));
+  s.alb = mix(s.alb, vec3(0.09,0.09,0.06), lichen*0.6);
+  s.h = hc*1.5; s.rough = 0.88;
 #elif MAT == 5
   float g = fbm(p*1.6);
   float strata = sin(p.y*9. + g*5.)*0.5+0.5;
@@ -310,22 +398,80 @@ Surf surface(vec3 p, vec3 n){
   s.h = g*0.7 + marks*0.15 + strata*0.1; s.rough = 0.85;
 #elif MAT == 6
   float g = fbm(p*18.);
-  s.alb = vec3(0.42,0.37,0.27)*(0.6+0.4*g); s.h = g*0.3; s.rough = 0.6;
+  s.alb = vec3(0.42,0.37,0.27)*(0.6+0.4*g); s.h = g*0.3; s.rough = 0.8;
 #elif MAT == 7
-  s.alb = vec3(0.025,0.022,0.02)*(0.7+0.6*fbm(p*10.)); s.rough = 0.45;
+  s.alb = vec3(0.025,0.022,0.02)*(0.7+0.6*fbm(p*10.)); s.rough = 0.75;
 #elif MAT == 8
-  vec2 uv = projUV(p,n)*7.;
-  float d1 = abs(fract(uv.x+uv.y)-.5), d2 = abs(fract(uv.x-uv.y)-.5);
-  float lead = smoothstep(0.0,0.07,min(d1,d2));
+  // Closed shutters: firelight leaks through the cracks between boards.
+  vec2 uv = projUV(p,n);
+  float id = floor(uv.x/0.12); float fx = fract(uv.x/0.12);
+  float crack = (1.-smoothstep(0.0,0.08,fx)) + (1.-smoothstep(1.0,0.92,fx));
+  crack *= 0.6 + 0.4*vnoise(vec3(uv*vec2(3.,9.), id));
   float seed = hash13(floor(p*0.5));
-  float fl = 0.75 + 0.25*vnoise(vec3(uTime*2.5+seed*40., seed, 0.));
-  vec3 warm = mix(vec3(1.0,0.38,0.08), vec3(1.0,0.6,0.25), seed);
-  s.alb = vec3(0.02);
-  s.emi = warm * lead * fl * 2.2 * (0.7+0.6*vnoise(vec3(uv*0.6,1.)));
-  s.rough = 0.3;
+  float fl = 0.7 + 0.3*vnoise(vec3(uTime*2.2+seed*40., seed, 0.));
+  float grain = vnoise(vec3(uv.x*50., uv.y*1.5, id));
+  s.alb = vec3(0.07,0.045,0.025)*(0.6+0.6*grain);
+  s.emi = mix(vec3(1.0,0.35,0.08), vec3(1.0,0.55,0.2), seed) * crack * fl * 3.0;
+  s.h = (1.-crack)*0.8; s.rough = 0.9;
 #elif MAT == 11
   float g = fbm(p*vec3(25.,6.,25.));
   s.alb = vec3(0.05,0.035,0.025)*(0.6+0.6*g); s.h = g*0.2; s.rough = 1.0;
+#elif MAT == 12
+  // Opus mixtum: Roman brick bands and tuff courses, reused and patched.
+  vec2 uv = projUV(p,n);
+  float band = mod(uv.y, 1.25);
+  float hb = hBrick(uv);
+  float row = floor(uv.y/0.07), bx = floor(uv.x/0.42 + hash12(vec2(row,3.))*0.5);
+  vec3 brickC = mix(vec3(0.2,0.085,0.05), vec3(0.24,0.13,0.08), hash12(vec2(bx,row)));
+  vec3 tuffC = vec3(0.2,0.18,0.13)*(0.7+0.5*hash12(floor(uv/vec2(0.3,0.11))));
+  vec3 mortarC = vec3(0.17,0.16,0.14);
+  vec3 c = band < 0.55 ? brickC : tuffC;
+  s.alb = mix(mortarC*0.7, c, smoothstep(0.15,0.45,hb))*(0.7+0.5*fbm(vec3(uv*3.,1.)));
+  s.h = hb*1.5; s.rough = 0.93;
+  weather(s,p,n);
+#elif MAT == 13
+  // River stones in lime mortar.
+  vec2 uv = projUV(p,n);
+  float hr = hRubble(uv);
+  vec3 v = voronoi(vec2(uv.x*5.5, uv.y*6.25));
+  vec3 stoneC = mix(vec3(0.16,0.15,0.14), vec3(0.22,0.19,0.15), v.z)*(0.6+0.6*hash12(floor(uv*7.)));
+  s.alb = mix(vec3(0.15,0.14,0.12)*0.8, stoneC, smoothstep(0.1,0.4,hr))*(0.75+0.4*fbm(vec3(uv*2.,3.)));
+  s.h = hr*1.5; s.rough = 0.94;
+  weather(s,p,n);
+#elif MAT == 14
+  // Spolia: Roman travertine and marble, pitted and stained black by rain.
+  vec2 uv = projUV(p,n);
+  float hm = hMarble(uv);
+  float veins = smoothstep(0.48,0.5,vnoise(vec3(uv*vec2(2.,7.),3.)))*0.3;
+  s.alb = vec3(0.36,0.33,0.27)*(0.7+0.3*fbm(vec3(uv*1.5,2.)))*(0.6+0.4*hm)*(1.-veins);
+  float stain = smoothstep(0.35,0.75, vnoise(vec3(uv.x*4., uv.y*0.3, 7.)));
+  s.alb *= 1. - stain*0.55;
+  s.h = hm*1.5; s.rough = 0.88;
+  weather(s,p,n);
+#elif MAT == 15
+  // Embers in a brazier bowl.
+  vec3 v = voronoi(p.xz*14.);
+  float hot = smoothstep(0.1,0.0,v.x-0.05) + 0.5*(1.-smoothstep(0.0,0.25,v.y-v.x));
+  float fl = 0.6+0.4*vnoise(vec3(p.xz*6., uTime*1.5));
+  s.alb = vec3(0.02);
+  s.emi = mix(vec3(0.9,0.12,0.02), vec3(1.0,0.45,0.1), v.z) * (1.-hot*0.8) * fl * 3.0;
+  s.rough = 1.0;
+#elif MAT == 16
+  // Horn panes: thin translucent horn, mottled amber, lit from within.
+  float m = fbm(p*vec3(30.,8.,30.));
+  float fl = 0.75+0.25*vnoise(vec3(uTime*3.+p.x*20., p.z, 0.));
+  s.alb = vec3(0.1,0.06,0.02);
+  s.emi = vec3(1.0,0.48,0.14)*(0.4+0.8*m)*fl*1.6;
+  s.rough = 0.6;
+#elif MAT == 17
+  // Fired clay (lucernae).
+  float g = fbm(p*30.);
+  s.alb = vec3(0.24,0.12,0.07)*(0.6+0.5*g); s.h = g*0.4; s.rough = 0.9;
+#elif MAT == 18
+  // Old bronze, dark with green patina.
+  float g = fbm(p*12.);
+  s.alb = mix(vec3(0.09,0.06,0.03), vec3(0.06,0.09,0.07), smoothstep(0.4,0.7,g));
+  s.rough = 0.7;
 #endif
   return s;
 }
