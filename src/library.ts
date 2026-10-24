@@ -942,7 +942,7 @@ function cabinet(b: Builder, parts: Parts, group: THREE.Group, anchor: Anchor) {
   b.collideShape(new THREE.BoxGeometry(0.7, 1.05, 0.5).applyMatrix4(M(dx, 0.52, dz, dry)), 'wood');
   const cp = new THREE.Vector3(0.27, 0, -0.18).applyMatrix4(M(dx, 1.08, dz, dry));
   candle(b, cp.x, cp.y, cp.z, 0.2);
-  lucerna(b, tx + 0.15, ty, tz + 0.75, -Math.PI / 2);
+  lucerna(b, tx + 0.2, ty, tz - 0.8, -Math.PI / 2 - 0.4, false, true);
   // Cobwebs in the corners of the vault.
   const web: number[] = [];
   for (const [cx, cy, cz, sx, sz] of [[IX0, 1.95, IZ0, 1, 1], [IX1, 1.95, IZ0, -1, 1], [IX0, 1.95, PZ - 0.23, 1, -1], [IX1, 1.6, -61.0, -1, 1]] as const) {
