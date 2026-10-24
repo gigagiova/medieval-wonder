@@ -44,7 +44,7 @@ export interface Garment {
 /** Body measurements in the bind pose (world-at-load units, metres). */
 export interface Measure {
   bone: (n: string) => THREE.Vector3;
-  head: { c: THREE.Vector3; rx: number; rz: number; top: number; brow: number };
+  head: { c: THREE.Vector3; rx: number; rz: number; top: number; brow: number; skull: boolean };
 }
 
 // ------------------------------------------------------------------ body
@@ -69,20 +69,73 @@ export function boneClassOf(mesh: THREE.SkinnedMesh): Cls[] {
   return cls;
 }
 
-export function measure(root: THREE.Object3D): Measure {
+/**
+ * Remove modern accessories modelled as separate pieces on the head
+ * (sunglasses, earrings, hair puffs): every connected piece made only of
+ * head vertices, except the largest one, the head itself.
+ */
+export function stripHeadPieces(root: THREE.Object3D) {
+  const removed: number[] = [];
+  root.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh) return;
+    const g = m.geometry, pos = g.attributes.position, idx = g.index!;
+    const cls = boneClassOf(m);
+    // Weld by position so UV seams don't split pieces.
+    const key = new Map<string, number>(), weld = new Int32Array(pos.count);
+    for (let i = 0; i < pos.count; i++) {
+      const k = `${Math.round(pos.getX(i) * 1e4)},${Math.round(pos.getY(i) * 1e4)},${Math.round(pos.getZ(i) * 1e4)}`;
+      if (!key.has(k)) key.set(k, i);
+      weld[i] = key.get(k)!;
+    }
+    const parent = Int32Array.from({ length: pos.count }, (_, i) => i);
+    const find = (x: number): number => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    for (let t = 0; t < idx.count; t += 3) {
+      const a = find(weld[idx.getX(t)]), b = find(weld[idx.getX(t + 1)]), c = find(weld[idx.getX(t + 2)]);
+      parent[b] = a; parent[find(c)] = find(a);
+    }
+    const size = new Map<number, number>(), allHead = new Map<number, boolean>();
+    for (let t = 0; t < idx.count; t += 3) {
+      const r = find(weld[idx.getX(t)]);
+      size.set(r, (size.get(r) ?? 0) + 1);
+      const h = cls[idx.getX(t)] === 'head' && cls[idx.getX(t + 1)] === 'head' && cls[idx.getX(t + 2)] === 'head';
+      allHead.set(r, (allHead.get(r) ?? true) && h);
+    }
+    let biggest = -1, bs = 0;
+    for (const [r, n] of size) if (allHead.get(r) && n > bs) { bs = n; biggest = r; }
+    const keep: number[] = [];
+    for (let t = 0; t < idx.count; t += 3) {
+      const r = find(weld[idx.getX(t)]);
+      if (allHead.get(r) && r !== biggest) continue;
+      keep.push(idx.getX(t), idx.getX(t + 1), idx.getX(t + 2));
+    }
+    removed.push((idx.count - keep.length) / 3, ...[...size].filter(([r]) => allHead.get(r)).map(([, n]) => n));
+    g.setIndex(keep);
+  });
+  return removed;
+}
+
+export function measure(root: THREE.Object3D, skull?: { rx: number; rz: number }): Measure {
   root.updateMatrixWorld(true);
   const bone = (n: string) => {
     let o: THREE.Object3D | undefined;
     root.traverse((x) => { if (!o && (x as THREE.Bone).isBone && canon(x.name) === n) o = x; });
     return o!.getWorldPosition(new THREE.Vector3());
   };
+  if (skull) {
+    // A head without its skull (see faceOnly): measured from the bones.
+    const hb = bone('Head'), top = Math.min(bone('HeadTop_End').y, hb.y + 0.165);
+    const c = new THREE.Vector3(hb.x, (hb.y + top) / 2 + 0.01, hb.z + 0.012);
+    return { bone, head: { c, rx: skull.rx, rz: skull.rz, top, brow: c.y + (top - hb.y) * 0.14, skull: false } };
+  }
   const neck = bone('Neck');
   const box = new THREE.Box3(), v = new THREE.Vector3();
   root.traverse((o) => {
     const m = o as THREE.SkinnedMesh;
-    if (!m.isSkinnedMesh || /Eye|Teeth/.test(m.name)) return;
+    if (!m.isSkinnedMesh || /Eye|Teeth|Headwear|Outfit/.test(m.name)) return;
     const cls = boneClassOf(m);
-    for (let i = 0; i < cls.length; i++) {
+    const used = new Set<number>(m.geometry.index!.array as unknown as number[]);
+    for (const i of used) {
       if (cls[i] !== 'head') continue;
       m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld);
       if (v.y > neck.y + 0.05) box.expandByPoint(v);
@@ -90,7 +143,41 @@ export function measure(root: THREE.Object3D): Measure {
   });
   const c = box.getCenter(new THREE.Vector3());
   const s = box.getSize(new THREE.Vector3());
-  return { bone, head: { c, rx: s.x / 2, rz: s.z / 2, top: box.max.y, brow: c.y + s.y * 0.12 } };
+  return { bone, head: { c, rx: s.x / 2, rz: s.z / 2, top: box.max.y, brow: c.y + s.y * 0.12, skull: true } };
+}
+
+/**
+ * Keep only the face and neck of a head that will be veiled: hair, ears and
+ * anything worn on them go (the veil is fitted to the skull's ellipsoid).
+ */
+export function faceOnly(root: THREE.Object3D) {
+  root.updateMatrixWorld(true);
+  let hb = new THREE.Vector3(), top = 0;
+  root.traverse((x) => {
+    if (canon(x.name) === 'Head') x.getWorldPosition(hb);
+    if (canon(x.name) === 'HeadTop_End') top = x.getWorldPosition(new THREE.Vector3()).y;
+  });
+  hb = hb.clone();
+  const cy = (hb.y + Math.min(top, hb.y + 0.165)) / 2;
+  const v = new THREE.Vector3();
+  root.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh) return;
+    const cls = boneClassOf(m), idx = m.geometry.index!;
+    const ok = (i: number) => {
+      if (cls[i] !== 'head') return true;
+      m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld);
+      if (v.y < hb.y + 0.01) return true; // neck and under the jaw
+      const a = Math.abs(Math.atan2(v.x - hb.x, v.z - hb.z));
+      return a < 1.0 && v.y < cy + 0.045;
+    };
+    const keep: number[] = [];
+    for (let t = 0; t < idx.count; t += 3) {
+      const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+      if (ok(a) && ok(b) && ok(c)) keep.push(a, b, c);
+    }
+    m.geometry.setIndex(keep);
+  });
 }
 
 /**
@@ -128,13 +215,14 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
     else if (m.name === 'Wolf3D_Outfit_Bottom') {
       // Wool hose, with linen fasciae wound from ankle to knee on laymen.
       const ankle = o.m.bone('LeftFoot').y + 0.03, knee = o.m.bone('LeftLeg').y + 0.02;
-      nm = withAtmos(new THREE.MeshStandardMaterial({ color: 0x2b241d, roughness: 0.97 }), o.wraps ? { wraps: { knee, ankle, color: new THREE.Color(0x8c8270) } } : {});
+      nm = withAtmos(new THREE.MeshStandardMaterial({ color: 0x2b241d, roughness: 0.97 }), o.wraps ? { wraps: { knee, ankle, color: new THREE.Color(0x6e6656) } } : {});
     } else if (/Body|Head|^Mesh$/.test(m.name) || kit === 'woman') {
       // Weathered skin: matte, slight wrap-around softness.
       const s = old.clone();
       s.roughness = 0.72;
       s.metalness = 0;
-      if (kit === 'man') s.color = new THREE.Color(0.93, 0.84, 0.8);
+      // The man's head is textured; his hands (Wolf3D_Body) only have a colour.
+      if (kit === 'man') s.color = m.name === 'Wolf3D_Body' ? s.color.clone().multiplyScalar(1.2) : new THREE.Color(0.93, 0.84, 0.8);
       else { s.roughness = 0.78; s.normalScale?.set(0.6, 0.6); }
       nm = withAtmos(s, { skin: true });
       nm.userData.skin = true;
@@ -393,7 +481,10 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
         const dir = new THREE.Vector3(Math.sin(ph) * Math.cos(th), Math.sin(th), Math.cos(ph) * Math.cos(th));
         ray.set(Hc, dir);
         const hit = S.all.bvh.raycastFirst(ray, THREE.DoubleSide);
+        // Where there is no skull to hit (a veiled head keeps only its face), the head's ellipsoid.
+        const ell = 1 / Math.sqrt((dir.x / M.head.rx) ** 2 + (dir.y / ((M.head.top - Hc.y) * 1.02)) ** 2 + (dir.z / M.head.rz) ** 2);
         let d = hit ? hit.distance : 0.13;
+        if (th > -0.45 && (!hit || hit.distance > ell * 1.3)) d = ell;
         let off = th > -0.45 ? H.off : THREE.MathUtils.lerp(H.off * 0.75, H.off, (th + 1.22) / 0.77);
         if (th > -0.45) d = Math.max(d, H.minD);
         let dph = ph - Math.PI;
@@ -416,9 +507,10 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   const tmp = { point: new THREE.Vector3(), distance: 0, faceIndex: 0 } as { point: THREE.Vector3; distance: number; faceIndex: number };
   const tri = new THREE.Triangle(), nrm = new THREE.Vector3(), vv = new THREE.Vector3();
   const setFor = (reg: number) => (reg === 0 ? S.trunk : reg === 1 ? S.arms : reg === 2 ? S.upper : S.torso);
-  const fit = (g: Grid, minOff: number) => {
+  const fit = (g: Grid, minOff: number, skipAbove = Infinity) => {
     for (let i = 0; i < g.pos.length / 3; i++) {
       vv.fromArray(g.pos, i * 3);
+      if (vv.y > skipAbove) continue;
       const fs = setFor(g.region[i]);
       fs.bvh.closestPointToPoint(vv, tmp);
       const ix = fs.geo.index!;
@@ -432,7 +524,8 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   };
   fit(tunic, 0.018);
   sleeves.forEach((g) => fit(g, bell ? 0.022 : 0.014));
-  if (hood) fit(hood, spec.hood === 'veil' ? 0.016 : 0.03);
+  // A head kept without its skull has nothing to push the hood out of above the jaw.
+  if (hood) fit(hood, spec.hood === 'veil' ? 0.016 : 0.03, M.head.skull ? Infinity : bone('Head').y);
 
   const tunicGeo = gridGeometry(tunic);
   const tunicBVH = new MeshBVH(tunicGeo);
@@ -614,6 +707,17 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     for (const [k, w] of m) m.set(k, w * (1 - t));
     m.set(hipsI, (m.get(hipsI) ?? 0) + t);
   }
+  // Hoods and veils sit on the skull: rigid with the head above the jaw.
+  const headI = bones.findIndex((b) => canon(b.name) === 'Head');
+  const jaw = bone('Head').y;
+  for (let i = 0; i < N; i++) {
+    if (region[i] !== 2) continue;
+    const t = ss(jaw - 0.1, jaw + 0.02, bind[i * 3 + 1]);
+    if (t <= 0) continue;
+    const m = wmap[i];
+    for (const [k, w] of m) m.set(k, w * (1 - t));
+    m.set(headI, (m.get(headI) ?? 0) + t);
+  }
   const nb: number[][] = Array.from({ length: N }, () => []);
   for (let e = 0; e < ES.length; e++) if (ES[e] === 1) { nb[E[e * 2]].push(E[e * 2 + 1]); nb[E[e * 2 + 1]].push(E[e * 2]); }
   for (let it = 0; it < 3; it++) {
@@ -675,7 +779,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
  * Faces deep in a hood: bake how much of the sky each head vertex sees past
  * the garment into vertex colours.
  */
-export function bakeHeadShade(root: THREE.Object3D, garmentGeo: THREE.BufferGeometry) {
+export function bakeHeadShade(root: THREE.Object3D, garmentGeo: THREE.BufferGeometry, floor = 0.1) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', garmentGeo.attributes.position.clone());
   g.setIndex(garmentGeo.index!.clone());
@@ -703,7 +807,7 @@ export function bakeHeadShade(root: THREE.Object3D, garmentGeo: THREE.BufferGeom
         ray.direction.copy(d);
         if (!bvh.raycastFirst(ray, THREE.DoubleSide, 0, 0.7)) open++;
       }
-      const k = 0.1 + 0.9 * Math.pow(open / dirs.length, 2.0);
+      const k = floor + (1 - floor) * Math.pow(open / dirs.length, 2.0);
       col[i * 3] = k; col[i * 3 + 1] = k * 0.97; col[i * 3 + 2] = k * 0.95;
     }
     m.geometry = m.geometry.clone();

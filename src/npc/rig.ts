@@ -175,6 +175,51 @@ export function retarget(template: THREE.Object3D, tpose: Map<string, THREE.Quat
   return { clips, speed };
 }
 
+/**
+ * Lower a T-posed body's arms and make that the new bind pose (the meshes
+ * are re-skinned into it and the bone inverses recomputed), so garments
+ * can be fitted round arms hanging at the sides.
+ */
+export function relaxArms(root: THREE.Object3D, angle: number) {
+  root.updateMatrixWorld(true);
+  const find = (n: string) => { let b: THREE.Object3D | undefined; root.traverse((o) => { if (!b && (o as THREE.Bone).isBone && canon(o.name) === n) b = o; }); return b!; };
+  const P = new THREE.Quaternion(), R = new THREE.Quaternion();
+  for (const [side, sgn] of [['Left', -1], ['Right', 1]] as const) {
+    const b = find(side + 'Arm');
+    b.parent!.getWorldQuaternion(P);
+    R.setFromAxisAngle(new THREE.Vector3(0, 0, 1), sgn * angle);
+    b.quaternion.premultiply(P).premultiply(R).premultiply(P.invert());
+  }
+  root.updateMatrixWorld(true);
+  const skeletons = new Set<THREE.Skeleton>();
+  const M = new THREE.Matrix4(), B = new THREE.Matrix4(), N3 = new THREE.Matrix3(), v = new THREE.Vector3();
+  root.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh) return;
+    m.skeleton.update();
+    skeletons.add(m.skeleton);
+    const g = m.geometry, pos = g.attributes.position, nrm = g.attributes.normal, si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
+    const bm = m.skeleton.boneMatrices!;
+    for (let i = 0; i < pos.count; i++) {
+      const e = M.elements;
+      e.fill(0);
+      for (let k = 0; k < 4; k++) {
+        const w = sw.getComponent(i, k);
+        if (!w) continue;
+        const o16 = si.getComponent(i, k) * 16;
+        for (let j = 0; j < 16; j++) e[j] += bm[o16 + j] * w;
+      }
+      // Exactly how three renders it: world = M · bindMatrix · v.
+      B.copy(m.bindMatrix).invert().multiply(M).multiply(m.bindMatrix);
+      pos.setXYZ(i, ...v.fromBufferAttribute(pos, i).applyMatrix4(B).toArray());
+      if (nrm) nrm.setXYZ(i, ...v.fromBufferAttribute(nrm, i).applyMatrix3(N3.setFromMatrix4(B)).normalize().toArray());
+    }
+    pos.needsUpdate = true;
+    if (nrm) nrm.needsUpdate = true;
+  });
+  for (const s of skeletons) s.calculateInverses();
+}
+
 // ------------------------------------------------------------------ materials
 
 /**

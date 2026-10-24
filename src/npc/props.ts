@@ -257,7 +257,7 @@ export function makeSticks(seed: number) {
   }
   const ties = [-0.25, 0.22].map((y) => at(new THREE.TorusGeometry(0.075, 0.007, 4, 14), 0, y, 0, Math.PI / 2).scale(1, 1, 0.75));
   const bark = (m.ash as THREE.MeshStandardMaterial).clone();
-  bark.color = new THREE.Color(0x5e4c3a);
+  bark.color = new THREE.Color(0x8a7458);
   bark.onBeforeCompile = m.ash.onBeforeCompile;
   bark.customProgramCacheKey = m.ash.customProgramCacheKey;
   const o = new THREE.Group();
