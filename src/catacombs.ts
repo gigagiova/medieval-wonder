@@ -488,8 +488,10 @@ export function buildCatacombs(b: Builder): void {
     raw(b, 'block', new THREE.BoxGeometry(hx.x1 - hx.x0 + 0.5, H + 0.6, 0.3), C.x, (H - 0.6) / 2 - 0.02, C.top - 0.15);
     // A lucerna on the parapet, and the iron grille that closed the stair, leant open.
     lucernaRaw(b, hx.x1 + 0.05, pH + 0.02, hx.z1 - 0.6, Math.PI / 2, true);
-    for (let i = 0; i < 6; i++) raw(b, 'iron', new THREE.BoxGeometry(0.03, 1.5, 0.03), hx.x0 - 0.5 + i * 0.27, H + 0.72, C.top - 0.55, 0, -0.32, 0);
-    for (const yy of [0.25, 0.75, 1.25]) raw(b, 'iron', new THREE.BoxGeometry(1.45, 0.035, 0.03), hx.x0 + 0.17, H + yy * 0.95 + 0.03, C.top - 0.62 + yy * 0.3, 0, -0.32, 0);
+    // (Leant against the outside of the west parapet, out of the way.)
+    const gx = hx.x0 - 0.62, gz = C.top + 0.9;
+    for (let i = 0; i < 6; i++) raw(b, 'iron', new THREE.BoxGeometry(0.03, 1.45, 0.03), gx, H + 0.7, gz + i * 0.26, 0, 0, -0.2);
+    for (const yy of [-0.45, 0.05, 0.55]) raw(b, 'iron', new THREE.BoxGeometry(0.03, 0.035, 1.38), gx - Math.sin(-0.2) * yy, H + 0.7 + yy, gz + 0.65, 0, 0, -0.2);
     // From the foot of the stair, a gallery into the crypt's north side.
     layGallery(C.x, bot + 0.6, C.bottomF, Cr.x - 0.85, Cr.z + 2.35, Cr.f, 1.35, 2.7, 0.5);
     CATACOMB_SPOTS.cellaTop.set(C.x, C.topF + 1.65, C.top - 0.7);
