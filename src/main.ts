@@ -166,10 +166,32 @@ scene.add(makeMotes());
 
 // Townsfolk (monks, peasants, Lombard soldiers) arrive a little after you do:
 // their models load and are dressed in the background, never holding up the start.
-const summonTownsfolk = () => setTimeout(() => {
-  loadNpcAssets()
-    .then(() => spawnTownsfolk(scene, { streets: getMapData().streets, ground: terrain, lamps, places: getMapData().landmarks }))
-    .catch((e) => console.warn('townsfolk unavailable', e));
+// A small status line says what the townsfolk are doing (loading, how many,
+// or the exact error), so a failure on a phone is visible, not silent.
+const npcStatus = document.createElement('div');
+npcStatus.id = 'npcstatus';
+Object.assign(npcStatus.style, { position: 'fixed', left: '50%', transform: 'translateX(-50%)', top: 'max(64px, calc(env(safe-area-inset-top, 0px) + 58px))',
+  font: "italic 13px 'IM Fell English', Georgia, serif", color: '#e6d2a2', textShadow: '0 0 6px #000', pointerEvents: 'none', zIndex: '6',
+  maxWidth: '90vw', textAlign: 'center', transition: 'opacity 1.5s' });
+document.body.appendChild(npcStatus);
+const say = (t: string, keep = false) => {
+  npcStatus.textContent = t; npcStatus.style.opacity = '1';
+  if (!keep) setTimeout(() => { npcStatus.style.opacity = '0'; }, 6000);
+};
+const summonTownsfolk = () => setTimeout(async () => {
+  say('The townsfolk are coming…', true);
+  const t0 = performance.now();
+  try {
+    await loadNpcAssets();
+    say('The townsfolk are dressing…', true);
+    spawnTownsfolk(scene, { streets: getMapData().streets, ground: terrain, lamps, places: getMapData().landmarks });
+    const n = npcDebug.people.length;
+    say(n ? `${n} townsfolk are about (${((performance.now() - t0) / 1000).toFixed(0)} s)` : 'No townsfolk could be placed', !n);
+  } catch (e) {
+    const err = e as Error;
+    console.warn('townsfolk unavailable', e);
+    say('Townsfolk failed: ' + (err?.message ?? String(e)).slice(0, 160), true);
+  }
 }, 500);
 
 const player = new Player(collider, SPAWN, camera, renderer.domElement);
