@@ -8,7 +8,9 @@ import { NLAMP, noiseGLSL, atmosGLSL, surfaceGLSL } from './shaders';
 
 const loader = new THREE.TextureLoader();
 const pending: Promise<unknown>[] = [];
+const inBrowser = typeof document !== 'undefined';
 function load(path: string, srgb: boolean): THREE.Texture {
+  if (!inBrowser) return new THREE.Texture(); // Node tooling (tsx) builds the world without images
   let done: () => void = () => {};
   pending.push(new Promise<void>((res) => { done = res; }));
   // A missing texture must not hold up the world: resolve on error too.
@@ -58,17 +60,17 @@ export type MatName = keyof typeof MAT;
  */
 interface MatCfg { set: string; tile: number; alb?: number; rough?: number; nrm?: number; moss?: number; tint?: [number, number, number] }
 const CFG: Partial<Record<number, MatCfg>> = {
-  0: { set: 'ashlar', tile: 2.0, alb: 0.72, moss: 0.7 },
-  1: { set: 'cobble', tile: 2.0 },
-  2: { set: 'plaster', tile: 2.3, alb: 0.7, moss: 0.4 },
-  3: { set: 'wood', tile: 2.0, alb: 0.75, moss: 0.3 },
-  4: { set: 'coppi', tile: 1.5, alb: 0.75, moss: 0.0 },
-  5: { set: 'tuff', tile: 1.8, alb: 0.9, moss: 0.0, tint: [1.15, 0.98, 0.72] },
-  9: { set: 'bigstone', tile: 3.0, alb: 0.7, moss: 0.8 },
-  10: { set: 'basoli', tile: 1.8, alb: 0.75, moss: 0.2 },
-  12: { set: 'brick', tile: 2.5, alb: 0.72, moss: 0.5 },
-  13: { set: 'rubble', tile: 2.12, alb: 0.72, moss: 0.6 },
-  14: { set: 'marble', tile: 1.8, alb: 0.65, moss: 0.5 },
+  0: { set: 'ashlar', tile: 2.0, alb: 0.9, moss: 0.7 },
+  1: { set: 'cobble', tile: 2.3 },
+  2: { set: 'plaster', tile: 2.3, alb: 0.8, moss: 0.4 },
+  3: { set: 'wood', tile: 2.0, alb: 0.9, moss: 0.3 },
+  4: { set: 'coppi', tile: 1.5, alb: 0.9, moss: 0.0 },
+  5: { set: 'tuff', tile: 1.8, alb: 0.95, moss: 0.0, tint: [1.06, 1.0, 0.86] },
+  9: { set: 'bigstone', tile: 3.0, alb: 0.85, moss: 0.8 },
+  10: { set: 'basoli', tile: 1.8, alb: 0.95, moss: 0.2 },
+  12: { set: 'brick', tile: 2.5, alb: 0.95, moss: 0.5 },
+  13: { set: 'rubble', tile: 2.12, alb: 0.95, moss: 0.6 },
+  14: { set: 'marble', tile: 1.8, alb: 0.75, moss: 0.5 },
 };
 const f = (x: number) => x.toFixed(4);
 

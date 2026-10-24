@@ -117,22 +117,21 @@ NT ntSetup(vec2 uv){
   t.dx = dFdx(uv); t.dy = dFdy(uv);
   return t;
 }
-float ntBlend(NT t, vec3 ca, vec3 cb){ return smoothstep(0.2, 0.8, t.f - 0.1*dot(ca - cb, vec3(1.0))); }
+// Blend weight between the two offsets; outside the transition band only one
+// fetch is needed (most pixels).
 vec4 ntGet(sampler2D s, NT t, float w){
-  vec4 a = textureGrad(s, t.uv + t.oa, t.dx, t.dy);
-  vec4 b = textureGrad(s, t.uv + t.ob, t.dx, t.dy);
-  return mix(a, b, w);
+  if (w < 0.002) return textureGrad(s, t.uv + t.oa, t.dx, t.dy);
+  if (w > 0.998) return textureGrad(s, t.uv + t.ob, t.dx, t.dy);
+  return mix(textureGrad(s, t.uv + t.oa, t.dx, t.dy), textureGrad(s, t.uv + t.ob, t.dx, t.dy), w);
 }
 
 // One planar projection of a full set.
 struct Smp { vec3 a; vec3 n; vec3 m; };
 Smp sampleSet(sampler2D A, sampler2D Nm, sampler2D M, vec2 uv){
   NT t = ntSetup(uv);
-  vec4 a0 = textureGrad(A, uv + t.oa, t.dx, t.dy);
-  vec4 a1 = textureGrad(A, uv + t.ob, t.dx, t.dy);
-  float w = ntBlend(t, a0.rgb, a1.rgb);
+  float w = smoothstep(0.3, 0.7, t.f);
   Smp s;
-  s.a = mix(a0.rgb, a1.rgb, w);
+  s.a = ntGet(A, t, w).rgb;
   s.n = ntGet(Nm, t, w).xyz * 2.0 - 1.0;
   s.m = ntGet(M, t, w).rgb;
   return s;
@@ -153,12 +152,15 @@ Smp biplanar(vec3 p, vec3 n){
   vec2 uvX = vec2(p.z, p.y), uvY = vec2(p.x, p.z), uvZ = vec2(p.x, p.y);
   vec2 u1 = ma.x == 0 ? uvX : ma.x == 1 ? uvY : uvZ;
   vec2 u2 = me.x == 0 ? uvX : me.x == 1 ? uvY : uvZ;
-  Smp s1 = sampleSet(tA, tN, tM, u1 / TILE);
-  Smp s2 = sampleSet(tA, tN, tM, u2 / TILE + 0.37);
   vec2 w = vec2(an[ma.x], an[me.x]);
   w = clamp((w - 0.5773) / (1.0 - 0.5773), 0.0, 1.0);
-  w = pow(w, vec2(8.0/8.0 * 4.0));
+  w = pow(w, vec2(4.0));
   w /= (w.x + w.y + 1e-4);
+  Smp s1 = sampleSet(tA, tN, tM, u1 / TILE);
+  Smp s2 = s1;
+  // Flat, axis-aligned faces (most walls, floors) need only one projection.
+  if (w.y > 0.02) s2 = sampleSet(tA, tN, tM, u2 / TILE + 0.37);
+  else w = vec2(1.0, 0.0);
   // World directions of +u and +v for each projection.
   vec3 U1 = ma.x == 0 ? vec3(0,0,1) : ma.x == 1 ? vec3(1,0,0) : vec3(1,0,0);
   vec3 V1 = ma.x == 0 ? vec3(0,1,0) : ma.x == 1 ? vec3(0,0,1) : vec3(0,1,0);
@@ -181,8 +183,8 @@ void weather(inout Surf s, vec3 p, vec3 n, float mossAmt){
   s.alb *= mix(vec3(1.0), vec3(1.05, 1.0, 0.92), nz.g);
   float y = p.y - groundY(p);
   float under = step(p.y, -2.5);
-  float damp = (1.0 - smoothstep(0.0, 0.7 + 1.4*nz2.r, y)) * (1.0 - under);
-  s.alb *= mix(1.0, 0.55, damp);
+  float damp = (1.0 - smoothstep(0.0, 0.25 + 0.8*nz2.r, y)) * (1.0 - under) * (1.0 - smoothstep(0.5, 0.9, n.y));
+  s.alb *= mix(1.0, 0.72, damp);
   s.alb = mix(s.alb, s.alb*vec3(0.85, 0.95, 0.7), damp*0.5);
   s.rough = mix(s.rough, 0.75, damp*0.4);
   // Rain streaks: vertical darkening on walls.
@@ -233,9 +235,12 @@ Surf surface(vec3 p, vec3 n){
   vec3 a = vec3(0.0), nn = vec3(0.0), m = vec3(0.0);
   float wsum = 0.0;
   if (cob > 0.01) {
-    float hc = texture2D(tM, uv / 2.0).b;
-    vec2 off = -vd.xz / max(vd.y, 0.3) * (hc - 0.5) * 0.035 * near;
-    Smp c = sampleSet(tA, tN, tM, (uv + off) / 2.0);
+    float hc = texture2D(tM, uv / TILE).b;
+    vec2 off = -vd.xz / max(vd.y, 0.3) * (hc - 0.5) * 0.03 * near;
+    Smp c = sampleSet(tA, tN, tM, (uv + off) / TILE);
+    // The scan's stones are warm; pull them towards grey river limestone.
+    vec3 g = vec3(dot(c.a, vec3(0.3, 0.55, 0.15)));
+    c.a = mix(c.a, g * vec3(1.02, 1.0, 0.95), 0.55);
     float w = cob * (0.6 + c.m.b);
     a += c.a*w; nn += c.n*w; m += c.m*w; wsum += w;
   }

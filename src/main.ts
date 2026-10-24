@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { MeshBVH } from 'three-mesh-bvh';
-import { shared, mat, MAT, makeSurfaceMaterial, makeSky, makeMotes } from './materials';
+import { shared, mat, MAT, makeSurfaceMaterial, makeSky, makeMotes, texturesReady } from './materials';
 import { makeFire } from './fire';
 import { makeBones } from './bones';
 import { NLAMP } from './shaders';
@@ -245,6 +245,8 @@ const overlay = document.getElementById('overlay')!;
 const regionEl = document.getElementById('region')!;
 const hintEl = document.getElementById('hint')!;
 // Compile every shader before letting anyone in, without freezing the page.
+await progress('Grinding the pigments', 0.9);
+await texturesReady;
 await progress('Mixing the pigments', 0.94);
 try { await renderer.compileAsync(scene, camera); } catch { /* compiled on first frame instead */ }
 enterEl.textContent = 'Enter';

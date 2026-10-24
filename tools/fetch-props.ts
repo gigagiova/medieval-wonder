@@ -16,7 +16,7 @@ import { execFileSync } from 'node:child_process';
 
 // id → resolution to fetch, max texture size, target triangle budget.
 // Chosen for an 8th-century Lombard town: nothing painted, glazed, machined.
-export const PROPS: Record<string, { res: '1k' | '2k'; tex: number; tris: number }> = {
+export const PROPS: Record<string, { res: '1k' | '2k'; tex: number; tris: number; free?: boolean }> = {
   // Interiors and streets
   wine_barrel_01: { res: '1k', tex: 1024, tris: 6000 },
   wooden_barrels_01: { res: '1k', tex: 1024, tris: 12000 },
@@ -38,7 +38,6 @@ export const PROPS: Record<string, { res: '1k' | '2k'; tex: number; tris: number
   marble_bust_01: { res: '2k', tex: 1024, tris: 20000 },
   street_rat: { res: '1k', tex: 1024, tris: 6000 },
   // Ground, ruins, forest
-  boulder_01: { res: '2k', tex: 1024, tris: 8000 },
   rock_07: { res: '1k', tex: 1024, tris: 5000 },
   rock_09: { res: '1k', tex: 1024, tris: 5000 },
   stone_01: { res: '1k', tex: 1024, tris: 8000 },
@@ -95,7 +94,7 @@ async function pack(id: string) {
   await doc.transform(dedup(), prune(), weld());
   if (triCount(doc) > cfg.tris) {
     const ratio = Math.max(0.02, cfg.tris / triCount(doc));
-    await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio, error: 0.004, lockBorder: true }));
+    await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio, error: cfg.free ? 0.02 : 0.004, lockBorder: !cfg.free }));
   }
   await doc.transform(
     textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [cfg.tex, cfg.tex], quality: 82 }),

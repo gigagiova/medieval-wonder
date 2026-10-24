@@ -1,6 +1,10 @@
-// Bakes the tileable PBR texture sets the world's materials sample.
+// Bakes the low-frequency noise texture the shaders use (public/textures/
+// noise.png), and, on request, procedural tileable PBR sets. The world now
+// uses photo-scanned sets (tools/fetch-textures.ts); the procedural ones are
+// kept as a fallback and written with a proc_ prefix so they never clash.
 //
-//   npx tsx tools/bake-textures.ts [name ...]
+//   npx tsx tools/bake-textures.ts            # noise.png only
+//   npx tsx tools/bake-textures.ts cobble ... # proc_cobble_a.webp, ...
 //
 // For each material it builds a height field (metres) the way a Substance
 // graph would: scattered or coursed shapes with irregular outlines, per-shape
@@ -243,9 +247,9 @@ async function write(b: Baked) {
     mm[o + 2] = Math.round(clamp((H[i] - hmin) / (hmax - hmin + 1e-9)) * 255);
   }
   const opt = { raw: { width: N, height: N, channels: 3 as const } };
-  await sharp(alb, opt).webp({ quality: 84, effort: 5 }).toFile(`${OUT}${b.name}_a.webp`);
-  await sharp(nor, opt).webp({ quality: 88, effort: 5 }).toFile(`${OUT}${b.name}_n.webp`);
-  await sharp(mm, opt).resize(512, 512).webp({ quality: 88, effort: 5 }).toFile(`${OUT}${b.name}_m.webp`);
+  await sharp(alb, opt).webp({ quality: 84, effort: 5 }).toFile(`${OUT}proc_${b.name}_a.webp`);
+  await sharp(nor, opt).webp({ quality: 88, effort: 5 }).toFile(`${OUT}proc_${b.name}_n.webp`);
+  await sharp(mm, opt).resize(512, 512).webp({ quality: 88, effort: 5 }).toFile(`${OUT}proc_${b.name}_m.webp`);
   // A small preview sheet for eyeballing.
   await sharp(alb, opt).resize(256, 256).png().toFile(`${OUT}../../tools/preview/${b.name}.png`);
   console.log(b.name, `h ${(hmin * 100).toFixed(1)}..${(hmax * 100).toFixed(1)} cm`);
@@ -835,7 +839,7 @@ const want = process.argv.slice(2);
 const t0 = Date.now();
 if (!want.length || want.includes('noise')) await macroNoise();
 for (const [name, fn] of Object.entries(ALL)) {
-  if (want.length && !want.includes(name)) continue;
+  if (!want.includes(name)) continue;
   const t = Date.now();
   await write(fn());
   console.log(`  ${name} ${((Date.now() - t) / 1000).toFixed(1)}s`);

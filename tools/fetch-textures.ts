@@ -21,7 +21,7 @@ const CACHE = new URL('./.cache/', import.meta.url).pathname;
 
 /** slot (what the shaders call it) → Poly Haven asset, resolution, and why. */
 export const SETS: { slot: string; asset: string; res: '1k' | '2k'; use: string }[] = [
-  { slot: 'cobble', asset: 'cobblestone_floor_13', res: '2k', use: 'alleys: river cobbles bedded in earth (acciottolato)' },
+  { slot: 'cobble', asset: 'cobblestone_02', res: '2k', use: 'alleys: rounded river cobbles set close (acciottolato)' },
   { slot: 'basoli', asset: 'monastery_stone_floor', res: '2k', use: 'Roman basalt paving of the main lane; church slab floors' },
   { slot: 'mud', asset: 'forest_ground_04', res: '1k', use: 'yards, outside the walls: trodden earth with pebbles' },
   { slot: 'rubble', asset: 'plaster_stone_wall_02', res: '2k', use: 'house walls: river stones laid in lime mortar' },
