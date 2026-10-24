@@ -19,7 +19,8 @@ export const TEXTS: Text[] = [
     rubric: 'Incipit Evangelium secundum Iohannem',
     body: `In principio erat Verbum, et Verbum erat apud Deum, et Deus erat Verbum. Hoc erat in principio apud Deum. Omnia per ipsum facta sunt, et sine ipso factum est nihil quod factum est. In ipso vita erat, et vita erat lux hominum; et lux in tenebris lucet, et tenebrae eam non comprehenderunt.
 Fuit homo missus a Deo, cui nomen erat Iohannes. Hic venit in testimonium, ut testimonium perhiberet de lumine, ut omnes crederent per illum. Non erat ille lux, sed ut testimonium perhiberet de lumine. Erat lux vera, quae inluminat omnem hominem venientem in mundum. In mundo erat, et mundus per ipsum factus est, et mundus eum non cognovit. In propria venit, et sui eum non receperunt. Quotquot autem receperunt eum, dedit eis potestatem filios Dei fieri, his qui credunt in nomine eius; qui non ex sanguinibus, neque ex voluntate carnis, neque ex voluntate viri, sed ex Deo nati sunt.
-Et Verbum caro factum est, et habitavit in nobis; et vidimus gloriam eius, gloriam quasi unigeniti a Patre, plenum gratiae et veritatis.`,
+Et Verbum caro factum est, et habitavit in nobis; et vidimus gloriam eius, gloriam quasi unigeniti a Patre, plenum gratiae et veritatis.
+Iohannes testimonium perhibet de ipso, et clamat dicens: Hic erat quem dixi, qui post me venturus est, ante me factus est, quia prior me erat. Et de plenitudine eius nos omnes accepimus, et gratiam pro gratia. Quia lex per Mosen data est, gratia et veritas per Iesum Christum facta est. Deum nemo vidit umquam; unigenitus Filius, qui est in sinu Patris, ipse enarravit.`,
   },
   {
     id: 'regula',
@@ -148,9 +149,10 @@ export function paginate(text: Text, cols: number): Page[] {
   const initLines = 5;
   const initW = f.pitch * initLines * 0.92;
   const pages: Page[] = [];
+  if (text.figure) pages.push({ cols: Array.from({ length: cols }, () => []), figure: true, font });
   let page: Page = { cols: Array.from({ length: cols }, () => []), rubric: text.rubric, initial: text.body[0], font };
   pages.push(page);
-  let figureDone = !text.figure;
+  const figureDone = true;
   let col = 0;
   // The rubric takes the first two lines of the first column.
   page.cols[0].push({ toks: [], indent: 0 }, { toks: [], indent: 0 });
@@ -159,16 +161,12 @@ export function paginate(text: Text, cols: number): Page[] {
     if (page.cols[col].length >= LINES) {
       col++;
       if (col >= cols) {
-        if (!figureDone) {
-          pages.push({ cols: Array.from({ length: cols }, () => []), figure: true, font });
-          figureDone = true;
-        }
         page = { cols: Array.from({ length: cols }, () => []), font };
         pages.push(page);
         col = 0;
       }
     }
-    const firstPage = pages.length === 1 && col === 0;
+    const firstPage = page.rubric !== undefined && col === 0;
     const li = page.cols[col].length;
     const indent = firstPage && li >= 2 && li < 2 + initLines ? initW : 0;
     const line: Line = { toks: [], indent };
@@ -194,7 +192,7 @@ export function paginate(text: Text, cols: number): Page[] {
     });
   });
   page.explicit = true;
-  if (!figureDone) pages.push({ cols: Array.from({ length: cols }, () => []), figure: true, font });
+  void figureDone;
   layoutCache.set(key, pages);
   return pages;
 }
@@ -422,10 +420,51 @@ function ouroboros(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 /** Draw one page (index `p` of `pages`) into the rectangle, written up to fraction `upto`. */
+/** Insular cross-carpet page: a cross of interlace in a frame, red-lead dots around. */
+function carpet(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  const m = w * 0.16, fw = w - 2 * m, fh = h - 2 * m * 1.1;
+  const fx = x + m, fy = y + m * 1.1;
+  ctx.save();
+  const band = (bx: number, by: number, bw: number, bh: number) => {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
+    ctx.fillStyle = '#2a1a10'; ctx.fillRect(bx, by, bw, bh);
+    const s = Math.min(bw, bh) * 0.18;
+    ctx.lineCap = 'round';
+    for (let k = -30; k < 30; k++) for (const dir of [1, -1]) {
+      ctx.beginPath();
+      for (let t = 0; t <= 1.0001; t += 0.05) {
+        const u = bx + k * s * 1.6 + dir * t * Math.max(bw, bh) * 0.9 + Math.sin(t * 20 + k) * s * 0.3;
+        const v = by + t * Math.max(bw, bh);
+        if (t === 0) ctx.moveTo(u, v); else ctx.lineTo(u, v);
+      }
+      ctx.strokeStyle = '#1e140c'; ctx.lineWidth = s * 0.75; ctx.stroke();
+      ctx.strokeStyle = (k + (dir > 0 ? 0 : 1)) % 3 === 0 ? GREEN : (k % 2 ? YELLOW : RED); ctx.lineWidth = s * 0.38; ctx.stroke();
+    }
+    ctx.restore();
+    ctx.strokeStyle = '#1e140c'; ctx.lineWidth = Math.max(1, w * 0.004); ctx.strokeRect(bx, by, bw, bh);
+  };
+  // Frame.
+  const t = w * 0.05;
+  band(fx, fy, fw, t); band(fx, fy + fh - t, fw, t); band(fx, fy, t, fh); band(fx + fw - t, fy, t, fh);
+  // Cross.
+  const cw = fw * 0.2;
+  band(fx + fw / 2 - cw / 2, fy + t * 1.6, cw, fh - t * 3.2);
+  band(fx + t * 1.6, fy + fh * 0.36 - cw / 2, fw - t * 3.2, cw);
+  // Red-lead dots outlining the cross.
+  ctx.fillStyle = RED;
+  const dot = (px: number, py: number) => { ctx.beginPath(); ctx.arc(px, py, w * 0.006, 0, Math.PI * 2); ctx.fill(); };
+  const d = w * 0.022;
+  for (let yy = fy + t * 1.6; yy < fy + fh - t * 1.6; yy += d) { dot(fx + fw / 2 - cw / 2 - d * 0.7, yy); dot(fx + fw / 2 + cw / 2 + d * 0.7, yy); }
+  for (let xx = fx + t * 1.6; xx < fx + fw - t * 1.6; xx += d) { dot(xx, fy + fh * 0.36 - cw / 2 - d * 0.7); dot(xx, fy + fh * 0.36 + cw / 2 + d * 0.7); }
+  ctx.restore();
+}
+
 export function drawPage(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, pages: Page[], p: number, cols: number, left: boolean, seed: number, upto = 1) {
   const f = frame(cols);
   const h = w * f.H;
   parchment(ctx, x, y, w, h, seed * 131 + p * 7, left);
+  if (p === -1) { carpet(ctx, x, y, w, h); return; }
   const page = pages[p];
   if (!page) return;
   if (page.figure) { ouroboros(ctx, x, y, w, h, seed + p); return; }
@@ -540,15 +579,19 @@ let current: { text: Text; page: number; seed: number } | null = null;
 
 export const isReading = () => current !== null;
 
+let fontPromise: Promise<unknown> | null = null;
 function ensureFonts() {
-  if (!document.querySelector('link[data-uncial]')) {
-    const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = 'https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Cardo&display=swap';
-    l.dataset.uncial = '1';
-    document.head.appendChild(l);
-  }
-  return Promise.all([document.fonts.load('40px "Uncial Antiqua"'), document.fonts.load('40px "Cardo"', 'ΕΝ')]).catch(() => []);
+  if (fontPromise) return fontPromise;
+  const l = document.createElement('link');
+  l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Cardo&display=swap';
+  const sheet = new Promise((res) => { l.onload = res; l.onerror = res; setTimeout(res, 6000); });
+  document.head.appendChild(l);
+  fontPromise = sheet
+    .then(() => Promise.all([document.fonts.load('40px "Uncial Antiqua"', 'In principio'), document.fonts.load('40px "Cardo"', 'ΕΝ ΤΟ ΠΑΝ')]))
+    .catch(() => [])
+    .then(() => { layoutCache.clear(); initialCache.clear(); });
+  return fontPromise;
 }
 export const fontsReady = () => ensureFonts();
 
@@ -565,6 +608,9 @@ function build() {
   #codex .close { top: max(14px, calc(env(safe-area-inset-top, 0px) + 10px)); right: max(14px, calc(env(safe-area-inset-right, 0px) + 10px)); }
   #codex .prev { left: max(10px, env(safe-area-inset-left, 0px)); top: 50%; transform: translateY(-50%); }
   #codex .next { right: max(10px, env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%); }
+  @media (max-aspect-ratio: 1/1) {
+    #codex .prev, #codex .next { top: auto; transform: none; bottom: max(14px, calc(env(safe-area-inset-bottom, 0px) + 8px)); }
+  }
   #codex .label { position: absolute; bottom: max(14px, calc(env(safe-area-inset-bottom, 0px) + 8px)); width: 100%; text-align: center;
     color: #cdb688; font: italic 15px 'IM Fell English', Georgia, serif; opacity: 0.8; pointer-events: none; }
   #codex button:focus-visible { outline: 2px solid #e8c88a; outline-offset: 3px; }`;
@@ -638,20 +684,23 @@ function render() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, innerWidth, innerHeight);
   const pages = paginate(current.text, cols);
-  current.page = Math.max(0, Math.min(current.page, pages.length - 1));
+  current.page = Math.max(two ? -1 : 0, Math.min(current.page, pages.length - 1));
   const ph = pw * PAGE_ASPECT;
   const y = (innerHeight - ph) / 2 - 8;
   ctx.shadowColor = 'rgba(0,0,0,0.7)';
   ctx.shadowBlur = 30;
   if (two) {
-    const first = current.page - (current.page % 2);
+    const o = current.text.figure ? 0 : 1;
+    const k = Math.floor((current.page + o) / 2);
+    const first = 2 * k - o;
+    current.page = Math.max(0, first);
     const x = innerWidth / 2 - pw;
     ctx.fillStyle = '#3a2414';
     ctx.fillRect(x - 10, y - 8, pw * 2 + 20, ph + 16); // the boards beneath
     ctx.shadowBlur = 0;
     drawPage(ctx, x, y, pw, pages, first, cols, true, current.seed);
     drawPage(ctx, x + pw, y, pw, pages, first + 1, cols, false, current.seed);
-    ui.label.textContent = `${current.text.rubric.replace(/^Incipit /, '')} · f. ${toRoman(Math.floor(first / 2) + 1)}v–${toRoman(Math.floor(first / 2) + 2)}r`;
+    ui.label.textContent = `${current.text.rubric.replace(/^Incipit /, '')} · f. ${toRoman(k + 1)}v–${toRoman(k + 2)}r`;
   } else {
     const x = (innerWidth - pw) / 2;
     ctx.fillStyle = '#3a2414';
@@ -659,7 +708,7 @@ function render() {
     ctx.shadowBlur = 0;
     const left = current.page % 2 === 1;
     drawPage(ctx, x, y, pw, pages, current.page, cols, left, current.seed);
-    ui.label.textContent = `f. ${toRoman(Math.floor((current.page + 1) / 2) + 1)}${left ? 'v' : 'r'} · ${pages.length > 1 ? 'swipe to turn' : ''}`;
+    ui.label.textContent = `f. ${toRoman(Math.floor(current.page / 2) + 1)}${left ? 'v' : 'r'}${pages.length > 1 ? ' · swipe to turn' : ''}`;
   }
 }
 
@@ -668,8 +717,8 @@ function turn(d: number) {
   const { two, cols } = geometry();
   const n = paginate(current.text, cols).length;
   const step = two ? 2 : 1;
-  const nextPage = current.page - (two ? current.page % 2 : 0) + d * step;
-  if (nextPage < 0 || nextPage >= n) return;
+  const nextPage = current.page + d * step;
+  if (nextPage < (two && !current.text.figure ? -1 : 0) || nextPage >= n) return;
   current.page = nextPage;
   render();
 }

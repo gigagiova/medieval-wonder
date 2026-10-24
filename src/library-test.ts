@@ -7,7 +7,7 @@ import { Builder } from './builder';
 import { shared, mat } from './materials';
 import { NLAMP } from './shaders';
 import { makeFire } from './fire';
-import { buildLibrary, updateLibrary, pushOutOfSecretDoor } from './library';
+import { buildLibrary, updateLibrary, pushOutOfSecretDoor, setSecretDoor } from './library';
 import { TEXTS, openCodex, fontsReady } from './codex';
 import { field } from './displace';
 
@@ -16,6 +16,16 @@ import { field } from './displace';
 //   &open                  the hidden door swung open
 //   &read=<textId>[,page]  open the reading view
 const q = new URLSearchParams(location.search);
+if (q.has('noscene')) {
+  // Just the reading view.
+  document.body.style.background = '#000';
+  fontsReady().then(async () => {
+    const [id, page] = (q.get('read') ?? 'iohannes').split(',');
+    await openCodex(TEXTS.find((t) => t.id === id)!, Number(page ?? 0), 5);
+    setTimeout(() => { (window as unknown as { __done: boolean; __stats: () => string }).__stats = () => 'codex'; (window as unknown as { __done: boolean }).__done = true; }, 300);
+  });
+  throw new Error('codex only'); // stop the module here
+}
 const renderer = new THREE.WebGLRenderer();
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
@@ -64,7 +74,7 @@ let cellTris = 0;
 for (const c of cells) for (const m of c.meshes) cellTris += m.geometry.attributes.position.count / 3;
 const w = window as unknown as { __done: boolean; __stats: () => string };
 w.__stats = () => `library build ${ms.toFixed(0)} ms · direct ${Math.round(tris)} tris · shell ${Math.round(cellTris)} tris · ${renderer.info.render.calls} calls`;
-if (q.has('open')) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+if (q.has('open')) setSecretDoor(true, true);
 let n = 0;
 const read = q.get('read');
 async function start() {
@@ -81,7 +91,7 @@ function frame() {
   pushOutOfSecretDoor(camera.position);
   composer.render();
   // The door needs a few seconds of animation before the shot.
-  const need = q.has('open') ? 160 : 8;
+  const need = 8;
   if (++n > need) { w.__done = true; return; }
   requestAnimationFrame(frame);
 }

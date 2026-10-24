@@ -283,7 +283,8 @@ export function updateLibrary(camera: THREE.Camera) {
   }
   target = isReading() ? null : best;
   // The press in the north partition can be examined (and closed again).
-  const door = secretDoorTick(camPos, camDir) && !isReading() && (!best || bestScore > 0.6);
+  // Facing the hidden press, examining it wins over reading one of the closed books.
+  const door = secretDoorTick(camPos, camDir) && !isReading() && (!best || !best.open);
   examine = door;
   if (door) target = null;
   btn.hidden = !target && !door;
@@ -984,4 +985,14 @@ function secretDoorTick(camPos: THREE.Vector3, camDir: THREE.Vector3) {
   tmp.subVectors(secret.front, camPos);
   const d = tmp.length();
   return d < 2.0 && tmp.dot(camDir) / d > 0.8;
+}
+
+/** Open or close the hidden door (animated unless `instant`). */
+export function setSecretDoor(open: boolean, instant = false) {
+  secret.target = open ? OPEN_ANGLE : 0;
+  if (instant && secret.pivot) {
+    secret.angle = secret.target;
+    secret.pivot.rotation.y = secret.angle;
+    updateSecretBox();
+  }
 }
