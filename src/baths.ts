@@ -488,9 +488,9 @@ function overgrowth(b: Builder) {
   }
   for (let i = 0; i < 26; i++) {
     const x = R(HX0 + 0.8, HX1 - 0.8), z = R(14.5, 24);
-    P(i % 3 ? 'rock_07' : 'rock_09', x, FL, z, R(0, 6), R(2.5, 6), false, [R(-0.5, 0.5), R(-0.5, 0.5)]);
+    P(i % 2 ? 'rock_moss_set_02' : 'rock_moss_set_01', x, FL, z, R(0, 6), R(0.25, 0.55), false, [R(-0.4, 0.4), R(-0.4, 0.4)]);
   }
-  for (let i = 0; i < 30; i++) P('stone_01', R(HX0 + 0.6, HX1 - 0.6), FL, R(14.5, 33), R(0, 6), R(3, 6));
+  for (let i = 0; i < 30; i++) P('rock_moss_set_02', R(HX0 + 0.6, HX1 - 0.6), FL, R(14.5, 33), R(0, 6), R(0.15, 0.3));
   // Along the foot of the walls and piers: weeds, nettles, ferns in the damp.
   const edge: [number, number][] = [];
   for (let z = 14.5; z < 34; z += R(0.8, 1.6)) { edge.push([HX0 + R(0.3, 0.8), z], [HX1 - R(0.3, 0.8), z]); }
@@ -564,11 +564,21 @@ function waterMaterial() {
  * dolphins and fish round a medallion. Lacunae show the mortar bed, with
  * moss and mud in them.
  */
+let stoneT: THREE.Texture | null = null;
+function stoneTex() {
+  if (stoneT) return stoneT;
+  stoneT = new THREE.TextureLoader().load('textures/marble_a.webp');
+  stoneT.colorSpace = THREE.SRGBColorSpace;
+  stoneT.wrapS = stoneT.wrapT = THREE.RepeatWrapping;
+  return stoneT;
+}
+
 function mosaicMaterial(cx: number, cz: number, hx: number, hz: number, motif: number) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0 });
   m.customProgramCacheKey = () => 'mosaic';
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, shared, {
+      tStone: { value: stoneTex() },
       uC: { value: new THREE.Vector2(cx, cz) },
       uH: { value: new THREE.Vector2(hx, hz) },
       uMotif: { value: motif },
@@ -580,7 +590,8 @@ function mosaicMaterial(cx: number, cz: number, hx: number, hz: number, motif: n
         uniform vec2 uC; uniform vec2 uH; uniform float uMotif;
         ${noiseGLSL}
         ${atmosGLSL}
-        const vec3 WHITE = vec3(0.46,0.44,0.39), BLACK = vec3(0.05,0.05,0.055), RED = vec3(0.42,0.14,0.07), OCHRE = vec3(0.52,0.37,0.16), GREY = vec3(0.32,0.32,0.31);
+        uniform sampler2D tStone;
+        const vec3 WHITE = vec3(0.4,0.37,0.31), BLACK = vec3(0.045,0.045,0.05), RED = vec3(0.42,0.14,0.07), OCHRE = vec3(0.52,0.37,0.16), GREY = vec3(0.32,0.32,0.31);
         float bitAt(float row, float col){
           float r = row < 0.5 ? 62. : row < 1.5 ? 34. : row < 2.5 ? 42. : row < 3.5 ? 46. : row < 4.5 ? 32. : 63.;
           return mod(floor(r / exp2(5. - col)), 2.);
@@ -676,7 +687,8 @@ function mosaicMaterial(cx: number, cz: number, hx: number, hz: number, motif: n
         }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec2 lp = vWorldPos.xz - uC;
-        const float TS = 0.05;
+        // Real floor tesserae are 1.5-2 cm: small, irregular, each its own stone.
+        const float TS = 0.019;
         vec2 cell = lp / TS;
         float row = floor(cell.y);
         cell.x += hash12(vec2(row, 3.)) * 0.6;           // rows of tesserae don't align
@@ -686,11 +698,16 @@ function mosaicMaterial(cx: number, cz: number, hx: number, hz: number, motif: n
         cc.x -= hash12(vec2(row, 3.)) * 0.6;
         vec3 tc = design(cc * TS);
         float tv = hash12(id * 1.7 + 4.);
-        tc *= 0.82 + 0.3 * tv;
-        // Grout: fades out in the distance instead of aliasing.
+        // Each tessera is cut from real stone: sample a scanned stone at a
+        // random spot so its colour, veining and pitting differ.
+        vec3 st = texture2D(tStone, (id + hash22(id * 3.1) * 37.) * 0.013 + f * 0.012).rgb;
+        float stL = dot(st, vec3(0.299, 0.587, 0.114));
+        tc *= (0.7 + 0.25 * tv) * (0.6 + 1.1 * stL);
+        // Grout: irregular, rounded tesserae; fades out in the distance instead of aliasing.
         float fw = fwidth(lp.x) / TS;
-        vec2 e = min(f, 1. - f);
-        float grout = 1. - smoothstep(0.06, 0.16 + fw, min(e.x, e.y));
+        vec2 e = min(f, 1. - f) + (hash22(id + 7.) - 0.5) * 0.08;
+        float round = length(max(vec2(0.18) - e, 0.)) / 0.18;
+        float grout = max(1. - smoothstep(0.05, 0.13 + fw, min(e.x, e.y)), smoothstep(0.85, 1.0, round));
         grout *= 1. - smoothstep(0.3, 0.7, fw);
         vec3 col = mix(tc, vec3(0.2, 0.19, 0.17), grout * 0.8);
         // Lacunae: whole patches lost, showing the pinkish mortar bed and mud.
@@ -703,7 +720,9 @@ function mosaicMaterial(cx: number, cz: number, hx: number, hz: number, motif: n
         col = mix(col, bed, max(hole, loose * 0.8));
         // Grime and damp: darker toward the walls and in streaks.
         float grime = fbm(vec3(vWorldPos.xz * 0.5, 9.));
-        col *= 0.5 + 0.45 * grime;
+        col *= 0.42 + 0.45 * grime;
+        // Dust and silt lie in the grout and over everything, greyer than the stone.
+        col = mix(col, vec3(0.16, 0.15, 0.13), 0.25 + 0.2 * fbm(vec3(vWorldPos.xz * 1.7, 3.)));
         col = mix(col, col * vec3(0.7, 0.85, 0.6), smoothstep(0.6, 0.8, fbm(vec3(vWorldPos.xz * 0.9, 4.))) * 0.6);
         diffuseColor.rgb = col;
         float mH = (1. - grout) * 0.6 + (1. - max(hole, loose)) * 0.8;`)

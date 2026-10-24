@@ -613,12 +613,32 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
     return false;
   };
 
+  // Ground cover draws from its own sequence, so the trees stay where they were.
+  const gr = rng(4711);
+  const GR = (a: number, b2: number) => a + (b2 - a) * gr();
   const STEP = 3.7, RMAX = 225;
   for (let gz = -RMAX; gz <= RMAX; gz += STEP) for (let gx = -RMAX; gx <= RMAX; gx += STEP) {
     const x = gx + R(-0.48, 0.48) * STEP, z = gz + R(-0.48, 0.48) * STEP;
     const r = Math.hypot(x, z);
     if (r > RMAX || opts.inside(x, z) || opts.keepOut(x, z)) continue;
     if (nearWall(x, z, 7)) { if (rand() < 0.93) continue; }
+    // Ground cover (scans) everywhere in the wood: ferns, nettles, weeds,
+    // fallen branches, bark, mossy stones; thick near the town, where people
+    // walk, it is thinner but the fog hides how far it goes anyway.
+    if (r < 150) for (let g = 0; g < 5; g++) {
+      if (gr() > 0.8) continue;
+      const gx2 = x + GR(-1.8, 1.8), gz2 = z + GR(-1.8, 1.8);
+      if (opts.inside(gx2, gz2) || opts.keepOut(gx2, gz2)) continue;
+      const u = gr();
+      if (u < 0.22) scan('fern_02', gx2, gz2, GR(1.0, 1.6), GR(0, 6.28), 0);
+      else if (u < 0.4) scan('nettle_plant', gx2, gz2, GR(3.5, 6), GR(0, 6.28), 0);
+      else if (u < 0.55) scan('weed_plant_02', gx2, gz2, GR(3, 5), GR(0, 6.28), 0);
+      else if (u < 0.68) scan('dry_branches_medium_01', gx2, gz2, GR(1.2, 2.2), GR(0, 6.28), 0);
+      else if (u < 0.78) scan('bark_debris_01', gx2, gz2, GR(1.5, 3), GR(0, 6.28), 0);
+      else if (u < 0.88) scan('rock_moss_set_02', gx2, gz2, GR(0.3, 0.8), GR(0, 6.28), -0.05);
+      else if (u < 0.95) scan('grass_medium_02', gx2, gz2, GR(0.7, 1.1), GR(0, 6.28), 0);
+      else scan('shrub_02', gx2, gz2, GR(0.5, 0.9), GR(0, 6.28), 0);
+    }
     let dens = 0.7;
     if (nearWall(x, z, 14)) dens = 0.3;
     // Groves and glades: a slow noise modulates the density.

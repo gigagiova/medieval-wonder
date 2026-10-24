@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { N8AOPass } from 'n8ao';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
@@ -14,6 +14,7 @@ import { terrain } from './displace';
 import { Player } from './player';
 import { Soundscape } from './audio';
 import { initMap } from './map';
+import { loadProps } from './props';
 import { updateLibrary, pushOutOfSecretDoor } from './library';
 import { isReading } from './codex';
 import { loadMonkAssets, createMonk } from './monk';
@@ -26,7 +27,7 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.4;
+renderer.toneMappingExposure = 1.15;
 renderer.info.autoReset = false;
 document.body.appendChild(renderer.domElement);
 
@@ -43,7 +44,9 @@ const progress = async (label: string, frac: number) => {
 };
 addEventListener('error', (e) => { enterEl.textContent = 'Something went wrong: ' + (e.message || e.error); });
 addEventListener('unhandledrejection', (e) => { enterEl.textContent = 'Something went wrong: ' + (e.reason?.message ?? e.reason); });
-await progress('Lighting the lamps', 0);
+await progress('Gathering the furnishings', 0);
+await loadProps();
+await progress('Lighting the lamps', 0.01);
 const t0 = performance.now();
 const { collider, cells, lamps, flames, props, townTex } = await buildWorld(scene, progress);
 shared.uTown.value = townTex;
@@ -62,8 +65,46 @@ Object.assign(moon.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, 
 moon.shadow.bias = -0.0006;
 moon.shadow.normalBias = 0.04;
 scene.add(moon, moon.target);
-const hemi = new THREE.HemisphereLight(0xb4bcc6, 0x4a4842, 3.0);
+// Image-based lighting from a real overcast sky over a medieval street (Poly
+// Haven 'cobblestone_parish_road', baked to an RGBE PNG): light arrives from
+// every direction with the sky's real distribution, walls get bounce from the
+// street, and every material gets matching soft reflections. This replaces the
+// flat hemisphere light, which lit everything evenly and looked like plastic.
+// A dim hemisphere stays only as a fallback until the sky has loaded.
+const hemi = new THREE.HemisphereLight(0xb4bcc6, 0x4a4842, 1.2);
 scene.add(hemi);
+let envReady = false;
+const envLoaded = (async () => {
+  try {
+    const blob = await (await fetch('textures/env.png')).blob();
+    const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+    const src = new THREE.Texture(bmp as unknown as HTMLImageElement);
+    src.flipY = false;
+    src.magFilter = src.minFilter = THREE.NearestFilter;
+    src.generateMipmaps = false;
+    src.colorSpace = THREE.NoColorSpace;
+    src.needsUpdate = true;
+    // Decode RGBE to linear HDR in a full-screen pass.
+    const rt = new THREE.WebGLRenderTarget(bmp.width, bmp.height, { type: THREE.HalfFloatType });
+    const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+      uniforms: { t: { value: src } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }',
+      fragmentShader: `uniform sampler2D t; varying vec2 vUv;
+        void main(){ vec4 c = texture2D(t, vec2(vUv.x, 1.0 - vUv.y));
+          gl_FragColor = vec4(c.rgb * 255.0 * exp2(c.a * 255.0 - 128.0) / 256.0, 1.0); }`,
+      depthTest: false, depthWrite: false,
+    }));
+    const qs = new THREE.Scene(); qs.add(q);
+    const cam2 = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    renderer.setRenderTarget(rt); renderer.render(qs, cam2); renderer.setRenderTarget(null);
+    rt.texture.mapping = THREE.EquirectangularReflectionMapping;
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromEquirectangular(rt.texture).texture;
+    scene.environmentIntensity = 1.0;
+    pmrem.dispose(); rt.dispose(); src.dispose(); bmp.close();
+    envReady = true;
+  } catch (e) { console.warn('environment light unavailable', e); }
+})();
 
 // A fixed pool of point lights reassigned every frame to the nearest lamps.
 const pool: THREE.PointLight[] = [];
@@ -195,8 +236,13 @@ player.onStep = (run) => audio?.step(run, player.pos.y < -2);
 const msaaTarget = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: 4 });
 const composer = new EffectComposer(renderer, msaaTarget);
 composer.setPixelRatio(renderer.getPixelRatio());
-composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.7, 0.55, 0.82);
+// Ambient occlusion: contact shadows where walls meet the street, under eaves,
+// in reveals, between stones. Its absence is what made everything float.
+const ao = new N8AOPass(scene, camera, innerWidth, innerHeight);
+Object.assign(ao.configuration, { aoRadius: 1.6, distanceFalloff: 1.2, intensity: 2.6, halfRes: true, screenSpaceRadius: false, gammaCorrection: false });
+ao.setQualityMode('Medium');
+composer.addPass(ao);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.35, 0.5, 0.95);
 // One bad pixel (NaN/inf) would be smeared over the whole screen by the bloom:
 // clear any non-finite or absurd values first.
 composer.addPass(new ShaderPass({
@@ -250,6 +296,7 @@ const hintEl = document.getElementById('hint')!;
 // Compile every shader before letting anyone in, without freezing the page.
 await progress('Grinding the pigments', 0.9);
 await texturesReady;
+await envLoaded;
 await progress('Mixing the pigments', 0.94);
 try { await renderer.compileAsync(scene, camera); } catch { /* compiled on first frame instead */ }
 enterEl.textContent = 'Enter';
@@ -400,7 +447,9 @@ function frame() {
   const under = THREE.MathUtils.smoothstep(-camY, 1.0, 4.0);
   shared.uUnder.value = under;
   moon.intensity = 0.5 * (1 - under);
-  hemi.intensity = 3.0 * (1 - under) + 0.015;
+  hemi.intensity = (envReady ? 0.0 : 1.2) * (1 - under) + 0.015;
+  // The sky was captured by day: dusk is about half of it.
+  scene.environmentIntensity = 0.55 * (1 - under) + 0.004;
   moon.position.copy(camera.position).addScaledVector(shared.uMoonDir.value, 120);
   moon.target.position.copy(camera.position);
   moon.position.x = Math.round(moon.position.x); moon.position.z = Math.round(moon.position.z);

@@ -4,7 +4,7 @@
 // that serves .json and .webp but not .glb/.bin.)
 //
 //   npx tsx tools/fetch-props.ts            # fetch + pack everything
-//   npx tsx tools/fetch-props.ts rock_07    # just one
+//   npx tsx tools/fetch-props.ts tree_stump_01    # just one
 import { NodeIO, Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, textureCompress, flatten, join } from '@gltf-transform/functions';
@@ -38,9 +38,6 @@ export const PROPS: Record<string, { res: '1k' | '2k'; tex: number; tris: number
   marble_bust_01: { res: '2k', tex: 1024, tris: 20000 },
   street_rat: { res: '1k', tex: 1024, tris: 6000 },
   // Ground, ruins, forest
-  rock_07: { res: '1k', tex: 1024, tris: 5000 },
-  rock_09: { res: '1k', tex: 1024, tris: 5000 },
-  stone_01: { res: '1k', tex: 1024, tris: 8000 },
   rock_moss_set_01: { res: '1k', tex: 1024, tris: 8000 },
   rock_moss_set_02: { res: '1k', tex: 1024, tris: 8000 },
   tree_stump_01: { res: '1k', tex: 1024, tris: 8000 },
