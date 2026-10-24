@@ -1,6 +1,50 @@
 import * as THREE from 'three';
 import { NLAMP, noiseGLSL, atmosGLSL, surfaceGLSL } from './shaders';
 
+/**
+ * A tiling 256² micro-detail texture for porous, coarse surfaces:
+ * R pores (pits), G grain, B fine grit, A fibres (for wood).
+ * Generated once with periodic noise, so it repeats seamlessly.
+ */
+function makeMicro(): THREE.DataTexture {
+  const S = 256, data = new Uint8Array(S * S * 4);
+  let seed = 9;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const lattice = (f: number) => { const a = new Float32Array(f * f); for (let i = 0; i < a.length; i++) a[i] = rnd(); return a; };
+  const vn = (x: number, y: number, f: number, L: Float32Array) => {
+    const fx = (x / S) * f, fy = (y / S) * f, i = Math.floor(fx), j = Math.floor(fy);
+    let u = fx - i, v = fy - j; u = u * u * (3 - 2 * u); v = v * v * (3 - 2 * v);
+    const a = L[(j % f) * f + (i % f)], b = L[(j % f) * f + ((i + 1) % f)], c = L[((j + 1) % f) * f + (i % f)], d = L[((j + 1) % f) * f + ((i + 1) % f)];
+    return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+  };
+  const oct = [8, 16, 32, 64, 128].map((f) => ({ f, L: lattice(f) }));
+  // Pores: periodic Worley over 40 random points per tile.
+  const P: [number, number, number][] = Array.from({ length: 90 }, () => [rnd() * S, rnd() * S, 0.4 + rnd() * 0.9]);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    let d1 = 1e9;
+    for (const [px, py, r] of P) {
+      let dx = Math.abs(x - px), dy = Math.abs(y - py);
+      dx = Math.min(dx, S - dx); dy = Math.min(dy, S - dy);
+      d1 = Math.min(d1, Math.hypot(dx, dy) / (6 * r));
+    }
+    const pore = Math.max(0, 1 - d1) ** 2;
+    const grain = vn(x, y, 16, oct[1].L) * 0.5 + vn(x, y, 32, oct[2].L) * 0.3 + vn(x, y, 64, oct[3].L) * 0.2;
+    const grit = vn(x, y, 128, oct[4].L) * 0.6 + rnd() * 0.4;
+    const fib = vn(x, y * 0.0625 + x * 0.02, 128, oct[4].L) * 0.7 + vn(x, y, 64, oct[3].L) * 0.3;
+    const k = (y * S + x) * 4;
+    data[k] = pore * 255; data[k + 1] = grain * 255; data[k + 2] = grit * 255; data[k + 3] = fib * 255;
+  }
+  const t = new THREE.DataTexture(data, S, S, THREE.RGBAFormat);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.anisotropy = 1;
+  t.needsUpdate = true;
+  return t;
+}
+const micro = makeMicro();
+
 export const shared = {
   uTime: { value: 0 },
   uLampPos: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3(0, -999, 0)) },
@@ -9,7 +53,9 @@ export const shared = {
   uUnder: { value: 0 },
   uMoonDir: { value: new THREE.Vector3(-0.92, 0.07, 0.38).normalize() },
   uTown: { value: null as THREE.Texture | null },
+  uMicro: { value: micro as THREE.Texture },
 };
+
 
 export const MAT = {
   stone: 0, ground: 1, plaster: 2, wood: 3, roof: 4, rock: 5, bone: 6,
@@ -58,6 +104,9 @@ export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
         '#include <normal_fragment_maps>',
         `#include <normal_fragment_maps>\n normal = bumpNormal(-vViewPosition, normal, S.h * ${BUMP.toFixed(4)} * (1.0 - smoothstep(10.0, 40.0, length(vViewPosition))));`,
       )
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        reflectedLight.directSpecular *= SPEC_K;
+        reflectedLight.indirectSpecular *= SPEC_K;`)
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = applyAtmos(gl_FragColor.rgb, vWPos);');
   };
   return m;

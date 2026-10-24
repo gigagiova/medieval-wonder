@@ -37,17 +37,18 @@ interface Species {
   leaves: number; // fraction of twig tips with clinging dead leaves
   moss: number;
   broken?: boolean; // dead snag: top snapped off
+  split?: number; // oaks and chestnuts: the trunk divides into this many great limbs
   lean: number;
 }
 
 const SPECIES: Species[] = [
   // Ancient oaks: huge low trunks, enormous twisting limbs reaching sideways.
-  { name: 'ancient', height: 10, r0: 1.35, maxDepth: 5, forkStart: 0.32, limbs: 0.9, forkRate: [0, 0.825, 1.35, 2.4, 3.9], childR: [0.42, 0.7], childLen: [0.55, 0.95], angle: [0.6, 1.25], wander: 0.12, curl: 0.35, up: [0.18, 0.05, 0.08, 0.12, 0.2, 0.25], sag: 0.22, twigs: 7.2, roots: 7, burls: 5, leaves: 0.08, moss: 1, lean: 0.06 },
-  { name: 'ancient2', height: 12, r0: 1.15, maxDepth: 5, forkStart: 0.38, limbs: 0.8, forkRate: [0, 0.9, 1.5, 2.55, 4.2], childR: [0.45, 0.72], childLen: [0.55, 0.9], angle: [0.55, 1.15], wander: 0.14, curl: 0.45, up: [0.22, 0.08, 0.1, 0.14, 0.22, 0.25], sag: 0.18, twigs: 6.4, roots: 6, burls: 4, leaves: 0.15, moss: 0.8, lean: 0.08 },
+  { name: 'ancient', height: 10, r0: 1.35, maxDepth: 5, forkStart: 0.32, limbs: 0.9, forkRate: [0, 0.825, 1.35, 2.4, 3.9], childR: [0.42, 0.7], childLen: [0.55, 0.95], angle: [0.6, 1.25], wander: 0.12, curl: 0.35, up: [0.18, 0.05, 0.08, 0.12, 0.2, 0.25], sag: 0.22, twigs: 7.2, roots: 7, burls: 5, leaves: 0.08, moss: 1, split: 4, lean: 0.06 },
+  { name: 'ancient2', height: 12, r0: 1.15, maxDepth: 5, forkStart: 0.38, limbs: 0.8, forkRate: [0, 0.9, 1.5, 2.55, 4.2], childR: [0.45, 0.72], childLen: [0.55, 0.9], angle: [0.55, 1.15], wander: 0.14, curl: 0.45, up: [0.22, 0.08, 0.1, 0.14, 0.22, 0.25], sag: 0.18, twigs: 6.4, roots: 6, burls: 4, leaves: 0.15, moss: 0.8, split: 3, lean: 0.08 },
   // Chestnuts / oaks of middle age: tall, spiralling.
-  { name: 'oak', height: 15, r0: 0.68, maxDepth: 5, forkStart: 0.35, limbs: 0.7, forkRate: [0, 1.125, 1.8, 3, 4.5], childR: [0.4, 0.68], childLen: [0.5, 0.85], angle: [0.5, 1.05], wander: 0.16, curl: 0.5, up: [0.3, 0.12, 0.12, 0.18, 0.25, 0.3], sag: 0.12, twigs: 6.4, roots: 5, burls: 3, leaves: 0.25, moss: 0.6, lean: 0.1 },
-  { name: 'oak2', height: 18, r0: 0.72, maxDepth: 5, forkStart: 0.45, limbs: 0.6, forkRate: [0, 1.05, 1.65, 2.85, 4.2], childR: [0.42, 0.66], childLen: [0.5, 0.82], angle: [0.45, 0.95], wander: 0.12, curl: 0.6, up: [0.35, 0.16, 0.14, 0.2, 0.28, 0.3], sag: 0.08, twigs: 5.76, roots: 5, burls: 2, leaves: 0.05, moss: 0.5, lean: 0.12 },
-  { name: 'chestnut', height: 13, r0: 0.82, maxDepth: 5, forkStart: 0.28, limbs: 0.85, forkRate: [0, 0.975, 1.725, 2.85, 4.35], childR: [0.4, 0.66], childLen: [0.6, 0.95], angle: [0.65, 1.3], wander: 0.15, curl: 0.4, up: [0.2, 0.04, 0.08, 0.16, 0.22, 0.28], sag: 0.25, twigs: 6.72, roots: 6, burls: 4, leaves: 0.3, moss: 0.7, lean: 0.07 },
+  { name: 'oak', height: 15, r0: 0.68, maxDepth: 5, forkStart: 0.35, limbs: 0.7, forkRate: [0, 1.125, 1.8, 3, 4.5], childR: [0.4, 0.68], childLen: [0.5, 0.85], angle: [0.5, 1.05], wander: 0.16, curl: 0.5, up: [0.3, 0.12, 0.12, 0.18, 0.25, 0.3], sag: 0.12, twigs: 6.4, roots: 5, burls: 3, leaves: 0.25, moss: 0.6, split: 3, lean: 0.1 },
+  { name: 'oak2', height: 18, r0: 0.72, maxDepth: 5, forkStart: 0.45, limbs: 0.6, forkRate: [0, 1.05, 1.65, 2.85, 4.2], childR: [0.42, 0.66], childLen: [0.5, 0.82], angle: [0.45, 0.95], wander: 0.12, curl: 0.6, up: [0.35, 0.16, 0.14, 0.2, 0.28, 0.3], sag: 0.08, twigs: 5.76, roots: 5, burls: 2, leaves: 0.05, moss: 0.5, split: 2, lean: 0.12 },
+  { name: 'chestnut', height: 13, r0: 0.82, maxDepth: 5, forkStart: 0.28, limbs: 0.85, forkRate: [0, 0.975, 1.725, 2.85, 4.35], childR: [0.4, 0.66], childLen: [0.6, 0.95], angle: [0.65, 1.3], wander: 0.15, curl: 0.4, up: [0.2, 0.04, 0.08, 0.16, 0.22, 0.28], sag: 0.25, twigs: 6.72, roots: 6, burls: 4, leaves: 0.3, moss: 0.7, split: 4, lean: 0.07 },
   // Gaunt crooked ones that grew in the shade, all leaning one way.
   { name: 'crooked', height: 16, r0: 0.4, maxDepth: 4, forkStart: 0.4, limbs: 0.55, forkRate: [0, 0.9, 1.8, 3.6], childR: [0.4, 0.65], childLen: [0.45, 0.8], angle: [0.45, 1.0], wander: 0.2, curl: 0.8, up: [0.25, 0.1, 0.16, 0.25, 0.3], sag: 0.1, twigs: 5.12, roots: 4, burls: 2, leaves: 0.1, moss: 0.4, lean: 0.22 },
   // Young spindly trees: thin, few branches, spiky.
@@ -57,13 +58,13 @@ const SPECIES: Species[] = [
   { name: 'snag', height: 12, r0: 0.68, maxDepth: 3, forkStart: 0.3, limbs: 0.7, forkRate: [0, 1.2, 2.4], childR: [0.35, 0.6], childLen: [0.3, 0.6], angle: [0.5, 1.2], wander: 0.18, curl: 0.4, up: [0.25, 0.2, 0.25, 0.3], sag: 0.05, twigs: 2.56, roots: 6, burls: 4, leaves: 0, moss: 1, broken: true, lean: 0.08 },
   { name: 'snag2', height: 17, r0: 0.52, maxDepth: 3, forkStart: 0.45, limbs: 0.5, forkRate: [0, 1.05, 2.1], childR: [0.3, 0.55], childLen: [0.25, 0.55], angle: [0.4, 1.1], wander: 0.14, curl: 0.5, up: [0.3, 0.25, 0.3, 0.3], sag: 0.05, twigs: 2.24, roots: 5, burls: 3, leaves: 0, moss: 0.7, broken: true, lean: 0.14 },
   // Twin-trunked hornbeam-like thing, writhing.
-  { name: 'writhing', height: 12, r0: 0.6, maxDepth: 5, forkStart: 0.12, limbs: 0.9, forkRate: [0, 1.05, 1.8, 3, 4.5], childR: [0.55, 0.8], childLen: [0.6, 0.95], angle: [0.35, 0.85], wander: 0.2, curl: 0.9, up: [0.3, 0.15, 0.15, 0.2, 0.25, 0.3], sag: 0.15, twigs: 6.4, roots: 5, burls: 4, leaves: 0.12, moss: 0.8, lean: 0.1 },
-  { name: 'witch', height: 8, r0: 0.95, maxDepth: 5, forkStart: 0.25, limbs: 1.2, forkRate: [0, 1.05, 1.65, 2.7, 4.2], childR: [0.4, 0.62], childLen: [0.7, 1.05], angle: [0.8, 1.45], wander: 0.18, curl: 0.6, up: [0.15, -0.05, 0.05, 0.12, 0.2, 0.25], sag: 0.3, twigs: 6.72, roots: 8, burls: 6, leaves: 0.05, moss: 1, lean: 0.05 },
+  { name: 'writhing', height: 12, r0: 0.6, maxDepth: 5, forkStart: 0.12, limbs: 0.9, forkRate: [0, 1.05, 1.8, 3, 4.5], childR: [0.55, 0.8], childLen: [0.6, 0.95], angle: [0.35, 0.85], wander: 0.2, curl: 0.9, up: [0.3, 0.15, 0.15, 0.2, 0.25, 0.3], sag: 0.15, twigs: 6.4, roots: 5, burls: 4, leaves: 0.12, moss: 0.8, split: 2, lean: 0.1 },
+  { name: 'witch', height: 8, r0: 0.95, maxDepth: 5, forkStart: 0.25, limbs: 1.2, forkRate: [0, 1.05, 1.65, 2.7, 4.2], childR: [0.4, 0.62], childLen: [0.7, 1.05], angle: [0.8, 1.45], wander: 0.18, curl: 0.6, up: [0.15, -0.05, 0.05, 0.12, 0.2, 0.25], sag: 0.3, twigs: 6.72, roots: 8, burls: 6, leaves: 0.05, moss: 1, split: 4, lean: 0.05 },
 ];
 
 // ------------------------------------------------------------- growth
 
-function grow(sp: Species, seed: number): Branch[] {
+function grow(sp: Species, seed: number, rateScale = 1): Branch[] {
   const rand = rng(seed);
   const R = (a: number, b: number) => a + (b - a) * rand();
   const out: Branch[] = [];
@@ -83,15 +84,28 @@ function grow(sp: Species, seed: number): Branch[] {
   const branch = (p0: V3, dir: V3, r0: number, len: number, depth: number, s0: number, trunk: boolean) => {
     const pts = [p0.clone()], rs = [r0], ss = [s0];
     const step = trunk ? 0.3 : THREE.MathUtils.clamp(r0 * 3.2, 0.09, 0.5);
-    const n = Math.max(3, Math.ceil(len / step));
+    const n = r0 < 0.02 ? 3 + Math.floor(len / 0.6) : Math.max(3, Math.ceil(len / step));
     const st = len / n;
     const d = dir.clone();
     const p = p0.clone();
     const brokenAt = trunk && sp.broken ? R(0.55, 0.8) : 2;
+    const splitAt = trunk && sp.split ? sp.forkStart + R(0.05, 0.2) : 2;
     let s = s0;
     for (let i = 1; i <= n; i++) {
       const t = i / n;
       if (t > brokenAt) break;
+      if (t > splitAt) {
+        // Divide: great limbs of nearly the trunk's girth, spreading out and up.
+        const nLimbs = sp.split!;
+        const az0 = R(0, 6.28);
+        for (let k2 = 0; k2 < nLimbs; k2++) {
+          const az = az0 + (k2 / nLimbs) * Math.PI * 2 + R(-0.4, 0.4);
+          const cd = away(d, R(0.35, 0.85), az);
+          const cr = rs[rs.length - 1] * R(0.55, 0.78);
+          branch(p.clone().addScaledVector(cd, -cr * 0.8), cd, cr, sp.height * R(0.55, 0.9), 1, s, false);
+        }
+        break;
+      }
       // Slow snaking (a smooth curl that depends on where the branch is),
       // a little random wander, then gravitropism with an elbow.
       const c = sp.curl * (trunk ? 0.35 : 1);
@@ -108,7 +122,9 @@ function grow(sp: Species, seed: number): Branch[] {
       p.addScaledVector(d, st);
       s += st;
       // Taper: limbs to a needle point (the spires), the trunk to its leader.
-      const taper = trunk ? Math.pow(1 - t * 0.92, 1.15) : Math.pow(1 - t, depth >= sp.maxDepth - 1 ? 1.1 : 0.9);
+      const taper = trunk
+        ? (t < sp.forkStart ? 1 - 0.18 * (t / sp.forkStart) : 0.82 * Math.pow(1 - (t - sp.forkStart) / (1 - sp.forkStart), 1.25))
+        : Math.pow(1 - t, depth >= sp.maxDepth - 1 ? 1.1 : 0.8);
       const r = Math.max(0.0025, r0 * taper);
       pts.push(p.clone()); rs.push(r); ss.push(s);
       if (depth >= sp.maxDepth) continue;
@@ -117,14 +133,14 @@ function grow(sp: Species, seed: number): Branch[] {
       if (t < start || t > 0.97) continue;
       const rate = trunk ? sp.limbs : sp.forkRate[Math.min(depth, sp.forkRate.length - 1)];
       const last = depth === sp.maxDepth - 1;
-      const k = (last ? sp.twigs : rate) * st;
+      const k = (last ? sp.twigs : rate) * st * (trunk ? 1 : rateScale);
       let forks = Math.floor(k) + (rand() < k - Math.floor(k) ? 1 : 0);
       while (forks-- > 0) {
         golden += 2.39996 + R(-0.4, 0.4);
         const a = R(sp.angle[0], sp.angle[1]) * (last ? 0.8 : 1);
         const cd = away(d, a, golden);
-        const cr = r * R(sp.childR[0], sp.childR[1]) * (last ? 0.7 : 1);
-        if (cr < 0.004) continue;
+        const cr = r * R(sp.childR[0], sp.childR[1]) * (last ? 0.7 : trunk ? 1.15 : 1);
+        if (cr < 0.006) continue;
         const remain = trunk ? sp.height * (1 - t) * 0.9 + sp.height * 0.35 : len * (1 - t) + len * 0.15;
         let cl = remain * R(sp.childLen[0], sp.childLen[1]);
         if (last) cl = THREE.MathUtils.clamp(cr * R(25, 55), 0.25, 1.4);
@@ -171,12 +187,13 @@ function grow(sp: Species, seed: number): Branch[] {
 interface GeoBuf { pos: number[]; nor: number[]; uv: number[]; rad: number[]; kind: number[]; ao: number[]; idx: number[] }
 const newBuf = (): GeoBuf => ({ pos: [], nor: [], uv: [], rad: [], kind: [], ao: [], idx: [] });
 
-function sweep(buf: GeoBuf, br: Branch, sp: Species, lod: 0 | 1, rand: () => number) {
+function sweep(buf: GeoBuf, br: Branch, sp: Species, lod: 0 | 1 | 2, rand: () => number) {
   const { pts, rs, ss } = br;
   if (pts.length < 2) return;
-  let M = br.trunk ? 16 : Math.round(THREE.MathUtils.clamp(br.r0 * 55, 3, 12));
-  if (lod) M = br.trunk ? 7 : Math.max(3, Math.round(M / 2));
-  const stride = lod && pts.length > 4 ? 2 : 1;
+  let M = br.trunk ? 16 : Math.round(THREE.MathUtils.clamp(br.r0 * 38, 3, 12));
+  if (lod === 1) M = br.trunk ? 9 : Math.max(3, Math.round(M / 2));
+  if (lod === 2) M = br.trunk ? 6 : 3;
+  const stride = lod && pts.length > 4 ? (lod === 2 ? 4 : 2) : 1;
   const keep: number[] = [];
   for (let i = 0; i < pts.length; i += stride) keep.push(i);
   if (keep[keep.length - 1] !== pts.length - 1) keep.push(pts.length - 1);
@@ -188,7 +205,9 @@ function sweep(buf: GeoBuf, br: Branch, sp: Species, lod: 0 | 1, rand: () => num
   const base = buf.pos.length / 3;
   keep.forEach((i, k) => {
     const p = pts[i];
-    T.subVectors(pts[Math.min(i + 1, pts.length - 1)], pts[Math.max(i - 1, 0)]).normalize();
+    T.subVectors(pts[Math.min(i + 1, pts.length - 1)], pts[Math.max(i - 1, 0)]);
+    if (T.lengthSq() < 1e-12) T.copy(k ? Tp : V(0, 1, 0));
+    T.normalize();
     if (k === 0) {
       N.set(0, 1, 0);
       if (Math.abs(T.y) > 0.9) N.set(1, 0, 0);
@@ -207,7 +226,7 @@ function sweep(buf: GeoBuf, br: Branch, sp: Species, lod: 0 | 1, rand: () => num
       const th = (j / M) * Math.PI * 2;
       let mod = 1;
       if (br.trunk) {
-        mod *= 1 + 0.75 * Math.exp(-Math.max(0, h) / 0.8) + 0.55 * Math.exp(-Math.max(0, h) / 1.3) * Math.pow(Math.max(0, Math.cos(lobes * th + lph)), 3);
+        mod *= 1 + 0.4 * Math.exp(-Math.max(0, h) / 0.7) + 0.45 * Math.exp(-Math.max(0, h) / 1.1) * Math.pow(Math.max(0, Math.cos(lobes * th + lph)), 4);
         for (const b of burls) {
           let dth = Math.abs(th - b.th);
           dth = Math.min(dth, Math.PI * 2 - dth);
@@ -243,9 +262,13 @@ function leaves(buf: GeoBuf, br: Branch, rand: () => number) {
   const n = 2 + Math.floor(rand() * 4);
   for (let i = 0; i < n; i++) {
     const c = p.clone().add(V((rand() - 0.5) * 0.25, (rand() - 0.6) * 0.25, (rand() - 0.5) * 0.25));
-    const u = V(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize().multiplyScalar(0.07);
-    const w = V(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize().cross(u).normalize().multiplyScalar(0.045);
-    const nrm = u.clone().cross(w).normalize();
+    const u = V(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize().multiplyScalar(0.045);
+    const w = V(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize().cross(u);
+    if (w.lengthSq() < 1e-10) continue;
+    w.normalize().multiplyScalar(0.03);
+    const nrm = u.clone().cross(w);
+    if (nrm.lengthSq() < 1e-12) continue;
+    nrm.normalize();
     const base = buf.pos.length / 3;
     for (const [a, b] of [[-1, 0], [0, -1], [1, 0], [0, 1]]) {
       buf.pos.push(c.x + u.x * a + w.x * b, c.y + u.y * a + w.y * b - Math.abs(a) * 0.01, c.z + u.z * a + w.z * b);
@@ -299,15 +322,22 @@ function toGeometry(buf: GeoBuf) {
 
 function treeGeometry(sp: Species, seed: number) {
   const rand = rng(seed * 31 + 7);
-  const skel = grow(sp, seed);
-  const hi = newBuf(), lo = newBuf();
+  // Keep each tree within a branch budget: grow, count, thin the forking, regrow.
+  const budget = sp.name.startsWith('ancient') || sp.name === 'witch' ? 1100 : sp.name.startsWith('young') ? 260 : sp.name.startsWith('snag') ? 160 : 700;
+  let scale = 1, skel = grow(sp, seed);
+  for (let it = 0; it < 4 && skel.length > budget * 1.15; it++) {
+    scale *= Math.pow(budget / skel.length, 0.45);
+    skel = grow(sp, seed, scale);
+  }
+  const hi = newBuf(), lo = newBuf(), far = newBuf();
   for (const br of skel) {
     sweep(hi, br, sp, 0, rand);
-    if (br.r0 > 0.018 || br.trunk) sweep(lo, br, sp, 1, rand);
+    if (br.r0 > 0.025 || br.trunk) sweep(lo, br, sp, 1, rand);
+    if (br.r0 > 0.07 || br.trunk) sweep(far, br, sp, 2, rand);
     if (br.depth === sp.maxDepth && rand() < sp.leaves) leaves(hi, br, rand);
     if (br.depth <= 1) moss(hi, br, rand, sp.moss);
   }
-  return { hi: toGeometry(hi), lo: toGeometry(lo) };
+  return { hi: toGeometry(hi), lo: toGeometry(lo), far: toGeometry(far) };
 }
 
 // ------------------------------------------------------------- ground scatter
@@ -318,12 +348,12 @@ function brambleGeometry(seed: number) {
   const R = (a: number, b: number) => a + (b - a) * rand();
   const buf = newBuf();
   const dummy = SPECIES[6];
-  for (let c = 0; c < 26; c++) {
+  for (let c = 0; c < 16; c++) {
     const a = R(0, Math.PI * 2), d0 = R(0, 0.6);
     const p = V(Math.cos(a) * d0, -0.05, Math.sin(a) * d0);
     const dir = V(Math.cos(a) * R(0.3, 0.8), 1, Math.sin(a) * R(0.3, 0.8)).normalize();
     const pts = [p.clone()], rs = [0.016], ss = [0];
-    const n = 14, len = R(1.2, 2.6);
+    const n = 9, len = R(1.2, 2.6);
     for (let i = 1; i <= n; i++) {
       dir.y -= 0.22; // arch over and down
       dir.x += R(-0.15, 0.15); dir.z += R(-0.15, 0.15);
@@ -332,7 +362,7 @@ function brambleGeometry(seed: number) {
       if (p.y < -0.05) p.y = -0.05;
       pts.push(p.clone()); rs.push(0.016 * (1 - i / n) + 0.003); ss.push((i * len) / n);
       // Thorns: tiny spikes.
-      if (i % 2 === 0) {
+      if (i % 3 === 0) {
         const t = V(R(-1, 1), R(-1, 1), R(-1, 1)).normalize();
         const tp = [p.clone(), p.clone().addScaledVector(t, 0.05)];
         sweep(buf, { pts: tp, rs: [0.005, 0.0], ss: [0, 0.05], depth: 5, trunk: false, r0: 0.004 }, dummy, 0, rand);
@@ -458,11 +488,12 @@ function barkMaterial() {
         float rough = 0.97;
         if (vKind < 0.5) {
           h = barkH(vBark, vRad);
-          vec3 plate = mix(vec3(0.04,0.037,0.033), vec3(0.058,0.052,0.045), vnoise(vWPos*0.7));
-          alb = mix(vec3(0.008,0.007,0.0065), plate, h);
+          vec3 plate = mix(vec3(0.017,0.016,0.015), vec3(0.028,0.025,0.022), vnoise(vWPos*0.7));
+          alb = mix(vec3(0.003,0.0028,0.0026), plate, h);
+          alb *= mix(0.55, 1.0, smoothstep(-0.6, 0.4, nW.y));
           // Lichen: pale grey-green crusts; moss on the up-facing sides.
-          float lich = smoothstep(0.62, 0.7, fbm(vWPos * 1.6 + 4.0)) * step(0.05, vRad);
-          alb = mix(alb, vec3(0.13,0.14,0.11) * (0.7 + 0.5 * h), lich * 0.6);
+          float lich = smoothstep(0.6, 0.72, fbm(vWPos * 3.1 + 4.0)) * step(0.05, vRad) * h;
+          alb = mix(alb, vec3(0.07,0.075,0.06), lich * 0.5);
           float up = nW.y + (fbm(vWPos * 0.9) - 0.5) * 0.8;
           float moss = smoothstep(0.15, 0.6, up) * smoothstep(0.03, 0.12, vRad);
           moss = max(moss, (1.0 - smoothstep(0.0, 1.4, vBark.y)) * smoothstep(0.45, 0.6, fbm(vWPos * 2.3)));
@@ -475,7 +506,7 @@ function barkMaterial() {
           h = f;
         } else if (vKind < 2.5) {
           float f = vnoise(vWPos * 13.0);
-          alb = mix(vec3(0.09,0.045,0.02), vec3(0.16,0.09,0.035), f) * (1.0 - 0.6 * max(abs(vBark.x), abs(vBark.y)));
+          alb = mix(vec3(0.14,0.07,0.03), vec3(0.24,0.13,0.05), f) * (1.0 - 0.5 * max(abs(vBark.x), abs(vBark.y)));
           rough = 0.9;
         } else {
           alb = mix(vec3(0.45,0.42,0.36), vec3(0.32,0.24,0.16), smoothstep(0.0, 0.05, vWPos.y - floor(vWPos.y)));
@@ -493,7 +524,8 @@ function barkMaterial() {
           vec3 grad = sign(det) * (dFdx(h * k) * r1 + dFdy(h * k) * r2);
           normal = normalize(abs(det) * normal - grad);
         }`)
-      .replace('#include <fog_fragment>', 'gl_FragColor.rgb = applyAtmos(gl_FragColor.rgb, vWPos);');
+      .replace('#include <fog_fragment>', `gl_FragColor.rgb = applyAtmos(gl_FragColor.rgb, vWPos);
+        if (any(isnan(gl_FragColor.rgb)) || any(isinf(gl_FragColor.rgb))) gl_FragColor.rgb = vec3(0.0);`);
   };
   return m;
 }
@@ -502,7 +534,7 @@ function barkMaterial() {
 
 export const treeSpots: THREE.Vector2[] = [];
 
-interface Kind { hi: THREE.BufferGeometry; lo?: THREE.BufferGeometry; near: number; far: number; meshHi: THREE.InstancedMesh; meshLo?: THREE.InstancedMesh; mats: THREE.Matrix4[]; pos: THREE.Vector3[]; rad: number[]; cols: THREE.Color[] }
+interface Kind { geos: THREE.BufferGeometry[]; dists: number[]; meshes: THREE.InstancedMesh[]; mats: THREE.Matrix4[]; pos: THREE.Vector3[]; rad: number[]; cols: THREE.Color[] }
 
 /**
  * Plant the wood outside the walls. `inside(x,z)` is true within the town;
@@ -519,8 +551,9 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
   const groundAt = (x: number, z: number) => field(x, 0, z, 'ground', gv).y;
 
   const kinds: Kind[] = [];
-  const mk = (hi: THREE.BufferGeometry, lo: THREE.BufferGeometry | undefined, near: number, far: number): Kind => {
-    const k: Kind = { hi, lo, near, far, meshHi: null!, mats: [], pos: [], rad: [], cols: [] };
+  /** geos[i] is drawn out to dists[i] metres. */
+  const mk = (geos: THREE.BufferGeometry[], dists: number[]): Kind => {
+    const k: Kind = { geos, dists, meshes: [], mats: [], pos: [], rad: [], cols: [] };
     kinds.push(k);
     return k;
   };
@@ -529,13 +562,13 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
   SPECIES.forEach((sp, i) => {
     for (let v = 0; v < (sp.name.startsWith('ancient') || sp.name === 'witch' ? 1 : 2); v++) {
       const g = treeGeometry(sp, 1000 + i * 17 + v * 101);
-      treeKinds.push({ k: mk(g.hi, g.lo, 30, 130), sp });
+      treeKinds.push({ k: mk([g.hi, g.lo, g.far], [12, 34, 88]), sp });
     }
   });
-  const brambles = [mk(brambleGeometry(5), undefined, 45, 45), mk(brambleGeometry(9), undefined, 45, 45)];
-  const logs = [mk(deadwoodGeometry(11, false), undefined, 70, 70), mk(deadwoodGeometry(12, false), undefined, 70, 70)];
-  const stumps = [mk(deadwoodGeometry(21, true), undefined, 60, 60), mk(deadwoodGeometry(22, true), undefined, 60, 60)];
-  const shrooms = mk(mushroomGeometry(3), undefined, 18, 18);
+  const brambles = [mk([brambleGeometry(5)], [26]), mk([brambleGeometry(9)], [26])];
+  const logs = [mk([deadwoodGeometry(11, false)], [55]), mk([deadwoodGeometry(12, false)], [55])];
+  const stumps = [mk([deadwoodGeometry(21, true)], [50]), mk([deadwoodGeometry(22, true)], [50])];
+  const shrooms = mk([mushroomGeometry(3)], [16]);
 
   const pick = (list: { k: Kind; sp: Species }[], w: (sp: Species) => number) => {
     const total = list.reduce((a, e) => a + w(e.sp), 0);
@@ -613,17 +646,13 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
 
   for (const k of kinds) {
     const n = Math.max(1, k.mats.length);
-    k.meshHi = new THREE.InstancedMesh(k.hi, mat, n);
-    k.meshHi.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
-    k.meshHi.count = 0;
-    k.meshHi.frustumCulled = false;
-    group.add(k.meshHi);
-    if (k.lo) {
-      k.meshLo = new THREE.InstancedMesh(k.lo, mat, n);
-      k.meshLo.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
-      k.meshLo.count = 0;
-      k.meshLo.frustumCulled = false;
-      group.add(k.meshLo);
+    for (const g of k.geos) {
+      const im = new THREE.InstancedMesh(g, mat, n);
+      im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+      im.count = 0;
+      im.frustumCulled = false;
+      group.add(im);
+      k.meshes.push(im);
     }
   }
 
@@ -635,28 +664,29 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
     pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(pm);
     const cp = camera.position;
+    const counts: number[] = [];
     for (const k of kinds) {
-      let nh = 0, nl = 0;
+      counts.length = 0;
+      for (let l = 0; l < k.meshes.length; l++) counts.push(0);
+      const maxD = k.dists[k.dists.length - 1];
       for (let i = 0; i < k.mats.length; i++) {
         const d = k.pos[i].distanceTo(cp);
-        if (d > k.far) continue;
+        if (d > maxD) continue;
         sph.center.copy(k.pos[i]); sph.center.y += k.rad[i] * 2;
         sph.radius = k.rad[i] * 4 + 4;
         if (!frustum.intersectsSphere(sph)) continue;
-        if (d < k.near || !k.meshLo) {
-          k.meshHi.setMatrixAt(nh, k.mats[i]); k.meshHi.setColorAt(nh, k.cols[i]); nh++;
-        } else {
-          k.meshLo.setMatrixAt(nl, k.mats[i]); k.meshLo.setColorAt(nl, k.cols[i]); nl++;
-        }
+        let l = 0;
+        while (d > k.dists[l]) l++;
+        const im = k.meshes[l];
+        im.setMatrixAt(counts[l], k.mats[i]);
+        im.setColorAt(counts[l], k.cols[i]);
+        counts[l]++;
       }
-      k.meshHi.count = nh;
-      k.meshHi.instanceMatrix.needsUpdate = true;
-      if (k.meshHi.instanceColor) k.meshHi.instanceColor.needsUpdate = true;
-      if (k.meshLo) {
-        k.meshLo.count = nl;
-        k.meshLo.instanceMatrix.needsUpdate = true;
-        if (k.meshLo.instanceColor) k.meshLo.instanceColor.needsUpdate = true;
-      }
+      k.meshes.forEach((im, l) => {
+        im.count = counts[l];
+        im.instanceMatrix.needsUpdate = true;
+        if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      });
     }
   };
   // An invisible, never-culled helper that triggers the update each render.
@@ -669,9 +699,8 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
     let inst = 0, tris = 0, drawn = 0;
     for (const k of kinds) {
       inst += k.mats.length;
-      const th = (k.hi.index!.count / 3), tl = k.lo ? k.lo.index!.count / 3 : 0;
-      tris += th;
-      drawn += k.meshHi.count * th + (k.meshLo ? k.meshLo.count * tl : 0);
+      tris += k.geos[0].index!.count / 3;
+      k.meshes.forEach((im, l) => { drawn += im.count * (k.geos[l].index!.count / 3); });
     }
     return { kinds: kinds.length, instances: inst, trianglesPerSet: tris, drawn };
   };

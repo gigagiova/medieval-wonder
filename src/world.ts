@@ -6,6 +6,7 @@ import { torch, brazier, hornLantern, bracketLantern, lucerna, polykandelon, can
 import { layoutTown, lotsFor, buildHouse, buildBridges, townTexture, type Town } from './town';
 import { setGroundExtra } from './displace';
 import { buildCatacombs, CATACOMB_SPOTS } from './catacombs';
+import { buildForest, treeSpots } from './forest';
 import { terrain } from './displace';
 
 // A Lombard town around AD 750, packed inside what is left of a Roman circuit.
@@ -122,6 +123,25 @@ export function buildWorld(scene: THREE.Scene) {
   monastery(b);
   buildCatacombs(b);
   outskirts(b);
+  // The wood: dense, old and dead, right up to a cleared strip along the wall.
+  const insideWall = (x: number, z: number) => {
+    let c = false;
+    for (let i = 0, j = WALL.length - 1; i < WALL.length; j = i++) {
+      const a = WALL[i], bb = WALL[j];
+      if ((a.y > z) !== (bb.y > z) && x < ((bb.x - a.x) * (z - a.y)) / (bb.y - a.y) + a.x) c = !c;
+    }
+    return c;
+  };
+  const [a0, a1] = mapMarks.aqueduct;
+  const keepOut = (x: number, z: number) => {
+    if (Math.hypot(x - GATE.p.x, z - GATE.p.y) < 20) return true;
+    if (z > GATE.p.y && Math.abs(x - GATE.p.x - Math.sin(z * 0.05) * 2) < 16) return true;
+    const ab = a1.clone().sub(a0), ap = new THREE.Vector2(x - a0.x, z - a0.y);
+    const t = THREE.MathUtils.clamp(ap.dot(ab) / ab.lengthSq(), 0, 1);
+    return ap.sub(ab.multiplyScalar(t)).length() < 6;
+  };
+  buildForest(scene, b, { inside: insideWall, keepOut });
+  mapMarks.trees.push(...treeSpots);
   const { collider, cells } = b.build(scene);
   return { collider, cells, lamps: b.lamps, flames: b.flames, props: b.props, townTex: townTexture(town) };
 }
@@ -448,13 +468,6 @@ function deadTree(b: Builder, x: number, z: number, h: number) {
 
 function outskirts(b: Builder) {
   const inside = (x: number, z: number) => Math.hypot(x, z) < 92;
-  for (let i = 0; i < 70; i++) {
-    const a = rand() * Math.PI * 2, r = R(95, 170);
-    const x = Math.sin(a) * r, z = Math.cos(a) * r;
-    if (Math.abs(x - GATE.p.x) < 14 && z > 0) continue;
-    deadTree(b, x, z, R(4, 9));
-    mapMarks.trees.push(V(x, z));
-  }
   // The aqueduct, long dry, striding in from the hills; whole spans have fallen.
   const a0 = V(78, -50), a1 = V(205, -150);
   const dir = a1.clone().sub(a0);

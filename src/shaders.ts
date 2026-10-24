@@ -75,6 +75,29 @@ export const surfaceGLSL = /* glsl */ `
 struct Surf { vec3 alb; float rough; float h; vec3 emi; };
 
 uniform sampler2D uTown; // R main lane, G street, B gutter, A terrain height
+uniform sampler2D uMicro; // R pores, G grain, B grit, A fibres
+
+// Porous surfaces reflect almost nothing: keep a third of the specular.
+#if MAT == 7 || MAT == 8 || MAT == 16 || MAT == 18 || MAT == 15
+  #define SPEC_K 1.0
+#else
+  #define SPEC_K 0.3
+#endif
+
+// Triplanar micro detail at two scales (pores ~1 cm, grain ~4 cm).
+vec4 micro(vec3 p, vec3 n){
+  vec3 w = pow(abs(n), vec3(4.)); w /= (w.x + w.y + w.z);
+  vec4 a = texture2D(uMicro, p.zy*1.7)*w.x + texture2D(uMicro, p.xz*1.7)*w.y + texture2D(uMicro, p.xy*1.7)*w.z;
+  vec4 b = texture2D(uMicro, p.zy*6.3+0.37)*w.x + texture2D(uMicro, p.xz*6.3+0.37)*w.y + texture2D(uMicro, p.xy*6.3+0.37)*w.z;
+  return vec4(max(a.r, b.r), a.g*0.6 + b.g*0.4, b.b, a.a);
+}
+// Make a surface coarse and porous: darker pits, grainy albedo, rough relief.
+void coarse(inout Surf s, vec3 p, vec3 n, float amount){
+  vec4 m = micro(p, n);
+  s.alb *= mix(1.0, (0.72 + 0.5*m.g) * (0.9 + 0.2*m.b) * (1.0 - 0.55*m.r), amount);
+  s.h += amount * (0.55*m.g + 0.25*m.b - 0.9*m.r);
+  s.rough = mix(s.rough, 0.98, amount*0.8);
+}
 vec4 townAt(vec2 xz){ return texture2D(uTown, (xz + 100.)/200.); }
 float groundY(vec3 p){ return p.y < -2.5 ? -7.0 : townAt(p.xz).a*4. - 1.5; }
 vec2 projUV(vec3 p, vec3 n){
@@ -369,7 +392,7 @@ Surf surface(vec3 p, vec3 n){
   float pud = smoothstep(0.66,0.7,fbm(vec3(uv*0.22,4.))) * (1.-step(0.5,rm)*0.5) + gut*0.5;
   pud = clamp(pud,0.,1.);
   s.alb *= 1.-pud*0.4;
-  s.rough = mix(rm > 0.5 ? 0.86 : 0.96, 0.4, pud);
+  s.rough = mix(rm > 0.5 ? 0.95 : 0.98, 0.62, pud);
   s.h *= 1.-pud*0.7;
 #elif MAT == 2
   vec2 uv = projUV(p,n);
@@ -487,6 +510,18 @@ Surf surface(vec3 p, vec3 n){
   float g = fbm(p*12.);
   s.alb = mix(vec3(0.09,0.06,0.03), vec3(0.06,0.09,0.07), smoothstep(0.4,0.7,g));
   s.rough = 0.7;
+#endif
+#if MAT == 0 || MAT == 9 || MAT == 12 || MAT == 13
+  coarse(s, p, n, 1.0);
+#elif MAT == 5
+  coarse(s, p, n, 1.0);
+  s.rough = 0.99;
+#elif MAT == 1
+  coarse(s, p, n, 0.9);
+#elif MAT == 3
+  { vec4 m = micro(p, n); s.alb *= 0.8 + 0.35*m.a; s.h += 0.6*m.a - 0.5*m.r; s.rough = 0.97; }
+#elif MAT == 2 || MAT == 10 || MAT == 14 || MAT == 17
+  coarse(s, p, n, 0.6);
 #endif
   return s;
 }
