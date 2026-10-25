@@ -50,6 +50,15 @@ function wornBox(w: number, h: number, d: number, r: number, L: number) {
   return m;
 }
 
+/**
+ * Detail level of what is built. 'mid' is for town chunks seen from 48-110 m
+ * (see benevento/stream.ts): small pieces (< ~0.5 m), roof tiles and worn or
+ * bevelled edges are dropped and surfaces are tessellated coarsely, but every
+ * random draw still happens, so the houses keep exactly the same shapes,
+ * materials and roofs as their full-detail build.
+ */
+export const DETAIL = { mid: false };
+
 /** Masonry never has knife edges: these materials get rounded, weathered arrises. */
 const WORN: Partial<Record<MatName, number>> = { stone: 1, block: 1, bigstone: 1.3, rubble: 1.2, brick: 0.8, marble: 0.9, slab: 0.7, plaster: 1.1, rock: 1.4, ground: 1.4, clay: 0.6 };
 import { mat, type MatName } from './materials';
@@ -219,7 +228,7 @@ export class Builder {
     const proxy = collide ? new THREE.BoxGeometry(w, h, d) : undefined;
     const worn = WORN[m];
     const small = Math.min(w, h, d);
-    if (worn && small > 0.03) {
+    if (worn && small > 0.03 && !DETAIL.mid) {
       // Radius grows with the block: a few cm on a sill, 10-20 cm on a wall end.
       const r = THREE.MathUtils.clamp(small * 0.16 * worn, 0.012, 0.2 * worn);
       this.add(wornBox(w, h, d, Math.min(r, small * 0.45), Math.min(L, 4)), m, tmpM, collide, true, false, proxy);

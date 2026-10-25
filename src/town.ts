@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { Builder, rng } from './builder';
+import { Builder, rng, DETAIL } from './builder';
 import type { MatName } from './materials';
 import { arcadeGeo } from './shapes';
 import { brazier } from './lights';
@@ -123,8 +123,8 @@ export function buildHouse(b: Builder, lot: Lot) {
   const front = lot.front;
   // One plain prism is the whole house as far as collision goes. The street
   // front is a separate thick panel with real openings (see facade()).
-  b.add(prismWalls(c, base, h1 - base, WALL_STEP, front ? 0 : -1), lower, undefined, true, true, false, prismWalls(c, base, h - base, 1e9));
-  if (h > h1 + 0.5) b.add(prismWalls(c, h1, h - h1, WALL_STEP, front ? 0 : -1), upper, undefined, false, true);
+  b.add(prismWalls(c, base, h1 - base, DETAIL.mid ? 3.2 : WALL_STEP, front ? 0 : -1), lower, undefined, true, true, false, prismWalls(c, base, h - base, 1e9));
+  if (h > h1 + 0.5) b.add(prismWalls(c, h1, h - h1, DETAIL.mid ? 3.2 : WALL_STEP, front ? 0 : -1), upper, undefined, false, true);
   let jetty = 0;
   if (front) {
     const width = lot.street ?? 2;
