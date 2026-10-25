@@ -12,6 +12,11 @@ import * as Props from './npc/props';
 import { makeStaff } from './npc/population-props';
 import { fabric, type FabricKind } from './npc/fabric';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
+import { loadV2, kitsV2, bodiesV2, outfitV2, type OutfitV2 } from './npc2/kit';
+import { dressV2 } from './npc2/dress';
+
+/** Townsfolk v2 (src/npc2): MakeHuman bodies in modelled garments. `?npc=v1|v2`. */
+export const NPC_V2 = typeof location !== 'undefined' && new URLSearchParams(location.search).get('npc') === 'v2';
 
 // Townsfolk: monks, peasant men and women, and Lombard soldiers (arimanni)
 // walking the streets, standing in talking groups and keeping the gates.
@@ -26,7 +31,6 @@ import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
 // Walk up to someone and press E (or the Loquere button) to speak with them.
 
 const DIR = 'models/npc/';
-const PROPS_DIR = 'models/props/';
 
 type Sex = 'man' | 'woman';
 /**
@@ -40,25 +44,27 @@ const BODIES: Record<BodyId, { sex: Sex; height: number }> = {
   claudia: { sex: 'woman', height: 1.6 }, sophia: { sex: 'woman', height: 1.57 },
 };
 export type Role = Speaker;
-type OutfitId = 'monk' | 'peasantHood' | 'peasantCloak' | 'soldier' | 'soldierCloak' | 'woman' | 'womanShawl';
-export interface OutfitDef { sex: Sex; bodies: BodyId[]; spec: GarmentSpec; beard: boolean; wraps: boolean }
+type OutfitId = 'monk' | 'monkBare' | 'peasantHood' | 'peasantCloak' | 'soldier' | 'soldierCloak' | 'woman' | 'womanShawl';
+export interface OutfitDef { sex: Sex; bodies: BodyId[]; spec: GarmentSpec; beard: boolean; wraps: boolean; tonsure?: boolean }
 
 // Which bodies wear an outfit: every pairing is tailored once at load.
 const OUTFITS: Record<OutfitId, OutfitDef> = {
   monk: { sex: 'man', bodies: ['manuel', 'eric'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
+  // A monk in habit and scapular without his cowl, the crown of his head shaven.
+  monkBare: { sex: 'man', bodies: ['manuel', 'eric'], beard: false, wraps: false, tonsure: true, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: null, scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
   peasantHood: { sex: 'man', bodies: ['nathan'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather', thighs: 0.6, swing: true } },
   peasantCloak: { sex: 'man', bodies: ['eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.35, swing: true } },
   soldier: { sex: 'man', bodies: ['nathan', 'manuel'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 0.6 } },
   soldierCloak: { sex: 'man', bodies: ['eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 0.3, capeOpen: 0.8 } },
-  woman: { sex: 'woman', bodies: ['claudia', 'sophia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
-  womanShawl: { sex: 'woman', bodies: ['sophia', 'claudia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
+  woman: { sex: 'woman', bodies: ['claudia', 'sophia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash', stride: 0.85 } },
+  womanShawl: { sex: 'woman', bodies: ['sophia', 'claudia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash', stride: 0.85 } },
 };
 /** More outfits (src/npc/population.ts), tailored on first use like the others. */
 export function registerOutfit(id: string, def: OutfitDef) { (OUTFITS as Record<string, OutfitDef>)[id] = def; }
 export const outfitBodies = (id: string) => (OUTFITS as Record<string, OutfitDef>)[id]?.bodies ?? [];
 /** Whether an `outfit:body` pairing is already tailored (dressing someone in it then costs nothing extra). */
 export const outfitTailored = (key: string) => outfits.has(key);
-const ROLE_OUTFITS: Record<Role, OutfitId[]> = { monk: ['monk'], peasant: ['peasantHood', 'peasantCloak'], woman: ['woman', 'womanShawl'], soldier: ['soldier', 'soldierCloak'] };
+const ROLE_OUTFITS: Record<Role, OutfitId[]> = { monk: ['monk', 'monkBare'], peasant: ['peasantHood', 'peasantCloak'], woman: ['woman', 'womanShawl'], soldier: ['soldier', 'soldierCloak'] };
 
 // Natural dyes on wool and linen, muted and a little faded.
 const DYES = {
@@ -93,7 +99,8 @@ export function loadNpcAssets(): Promise<void> {
     const get = (u: string) => loadGltf(u, loader);
     const ids = Object.keys(BODIES) as BodyId[];
     const [ual, ...bodies] = await Promise.all([get(DIR + 'ual.json'), ...ids.map((id) => get(DIR + id + '.json'))]);
-    const scan = (id: string, top = false) => get(PROPS_DIR + id + '.json').then((g) => Props.prepScan(g.scene, top)).catch(() => null);
+    // (Lighter copies of the town's scanned props: see tools/npc-props.ts.)
+    const scan = (id: string, top = false) => get(DIR + id + '_lo.json').then((g) => Props.prepScan(g.scene, top)).catch(() => null);
     const [basket, bucket, jar] = await Promise.all([scan('wicker_basket_02', true), scan('wooden_bucket_01', true), scan('planter_pot_clay')]);
     scans = { basket, bucket, jar };
     // Older faces (see faceSwap).
@@ -125,6 +132,10 @@ export function loadNpcAssets(): Promise<void> {
       t.traverse((o) => { if (canon(o.name) === 'HeadTop_End') top = o.getWorldPosition(new THREE.Vector3()).y; });
       kits![id] = { id, sex, template: t, motion: retarget(t, ual), m, scale: height / (top || 1.8) };
     });
+    if (NPC_V2) {
+      await loadV2(get, ual);
+      for (const [id, k] of kitsV2) (kits as Record<string, KitData>)[id] = k as unknown as KitData;
+    }
     npcDebug.buildMs.retarget = performance.now() - t0;
     (npcDebug as unknown as { heads: unknown }).heads = Object.fromEntries(Object.entries(kits).map(([k, v]) => [k, { ...v.m.head, c: v.m.head.c.toArray(), hb: v.m.bone('Head').toArray(), top: v.m.bone('HeadTop_End').toArray(), neck: v.m.bone('Neck').toArray(), hips: v.m.bone('Hips').toArray() }]));
     weave = makeWeave();
@@ -140,12 +151,13 @@ export function loadNpcAssets(): Promise<void> {
  * cowl hides where face and head meet.
  */
 const FACES: Record<string, { outfits: OutfitId[]; share: number }> = {
-  face_grandpa: { outfits: ['monk', 'peasantHood'], share: 0.4 },
+  face_grandpa: { outfits: ['monk', 'monkBare', 'peasantHood'], share: 0.4 },
 };
 const faces = new Map<string, { geo: THREE.BufferGeometry; map: THREE.Texture }>();
 
 /** An outfit on a body, tailored on first use (0.2-0.7 s each); `outfit:body#face` with another face. */
 function outfitFor(key: string): Outfit {
+  if (NPC_V2 && kitsV2.has(key.split(':')[1])) return outfitV2(key.split(':')[0], key.split(':')[1]) as unknown as Outfit;
   let o = outfits.get(key);
   if (!o && key.includes('#')) {
     const [base, fid] = key.split('#'), b = outfitFor(base), f = faces.get(fid)!;
@@ -170,7 +182,7 @@ function tailor(id: OutfitId, body: BodyId): Outfit {
   const o = OUTFITS[id], k = kits![body];
   const t = SkeletonUtils.clone(k.template);
   t.updateMatrixWorld(true);
-  dressBody(t, o.sex, { beard: o.beard, wraps: o.wraps, m: k.m });
+  dressBody(t, o.sex, { beard: o.beard, wraps: o.wraps, m: k.m, tonsure: o.tonsure });
   t.traverse((x) => { if (/Teeth/.test(x.name)) x.visible = false; });
   if (o.spec.swing) addSwingBones(t);
   if (o.spec.stride) {
@@ -184,6 +196,19 @@ function tailor(id: OutfitId, body: BodyId): Outfit {
       const ix = m.geometry.index!, keep: number[] = [];
       const low = (i: number) => m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld).y < knee;
       for (let i = 0; i < ix.count; i += 3) if (low(ix.getX(i)) || low(ix.getX(i + 1)) || low(ix.getX(i + 2))) keep.push(ix.getX(i), ix.getX(i + 1), ix.getX(i + 2));
+      m.geometry.setIndex(keep);
+    });
+  }
+  if (o.spec.hem === 'knee') {
+    // Under a tunic to the knee, the trousers' thighs are never seen.
+    const keepBelow = k.m.bone('LeftLeg').y + 0.14, v = new THREE.Vector3();
+    t.traverse((x) => {
+      const m = x as THREE.SkinnedMesh;
+      if (!m.isSkinnedMesh || !/^(Wolf3D_Outfit_Bottom|Scan_Bottom)$/.test(m.name)) return;
+      const ix = m.geometry.index!, keep: number[] = [];
+      const low = (i: number) => m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld).y < keepBelow;
+      for (let i = 0; i < ix.count; i += 3) if (low(ix.getX(i)) || low(ix.getX(i + 1)) || low(ix.getX(i + 2))) keep.push(ix.getX(i), ix.getX(i + 1), ix.getX(i + 2));
+      m.geometry = m.geometry.clone();
       m.geometry.setIndex(keep);
     });
   }
@@ -338,6 +363,7 @@ export class Person {
     const mats = [fabric(kinds[0], tunic), fabric(kinds[1], over), belt, fabric(kinds[2], head)];
     // A long skirt is also skinned to helper bones that swing with the thighs.
     let skel = this.skeleton;
+    const v2 = (outfit as unknown as OutfitV2).v2;
     const extra = outfit.garment.extraBones;
     if (extra) {
       skel = new THREE.Skeleton([...skel.bones, ...extra.map((e) => this.bones.get(e.name)!)], [...skel.boneInverses, ...extra.map((e) => e.inv)]);
@@ -358,7 +384,9 @@ export class Person {
       this.thighBind = ['Left', 'Right'].map((s) => { const d = outfit.m.bone(s + 'Leg').sub(outfit.m.bone(s + 'UpLeg')); return Math.atan2(d.z, -d.y); });
       skel = new THREE.Skeleton([...skel.bones, ...this.skirt], [...skel.boneInverses, inv, inv.clone()]);
     }
-    this.cloth = new Clothing(scene, outfit.garment, skel, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
+    this.cloth = v2
+      ? dressV2(this.body, outfit as unknown as OutfitV2, { tunic, over, head, belt, leg: dye(pick(rnd, [...DYES.undyed, ...DYES.woad]), 0.3), shoe: new THREE.Color(0x8a7a6a).multiplyScalar(0.8 + rnd() * 0.3), kinds: lc?.kinds }) as unknown as Clothing
+      : new Clothing(scene, outfit.garment, skel, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
 
     // Motion.
     this.mixer = new THREE.AnimationMixer(this.body);
@@ -947,8 +975,10 @@ function cast(role: Role, o: { outfit?: number; body?: number; seed?: number; ge
   const rnd = mulberry(o.seed ?? rngSeed++ * 7919);
   const ids = ROLE_OUTFITS[role];
   const id = (o.outfitId as OutfitId | undefined) ?? ids[(o.outfit ?? Math.floor(rnd() * ids.length)) % ids.length];
-  const bs = OUTFITS[id].bodies;
+  const v2b = NPC_V2 ? bodiesV2(id, OUTFITS[id].sex) : [];
+  const bs: string[] = v2b.length ? v2b : OUTFITS[id].bodies;
   let key = `${id}:${bs[(o.body ?? Math.floor(rnd() * bs.length)) % bs.length]}`;
+  if (v2b.length) return { role, id, key, rnd, gear: o.gear, look: o.look };
   for (const [fid, f] of Object.entries(FACES)) if (f.outfits.includes(id) && faces.has(fid) && (o.face ?? rnd() < f.share)) { key += '#' + fid; break; }
   return { role, id, key, rnd, gear: o.gear, look: o.look };
 }

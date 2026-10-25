@@ -104,8 +104,16 @@ World coordinates in metres (x, z).
 - **Arch of Trajan / Porta Aurea** (389, −224): complete then as now (AD 114); part of the walls.
 - **Arch of Sacramento** (−76, −61) with the late-antique pentagonal tower beside it (OSM "Torre
   tardoantica"): stripped of marble, a gate.
-- **Roman theatre** (−229, −8): outside the walls in 700; houses in its arches (reuse certain from
-  archaeology), huts on the upper seats, the stage wall broken.
+- **Roman theatre** (−229, −8): Hadrianic, ~90 m across, cavea on vaulted substructures behind an
+  outer arcade of 25 arches per order; outside the walls in 700; houses in its arches (reuse certain
+  from archaeology), huts on the upper seats, the stage wall broken. The cavea is built block by block
+  (`theatrum.ts`): 12 rows of the ima cavea, a walkway (praecinctio) and a parapet wall (balteus), 10
+  rows of the media cavea, a second walkway and balteus, 6–7 rows of the summa; 5 radial stairs below and
+  11 above, two steps to every row of seats; every seat block with tread, riser and worn nose. Ruined
+  for 700: the orchestra silted over the first row and a half, the top rows robbed for lime (unevenly
+  round the curve), two sectors slumped where the vaults beneath fell in (rubble slopes, fallen blocks,
+  the upper arcade gone over them), single blocks missing, shifted and tipped, earth and weeds in the
+  joints.
 - **Thermae** (−419, −140): the baths between Porta S. Lorenzo and Port'Arsa (Meomartini), outside the
   circuit; shown with the ruined-baths module (pool, mosaics, collapsed vaults).
 - **Amphitheatre** (−593, −214): abandoned since the late antique ruralisation of the west; quarried
@@ -116,20 +124,64 @@ World coordinates in metres (x, z).
   The church "of the Forty" in it is medieval but undated: shown only as a chapel.
 - **Torre della Catena** (−517, −27): the 7th-c. fort (today isolated by 1943 bombing); enterable.
 - **S. Ilario a Port'Aurea** (429, −285): the little church with two domes in line on the Via Traiana.
-- **Ponte Leproso** (−764, −99): the Appia over the Sabato; **Pons S. Onuphrii** (−86, −372) over the
+- **Ponte Leproso** (axis from (−736.8, −143.4) to (−788.5, −61.4), OSM way 59431406): the Appia over
+  the Sabato, "pons marmoreus quod dicitur de Leprosis" in a charter of 1077, named Leproso first in
+  830. Built after Meomartini's survey (1889; summarised in it.wikipedia "Ponte Leproso", which cites
+  Meomartini, Galliazzo, Quilici, Rotili 1986 and *NSc* 1891): five equal semicircular arches of 8.70 m
+  on four piers 5 m thick and 7.50 m through (the roadway's width), a triangular cutwater upstream only,
+  the arches springing from a projecting cornice 60 cm high, all in pseudisodomic work of big, roughly
+  bossed limestone blocks (whence "marmoreus"), the rings of great wedge-shaped voussoirs; a level
+  roadway on the bridge reached by ramps between embankment walls of the same bossed blocks; tuff
+  footings. Restored under Valentinian, Valens and Gratian (367–375), whose names were on the parapet
+  (a readable; the wording after the names is reconstruction). Left out as later: Nauclerio's four
+  southern arches (1712), the widened mill pier and the mills (after 1077), the hospice (830). In the
+  game the classical span is 63.5 m (abutments at 20 and 83.5 m from the town end), the springing 1 m
+  above the Sabato's mean level, the roadway ~6 m above the water, ramps of 9–10% about 50 m long each
+  side; the river (OSM course) runs under the two southern arches, the northern ones stand half silted
+  over gravel; one downstream ring relaid in brick stands for the late-antique repair. The Appia and
+  the lane from the town now run to the ramp feet; trees are kept off the bridge, the ramps and the
+  meadow upstream on the town bank (the view from the lane). **Pons S. Onuphrii** (−86, −372) over the
   Calore at Porta Gloriosa (today's Ponte Vanvitelli, medieval core).
 - **S. Pietro extra muros** (−858, −6): Theodorada's nunnery across the Sabato on the Appia.
-- **Iseum** (660, 168): Domitian's temple of Isis (AD 88), whose obelisks and statues (the Apis bull)
-  survive scattered; its exact site is unknown — placed outside the east gate, where Isiac fragments
-  are built into the later walls and the Rocca. **Reconstruction.**
+- **Iseum** (−33, −73): Domitian's temple of Isis (AD 88/89), its remains in the square before the
+  bishop's church. The temple itself has never been found; the evidence: (1) one obelisk was standing
+  in front of the cathedral by 1597 (now Piazza Papiniano; its twin is in the Museo del Sannio; both name
+  Domitian and the dedicant Rutilius Lupus); (2) H. W. Müller (*Der Isiskult im antiken Benevent*, 1969;
+  Ital. tr. 1971) put the temple near the cathedral; (3) a red-granite sphinx was found in the
+  Superintendency's excavations in the cathedral area in 2009 (Pirelli, "The Imperial Iseum in Benevento
+  and its Zoomorphic Gods", 2023, n. 42); (4) most of the ~50 Isiac pieces came out in 1903 (Meomartini,
+  Marucchi, Savignoni, *NSc* 1904) from the foundations of the late-antique/Lombard town walls, i.e. as
+  spolia, so their findspot does not give the temple's site — Meomartini himself preferred the
+  north-east near the Arch of Trajan, others the theatre. Since the temple stood inside the Roman town
+  and its spolia are in the walls of the 4th–7th c. circuit, the most defensible place is the centre,
+  by the cathedral (also the user's view). Shown as remains worked into the episcopal quarter: the
+  podium with a house on it, granite columns of the pronaos, a fallen and a broken obelisk, two
+  sphinxes set up at the atrium gate, a pharaoh walled into a house, the Apis bull (survives, Viale
+  San Lorenzo; findspot unknown) sunk at the corner of the square. **Reconstruction** of the
+  arrangement; the location is a scholarly hypothesis, not proven. Earlier versions of the game put
+  it outside the east gate; that was wrong (a temple of the colony stood inside its walls).
 - **Lombard cemetery** (238, 286): the necropolis excavated south of the town (Rotili 1977); poles with
   wooden doves (perticae, Paul the Deacon HL V 34).
 - **The walnut** (−330, 478): legend only. The *Vita Barbati* tells of the sacred tree; the later
   witches' walnut was "by the Sabato". Placed by the Sabato south of the town.
 - **Mill** (−692, 2) on a leat of the Sabato: mills and baths on the rivers appear in charters of the
   early 8th c. (inferred).
-- **Hortus Curtis** (566, −16): the future site of S. Sofia, in 700 the dukes' orchard with a Roman
-  cistern under it (the cistern is invented).
+- **Hortus Curtis / site of S. Sofia** (566, −16): S. Sofia was founded c. 760 by Gisulf II and
+  Arechis II (Chronicon S. Sophiae), the Lombards' national church: a star-shaped wall round a ring of
+  eight pillars and a central hexagon of six Roman columns. No earlier church is attested on the site,
+  so in 700 it is the dukes' orchard with a Roman cistern under it (the cistern is invented) and, as a
+  foreshadowing, six Roman columns stacked in a rough ring, two carrying a vine (reconstruction; a
+  readable tells what will rise here). Teleports "Hortus Curtis" and "Sancta Sophia".
+- **Castellum Aquae** (622, 160): the height where the Rocca dei Rettori stands (1321), just outside
+  the circuit of 700 beyond Porta Summa (the annex that takes it in is 10th-c.). Excavations of 1998
+  found a Samnite rampart and necropolis and a Roman bath building / castellum aquae of the aqueduct from
+  the Serino; the Lombard Torrione is of 871/875, a Benedictine nunnery here is 8th-c. (later than 700),
+  the papal Rocca from 1321 (Rete museale della Provincia di Benevento, "Rocca dei Rettori"; it/en
+  Wikipedia). Shown as the Roman water-castle: a brick hall of two barrel vaults over a cistern (enter
+  by the broken arch; water still stands in it), the distribution tank on the roof (climb the stair of
+  reused blocks), the last arches of the aqueduct from the east-south-east (two fallen), tombs on the
+  slope, and a Lombard timber watch platform over the Via Summa (**inferred**). Readables: the
+  water-castle, and what the height will carry (Torrione, castrum, Rocca).
 
 ## 6. The town in 700
 
@@ -150,11 +202,33 @@ World coordinates in metres (x, z).
 - The decumanus (*platea publica maior*) cannot be traced as one corridor in the plan; it is the cheapest
   path through the plan's lane graph that stays near the line of the later Via Magistrale (Dijkstra in
   `gen_geo.py`), paved at 3.3 m with the old Roman slabs.
-- Density: houses are dense along the decumanus, round the curtis, the bishop's church and inside Porta
-  Aurea; elsewhere blocks are gardens (*orti*), vines, pens (*stabula*), meadows and ruins of Roman
-  houses — "strong penetration of the countryside inside" (Bertelli). Houses of stone (*casae
-  fabritae*, single or with an upper storey, outside stair) and of wood; pontili bridge some lanes
-  (attested later, e.g. *pontile de aurificibus*, and surviving examples).
+- **Built and open: the plan decides.** The user's plan is the authority for what was built and what
+  was open in 700, and it draws the buildings themselves: inside the blocks its lines divide the cells
+  that are houses. **Every drawn cell of a block is one building with the drawn footprint** (irregular
+  outlines kept, simplified to at most ~10 corners, roofs hipped to follow them; the front is the side
+  on a lane). Where the plan draws a cell inside another: if what is left of the outer cell is a thin
+  band (under 9 m), the outer cell is a ring of buildings (a cloister, a courtyard house) and the inner
+  one its courtyard, left open; otherwise the outer cell is a yard with the inner buildings standing in
+  it. Cells too big for one house (blocks drawn without inner lines, over ~420 m²) are built up wall to
+  wall: houses along every lane edge, back ranges behind them, then the rest tiled with buildings on the
+  block's grain. Only the plan's green open spaces are gardens (*orti*), vines, pens (*stabula*),
+  meadows and ruins; its street spaces stay open (with pontili and arches over the narrow lanes). The
+  exceptions are blocks taken by a landmark the game builds (the curtis, the episcopium and the Iseum
+  before it, the forum's precinct) and the 3–4 m band kept clear inside the curtain. An earlier version
+  thinned the plan's blocks into gardens by a "density" field following the *città ad isole* model
+  (islands of houses among fields and ruins, as Brogiolo and Gelichi describe for many north-Italian
+  towns, and the "strong penetration of the countryside inside" Bertelli notes for Benevento); that
+  contradicted the plan and was dropped. A ducal capital and bishop's see c. 700 can carry a dense core (on
+  Lombard cities staying the political and social centres of their territories: Wickham, *Framing the
+  Early Middle Ages*, 2005; on the continuity of urban living under the Lombards: C. La Rocca's work on
+  Lombard towns; the *isole* model itself is argued case by case, not as a rule), and the plan's
+  own open spaces keep the countryside inside the walls. `tools/benevento/test_layout.ts` reports the
+  match: about 80% of the plan's block area lies under house walls (about 90% under their roofs, eaves
+  included; the rest is the drawn courtyards, joints under 1 m and small yards) and over 99% of the
+  plan's open ground is left open; `layout_vs_plan.py` writes zoomed overlays of the plan's cell
+  outlines on the generated footprints. Houses of stone (*casae fabritae*, single or with an upper storey, outside stair) and of
+  wood; pontili bridge some lanes (attested later, e.g. *pontile de aurificibus*, and surviving
+  examples). The density field now only sets how tall the houses are and where wells and arches go.
 - Quarters exposed to the game (`getMapData().districts`) with certainty flags: curtis and Lombard
   quarter (attested), episcopium (attested), forum market (inferred), Latin quarters along the decumanus
   and in the west (inferred), an eastern/Greek household by Porta Aurea (**hypothesis**: churches "de
@@ -165,7 +239,7 @@ World coordinates in metres (x, z).
 
 - The plan is schematic: houses are placed in its blocks, not on surveyed 8th-century plots.
 - East end of the circuit and Porta Summa's old position; the old Porta Rufina.
-- The Iseum's location; the walnut (legend); the cistern (invented); the Santi Quaranta hypogea used
+- The Iseum's exact site (placed by the cathedral, see §5); the walnut (legend); the cistern (invented); the Santi Quaranta hypogea used
   as catacombs (a reconstruction choice: the complex was a Roman cryptoporticus).
 - The 700 ground level was several metres below today's in places; the DEM is modern.
 
@@ -176,10 +250,97 @@ World coordinates in metres (x, z).
   districts, explorable targets); `layout.ts` (the 0.5 m town raster: blocks, lanes, lots, plots,
   pontili); `fabric.ts` + `fabric.worker.ts` + `stream.ts` (32 m chunks built in workers, 128 m LOD
   super-chunks of plain prisms beyond 48–68 m); `monuments.ts`, `interiors.ts`, `lore.ts`, `secrets.ts`.
+- `theatrum.ts` builds the theatre's cavea block by block (seat blocks are 12–14-triangle shells
+  showing tread, riser, worn nose, ends and, where the row behind is gone, the back; a stepped core
+  shows where blocks are missing; collision is a smooth ramp through the treads). `pons.ts` builds the
+  Ponte Leproso in world coordinates from its OSM axis (bossed ashlar faces in uneven courses with the
+  arch openings cut out, voussoir rings, barrels, cutwaters, cornice, basoli, kerbs, parapets; collision
+  is the roadway, the side walls and the piers). Masonry is emitted through the arch kit (`Acc`).
 - Check the town against the plan: `tools/benevento/test_layout.ts` (writes the raster), then
   `tools/benevento/layout_vs_plan.py` (writes `layout-vs-plan.png`).
 - Measured in headless Chromium (SwiftShader, CPU rendering), phone viewport 390×844: world build
   16–23 s, title to *Enter* 40–75 s; at the busiest places 220k–640k triangles and 100–190 draw calls
   per frame; JS heap ~340–365 MB after GC (it was ~900 MB before the CPU copies of the meshes were
   freed). Collision is one merged proxy mesh (boxes and prisms) with a BVH.
+- Performance (phone first): `?debug` shows a HUD (`src/perf.ts`) with fps, frame time, CPU ms per
+  system, draw calls, triangles, GPU textures / geometries, resolution scale and JS heap. Culling in
+  `main.ts` `cull()`: zones, draw distance, cells wholly inside the fog (`src/fogcull.ts`, a CPU twin of
+  the shader's height fog: keep its constants in step), and above ground a conservative software
+  occlusion buffer of the nearby houses (`src/occlusion.ts`). The stream keeps three details: full
+  chunks within 48–68 m, middle chunks within 88–104 m (the same houses built with `DETAIL.mid`
+  in `builder.ts`: no small pieces, tiles or bevels, coarse tessellation, about a fifth of the
+  triangles), plain blocks beyond. Props are one InstancedMesh per kind and part, refilled per
+  instance by range and frustum (`commitProps`). World textures ship as KTX2 (`*.ktx2.wasm`,
+  because the host refuses `.ktx2`; `tools/encode-ktx2.mjs`), with the WebP as fallback (`?noktx2`).
 - Secrets, explorables and easter eggs: `SECRETS.md`.
+
+## 9. Ponte Fratto (Pons Maior)
+
+**What is known.** The ruins of a Roman bridge over the **Calore at Cellarulo**, the plain north-west of
+the town where the Calore turns south to meet the Sabato. Meomartini (1889, *I monumenti*, pp. 250-251,
+on the Via Latina) puts it upstream of the confluence, "at the end of the contrada Cellarulo, where one
+still sees the ruins of a bridge, which is therefore called *Ponte Fratto*, that is broken bridge", and
+notes the Roman road still under the fields from the bridge to S. Maria delle Grazie; he thought the
+visible ruins later than the first Roman bridge, but the crossing itself certain
+(https://it.wikisource.org/wiki/Pagina:Meomartini_-_I_monumenti_e_le_opere_d%27arte_della_citt%C3%A0_di_Benevento.djvu/276).
+The Treccani *Enciclopedia dell'Arte Antica*, "Benevento"
+(https://www.treccani.it/enciclopedia/benevento_(Enciclopedia-dell'-Arte-Antica)/) gives it to the
+second Roman artery, the branch of the **Via Latina** from Teanum by Allifae and Telesia: "the remains
+of the piers of a bridge, the so-called Ponte Fratto, which crossed the Calore in contrada Cellarulo",
+next to Republican-to-Imperial kilns and workshops. Local archaeology calls it the **Pons Maior** of the
+texts and says it fell after the Middle Ages and was not rebuilt (Archeomedia, "Salviamo e valorizziamo
+il Parco archeologico di Cellarulo"; Anteprima24 on the LIPU paths); today only pier stumps show, worn by
+floods (Meer, "I ponti della provincia di Benevento"). It is often confused with Ponte Leproso (the Appia
+over the Sabato). Torelli brings the Via Latina in by this bridge, Rotili by the bridge of S. Onofrio.
+Position: OpenStreetMap node 3734199956 "Ponte Fratto" (41.13920 N, 14.75850 E), on the Calore's real
+course (OSM way 838750109). No survey of its spans or masonry was found.
+
+**What the game shows (a reconstruction).** Five round arches of 8.8 m clear span on piers 3.2 m thick,
+with pointed cutwaters upstream (the Calore runs south here) and blunter ones downstream; a deck 6.4 m
+wide about 7.4 m over the water; abutments into the banks and low embankments (*aggeres*) carrying the
+road down to the plain; faced with large limestone blocks over a rubble core (the "massi lapidei a bozze"
+reported for the ruins), voussoir rings of dressed stone. In AD 700 it is drawn **damaged but in use**: a
+flood has carried off the middle arch (its blocks lie in the river, one with the end of the building
+inscription), the gap is spanned with timber on a trestle in the stream, the next arch has lost its
+upstream half, the parapets are broken, the road's paving robbed for building, weeds and shrubs grow on
+the piers. "Fratto" is the later name; the game calls it Pons Maior, with the modern name in the
+teleport. Dimensions, damage and repair are inferences; the two readables there are invented.
+
+**How it is built.** The bridge lies 160 m north of the edge of the baked map (z < -800), so
+`src/benevento/cellarulo.ts` supplies the ground there: EU-DEM 25 m from OpenTopoData sampled every
+12.5 m, blended into the map's last row over 30 m, with the Calore's real course carved the way
+`gen_geo.py` carves the rivers; `geo.ts` `baseHeight()` defers to it north of the map.
+`pontefratto.ts` draws that ground and its collision, the water along the real course (trimming the baked
+course's shortcut beyond the map edge), the bridge, the road remnants and a wood along the banks (a second
+`buildForest` call bounded to the patch, kept off the bridge and roads). Teleport "Pons Maior (Ponte
+Fratto)"; region name "Pons Maior"; map landmark.
+
+## 10. Spolia: Roman sculpture in the walls and the ruins
+
+Benevento's late-antique and Lombard walls are known for the Roman material built into them: funerary
+portraits and reliefs, inscriptions, altars, heads and column pieces, and Egyptian sculpture of the
+Iseum (sphinxes, an Apis bull and other pieces in the Museo del Sannio came out of walls and later
+buildings: Treccani EAA "Benevento"; Bertelli Buquicchio 1992; Rotili 1986; H. W. Müller, *Il culto di
+Iside nell'antica Benevento*, 1971). The game places 23 scanned pieces (photogrammetry of real Roman and
+Egyptian sculpture in museums, CC BY / CC0, credited in `public/models/spolia/CREDITS.md`; none is from
+Benevento, so which scan stands for which kind of piece is illustrative):
+
+- **in the outer face of the curtain** all round, thickest by Porta Rufina, the Arcus Sacramenti and Porta
+  Summa (where a sphinx and a ram of Amun lie in the footing as building blocks); stelae sometimes upside
+  down, torsos laid on their sides as blocks; an epitaph to read by Porta Rufina;
+- **in gate jambs** (low, on the gates' outer faces) and **in house fronts** (small heads and a stele, at
+  the ends of a front where no opening is cut);
+- **lying broken**, half sunk, in the theatre, amphitheatre, baths, Santi Quaranta, by the Arcus
+  Sacramenti and S. Ilario, and along the Appia by Ponte Leproso (the roads' tombs);
+- **reused**: a headless cuirassed emperor still on a base at the forum (readable "The iron man"), a
+  Roman sarcophagus for a burial in the bishop's atrium and another for a Lombard grave (both practices
+  attested), a sarcophagus as the mill's trough, a lion and a capital by the church, an altar set up as a
+  milestone at Ponte Fratto, a torso as a mounting block inside Porta Summa;
+- **Egyptian pieces round the Iseum** (sphinx, seated king, Isis, Apis, ram, a dark sarcophagus lid),
+  placed relative to `SITES.iseum`, so they follow the site if it moves.
+
+Placement (`src/benevento/spolia.ts`) is computed at load from the wall plan, the gates, the lots and the
+sites, and every spot is tested against the collision already built (1 m occupancy cells), so the pieces
+follow the layout when it changes. The scans are packed by `tools/fetch-spolia.ts` (decimated to 5-12k
+triangles with ~1-2k far versions, scaled to real sizes, colour greyed); a shader adds grime in the
+hollows, rain streaks, lichen, moss on the tops and soil at the foot, and the common fog.
