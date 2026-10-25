@@ -4,17 +4,29 @@ import { makeFire } from '../fire';
 import type { Cell, Lamp } from '../builder';
 import { field, fastTerrain } from '../displace';
 import { BOUNDS } from './geo';
-import { CHUNK, lodChunk, type ChunkItems, type ChunkResult, type Hole } from './fabric';
+import { CHUNK, lodChunk, type Baked, type ChunkItems, type ChunkResult, type Hole } from './fabric';
 
 // Streams the town around the player. Every chunk always has a cheap
 // stand-in (plain house blocks, roofs and coarse ground, merged per 128 m
 // super-chunk); chunks near the player are built in full by web workers and
 // swap in as they arrive, and are dropped again when left behind. The fog
 // closes in at ~70 m, so nobody sees the swap.
+//
+// Between the full chunks and the plain blocks there is a middle detail
+// (R_MID): the same houses built by the same code with the same random draws,
+// but without the small pieces, roof tiles and bevels and with coarse
+// tessellation (about a fifth of the triangles). A middle chunk is uploaded
+// once when it arrives and then only shown or hidden: it stays under a full
+// chunk while that one is drawn and comes back the moment it is dropped, so
+// neither swap rebuilds anything; its super-chunk leaves out its blocks.
 
 export const R_IN = 48, R_OUT = 68;
+/** Middle detail is built within R_MID and forgotten beyond R_MID_OUT. */
+export const R_MID = 88, R_MID_OUT = 104;
 const SUPER = 4; // chunks per super-chunk side
-interface ChunkState { it: ChunkItems; status: 'lod' | 'queued' | 'building' | 'ready'; cell?: Cell; lamps: Lamp[]; fire?: THREE.Object3D; lod?: { walls: number[]; roofs: number[] } }
+interface ChunkState { it: ChunkItems; status: 'lod' | 'queued' | 'building' | 'ready'; cell?: Cell; lamps: Lamp[]; fire?: THREE.Object3D; lod?: { walls: number[]; roofs: number[] };
+  /** Middle detail (kept on the GPU while within R_MID_OUT); shown when in this.cells. */
+  midCell?: Cell; midShown?: boolean; midStatus: 'none' | 'queued' | 'building' | 'ready' }
 interface Super { key: number; si: number; sj: number; members: number[]; dirty: boolean; cell?: Cell; holes: Hole[] }
 
 export class FabricStream {
@@ -24,12 +36,15 @@ export class FabricStream {
   uploader?: (meshes: THREE.Mesh[]) => void;
   private workers: { w: Worker; busy: number | null }[] = [];
   private queue: number[] = [];
-  stats = { built: 0, ms: 0, ready: 0, building: 0, lodRebuilds: 0, tris: 0 };
+  private midQueue: number[] = [];
+  /** Middle chunks that came back from the workers, uploaded one per frame. */
+  private midArrived: ChunkResult[] = [];
+  stats = { built: 0, ms: 0, ready: 0, building: 0, lodRebuilds: 0, tris: 0, mid: 0, midBuilt: 0, midMs: 0, superMs: 0 };
   private waiters: { x: number; z: number; r: number; res: () => void; prog?: (f: number) => void }[] = [];
 
   constructor(private scene: THREE.Scene, items: Map<number, ChunkItems>, private cells: Cell[], private lamps: Lamp[], holes: Hole[]) {
     for (const it of items.values()) {
-      this.chunks.set(it.key, { it, status: 'lod', lamps: [] });
+      this.chunks.set(it.key, { it, status: 'lod', lamps: [], midStatus: 'none' });
       const si = Math.floor(it.i / SUPER), sj = Math.floor(it.j / SUPER), sk = si * 4096 + sj;
       let s = this.supers.get(sk);
       if (!s) this.supers.set(sk, (s = { key: sk, si, sj, members: [], dirty: true, holes: [] }));
@@ -43,7 +58,7 @@ export class FabricStream {
     for (let i = 0; i < n; i++) {
       const w = new Worker(new URL('./fabric.worker.ts', import.meta.url), { type: 'module' });
       const slot = { w, busy: null as number | null };
-      w.onmessage = (e: MessageEvent<ChunkResult>) => { slot.busy = null; this.arrive(e.data); this.pump(); };
+      w.onmessage = (e: MessageEvent<ChunkResult & { mid?: boolean }>) => { slot.busy = null; if (e.data.mid) this.midArrived.push(e.data); else this.arrive(e.data); this.pump(); };
       w.onerror = (e) => { console.warn('fabric worker error', e.message); slot.busy = null; };
       this.workers.push(slot);
     }
@@ -54,6 +69,8 @@ export class FabricStream {
   ready(x: number, z: number, r: number, prog?: (f: number) => void) {
     return new Promise<void>((res) => { this.waiters.push({ x, z, r, res, prog }); this.checkWaiters(); });
   }
+  /** The chunks' items within r of (x, z) (for occlusion: their houses). */
+  itemsNear(x: number, z: number, r: number) { return this.near(x, z, r).map((c) => c.it); }
   private near(x: number, z: number, r: number) {
     const out: ChunkState[] = [];
     for (let i = Math.floor((x - r) / CHUNK); i <= Math.floor((x + r) / CHUNK); i++)
@@ -95,8 +112,31 @@ export class FabricStream {
       if (rectDist(c.it, cam.x, cam.z) > R_OUT) { c.status = 'lod'; return false; }
       return true;
     });
+    // Middle detail: wanted within R_MID (also under full chunks, so it is
+    // there the moment they are dropped), forgotten beyond R_MID_OUT.
+    for (const c of this.near(cam.x, cam.z, R_MID)) if (c.midStatus === 'none') { c.midStatus = 'queued'; this.midQueue.push(c.it.key); }
+    if (this.midQueue.length) {
+      this.midQueue.sort((a, b) => rectDist(this.chunks.get(a)!.it, cam.x, cam.z) - rectDist(this.chunks.get(b)!.it, cam.x, cam.z));
+      this.midQueue = this.midQueue.filter((k) => {
+        const c = this.chunks.get(k)!;
+        if (rectDist(c.it, cam.x, cam.z) > R_MID_OUT) { c.midStatus = 'none'; return false; }
+        return true;
+      });
+    }
     this.pump();
-    for (const c of this.chunks.values()) if (c.status === 'ready' && rectDist(c.it, cam.x, cam.z) > R_OUT) this.unload(c);
+    for (const c of this.chunks.values()) {
+      if (c.status === 'ready' && rectDist(c.it, cam.x, cam.z) > R_OUT) this.unload(c);
+      if (c.midStatus === 'ready' && rectDist(c.it, cam.x, cam.z) > R_MID_OUT) {
+        const shown = c.midShown;
+        this.hideMid(c);
+        for (const m of c.midCell!.meshes) { this.scene.remove(m); m.geometry.dispose(); }
+        c.midCell = undefined; c.midStatus = 'none'; this.stats.mid--;
+        if (shown) this.markSuper(c); // its blocks come back
+      }
+    }
+    // One middle chunk to the GPU per frame: spreads the uploads after a teleport.
+    const r = this.midArrived.shift();
+    if (r) this.arriveMid(r);
     let budget = 2;
     for (const s of this.supers.values()) if (s.dirty && budget-- > 0) this.rebuildSuper(s);
   }
@@ -104,12 +144,21 @@ export class FabricStream {
   private pump() {
     for (const slot of this.workers) {
       if (slot.busy !== null) continue;
+      // Full detail first; middle detail only with a worker to spare.
       const k = this.queue.shift();
-      if (k === undefined) break;
-      const c = this.chunks.get(k)!;
-      c.status = 'building';
-      slot.busy = k;
-      slot.w.postMessage({ items: c.it });
+      if (k !== undefined) {
+        const c = this.chunks.get(k)!;
+        c.status = 'building';
+        slot.busy = k;
+        slot.w.postMessage({ items: c.it });
+        continue;
+      }
+      const m = this.midQueue.shift();
+      if (m === undefined) break;
+      const c = this.chunks.get(m)!;
+      c.midStatus = 'building';
+      slot.busy = m;
+      slot.w.postMessage({ items: c.it, mid: true });
     }
     this.stats.building = this.workers.filter((w) => w.busy !== null).length;
   }
@@ -147,8 +196,52 @@ export class FabricStream {
     }
     c.status = 'ready';
     this.stats.ready++;
+    this.hideMid(c);
     this.markSuper(c);
     this.checkWaiters();
+  }
+
+  private arriveMid(r: ChunkResult) {
+    const c = this.chunks.get(r.key);
+    if (!c) return;
+    this.stats.midBuilt++; this.stats.midMs += r.ms;
+    if (c.midStatus !== 'building') return; // dropped while building
+    c.midCell = this.makeCell('m' + r.key, r.baked);
+    c.midStatus = 'ready';
+    this.stats.mid++;
+    // Shown by its super-chunk's next rebuild (which drops the blocks it replaces).
+    if (c.status !== 'ready') this.markSuper(c);
+  }
+  private makeCell(key: string, baked: Baked[]): Cell {
+    const cell: Cell = { key, under: false, box: new THREE.Box3(), meshes: [], visible: true, occluded: 0 };
+    for (const bk of baked) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(bk.pos, 3));
+      g.setAttribute('normal', new THREE.BufferAttribute(bk.nor, 3, true));
+      g.computeBoundingBox(); g.computeBoundingSphere();
+      cell.box.union(g.boundingBox!);
+      for (const a of Object.values(g.attributes)) (a as THREE.BufferAttribute).onUpload(function (this: THREE.BufferAttribute) { (this as unknown as { array: unknown }).array = null; });
+      const mesh = new THREE.Mesh(g, mat(bk.m));
+      mesh.matrixAutoUpdate = false;
+      mesh.visible = false;
+      this.scene.add(mesh);
+      cell.meshes.push(mesh);
+    }
+    this.uploader?.(cell.meshes as THREE.Mesh[]);
+    return cell;
+  }
+  private showMid(c: ChunkState) {
+    if (!c.midCell || c.midShown) return;
+    c.midShown = true;
+    c.midCell.occluded = 0;
+    this.cells.push(c.midCell);
+  }
+  private hideMid(c: ChunkState) {
+    if (!c.midCell || !c.midShown) return;
+    c.midShown = false;
+    const i = this.cells.indexOf(c.midCell);
+    if (i >= 0) this.cells.splice(i, 1);
+    for (const m of c.midCell.meshes) m.visible = false;
   }
 
   private unload(c: ChunkState) {
@@ -167,7 +260,8 @@ export class FabricStream {
     }
     c.status = 'lod';
     this.stats.ready--;
-    this.markSuper(c);
+    // The middle detail takes over at once; without it the blocks come back.
+    if (c.midCell) this.showMid(c); else this.markSuper(c);
   }
 
   private markSuper(c: ChunkState) {
@@ -185,11 +279,15 @@ export class FabricStream {
       if (i >= 0) this.cells.splice(i, 1);
       s.cell = undefined;
     }
+    const t0 = performance.now();
     const walls: number[] = [], roofs: number[] = [];
     const readyRect: [number, number][] = [];
+    const showing: ChunkState[] = [];
     for (const k of s.members) {
       const c = this.chunks.get(k)!;
       if (c.status === 'ready') { readyRect.push([c.it.i, c.it.j]); continue; }
+      // Middle detail carries its own ground.
+      if (c.midCell) { showing.push(c); readyRect.push([c.it.i, c.it.j]); continue; }
       if (!c.lod) c.lod = lodChunk(c.it);
       for (const v of c.lod.walls) walls.push(v);
       for (const v of c.lod.roofs) roofs.push(v);
@@ -227,6 +325,8 @@ export class FabricStream {
     };
     add(walls, 'rubble'); add(roofs, 'roof'); add(gp, 'ground');
     if (cell.meshes.length) { this.uploader?.(cell.meshes as THREE.Mesh[]); s.cell = cell; this.cells.push(cell); }
+    for (const c of showing) this.showMid(c);
+    this.stats.superMs += performance.now() - t0;
   }
 }
 

@@ -25,6 +25,10 @@ import { loadNpcAssets, spawnTownsfolk, updateTownsfolk, pushOutOfTownsfolk, npc
 import { registerPopulationOutfits, populationDirector, popDebug } from './npc/population';
 Object.assign(window, { __npc: npcDebug });
 import type { Lamp, Cell, PropKind } from './builder';
+import { fogHides } from './fogcull';
+import { OcclusionBuffer, chunkPrisms, indexLotsFrom, OCC_RANGE } from './occlusion';
+import { setKtx2Renderer } from './ktx2';
+import { perfT, perfAdd, perfFrame, perfStats, initHud, gpuBegin, gpuEnd } from './perf';
 
 const params = new URLSearchParams(location.search);
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -36,6 +40,7 @@ renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.info.autoReset = false;
 document.body.appendChild(renderer.domElement);
+setKtx2Renderer(renderer);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 900);
@@ -182,6 +187,8 @@ function updateBones(showAbove: boolean, showUnder: boolean) {
       else g.lo.setMatrixAt(nl++, p.matrix);
     });
     g.hi.count = nh; g.lo.count = nl;
+    // An instanced mesh with no instances still costs a draw call.
+    g.hi.visible = nh > 0; g.lo.visible = nl > 0;
     g.hi.instanceMatrix.needsUpdate = true;
     g.lo.instanceMatrix.needsUpdate = true;
   }
@@ -413,9 +420,14 @@ if (params.has('shot') && !params.has('at')) {
 // 1. Zones: the earth is the biggest occluder. Underground cells are hidden
 //    above ground and vice versa, except around the ossuary stair.
 // 2. Distance: past ~120 m the fog has swallowed everything.
-// 3. Occlusion: rays from the eye to the cell's bounds against the collision
-//    BVH; a cell whose every ray is blocked twice in a row is hidden.
+// 3. Occlusion above ground: the houses near the eye are drawn into a small
+//    software depth buffer every frame and a cell is hidden only when its
+//    whole box is behind them (conservative, see occlusion.ts). Underground:
+//    rays from the eye to the cell's bounds against the collision BVH; a cell
+//    whose every ray is blocked twice in a row is hidden.
 // Three.js frustum-culls each cell's meshes on top of this.
+const occBuf = new OcclusionBuffer();
+indexLotsFrom([...stream.chunks.values()].flatMap((c) => c.it.lots));
 const ray = new THREE.Ray();
 const pts: THREE.Vector3[] = Array.from({ length: 10 }, () => new THREE.Vector3());
 const cen = new THREE.Vector3(), hit = new THREE.Vector3(), eye = new THREE.Vector3();
@@ -450,12 +462,19 @@ function cull(isUnder: boolean, camLocal: number) {
   const live: Cell[] = [];
   for (const c of cells) {
     const zoneOk = c.under ? showUnder : showAbove;
-    const near = c.box.distanceToPoint(eye) < (c.range ?? 120);
-    if (zoneOk && near && !c.lod) live.push(c);
+    // Past its draw distance, or wholly inside the fog (see fogcull.ts).
+    const near = c.box.distanceToPoint(eye) < (c.range ?? 120) && !(zoneOk && !c.under && fogHides(c.box, eye, shared.uFogBase.value, shared.uUnder.value));
+    if (zoneOk && near && c.under && !c.lod) live.push(c);
     else c.occluded = 0;
     c.visible = zoneOk && near;
   }
-  // Re-test a slice of the live cells each frame.
+  if (!isUnder) {
+    const t = perfT();
+    if (occBuf.begin(camera)) for (const it of stream.itemsNear(eye.x, eye.z, OCC_RANGE)) occBuf.drawPrisms(chunkPrisms(it), eye);
+    perfAdd('occl', t);
+    for (const c of cells) if (c.visible && !c.under) c.occluded = occBuf.hidden(c.box) ? 2 : 0;
+  }
+  // Underground: re-test a slice of the live cells each frame.
   const per = Math.max(4, Math.ceil(live.length / 6));
   for (let i = 0; i < per && live.length; i++) {
     const c = live[(rr++) % live.length];
@@ -508,18 +527,21 @@ function frame() {
   frames++;
   const rawDt = clock.getDelta();
   const dt = Math.min(rawDt, 0.05);
-  const t = clock.elapsedTime;
+  const t = fixedTime ?? clock.elapsedTime;
   shared.uTime.value = t;
   grade.uniforms.uTime.value = t;
   fps += (1 / Math.max(dt, 1e-3) - fps) * 0.05;
   renderer.info.reset();
 
+  let pt = perfT();
   if (!isReading() && !isReadingSecret()) player.update(dt);
   guardFall(dt);
   pushOutOfSecretDoor(player.pos);
   updateLibrary(libCam());
   pushOutOfTownsfolk(player.pos);
+  perfAdd('player', pt); pt = perfT();
   updateTownsfolk(dt, camera, player);
+  perfAdd('npc', pt); pt = perfT();
 
   const camY = camera.position.y;
   sky.position.copy(camera.position);
@@ -580,17 +602,32 @@ function frame() {
   if (regionTimer < 0) regionEl.classList.remove('show');
   hintEl.classList.toggle('show', isUnder && !lanternOn);
 
+  perfAdd('misc', pt); pt = perfT();
   stream.update(camera.position, camera.getWorldDirection(tmpDir));
+  perfAdd('stream', pt); pt = perfT();
   lightField.update(camera.position, stream.stats.ready, dt);
   cull(isUnder, camLocal);
+  perfAdd('cull', pt); pt = perfT();
   updateSecrets(camera);
   audio?.update(dt, under, Math.hypot(player.pos.x - SITES.episcopium.x, player.pos.z - SITES.episcopium.z));
   if (!params.has('shot')) adaptResolution(rawDt);
+  perfAdd('misc', pt); pt = perfT();
+  gpuBegin();
   composer.render(dt);
+  gpuEnd();
+  perfAdd('render', pt);
+  if (captureNext && frames > 12) { captureNext = false; (window as unknown as { __shot: string }).__shot = renderer.domElement.toDataURL('image/png'); }
+  const mi = renderer.info;
+  perfFrame({ calls: mi.render.calls, tris: mi.render.triangles, textures: mi.memory.textures, geometries: mi.memory.geometries, ratio, chunks: stream.stats.ready, extra: debugHud ? `cells ${cullStats.visible}/${cells.length} · occluded ${cullStats.occluded} · mid ${stream.stats.mid}` : undefined });
   if (params.has('debug')) document.title = `${fps.toFixed(0)} fps · cells ${cullStats.visible}/${cells.length} · occluded ${cullStats.occluded} · ${renderer.info.render.calls} calls · ${(renderer.info.render.triangles / 1000).toFixed(0)}k tris · chunks ${stream.stats.ready}`;
-  if (params.has('shot') && !held && frames > 12) { (window as unknown as { __done: boolean }).__done = true; return; }
+  if (params.has('shot') && !held && frames > 12) { (window as unknown as { __done: boolean }).__done = true; running = false; return; }
   requestAnimationFrame(frame);
 }
+// Benchmarks: restart the frame loop after a ?shot run has finished.
+let running = true, captureNext = false, fixedTime: number | null = null;
+Object.assign(window, { __THREE: THREE, __cells: cells, __cullStats: cullStats, __fixTime: (v: number | null) => { fixedTime = v; }, __renderer: renderer, __perf: perfStats, __resume: (n = 12, capture = false) => { captureNext = capture; (window as unknown as { __done: boolean }).__done = false; frames = 12 - n; if (!running) { running = true; requestAnimationFrame(frame); } } });
+const debugHud = params.has('debug');
+if (debugHud) initHud(renderer, scene);
 // ?at=<teleport name>[&yaw=..&pitch=..]: start at a named place (also for screenshots).
 if (params.has('at')) {
   const want = params.get('at')!.toLowerCase();

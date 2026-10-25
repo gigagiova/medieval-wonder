@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Builder } from '../builder';
-import { rng } from '../builder';
+import { rng, DETAIL } from '../builder';
 import type { MatName } from '../materials';
 import { field, tessellate } from '../displace';
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -12,6 +12,7 @@ import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.j
 // callers never have to think about handedness.
 
 let rand = rng(90210);
+
 /** Restart the kit's random sequence (each streamed chunk builds from its own seed). */
 export function reseedKit(seed: number) { rand = rng(seed); }
 export const R = (a: number, b: number) => a + (b - a) * rand();
@@ -66,7 +67,7 @@ export class Acc {
    * edge and a facet at every corner): no stone in a medieval wall has a
    * knife-sharp arris, and the bevels catch the light the way real ones do.
    */
-  hexa(m: MatName, c: V3[]) {
+  hexa(m: MatName, c: V3[], keep = false) {
     // Nothing hand-made is square: nudge every corner of a block a little
     // (more for rough stone, less for brick), so edges are never ruled lines.
     const irr = IRREG[m] ?? 0;
@@ -79,6 +80,8 @@ export class Acc {
     const ctr = v3();
     for (const p of c) ctr.add(p);
     ctr.multiplyScalar(1 / 8);
+    let small = false;
+    if (DETAIL.mid && !keep) { let r2 = 0; for (const p of c) r2 = Math.max(r2, p.distanceToSquared(ctr)); small = r2 < 0.25 * 0.25; }
     const F = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]];
     const bev = BEVEL[m] ?? 0;
     if (bev > 0) {
@@ -86,8 +89,9 @@ export class Acc {
       for (const f of F) for (let i = 0; i < 4; i++) minEdge = Math.min(minEdge, c[f[i]].distanceTo(c[f[(i + 1) % 4]]));
       // Wear grows with the piece: 2-4 cm on a stone, up to 12 cm on a wall end.
       const r = Math.min(Math.max(bev * R(0.7, 1.3), minEdge * 0.12), minEdge * 0.3, 0.12);
-      if (r > 0.003) { this.bevelled(m, c, F, ctr, r); return; }
+      if (r > 0.003 && !DETAIL.mid) { this.bevelled(m, c, F, ctr, r); return; }
     }
+    if (small) return;
     for (const [a, b, cc, d] of F) this.quad(m, c[a], c[b], c[cc], c[d], ctr);
   }
   private bevelled(m: MatName, c: V3[], F: number[][], ctr: V3, r: number) {
@@ -210,6 +214,14 @@ export function planks(acc: Acc, m: MatName, f: Frame, u0: number, u1: number, v
   while (tot < u1 - u0 - 0.04) { const pwi = pw * R(0.7, 1.35); widths.push(pwi); tot += pwi; }
   const k = (u1 - u0) / tot;
   let u = u0;
+  if (DETAIL.mid) {
+    // One board-faced slab instead of every plank (same draws, same extent).
+    let tops = 0;
+    for (let i = 0; i < widths.length; i++) { R(0, 1); R(0, 1); tops += top(u0 + (u1 - u0) * (i + 0.5) / widths.length); R(0, 1); R(0, 1); R(0, 1); R(0, 1); R(0, 1); }
+    const t = tops / Math.max(1, widths.length);
+    acc.hexa(m, [f.p(u0, v0, w - th), f.p(u1, v0, w - th), f.p(u1, v0, w), f.p(u0, v0, w), f.p(u0, t, w - th), f.p(u1, t, w - th), f.p(u1, t, w), f.p(u0, t, w)], true);
+    return;
+  }
   for (const wd of widths) {
     const a = u + R(0.003, 0.012), b = u + wd * k - R(0.003, 0.012);
     u += wd * k;
@@ -235,6 +247,7 @@ export function planks(acc: Acc, m: MatName, f: Frame, u0: number, u1: number, v
 
 /** A half-tube strip (a coppo course) between two points, radius tapering r0→r1, faces up. */
 export function coppo(acc: Acc, m: MatName, p0: V3, p1: V3, up: V3, side: V3, r0: number, r1: number, seg = 3) {
+  if (DETAIL.mid) return; // the underlay's tile texture carries the roof at mid distance
   const ring = (p: V3, r: number) => {
     const out: V3[] = [];
     for (let k = 0; k <= seg; k++) {
