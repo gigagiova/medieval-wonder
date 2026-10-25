@@ -3,6 +3,7 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { canon, mixamoFrames, retarget, type Motion } from '../npc/rig';
 import { measure, type Garment, type Measure } from '../npc/garment';
+import { skinMaterial } from '../npc/scan';
 
 // Townsfolk v2: rigged MakeHuman bodies (CC0, built by MPFB 2 in Blender,
 // tools/npc2/build.py) with artist-modelled garments fitted and skinned to
@@ -68,10 +69,11 @@ function prep(t: THREE.Object3D) {
     if (m.userData.npc2 === 'garment') m.userData.garment = n.replace(/^G_/, '').replace(/_\d+$/, '');
     if (m.userData.npc2 === 'body') {
       // Skin: npc.ts tints it per person and gives it the soft wrapped light of skin (withAtmos).
+      // The same skin shading as the scanned v1 bodies (src/npc/scan.ts): pores, wrapped light, matte.
       const src = m.material as THREE.MeshStandardMaterial;
-      const sk = new THREE.MeshStandardMaterial({ map: src.map, normalMap: src.normalMap, roughness: 0.62, metalness: 0 });
-      sk.userData.skin = true;
-      m.material = sk;
+      if (src.map) src.map.colorSpace = THREE.SRGBColorSpace;
+      if (!m.geometry.getAttribute('beard')) m.geometry.setAttribute('beard', new THREE.BufferAttribute(new Float32Array(m.geometry.attributes.position.count), 1));
+      m.material = skinMaterial(src);
     }
   });
 }
@@ -129,7 +131,7 @@ export function outfitV2(id: string, body: string): OutfitV2 {
   });
   drop.forEach((d) => d.parent!.remove(d));
   t.updateMatrixWorld(true);
-  const garment = beltOf(t, k.m);
+  const garment = beltOf(t, k.m, k.meta);
   t.traverse((x) => {
     const b = x.userData.npc2_brooch as number[] | undefined;
     // (Blender's Z-up bind-pose coordinates.)
@@ -145,18 +147,19 @@ export function outfitV2(id: string, body: string): OutfitV2 {
 }
 
 /** Where a belt sits (for fittings hung on it): the waist of the outermost body garment, measured round. */
-function beltOf(t: THREE.Object3D, M: Measure): Garment {
+function beltOf(t: THREE.Object3D, M: Measure, meta: BodyMeta): Garment {
   const y = THREE.MathUtils.lerp(M.bone('Hips').y, M.bone('Spine1').y, 0.55);
   const hips = M.bone('Hips');
   const rs = new Float32Array(36).fill(0);
   const v = new THREE.Vector3();
   t.traverse((x) => {
     const m = x as THREE.SkinnedMesh;
-    if (!m.isSkinnedMesh || m.userData.npc2 === 'eyes') return;
+    // The tunic or gown only (in the bind pose the arms hang out at waist height).
+    if (!m.isSkinnedMesh || m.userData.npc2 !== 'garment' || !/tunic|belt/.test(meta.garments[m.userData.garment]?.layer ?? '')) return;
     const p = m.geometry.attributes.position;
     for (let i = 0; i < p.count; i++) {
       v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld);
-      if (Math.abs(v.y - y) > 0.02) continue;
+      if (Math.abs(v.y - y) > 0.02 || Math.hypot(v.x - hips.x, v.z - hips.z) > 0.3) continue;
       const a = Math.atan2(v.x - hips.x, v.z - hips.z), r = Math.hypot(v.x - hips.x, v.z - hips.z);
       const k = ((Math.round((a / (Math.PI * 2)) * 36) % 36) + 36) % 36;
       rs[k] = Math.max(rs[k], r);

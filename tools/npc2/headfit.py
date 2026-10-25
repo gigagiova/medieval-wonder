@@ -171,12 +171,16 @@ def fit(basemesh, spec):
             inner[i] = h[0] is not None
     # Eye sockets: MakeHuman's eyes are separate balls in deep sockets; here
     # the socket is laid onto the scan's eye, looking from in front.
-    sock = [False] * len(co)
+    # How much a vertex is laid on the scan from in front rather than along
+    # its normal: fully in the socket, fading out over the lids.
+    sock = [0.0] * len(co)
     for i in range(len(co)):
-        if w[i] > 0 and min((co[i] - eyeL).length, (co[i] - eyeR).length) < 0.024 and (inner[i] or co[i].y > eyeL.y - 0.004):
-            sock[i] = True
-            inner[i] = False
-    log('inner', sum(inner), 'socket', sum(sock))
+        if w[i] > 0:
+            de = min((co[i] - eyeL).length, (co[i] - eyeR).length)
+            sock[i] = 1 - smoothstep(0.013, 0.026, de)
+            if sock[i] > 0.5:
+                inner[i] = False
+    log('inner', sum(inner), 'socket', sum(1 for x in sock if x > 0))
 
     # Landmarks: the mouth's corners and the nose's tip moved onto the
     # scan's (the eyes already coincide), the head round them following
@@ -208,12 +212,15 @@ def fit(basemesh, spec):
                 continue
             p, n = pos[i], nrm[i]
             best = None
-            if sock[i]:
+            front = None
+            if sock[i] > 0:
                 h = scan.bvh.ray_cast(p + Vector((0, -0.06, 0)), Vector((0, 1, 0)), 0.1)
                 if h[0] is not None:
-                    delta[i] = h[0] - p
+                    front = h[0] - p
+                if sock[i] >= 1 and front is not None:
+                    delta[i] = front
                     conf[i] = 1.0
-                continue
+                    continue
             for d in (n, -n):
                 h = scan.bvh.ray_cast(p, d, 0.04)
                 if h[0] is not None and (best is None or h[3] < best[3]):
@@ -224,6 +231,9 @@ def fit(basemesh, spec):
                     best = h
             if best is not None:
                 delta[i] = best[0] - p
+                conf[i] = 1.0
+            if front is not None:
+                delta[i] = delta[i].lerp(front, sock[i]) if best is not None else front
                 conf[i] = 1.0
         # Smooth the moves over the surface (outliers and misses filled in).
         for _ in range(12 if it < 2 else 4):
@@ -325,7 +335,10 @@ def bake(basemesh, spec, out_dir, size=1024):
     cut = neckz - 0.02
     head_faces = [p for p in me.polygons if (mw @ p.center).z > cut]
     hidx = {p.index for p in head_faces}
-    # Their UV islands packed afresh over the whole image.
+    # Their UV islands packed afresh over the whole image (MakeHuman's own
+    # layout kept aside, to blend the neck into the painted body skin).
+    mhuv = me.uv_layers.new(name='mhuv', do_init=True)
+    me.uv_layers.active = me.uv_layers[0]
     for p in me.polygons:
         p.select = p.index in hidx
     bpy.ops.object.select_all(action='DESELECT')
@@ -414,12 +427,20 @@ def bake(basemesh, spec, out_dir, size=1024):
     for i, m in enumerate(old_mats):
         scan.mesh.data.materials[i] = m
     tex.image = img
-    fill_non_skin(img, mask)
+    # The scan's atlas is padded with a flat colour (fetch-people.ts) that
+    # shows round its eyeballs where they meet the lids: masked out too.
+    alb = next(n.image for m in scan.mesh.data.materials for n in m.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image and 'albedo' in n.image.name)
+    w0 = alb.size[0]
+    bg = list(alb.pixels[(2 * w0 + 2) * 4:(2 * w0 + 2) * 4 + 3])
+    transfer(basemesh, hidx, scan, alb, img)
+    fill_non_skin(img, mask, bg)
     nt.links.new(tex.outputs['Color'], nt.nodes['Principled BSDF'].inputs['Base Color'])
+    body_img = match_body_tone(basemesh, skin, img, hidx, zc)
+    blend_neck(basemesh, hidx, body_img, img, zc)
+    me.uv_layers.remove(me.uv_layers['mhuv'])
     img.filepath_raw = os.path.join(out_dir, basemesh.name.split('.')[0] + '_head.png')
     img.file_format = 'PNG'
     img.save()
-    match_body_tone(basemesh, skin, img, hidx, cut)
     st.nodes.remove(dn)
     st.nodes.active = next(n for n in st.nodes if n.type == 'TEX_IMAGE')
     rig.data.pose_position = 'POSE'
@@ -428,7 +449,7 @@ def bake(basemesh, spec, out_dir, size=1024):
     return img
 
 
-def fill_non_skin(img, mask):
+def fill_non_skin(img, mask, bg=None):
     """Pixels that are not the scan's skin (or not baked at all) filled by
     push-pull from the skin round them: a smooth continuation of its tone."""
     import numpy as np
@@ -437,6 +458,10 @@ def fill_non_skin(img, mask):
     m = np.array(mask.pixels[:], dtype=np.float32).reshape(n, n, 4)[..., 0]
     alpha = np.clip((m - 0.45) / 0.25, 0, 1)
     alpha[a.sum(-1) < 0.02] = 0  # unbaked background
+    if bg is not None:
+        flat = np.abs(a - np.array(bg, np.float32)[None, None, :]).max(-1) < 0.035
+        alpha[flat] = 0
+        log('atlas padding masked', int(flat.sum()), 'px')
     # Pyramid of premultiplied colour and weight.
     levels = []
     c, wgt = a * alpha[..., None], alpha.copy()
@@ -455,33 +480,45 @@ def fill_non_skin(img, mask):
         up = up2(fill)
         k = np.clip(wgt, 0, 1)[..., None]
         fill = (c / np.maximum(wgt, 1e-6)[..., None]) * k + up * (1 - k)
+    # Far from any skin (more than ~10 px, where image neighbours are other
+    # islands, e.g. the lips beside the neck), the scan's median skin tone.
+    good = alpha > 0.9
+    lum = a.mean(-1)
+    sk = a[good & (lum > np.percentile(lum[good], 40)) & (lum < np.percentile(lum[good], 90))]
+    med = np.median(sk, 0) if len(sk) else np.array([0.6, 0.45, 0.38])
+    near = alpha.copy()
+    for _ in range(10):
+        p = np.pad(near, 1, mode='edge')
+        near = np.maximum(alpha, np.maximum.reduce([p[:-2, 1:-1], p[2:, 1:-1], p[1:-1, :-2], p[1:-1, 2:]]) * 0.9)
+    k = np.clip(near, 0, 1)[..., None]
+    fill = fill * k + med[None, None, :] * (1 - k)
     out = np.concatenate([fill, np.ones((n, n, 1), np.float32)], -1)
     img.pixels[:] = out.ravel()
     log('filled', round(float((alpha < 0.5).mean()), 3), 'of the head image')
 
 
-def match_body_tone(basemesh, skin, head_img, hidx, cut):
-    """Scale the painted body skin's colour so the neck below the cut meets
-    the scanned neck above it in tone."""
+def match_body_tone(basemesh, skin, head_img, hidx, zc):
+    """Scale the painted body skin's colour so it meets the scanned neck in
+    tone: the scan's neck just above `zc` (in the head image) against the
+    painted skin of the same faces (MakeHuman's own UVs)."""
     import numpy as np
     me, mw = basemesh.data, basemesh.matrix_world
     body_img = next(n.image for n in skin.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image and n.image.name != 'dummy' and 'normal' not in n.image.name.lower())
-    uv = me.uv_layers.active.data
+    huv, muv = me.uv_layers[0].data, me.uv_layers['mhuv'].data
 
-    def mean_at(img, faces):
+    def mean_at(img, uv, faces):
         n, m = img.size
         px = np.array(img.pixels[:], dtype=np.float32).reshape(m, n, 4)
         acc, k = np.zeros(3), 0
         for p in faces:
             for li in p.loop_indices:
                 u, v = uv[li].uv
-                acc += px[min(m - 1, int(v * m)), min(n - 1, int(u * n)), :3]
+                acc += px[min(m - 1, max(0, int(v * m))), min(n - 1, max(0, int(u * n))), :3]
                 k += 1
         return acc / max(1, k)
-    band_hi = [p for p in me.polygons if p.index in hidx and (mw @ p.center).z < cut + 0.04]
-    band_lo = [p for p in me.polygons if cut - 0.04 < (mw @ p.center).z <= cut]
-    hm, bmn = mean_at(head_img, band_hi), mean_at(body_img, band_lo)
-    k = np.clip(hm / np.maximum(bmn, 1e-3), 0.6, 1.6)
+    band = [p for p in me.polygons if p.index in hidx and zc + 0.005 < (mw @ p.center).z < zc + 0.04]
+    hm, bmn = mean_at(head_img, huv, band), mean_at(body_img, muv, band)
+    k = np.clip(hm / np.maximum(bmn, 1e-3), 0.5, 1.6)
     n, m = body_img.size
     px = np.array(body_img.pixels[:], dtype=np.float32).reshape(-1, 4)
     px[:, :3] = np.clip(px[:, :3] * k, 0, 1)
@@ -492,3 +529,158 @@ def match_body_tone(basemesh, skin, head_img, hidx, cut):
         if nd.type == 'TEX_IMAGE' and nd.image == body_img:
             nd.image = new
     log('body tone x', [round(float(x), 3) for x in k])
+    return new
+
+
+def blend_neck(basemesh, hidx, body_img, head_img, zc, width=0.035):
+    """Below the collar line the head image takes the (tone-matched) painted
+    body skin, texel for texel through MakeHuman's own UVs, fading into the
+    scanned skin over `width` above it: no seam where the head's material
+    meets the body's."""
+    import numpy as np
+    me, mw = basemesh.data, basemesh.matrix_world
+    huv, muv = me.uv_layers[0].data, me.uv_layers['mhuv'].data
+    n = head_img.size[0]
+    out = np.array(head_img.pixels[:], dtype=np.float32).reshape(n, n, 4)
+    W, H = body_img.size
+    src = np.array(body_img.pixels[:], dtype=np.float32).reshape(H, W, 4)
+    me.calc_loop_triangles()
+    k = 0
+    for t in me.loop_triangles:
+        if t.polygon_index not in hidx:
+            continue
+        zs = [(mw @ me.vertices[v].co).z for v in t.vertices]
+        if min(zs) > zc + width:
+            continue
+        D = np.array([[huv[l].uv.x * n, huv[l].uv.y * n] for l in t.loops])
+        S = np.array([[muv[l].uv.x, muv[l].uv.y] for l in t.loops])
+        raster(out, D, S, src, lambda l1, l2, l3: 1 - np.clip((l1 * zs[0] + l2 * zs[1] + l3 * zs[2] - zc) / width, 0, 1))
+        k += 1
+    head_img.pixels[:] = out.ravel()
+    log('neck blended over', k, 'triangles')
+
+
+def raster(out, D, S, src, weight=None):
+    """Draw one triangle into `out` (n x n x 4): D its corners in pixels, S
+    the same corners' UVs in `src`, sampled bilinearly; `weight(l1, l2, l3)`
+    (barycentric) blends it over what is there."""
+    import numpy as np
+    n = out.shape[0]
+    H, W = src.shape[:2]
+    x0, y0 = np.floor(D.min(0)).astype(int) - 1
+    x1, y1 = np.ceil(D.max(0)).astype(int) + 1
+    x0, y0, x1, y1 = max(x0, 0), max(y0, 0), min(x1, n - 1), min(y1, n - 1)
+    if x1 < x0 or y1 < y0:
+        return
+    xs, ys = np.meshgrid(np.arange(x0, x1 + 1) + 0.5, np.arange(y0, y1 + 1) + 0.5)
+    (ax, ay), (bx, by), (cx, cy) = D
+    det = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+    if abs(det) < 1e-9:
+        return
+    l1 = ((by - cy) * (xs - cx) + (cx - bx) * (ys - cy)) / det
+    l2 = ((cy - ay) * (xs - cx) + (ax - cx) * (ys - cy)) / det
+    l3 = 1 - l1 - l2
+    e = -0.6 / max(1.0, abs(det) ** 0.5)
+    inside = (l1 >= e) & (l2 >= e) & (l3 >= e)
+    if not inside.any():
+        return
+    su = l1 * S[0][0] + l2 * S[1][0] + l3 * S[2][0]
+    sv = l1 * S[0][1] + l2 * S[1][1] + l3 * S[2][1]
+    px = np.clip(su * W - 0.5, 0, W - 1.001)
+    py = np.clip(sv * H - 0.5, 0, H - 1.001)
+    ix, iy = px.astype(int), py.astype(int)
+    fx, fy = (px - ix)[..., None], (py - iy)[..., None]
+    col = (src[iy, ix] * (1 - fx) * (1 - fy) + src[iy, ix + 1] * fx * (1 - fy)
+           + src[iy + 1, ix] * (1 - fx) * fy + src[iy + 1, ix + 1] * fx * fy)
+    yy, xx = np.nonzero(inside)
+    if weight is None:
+        out[yy + y0, xx + x0, :3] = col[yy, xx, :3]
+    else:
+        wgt = np.clip(weight(l1, l2, l3), 0, 1)[yy, xx][:, None]
+        out[yy + y0, xx + x0, :3] = out[yy + y0, xx + x0, :3] * (1 - wgt) + col[yy, xx, :3] * wgt
+
+def transfer(basemesh, hidx, scan, alb, img):
+    """Colour by correspondence round the eyes. Each head vertex already lies on the scan's
+    surface (fit()), so it has a place in the scan's own texture: every head
+    triangle is drawn into the head image straight from the scan's atlas,
+    interpolating those places — no rays, so no smearing where the head's
+    normals turn about (the eyes, the lips' corners). Triangles whose
+    corners fall in different islands of the scan's atlas keep the ray bake."""
+    import numpy as np
+    from mathutils.geometry import barycentric_transform
+    dg = bpy.context.evaluated_depsgraph_get()
+    se = scan.mesh.evaluated_get(dg)
+    sm = se.to_mesh()
+    suv = sm.uv_layers.active.data
+    sm.calc_loop_triangles()
+    tris = [t for t in sm.loop_triangles if all(scan.head[v] for v in t.vertices)]
+    from mathutils.bvhtree import BVHTree
+    co = scan.co
+    tree = BVHTree.FromPolygons(co, [tuple(t.vertices) for t in tris])
+    tuv = [[suv[l].uv.copy() for l in t.loops] for t in tris]
+    tco = [[co[v] for v in t.vertices] for t in tris]
+    se.to_mesh_clear()
+
+    me, mw = basemesh.data, basemesh.matrix_world
+    huv = me.uv_layers.active.data
+    me.calc_loop_triangles()
+    vuv = {}
+    def scan_uv(vi):
+        if vi not in vuv:
+            p = mw @ me.vertices[vi].co
+            loc, nrm, ti, d = tree.find_nearest(p, 0.01)
+            if loc is None:
+                vuv[vi] = None
+            else:
+                a, b, c = tco[ti]
+                ua, ub, uc = (Vector((u.x, u.y, 0)) for u in tuv[ti])
+                vuv[vi] = barycentric_transform(loc, a, b, c, ua, ub, uc).to_2d()
+        return vuv[vi]
+    eyes = (scan.eyeL, scan.eyeR)
+    n = img.size[0]
+    out = np.array(img.pixels[:], dtype=np.float32).reshape(n, n, 4)
+    W, H = alb.size
+    src = np.array(alb.pixels[:], dtype=np.float32).reshape(H, W, 4)
+    done = 0
+    for t in me.loop_triangles:
+        if t.polygon_index not in hidx:
+            continue
+        c3 = mw @ me.polygons[t.polygon_index].center
+        if min((c3 - e).length for e in eyes) > 0.03:
+            continue
+        S = [scan_uv(v) for v in t.vertices]
+        if any(x is None for x in S):
+            continue
+        if max((S[0] - S[1]).length, (S[1] - S[2]).length, (S[0] - S[2]).length) > 0.04:
+            continue
+        D = np.array([[huv[l].uv.x * n, huv[l].uv.y * n] for l in t.loops])
+        x0, y0 = np.floor(D.min(0)).astype(int) - 1
+        x1, y1 = np.ceil(D.max(0)).astype(int) + 1
+        x0, y0, x1, y1 = max(x0, 0), max(y0, 0), min(x1, n - 1), min(y1, n - 1)
+        if x1 < x0 or y1 < y0:
+            continue
+        xs, ys = np.meshgrid(np.arange(x0, x1 + 1) + 0.5, np.arange(y0, y1 + 1) + 0.5)
+        (ax, ay), (bx, by), (cx, cy) = D
+        det = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+        if abs(det) < 1e-9:
+            continue
+        l1 = ((by - cy) * (xs - cx) + (cx - bx) * (ys - cy)) / det
+        l2 = ((cy - ay) * (xs - cx) + (ax - cx) * (ys - cy)) / det
+        l3 = 1 - l1 - l2
+        e = -0.6 / max(1.0, abs(det) ** 0.5)  # (a little over the edge: no cracks)
+        inside = (l1 >= e) & (l2 >= e) & (l3 >= e)
+        if not inside.any():
+            continue
+        su = l1 * S[0].x + l2 * S[1].x + l3 * S[2].x
+        sv = l1 * S[0].y + l2 * S[1].y + l3 * S[2].y
+        px = np.clip(su * W - 0.5, 0, W - 1.001)
+        py = np.clip(sv * H - 0.5, 0, H - 1.001)
+        ix, iy = px.astype(int), py.astype(int)
+        fx, fy = (px - ix)[..., None], (py - iy)[..., None]
+        col = (src[iy, ix] * (1 - fx) * (1 - fy) + src[iy, ix + 1] * fx * (1 - fy)
+               + src[iy + 1, ix] * (1 - fx) * fy + src[iy + 1, ix + 1] * fx * fy)
+        yy, xx = np.nonzero(inside)
+        out[yy + y0, xx + x0, :3] = col[yy, xx, :3]
+        done += 1
+    img.pixels[:] = out.ravel()
+    log('transferred', done, 'triangles from the scan atlas')

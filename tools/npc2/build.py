@@ -72,6 +72,18 @@ if spec.get('scan') and 'nohead' not in OPTS:
 # ------------------------------------------------------------------ garments
 garments = {}
 gspec = {}
+# `only=a,b`: just these garments (and what they are cut from or draped over), for quick tests.
+ONLY = next((set(o[5:].split(',')) for o in OPTS if o.startswith('only=')), None)
+if ONLY:
+    for g in list(ONLY):
+        dd = GARMENTS[g].get('derive', {}).get('from') or None
+        ONLY |= set(GARMENTS[g].get('drape', {}).get('over', [])) | ({dd} if dd else set())
+    for g in list(ONLY):
+        dd = GARMENTS[g].get('derive', {}).get('from')
+        if dd:
+            ONLY.add(dd)
+    GARMENTS = {k: v for k, v in GARMENTS.items() if k in ONLY}
+    OUTFITS = {k: {**v, 'garments': [g for g in v['garments'] if g in ONLY]} for k, v in OUTFITS.items()}
 for gid, g in GARMENTS.items():
     if sex not in g['sex']:
         continue
@@ -133,6 +145,9 @@ bm.to_mesh(basemesh.data)
 bm.free()
 log('body after helpers', len(basemesh.data.vertices), len(basemesh.data.polygons))
 
+if 'stop' in OPTS:
+    bpy.ops.wm.save_as_mainfile(filepath=OUT.replace('.glb', '.stop.blend'))
+    sys.exit(0)
 if 'prebake' in OPTS:
     bpy.ops.wm.save_as_mainfile(filepath=OUT.replace('.glb', '.prebake.blend'))
     sys.exit(0)

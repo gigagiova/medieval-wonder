@@ -109,6 +109,9 @@ def make(gid, g, garments, basemesh, rig):
     cs.use_self_collision = d.get('self', False)
     cs.collision_quality = 4
     cl.point_cache.frame_start, cl.point_cache.frame_end = 1, d.get('frames', 70)
+    import os
+    if os.environ.get('NPC2_DRAPE_DEBUG'):
+        bpy.ops.wm.save_as_mainfile(filepath=os.environ['NPC2_DRAPE_DEBUG'] + '_' + gid + '_init.blend', copy=True)
     for f in range(1, d.get('frames', 70) + 1):
         sc.frame_set(f)
     dg = bpy.context.evaluated_depsgraph_get()
@@ -121,6 +124,9 @@ def make(gid, g, garments, basemesh, rig):
         v.co = p
     sc.frame_set(1)
     log(gid, 'draped', len(posed))
+    import os
+    if os.environ.get('NPC2_DRAPE_DEBUG'):
+        bpy.ops.wm.save_as_mainfile(filepath=os.environ['NPC2_DRAPE_DEBUG'] + '_' + gid + '_posed.blend', copy=True)
 
     # Weights from the posed body, smoothed over the cloth.
     for vg in basemesh.vertex_groups:
@@ -135,6 +141,23 @@ def make(gid, g, garments, basemesh, rig):
     dt.layers_vgroup_select_dst = 'NAME'
     bpy.context.view_layer.objects.active = o
     bpy.ops.object.modifier_apply(modifier='wt')
+    # Cloth hanging by the arms took their weights (and the hands'): it is
+    # carried by the shoulders and back instead, following the upper arm only
+    # a little (`arm_follow`), so a swinging arm pushes it rather than lifting it.
+    import re
+    kf = d.get('arm_follow', 0.3)
+    for v in o.data.vertices:
+        ws = {o.vertex_groups[gr.group].name: gr.weight for gr in v.groups}
+        for S in ('Left', 'Right'):
+            arm = [n for n in ws if re.match(r'mixamorig:%s(Arm|ForeArm|Hand)' % S, n)]
+            tot = sum(ws[n] for n in arm)
+            if tot <= 0:
+                continue
+            for n in arm:
+                o.vertex_groups[n].add([v.index], 0.0, 'REPLACE')
+            o.vertex_groups['mixamorig:%sArm' % S].add([v.index], tot * kf, 'REPLACE')
+            o.vertex_groups['mixamorig:%sShoulder' % S].add([v.index], tot * (1 - kf) * 0.5, 'ADD')
+            o.vertex_groups['mixamorig:Spine2'].add([v.index], tot * (1 - kf) * 0.5, 'ADD')
     # Thigh influence on the lower cloth (it follows a striding leg a little).
     lo = min(p.z for p in posed)
     hips = bone_world(rig, 'Hips')
