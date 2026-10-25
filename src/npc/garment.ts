@@ -1492,7 +1492,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     const under = [tunicGeo, ...arms, ...scap.map(gridGeometry)];
     const clothes = new MeshBVH(mergeGeometries(under.map((g) => posOnly(g.clone()))));
     hood = layHood(M, spec.hood, clothes, new MeshBVH(mergeGeometries([...under, S.shoulders.geo.clone()].map(posOnly))),
-      new MeshBVH(mergeGeometries([...under.map((g) => g.clone()), (spec.hood === 'veil' ? S.all : S.noBeard().all).geo.clone()].map(posOnly))), yBelt);
+      new MeshBVH(mergeGeometries([...under.map((g) => g.clone()), (spec.hood === 'veil' ? S.all : S.noBeard().all).geo.clone()].map(posOnly))), yBelt, spec.cape === 'shawl');
   }
 
   // --- A mantle: a cloak fastened on the right shoulder, or a woman's shawl (see layMantle).
@@ -1960,10 +1960,13 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     for (const { g, f, ease, body } of onTunic) {
       const ubvh = body ? bodyOnly : withSleeves, uix = ubvh.geometry.index!;
       const c0 = baseOf.get(g)!, n = g.pos.length / 3;
+      const unsure: number[] = [];
       for (let i = c0; i < c0 + n; i++) {
         const k = f(bind[i * 3 + 1]);
         if (k <= 0) continue;
         ubvh.closestPointToPoint(vv.fromArray(bind, i * 3), tmp);
+        // (Far from the cloth beneath, the nearest point is no sure guide: see the inpainting below.)
+        if (tmp.distance > 0.045) unsure.push(i);
         const vs = [uix.getX(tmp.faceIndex * 3), uix.getX(tmp.faceIndex * 3 + 1), uix.getX(tmp.faceIndex * 3 + 2)];
         tri.a.fromArray(bind, vs[0] * 3); tri.b.fromArray(bind, vs[1] * 3); tri.c.fromArray(bind, vs[2] * 3);
         const bc = tri.getBarycoord(tmp.point, new THREE.Vector3()) ?? new THREE.Vector3(1 / 3, 1 / 3, 1 / 3);
@@ -1972,6 +1975,28 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
         [bc.x, bc.y, bc.z].forEach((w, j) => { const tt = [...wmap[vs[j]].values()].reduce((x, y) => x + y, 0) || 1; for (const [kk, x] of wmap[vs[j]]) m.set(kk, (m.get(kk) ?? 0) + (x / tt) * w * k); });
         for (const [kk, x] of old) m.set(kk, (m.get(kk) ?? 0) + (x / ot) * (1 - k));
         wmap[i] = m;
+      }
+      // Weight inpainting (Abdrashitov et al., "Robust Skin Weights Transfer
+      // via Weight Inpainting", SIGGRAPH Asia 2023): weights are copied only
+      // where the cloth beneath is near; elsewhere (a cape standing off over
+      // the arms, a veil's fall away from the shoulders) they are filled in
+      // smoothly from the sure ones round about (Jacobi iterations of the
+      // graph Laplacian, the sure weights held), not taken from whichever
+      // sleeve or back happened to be nearest.
+      if (unsure.length) {
+        for (let it = 0; it < 40; it++) {
+          const next: [number, Map<number, number>][] = [];
+          for (const i of unsure) {
+            const o = new Map<number, number>();
+            let cnt = 0;
+            for (const j of nb[i]) { cnt++; for (const [kk, w] of wmap[j]) o.set(kk, (o.get(kk) ?? 0) + w); }
+            if (!cnt) continue;
+            const sum = [...o.values()].reduce((a2, b2) => a2 + b2, 0) || 1;
+            for (const [kk, w] of o) o.set(kk, w / sum);
+            next.push([i, o]);
+          }
+          for (const [i, o] of next) wmap[i] = o;
+        }
       }
       // Eased between the arms and the back, so it drapes rather than tears.
       for (let it = 0; it < ease; it++) {
@@ -2313,8 +2338,9 @@ const HOODS: Record<HoodKind, {
  * back (seen from the neck's axis and from above, as bodyshape.ts's starField,
  * then exactly), and never tucks back in.
  */
-function layHood(M: Measure, kind: HoodKind, clothes: MeshBVH, under: MeshBVH, all: MeshBVH, yLow: number): Grid {
-  const K = HOODS[kind], H = M.head, Hc = H.c, nk = M.bone('Neck');
+function layHood(M: Measure, kind: HoodKind, clothes: MeshBVH, under: MeshBVH, all: MeshBVH, yLow: number, short = false): Grid {
+  // (Under a shawl a veil is shorter, to the shoulders: the shawl's edge lies over it, never under.)
+  const K = short ? { ...HOODS[kind], hem: [-0.09, -0.06, -0.13] as [number, number, number], flare: [0.035, 0.05] as [number, number] } : HOODS[kind], H = M.head, Hc = H.c, nk = M.bone('Neck');
   const eyes = M.bone('LeftEye').add(M.bone('RightEye')).multiplyScalar(0.5);
   // A veil's skull is the bare one, filled out by her hair; a man's head is measured with its hair and ears.
   const room = (H.skull ? 0.006 : 0.014) + K.off;
