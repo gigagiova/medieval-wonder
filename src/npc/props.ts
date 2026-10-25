@@ -359,7 +359,8 @@ export function makeShield(paint: THREE.Color) {
   boss.rotateX(Math.PI / 2).translate(0, 0, 0.026);
   const rivets: THREE.BufferGeometry[] = [];
   for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; rivets.push(at(new THREE.SphereGeometry(0.009, 6, 4), Math.sin(a) * 0.075, Math.cos(a) * 0.075, 0.03)); }
-  const grip = at(new THREE.BoxGeometry(0.03, 0.34, 0.02), 0, 0, -0.03);
+  // The grip stands off the back on two cleats, room for a fist and a sleeve behind the boss.
+  const grip = merge([at(new THREE.BoxGeometry(0.03, 0.34, 0.02), 0, 0, -0.065), at(new THREE.BoxGeometry(0.03, 0.03, 0.065), 0, 0.155, -0.035), at(new THREE.BoxGeometry(0.03, 0.03, 0.065), 0, -0.155, -0.035)]);
   const o = new THREE.Group();
   o.add(new THREE.Mesh(board, face), new THREE.Mesh(rim, m.darkLeather), new THREE.Mesh(merge([boss, ...rivets]), m.darkIron), new THREE.Mesh(grip, m.ash));
   return o;
