@@ -68,15 +68,17 @@ uniform sampler2D tFabD; uniform sampler2D tFabN;
 uniform vec4 uFab; // 1/tile, contrast, normal strength, fuzz
 uniform float uFabSpec;
 varying vec3 vFab; varying vec3 vFabN;
-// One planar projection: detail and normal XY (strength applied).
-void fabTap(vec2 uv, out float d, out vec2 n){
-  d = texture2D(tFabD, uv).r * 2.0;
-  n = (texture2D(tFabN, uv).rg * 2.0 - 1.0) * uFab.z;
+// A projection's (u, v) of a bind-pose point or offset: 0 looks along X, 1 along Y, 2 along Z.
+vec2 fabProj(vec3 p, int ax){ return ax == 0 ? p.zy : ax == 1 ? p.xz : p.xy; }
+// One planar projection: detail and normal XY (strength applied). Explicit
+// gradients: derivatives of uv itself jump where the projection switches.
+void fabTap(vec2 uv, vec2 gx, vec2 gy, out float d, out vec2 n){
+  d = textureGrad(tFabD, uv, gx, gy).r * 2.0;
+  n = (textureGrad(tFabN, uv, gx, gy).rg * 2.0 - 1.0) * uFab.z;
 }
-// Tangent frame from screen derivatives of a projection's uv (three's getTangentFrame).
-vec3 fabPerturb(vec2 uv, vec2 n, vec3 N, vec3 eye){
-  vec3 q0 = dFdx(eye), q1 = dFdy(eye);
-  vec2 st0 = dFdx(uv), st1 = dFdy(uv);
+// Tangent frame from screen derivatives (three's getTangentFrame), with the
+// uv derivatives st0/st1 given rather than taken.
+vec3 fabPerturb(vec2 st0, vec2 st1, vec2 n, vec3 N, vec3 q0, vec3 q1){
   vec3 q1p = cross(q1, N), q0p = cross(N, q0);
   vec3 T = q1p * st0.x + q0p * st1.x;
   vec3 B = q1p * st0.y + q0p * st1.y;
@@ -134,16 +136,17 @@ export function fabric(kind: FabricKind, color: THREE.ColorRepresentation, o: Fa
         ivec3 fMa = (fA.x > fA.y && fA.x > fA.z) ? ivec3(0,1,2) : (fA.y > fA.z) ? ivec3(1,2,0) : ivec3(2,0,1);
         ivec3 fMi = (fA.x < fA.y && fA.x < fA.z) ? ivec3(0,1,2) : (fA.y < fA.z) ? ivec3(1,2,0) : ivec3(2,0,1);
         ivec3 fMe = ivec3(3) - fMi - fMa;
-        vec2 fUv1 = fMa.x == 0 ? fP.zy : fMa.x == 1 ? fP.xz : fP.xy;
-        vec2 fUv2 = fMe.x == 0 ? fP.zy : fMe.x == 1 ? fP.xz : fP.xy;
-        fUv2 += vec2(0.37, 0.61);
+        vec3 fPx = dFdx(fP), fPy = dFdy(fP), fQx = dFdx(-vViewPosition), fQy = dFdy(-vViewPosition);
+        vec2 fUv1 = fabProj(fP, fMa.x), fUv2 = fabProj(fP, fMe.x) + vec2(0.37, 0.61);
+        vec2 fG1x = fabProj(fPx, fMa.x), fG1y = fabProj(fPy, fMa.x), fG2x = fabProj(fPx, fMe.x), fG2y = fabProj(fPy, fMe.x);
         vec2 fW = vec2(fA[fMa.x], fA[fMe.x]);
         fW = clamp((fW - 0.5773) / (1.0 - 0.5773), 0.0, 1.0);
         fW = pow(fW, vec2(6.0));
-        fW /= fW.x + fW.y + 1e-5;
+        // (Near the diagonals both weights are tiny: normalise without an epsilon that would zero them.)
+        fW = fW.x + fW.y > 1e-12 ? fW / (fW.x + fW.y) : vec2(1.0, 0.0);
         float fD1, fD2 = 1.0; vec2 fN1, fN2 = vec2(0.0);
-        fabTap(fUv1, fD1, fN1);
-        if (fW.y > 0.01) fabTap(fUv2, fD2, fN2); else fW = vec2(1.0, 0.0);
+        fabTap(fUv1, fG1x, fG1y, fD1, fN1);
+        if (fW.y > 0.01) fabTap(fUv2, fG2x, fG2y, fD2, fN2); else fW = vec2(1.0, 0.0);
         float fD = fD1 * fW.x + fD2 * fW.y;
         // Slow, irregular unevenness of a hand-spun, hand-dyed cloth: breaks up repeats too.
         vec4 fNz = texture2D(uNoise, (vFab.xy + vFab.zx * 0.7) * 0.9);
@@ -154,10 +157,9 @@ export function fabric(kind: FabricKind, color: THREE.ColorRepresentation, o: Fa
         roughnessFactor = clamp(roughnessFactor * (1.06 - 0.12 * fD), 0.0, 1.0);`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
-          vec3 fEye = -vViewPosition;
-          vec3 fPert = fabPerturb(fUv1, fN1, normal, fEye) * fW.x;
-          if (fW.y > 0.0) fPert += fabPerturb(fUv2, fN2, normal, fEye) * fW.y;
-          normal = normalize(normal + fPert);
+          vec3 fPert = fabPerturb(fG1x, fG1y, fN1, normal, fQx, fQy) * fW.x;
+          if (fW.y > 0.0) fPert += fabPerturb(fG2x, fG2y, fN2, normal, fQx, fQy) * fW.y;
+          normal = normalize(normal + fPert * faceDirection);
         }`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         {
