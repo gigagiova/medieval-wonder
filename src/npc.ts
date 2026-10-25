@@ -125,6 +125,7 @@ interface Held { obj: THREE.Object3D; kind: 'hang' | 'spear'; drop: number; swin
 const ANIMS: ClipName[] = ['walk', 'idle', 'talk', 'bless', 'kneel'];
 const UP = new THREE.Vector3(0, 1, 0);
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+const _h1 = new THREE.Vector3(), _h2 = new THREE.Vector3(), _h3 = new THREE.Vector3(), _h4 = new THREE.Vector3(), _h5 = new THREE.Vector3(), _h6 = new THREE.Vector3(), _h7 = new THREE.Vector3(), _h8 = new THREE.Vector3(), _hq = new THREE.Quaternion();
 
 let rngSeed = 1;
 const mulberry = (a: number) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -233,6 +234,8 @@ export class Person {
     this.equip(gear);
   }
   walkSpeed = 1.2;
+  /** Half the width of a bucket or basket a peasant carries (0: none). */
+  carryHalf = 0;
 
   private bindOf(name: string) {
     const b = this.bones.get(name)!;
@@ -271,7 +274,9 @@ export class Person {
     }
     if (g.sticks) {
       const sp = m.bone('Spine2');
-      on('Spine2', Props.makeSticks(Math.floor(r() * 1e6) + 1), Props.placeAt(new THREE.Vector3(sp.x + 0.02, sp.y - 0.12, sp.z - 0.21), new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, 0, 0.42))));
+      // Clear of the hood's cape on his shoulders, its top end behind his head.
+      const cape = this.outfit.id === 'peasantHood';
+      on('Spine2', Props.makeSticks(Math.floor(r() * 1e6) + 1), Props.placeAt(new THREE.Vector3(sp.x + 0.02, sp.y - 0.12, sp.z - (cape ? 0.27 : 0.21)), new THREE.Quaternion().setFromEuler(new THREE.Euler(cape ? -0.2 : -0.12, 0, 0.42))));
     }
     if (g.jar) {
       const h = m.head;
@@ -289,8 +294,10 @@ export class Person {
       this.lanternLight = l.light;
       this.lamp = { pos: new THREE.Vector3(), color: new THREE.Color(1, 0.5, 0.18), intensity: 0.5, under: false, seed: r() * 50 };
     }
-    if (g.bucket && scans.bucket) { const b = scans.bucket.clone(); b.scale.setScalar(0.8); const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.02); }
-    if (g.basket && scans.basket) { const b = scans.basket.clone(); b.scale.setScalar(1.25); const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.0); }
+    // A peasant's are a size a man carries in one hand, the basket long side forward.
+    const pz = this.role === 'peasant';
+    if (g.bucket && scans.bucket) { const b = scans.bucket.clone(); b.scale.setScalar(pz ? 0.62 : 0.8); const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.02); this.carryHalf = 0.115; }
+    if (g.basket && scans.basket) { const b = scans.basket.clone(); b.scale.setScalar(pz ? 1.0 : 1.25); if (pz) b.rotation.y = Math.PI / 2; const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.0); this.carryHalf = 0.14; }
     if (g.spear) hang(Props.makeSpear(), 'spear', 0);
   }
 
@@ -341,8 +348,43 @@ export class Person {
         b.quaternion.premultiply(_q).premultiply(_q2).premultiply(_q.invert());
       }
     }
+    if (this.carryHalf && this.role === 'peasant') this.holdOut();
     this.swing?.();
     return true;
+  }
+
+  /**
+   * A peasant carrying a bucket or basket keeps that arm down and out, the
+   * load clear of his skirts, whatever the clip does with it: talking, he
+   * gestures with the other hand; walking, it swings only a little.
+   */
+  private holdOut() {
+    const arm = this.bones.get('RightArm')!, fore = this.bones.get('RightForeArm')!, hand = this.bones.get('RightHand')!;
+    this.group.updateMatrixWorld(true);
+    const pA = arm.getWorldPosition(_h1), pF = fore.getWorldPosition(_h2), pH = hand.getWorldPosition(_h3);
+    const right = _h4.set(-Math.cos(this.yaw), 0, Math.sin(this.yaw)), fwd = _h5.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    const hips = this.bones.get('Hips')!.getWorldPosition(_h6);
+    // Out from the hips' line by the skirt's flare and half the load.
+    const L = pA.distanceTo(pF) + pF.distanceTo(pH) + 0.07 * this.scale;
+    const lat = _h7.copy(pA).sub(hips).dot(right);
+    const sin = THREE.MathUtils.clamp(((0.33 + this.carryHalf) * this.scale - lat) / L, 0, 0.6);
+    const cur = _h7.copy(pF).sub(pA).normalize();
+    const walk = THREE.MathUtils.clamp(this.w.walk ?? 0, 0, 1);
+    const swing = THREE.MathUtils.clamp(cur.dot(fwd), -0.5, 0.5) * (0.2 + 0.4 * walk);
+    const dir = _h8.set(0, -Math.sqrt(1 - sin * sin), 0).addScaledVector(right, sin).addScaledVector(fwd, swing).normalize();
+    const turn = (b: THREE.Bone, from: THREE.Vector3, k: number) => {
+      _q.setFromUnitVectors(from, dir);
+      if (k < 1) _q.slerp(_hq.identity(), 1 - k);
+      b.parent!.getWorldQuaternion(_q2);
+      b.getWorldQuaternion(_hq).premultiply(_q);
+      b.quaternion.copy(_q2.invert().multiply(_hq));
+      b.updateMatrixWorld(true);
+    };
+    turn(arm, cur, 1);
+    // The elbow nearly straight under the weight.
+    fore.getWorldPosition(pF);
+    hand.getWorldPosition(pH);
+    turn(fore, _h7.copy(pH).sub(pF).normalize(), 0.85);
   }
 
   /** Lanterns, buckets and spears follow the hand. */
@@ -368,11 +410,14 @@ export class Person {
       h.last.copy(_v);
       const s = h.swing;
       s.v += (-s.a * 28 - hv.dot(fwd) * 0.7 - s.v * 3.2) * dt;
-      s.a = THREE.MathUtils.clamp(s.a + s.v * dt, -0.6, 0.6);
+      const pz = this.role === 'peasant' && this.carryHalf > 0; // a full bucket swings less
+      s.a = THREE.MathUtils.clamp(s.a + s.v * dt, pz ? -0.3 : -0.6, pz ? 0.3 : 0.6);
       const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
       s.w += (-s.b * 28 - hv.dot(side) * 0.5 - s.w * 3.2) * dt;
-      s.b = THREE.MathUtils.clamp(s.b + s.w * dt, -0.4, 0.4);
-      h.obj.position.copy(_v).addScaledVector(fwd, 0.03).y -= h.drop;
+      s.b = THREE.MathUtils.clamp(s.b + s.w * dt, pz ? -0.15 : -0.4, pz ? 0.15 : 0.4);
+      // Held in the palm (between wrist and knuckles), not at the wrist.
+      if (pz) this.bones.get('RightHandMiddle1')!.getWorldPosition(_v3).add(_v).multiplyScalar(0.5), _v.copy(_v3);
+      h.obj.position.copy(_v).addScaledVector(fwd, pz ? 0 : 0.03).y -= h.drop;
       h.obj.quaternion.setFromEuler(new THREE.Euler(s.a, this.yaw, s.b, 'YXZ'));
     }
     if (this.lamp && this.lanternLight) {
