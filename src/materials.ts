@@ -40,12 +40,18 @@ export const shared = {
   uLampCol: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3()) },
   uFogCol: { value: new THREE.Color(0.15, 0.155, 0.165) },
   uUnder: { value: 0 },
-  uMoonDir: { value: new THREE.Vector3(-0.92, 0.07, 0.38).normalize() },
+  // The key light: the bright part of the overcast in the west, low (~19°).
+  uMoonDir: { value: new THREE.Vector3(-0.86, 0.33, 0.36).normalize() },
   uTown: { value: null as THREE.Texture | null },
   uTownBox: { value: new THREE.Vector4(-100, -100, 1 / 200, 1 / 200) },
   uTownH: { value: new THREE.Vector2(-1.5, 2.5) },
   uFogBase: { value: 0 },
   uNoise: { value: noiseTex as THREE.Texture },
+  // Light field (see lightfield.ts): baked sun shadow height + mean town heights.
+  uLF: { value: new THREE.DataTexture(new Uint8Array(4), 1, 1) as THREE.Texture },
+  uLFBox: { value: new THREE.Vector4(0, 0, 1, 0) },
+  uFogK: { value: new THREE.Vector4(0.009, 0.055, 0.12, 60) },
+  uSkyGlow: { value: 0.35 },
 };
 
 
@@ -164,21 +170,38 @@ export function makeSky(): THREE.Mesh {
       void main(){ vec4 w = modelMatrix*vec4(position,1.); vWPos = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
     fragmentShader: /* glsl */ `
       varying vec3 vWPos;
+      uniform float uSkyGlow;
+      #define SKY_DOME
       ${noiseGLSL}
       ${atmosGLSL}
       void main(){
         vec3 rd = normalize(vWPos - cameraPosition);
         float y = rd.y;
-        // Overcast dusk: an even grey lid of cloud, slightly brighter towards
-        // the horizon and in the west where the light is going. No colour.
-        float md = dot(rd, uMoonDir);
-        vec3 col = mix(vec3(0.2,0.205,0.215), vec3(0.11,0.115,0.13), smoothstep(-0.05,0.6,y));
-        col *= 1.0 + 0.18 * pow(max(md,0.), 2.0) * (1.0 - smoothstep(0.0, 0.5, y));
-        vec2 cuv = rd.xz/(max(y,0.0)+0.12);
-        float cl = texture2D(uNoise, cuv*0.15 + vec2(uTime*0.0015, 0.)).r;
-        float cl2 = texture2D(uNoise, cuv*0.47 - vec2(uTime*0.0025, 0.)).g;
-        col *= 1.0 - (smoothstep(0.35,0.8,cl)*0.28 + smoothstep(0.5,0.85,cl2)*0.12)*smoothstep(0.0,0.25,y);
-        gl_FragColor = vec4(applyAtmos(col, cameraPosition + rd*140.), 1.0);
+        // A low, heavy overcast at dusk. The light is going in the west: there
+        // the lid of cloud is thinner and glows grey-white behind it; overhead
+        // and in the east it is a dark slate. Cloud masses drift slowly and
+        // read by their darker, denser bellies; thin parts let the glow through.
+        float md = max(dot(rd, uMoonDir), 0.0);
+        vec3 hor = vec3(0.19, 0.195, 0.205), zen = vec3(0.055, 0.06, 0.07);
+        vec3 col = mix(hor, zen, smoothstep(-0.02, 0.55, y));
+        vec3 glowC = vec3(0.92, 0.93, 0.95);
+        float glow = uSkyGlow * (0.28 * pow(md, 3.0) + 0.55 * pow(md, 14.0) + 0.6 * pow(md, 60.0));
+        // Cloud deck: a plane ~1.5 km up, warped so the masses billow.
+        vec2 cuv = rd.xz / (max(y, 0.0) + 0.07);
+        float t = uTime;
+        vec2 w = texture2D(uNoise, cuv * 0.035 + vec2(t * 0.0004, t * 0.0002)).rg - 0.5;
+        float c1 = texture2D(uNoise, cuv * 0.07 + w * 0.5 + vec2(t * 0.0009, 0.0)).r;
+        float c2 = texture2D(uNoise, cuv * 0.19 - w * 0.3 + vec2(t * 0.0016, t * 0.0005)).g;
+        float c3 = texture2D(uNoise, cuv * 0.53 + w * 0.2 + vec2(t * 0.0025, 0.0)).b;
+        float d = c1 * 0.55 + c2 * 0.3 + c3 * 0.15;
+        float thick = smoothstep(0.3, 0.72, d);
+        float far = smoothstep(0.0, 0.22, y); // the deck flattens into haze at the horizon
+        col *= 1.0 - thick * 0.5 * far;
+        col += glowC * glow * mix(1.0, 0.18, thick * far);
+        // Bright rims where thin cloud edges face the glow.
+        float rim = clamp(1.0 - abs(d - 0.42) * 7.0, 0.0, 1.0);
+        col += glowC * rim * 0.22 * pow(md, 5.0) * far;
+        gl_FragColor = vec4(applyAtmos(col, cameraPosition + rd*uFogK.w*mix(1.0, 0.4, smoothstep(0.0, 0.5, y))), 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,

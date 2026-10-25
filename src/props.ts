@@ -59,6 +59,14 @@ function fog(m: THREE.Material) {
   const sm = m as THREE.MeshStandardMaterial;
   // Scans are lit by dusk and lamps only: keep them matte.
   if ('roughness' in sm) sm.envMapIntensity = 0;
+  // Leaves and blades come in as alpha-blended: cut them out instead, so they
+  // write depth, sort freely and stay out of every transparency pass.
+  if (m.transparent) {
+    m.transparent = false;
+    m.alphaTest = 0.5;
+    m.depthWrite = true;
+    m.userData.foliage = true;
+  }
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, shared);
     sh.vertexShader = sh.vertexShader
