@@ -18,7 +18,7 @@ let loader: Promise<KTX2Loader | null> | null = null;
 const disabled = typeof location !== 'undefined' && new URLSearchParams(location.search).has('noktx2');
 
 /** Main calls this as soon as the renderer exists (KTX2 needs it to pick a GPU format). */
-export function setKtx2Renderer(r: THREE.WebGLRenderer) { resolveRenderer(r); }
+export function setKtx2Renderer(r: THREE.WebGLRenderer) { resolveRenderer(r); Object.assign(window, { __ktx2: ktx2Stats }); }
 
 function getLoader() {
   // Pages that never hand over a renderer (the test pages) get the WebP.
@@ -32,7 +32,7 @@ function getLoader() {
   return loader;
 }
 
-export const ktx2Stats = { ktx2: 0, webp: 0 };
+export const ktx2Stats = { ktx2: 0, webp: 0, filled: [] as THREE.Texture[] };
 /**
  * The published game is served by a host that only serves common web types
  * (.ktx2 is refused, .wasm is served byte for byte), so the KTX2 files are
@@ -61,8 +61,11 @@ export async function fillTexture(tex: THREE.Texture, base: string, srgb: boolea
       t.flipY = false; // the files are stored flipped, matching the WebP's upload
       t.minFilter = c.mipmaps.length > 1 ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
       t.magFilter = THREE.LinearFilter;
+      // Once on the GPU, the CPU copy of the blocks (~1.4 MB a map) can go.
+      t.onUpdate = () => { t.mipmaps = []; t.onUpdate = null; };
       t.needsUpdate = true;
       ktx2Stats.ktx2++;
+      ktx2Stats.filled.push(t);
       return;
     } catch (e) {
       console.warn('KTX2 failed, using WebP:', base, e);
