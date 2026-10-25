@@ -51,8 +51,8 @@ const OUTFITS: Record<OutfitId, OutfitDef> = {
   peasantCloak: { sex: 'man', bodies: ['eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.35, swing: true } },
   soldier: { sex: 'man', bodies: ['nathan', 'manuel'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 0.6 } },
   soldierCloak: { sex: 'man', bodies: ['eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 0.3, capeOpen: 0.8 } },
-  woman: { sex: 'woman', bodies: ['claudia', 'sophia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
-  womanShawl: { sex: 'woman', bodies: ['sophia', 'claudia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
+  woman: { sex: 'woman', bodies: ['claudia', 'sophia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash', stride: 0.85 } },
+  womanShawl: { sex: 'woman', bodies: ['sophia', 'claudia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash', stride: 0.85 } },
 };
 /** More outfits (src/npc/population.ts), tailored on first use like the others. */
 export function registerOutfit(id: string, def: OutfitDef) { (OUTFITS as Record<string, OutfitDef>)[id] = def; }
