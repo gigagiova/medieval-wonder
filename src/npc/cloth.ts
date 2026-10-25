@@ -108,6 +108,12 @@ export class Clothing {
       free: Uint32Array.from(idx.filter((i) => invM[i] > 0)),
       pinned: Uint32Array.from(idx.filter((i) => invM[i] === 0)),
       rope, first: true, lastRoot: new THREE.Vector3(),
+      riders: G.ride ? Uint32Array.from(idx.filter((i) => G.ride![i] >= 0)) : null,
+      // The cloth a hanging cord lies on: whatever is near its line, below the knot.
+      under: R ? Uint32Array.from(idx.filter((i) => {
+        const k = R.root * 3, b = G.bind;
+        return i !== R.root && Math.abs(b[i * 3] - b[k]) < 0.22 && Math.abs(b[i * 3 + 2] - b[k + 2]) < 0.3 && b[i * 3 + 1] < b[k + 1] - 0.02 && b[i * 3 + 1] > b[k + 1] - R.n * R.seg - 0.15;
+      })) : null,
     };
   }
 
@@ -188,6 +194,20 @@ export class Clothing {
       kp.multiplyScalar(dt2 / dp - 1);
       P[o] += kp.x; P[o + 1] += kp.y; P[o + 2] += kp.z;
     };
+    // A cord lies on the skirt: kept outside the nearest cloth vertex's surface (last frame's normals).
+    const NR = S.geo.attributes.normal.array as Float32Array, margin = 0.012 * this.scale;
+    const outOf = (arr: Float32Array, prev: Float32Array, j: number) => {
+      const U = S.under!, o = j * 3;
+      let best = -1, bd = Infinity;
+      for (let k = 0; k < U.length; k++) {
+        const q = U[k] * 3, d = (P[q] - arr[o]) ** 2 + (P[q + 1] - arr[o + 1]) ** 2 + (P[q + 2] - arr[o + 2]) ** 2;
+        if (d < bd) { bd = d; best = q; }
+      }
+      if (best < 0 || bd > 0.04) return;
+      const s = (arr[o] - P[best]) * NR[best] + (arr[o + 1] - P[best + 1]) * NR[best + 1] + (arr[o + 2] - P[best + 2]) * NR[best + 2];
+      // (Carried along, not flung: the push is no new speed.)
+      if (s < margin) { const k = margin - s; for (let a = 0; a < 3; a++) { arr[o + a] += NR[best + a] * k; prev[o + a] += NR[best + a] * k; } }
+    };
     const Ko = G.keepOut;
     const SUB = 2, h = dt / SUB, g = -9.8 * h * h;
     const D = G.maxD, Ed = G.edges, Rl = S.rest, St = G.stiff, ne = Rl.length, Cm = G.capMask, invM = S.invM, sc = this.scale;
@@ -227,7 +247,7 @@ export class Clothing {
         rP[0] = T[k * 3]; rP[1] = T[k * 3 + 1]; rP[2] = T[k * 3 + 2];
         for (let j = 1; j < R.n; j++) {
           const o = j * 3;
-          const vx = (rP[o] - rQ[o]) * 0.98, vy = (rP[o + 1] - rQ[o + 1]) * 0.98, vz = (rP[o + 2] - rQ[o + 2]) * 0.98;
+          const vx = (rP[o] - rQ[o]) * 0.94, vy = (rP[o + 1] - rQ[o + 1]) * 0.94, vz = (rP[o + 2] - rQ[o + 2]) * 0.94;
           rQ[o] = rP[o]; rQ[o + 1] = rP[o + 1]; rQ[o + 2] = rP[o + 2];
           rP[o] += vx; rP[o + 1] += vy + g; rP[o + 2] += vz;
         }
@@ -239,7 +259,16 @@ export class Clothing {
           if (j === 1) { rP[b] -= dx * c; rP[b + 1] -= dy * c; rP[b + 2] -= dz * c; }
           else { rP[a] += dx * c * 0.5; rP[a + 1] += dy * c * 0.5; rP[a + 2] += dz * c * 0.5; rP[b] -= dx * c * 0.5; rP[b + 1] -= dy * c * 0.5; rP[b + 2] -= dz * c * 0.5; }
           collide(rP, j, 0b01111111);
+          if (S.under) outOf(rP, rQ, j);
         }
+      }
+    }
+    // Layers over layers (a scapular on the tunic) keep their place on the cloth beneath.
+    if (S.riders) {
+      const Rd = G.ride!;
+      for (let k = 0; k < S.riders.length; k++) {
+        const o = S.riders[k] * 3, q = Rd[S.riders[k]] * 3;
+        P[o] = P[q] + T[o] - T[q]; P[o + 1] = P[q + 1] + T[o + 1] - T[q + 1]; P[o + 2] = P[q + 2] + T[o + 2] - T[q + 2];
       }
     }
     const t2 = performance.now();
