@@ -262,6 +262,16 @@ World coordinates in metres (x, z).
   16–23 s, title to *Enter* 40–75 s; at the busiest places 220k–640k triangles and 100–190 draw calls
   per frame; JS heap ~340–365 MB after GC (it was ~900 MB before the CPU copies of the meshes were
   freed). Collision is one merged proxy mesh (boxes and prisms) with a BVH.
+- Performance (phone first): `?debug` shows a HUD (`src/perf.ts`) with fps, frame time, CPU ms per
+  system, draw calls, triangles, GPU textures / geometries, resolution scale and JS heap. Culling in
+  `main.ts` `cull()`: zones, draw distance, cells wholly inside the fog (`src/fogcull.ts`, a CPU twin of
+  the shader's height fog: keep its constants in step), and above ground a conservative software
+  occlusion buffer of the nearby houses (`src/occlusion.ts`). The stream keeps three details: full
+  chunks within 48–68 m, middle chunks within 88–104 m (the same houses built with `DETAIL.mid`
+  in `builder.ts`: no small pieces, tiles or bevels, coarse tessellation, about a fifth of the
+  triangles), plain blocks beyond. Props are one InstancedMesh per kind and part, refilled per
+  instance by range and frustum (`commitProps`). World textures ship as KTX2 (`*.ktx2.wasm`,
+  because the host refuses `.ktx2`; `tools/encode-ktx2.mjs`), with the WebP as fallback (`?noktx2`).
 - Secrets, explorables and easter eggs: `SECRETS.md`.
 
 ## 9. Ponte Fratto (Pons Maior)
