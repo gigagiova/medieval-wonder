@@ -433,9 +433,10 @@ def bake(basemesh, spec, out_dir, size=1024):
     w0 = alb.size[0]
     bg = list(alb.pixels[(2 * w0 + 2) * 4:(2 * w0 + 2) * 4 + 3])
     transfer(basemesh, hidx, scan, alb, img)
-    fill_non_skin(img, mask, bg)
+    alpha = fill_non_skin(img, mask, bg)
     nt.links.new(tex.outputs['Color'], nt.nodes['Principled BSDF'].inputs['Base Color'])
     body_img = match_body_tone(basemesh, skin, img, hidx, zc)
+    under_scan(basemesh, hidx, body_img, img, alpha)
     blend_neck(basemesh, hidx, body_img, img, zc)
     me.uv_layers.remove(me.uv_layers['mhuv'])
     img.filepath_raw = os.path.join(out_dir, basemesh.name.split('.')[0] + '_head.png')
@@ -494,6 +495,7 @@ def fill_non_skin(img, mask, bg=None):
     fill = fill * k + med[None, None, :] * (1 - k)
     out = np.concatenate([fill, np.ones((n, n, 1), np.float32)], -1)
     img.pixels[:] = out.ravel()
+    return alpha
     log('filled', round(float((alpha < 0.5).mean()), 3), 'of the head image')
 
 
@@ -684,3 +686,33 @@ def transfer(basemesh, hidx, scan, alb, img):
         done += 1
     img.pixels[:] = out.ravel()
     log('transferred', done, 'triangles from the scan atlas')
+
+
+def under_scan(basemesh, hidx, body_img, head_img, alpha):
+    """Where the scan has no skin to give (inside the ears, a face-only scan's
+    scalp, under a collar), the painted body skin, tone-matched, texel for
+    texel through MakeHuman's own UVs; the scan over it, its edge softened."""
+    import numpy as np
+    me = basemesh.data
+    huv, muv = me.uv_layers[0].data, me.uv_layers['mhuv'].data
+    n = head_img.size[0]
+    cur = np.array(head_img.pixels[:], dtype=np.float32).reshape(n, n, 4)
+    base = cur.copy()
+    W, H = body_img.size
+    src = np.array(body_img.pixels[:], dtype=np.float32).reshape(H, W, 4)
+    me.calc_loop_triangles()
+    for t in me.loop_triangles:
+        if t.polygon_index not in hidx:
+            continue
+        D = np.array([[huv[l].uv.x * n, huv[l].uv.y * n] for l in t.loops])
+        S = np.array([[muv[l].uv.x, muv[l].uv.y] for l in t.loops])
+        raster(base, D, S, src)
+    a = alpha.copy()
+    for _ in range(3):  # soften the scan's edge over a few texels
+        p = np.pad(a, 1, mode='edge')
+        a = (p[:-2, 1:-1] + p[2:, 1:-1] + p[1:-1, :-2] + p[1:-1, 2:] + p[1:-1, 1:-1]) / 5
+    a = np.minimum(a, alpha + 0.0)[..., None] if False else a[..., None]
+    out = cur * a + base * (1 - a)
+    out[..., 3] = 1
+    head_img.pixels[:] = out.ravel()
+    log('painted skin under the scan where it has none:', round(float((alpha < 0.5).mean()), 3))

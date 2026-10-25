@@ -48,7 +48,7 @@ BODIES = {
 GARMENTS = {
     'robe_src': {'sex': ['man'], 'mhclo': 'donitz_monk_robe/donitz_monk_robe.mhclo', 'only_source': True},
     'robe': {'sex': ['man'], 'derive': {'from': 'robe_src', 'drop': ['rope']}, 'fabric': 'tabby', 'layer': 'tunic', 'map': 'detail'},
-    'longrobe': {'sex': ['man'], 'derive': {'from': 'robe_src', 'drop': ['rope', 'capelet']}, 'fabric': 'twill', 'layer': 'tunic', 'map': 'detail'},
+    'longrobe': {'sex': ['man'], 'derive': {'from': 'robe_src', 'drop': ['rope']}, 'fabric': 'twill', 'layer': 'tunic', 'map': 'detail'},
     'rope': {'sex': ['man'], 'derive': {'from': 'robe_src', 'keep': ['rope']}, 'fabric': 'rope', 'layer': 'belt', 'map': 'color'},
     'cowl': {'sex': ['man'], 'mhclo': 'donitz_monk_robe_hood_down/donitz_monk_robe_hood_down.mhclo', 'fabric': 'tabby', 'layer': 'over', 'map': 'detail'},
     'hood': {'sex': ['man'], 'mhclo': 'donitz_monk_robe_hood/donitz_monk_robe_hood.mhclo', 'fabric': 'felt', 'layer': 'head', 'map': 'detail'},
@@ -61,7 +61,7 @@ GARMENTS = {
     'shoes': {'sex': ['man', 'woman'], 'mhclo': 'punkduck_medieval_boots/punkduck_medieval_boots.mhclo', 'fabric': 'leather', 'layer': 'shoe', 'map': 'color'},
     # Modelled here (drape.py): a Lombard cloak of fulled wool fastened at
     # the right shoulder, to the calf; a woman's shawl round the shoulders.
-    'cloak': {'sex': ['man'], 'drape': {'from': 165, 'to': 375, 'length': 1.05, 'over': ['tunic'], 'bend': 2.0, 'frames': 25}, 'fabric': 'felt', 'layer': 'over', 'depth': 80},
+    'cloak': {'sex': ['man'], 'drape': {'from': 165, 'to': 375, 'length': 1.05, 'over': ['shirt', 'belt'], 'bend': 2.0, 'frames': 25}, 'fabric': 'felt', 'layer': 'over', 'depth': 80},
     'shawl': {'sex': ['woman'], 'drape': {'from': 140, 'to': 400, 'length': 0.5, 'over': ['gown', 'veil'], 'collar': 0.11, 'bend': 2.0, 'frames': 25}, 'fabric': 'twill', 'layer': 'over', 'depth': 80},
     'gown': {'sex': ['woman'], 'mhclo': 'punkduck_medieval_dress/punkduck_medieval_dress.mhclo', 'fabric': 'twill', 'layer': 'tunic'},
     'veil': {'sex': ['woman'], 'mhclo': 'elvs_charity_veil1/elvs_charity_veil1.mhclo', 'fabric': 'linen', 'layer': 'head', 'relax': 12},
@@ -71,7 +71,7 @@ GARMENTS = {
 OUTFITS = {
     'monk': {'sex': 'man', 'garments': ['robe', 'rope', 'cowl', 'shoes']},
     'peasantHood': {'sex': 'man', 'garments': ['tunic', 'hood', 'hose', 'boots']},
-    'peasantCloak': {'sex': 'man', 'garments': ['tunic', 'cloak', 'hose', 'boots']},
+    'peasantCloak': {'sex': 'man', 'garments': ['shirt', 'belt', 'cloak', 'hose', 'boots']},
     'soldier': {'sex': 'man', 'garments': ['shirt', 'belt', 'hose', 'boots']},
     'soldierCloak': {'sex': 'man', 'garments': ['shirt', 'belt', 'cloak', 'hose', 'boots']},
     # The long tunic of clergy, merchants and strangers, and the same under a mantle (src/npc/population.ts).

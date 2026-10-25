@@ -370,7 +370,7 @@ export class Person {
       skel = new THREE.Skeleton([...skel.bones, ...this.skirt], [...skel.boneInverses, inv, inv.clone()]);
     }
     this.cloth = v2
-      ? dressV2(this.body, outfit as unknown as OutfitV2, { tunic, over, head, belt, leg: dye(pick(rnd, [...DYES.undyed, ...DYES.woad]), 0.3), shoe: new THREE.Color(0x8a7a6a).multiplyScalar(0.8 + rnd() * 0.3), kinds: lc?.kinds }) as unknown as Clothing
+      ? dressV2(this.body, outfit as unknown as OutfitV2, { tunic, over, head, belt, leg: dye(pick(rnd, [...DYES.undyed, ...DYES.woad]), 0.3), shoe: new THREE.Color(0x8a7a6a).multiplyScalar(0.8 + rnd() * 0.3), kinds: lc?.kinds, role }) as unknown as Clothing
       : new Clothing(scene, outfit.garment, skel, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
 
     // Motion.
