@@ -316,6 +316,37 @@ export function dressWall(acc: Acc, d: WallDress, seed: number) {
       renderPatch(acc, d.f, cu, cv, w / 2, hgt / 2, r);
     }
   }
+  // A timber upper storey: a frame of posts, rails and braces filled with
+  // wattle and daub (plaster), or boards with battens over the joints (wood).
+  if (!d.oneMass && d.h - d.lowTop > 1.2 && (d.upper === 'plaster' || d.upper === 'wood')) {
+    const y0 = d.lowTop + 0.02, y1 = d.h - 0.05, w = d.upFace + 0.035;
+    const holesUp = d.holes.filter((o) => o.v1 > y0 + 0.2);
+    const blocked = (u: number) => holesUp.some((o) => u > o.u0 - 0.12 && u < o.u1 + 0.12);
+    if (d.upper === 'plaster') {
+      box(acc, 'wood', d.f, d.L / 2, y0 + 0.08, w, d.L / 2, 0.09, 0.05, 0.01); // sole plate
+      box(acc, 'wood', d.f, d.L / 2, y1 - 0.08, w, d.L / 2, 0.08, 0.05, 0.01); // head plate
+      const posts: number[] = [];
+      for (let u = 0.08; u <= d.L - 0.05; u += R(0.9, 1.3)) { let uu = u; while (blocked(uu) && uu < d.L - 0.1) uu += 0.1; if (uu < d.L - 0.05 && (!posts.length || uu - posts[posts.length - 1] > 0.5)) posts.push(uu); }
+      if (!posts.length || d.L - 0.08 - posts[posts.length - 1] > 0.4) posts.push(d.L - 0.08);
+      for (const u of posts) box(acc, 'wood', d.f, u, (y0 + y1) / 2, w, 0.07, (y1 - y0) / 2 - 0.1, 0.05, 0.015);
+      // A mid rail between posts (cut by windows) and a brace in some bays.
+      const ym = y0 + (y1 - y0) * R(0.42, 0.55);
+      for (const [a, b] of runs(ym - 0.08, ym + 0.08, 0.1, d.L - 0.1)) box(acc, 'wood', d.f, (a + b) / 2, ym, w - 0.005, (b - a) / 2, 0.065, 0.045, 0.012);
+      for (let i = 0; i + 1 < posts.length; i++) {
+        const a = posts[i] + 0.06, b = posts[i + 1] - 0.06;
+        if (b - a < 0.5 || r() < 0.45 || holesUp.some((o) => o.u1 > a - 0.1 && o.u0 < b + 0.1)) continue;
+        const up = r() < 0.5;
+        const p0 = d.f.p(up ? a : b, y0 + 0.15, w - 0.04), p1 = d.f.p(up ? b : a, ym - 0.06, w - 0.04);
+        const t = new THREE.Vector3(0, 0.12, 0), o = d.f.z.clone().multiplyScalar(0.08);
+        acc.hexa('wood', [p0, p1, p1.clone().add(o), p0.clone().add(o), p0.clone().add(t), p1.clone().add(t), p1.clone().add(t).add(o), p0.clone().add(t).add(o)], true);
+      }
+    } else {
+      for (let u = R(0.15, 0.3); u < d.L - 0.1; u += R(0.24, 0.32)) {
+        if (blocked(u)) continue;
+        box(acc, 'wood', d.f, u, (y0 + y1) / 2 + R(-0.05, 0.05), d.upFace + 0.015, 0.035, (y1 - y0) / 2 - 0.05 + R(-0.06, 0.02), 0.018, 0.006);
+      }
+    }
+  }
   // Joist heads where the upper floor rests (no jetty: they stop at the face).
   if (!d.oneMass || d.h > 4.5) {
     const v = (d.oneMass ? Math.min(3.2, d.h * 0.48) : d.lowTop) + 0.12;
