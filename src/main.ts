@@ -305,7 +305,7 @@ Object.assign(ao.configuration, { aoRadius: 1.6, distanceFalloff: 1.2, intensity
 (ao as { autoDetectTransparency: boolean }).autoDetectTransparency = false;
 ao.setQualityMode('Medium');
 composer.addPass(ao);
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.35, 0.5, 0.95);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.5, 0.7, 0.95);
 // Key light scattered in the mist (shafts), composited together with the
 // NaN guard: one bad pixel (NaN/inf) would be smeared over the whole screen
 // by the bloom, so non-finite or absurd values are cleared in the same pass.

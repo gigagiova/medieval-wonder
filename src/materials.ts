@@ -57,7 +57,8 @@ export const shared = {
   uLF: { value: new THREE.DataTexture(new Uint8Array(4), 1, 1) as THREE.Texture },
   uLFBox: { value: new THREE.Vector4(0, 0, 1, 0) },
   uFogK: { value: new THREE.Vector4(0.009, 0.055, 0.12, 60) },
-  uSkyGlow: { value: 0.35 },
+  uSkyGlow: { value: 0.45 },
+  uSkyK: { value: new THREE.Vector4(0.75, 0.55, 1.25, 0.11) },
 };
 
 
@@ -205,6 +206,7 @@ export function makeSky(): THREE.Mesh {
     fragmentShader: /* glsl */ `
       varying vec3 vWPos;
       uniform float uSkyGlow;
+      uniform vec4 uSkyK; // cloud belly darkening, gap brightening, horizon brightness, edge softness
       #define SKY_DOME
       ${noiseGLSL}
       ${atmosGLSL}
@@ -217,7 +219,7 @@ export function makeSky(): THREE.Mesh {
         // read by their darker, denser bellies; thin parts let the glow through.
         float md = max(dot(rd, uMoonDir), 0.0);
         vec3 hor = vec3(0.19, 0.195, 0.205), zen = vec3(0.055, 0.06, 0.07);
-        vec3 col = mix(hor, zen, smoothstep(-0.02, 0.55, y));
+        vec3 col = mix(hor * uSkyK.z, zen, smoothstep(-0.02, 0.55, y));
         vec3 glowC = vec3(0.92, 0.93, 0.95);
         float glow = uSkyGlow * (0.28 * pow(md, 3.0) + 0.55 * pow(md, 14.0) + 0.6 * pow(md, 60.0));
         // Cloud deck: a plane ~1.5 km up, warped so the masses billow.
@@ -228,9 +230,10 @@ export function makeSky(): THREE.Mesh {
         float c2 = texture2D(uNoise, cuv * 0.19 - w * 0.3 + vec2(t * 0.0016, t * 0.0005)).g;
         float c3 = texture2D(uNoise, cuv * 0.53 + w * 0.2 + vec2(t * 0.0025, 0.0)).b;
         float d = c1 * 0.55 + c2 * 0.3 + c3 * 0.15;
-        float thick = smoothstep(0.3, 0.72, d);
+        float thick = smoothstep(0.51 - uSkyK.w, 0.51 + uSkyK.w, d);
         float far = smoothstep(0.0, 0.22, y); // the deck flattens into haze at the horizon
-        col *= 1.0 - thick * 0.5 * far;
+        // Dense bellies darken; between them the thinner deck is paler.
+        col *= (1.0 - thick * uSkyK.x * far) * (1.0 + (1.0 - thick) * uSkyK.y * far);
         col += glowC * glow * mix(1.0, 0.18, thick * far);
         // Bright rims where thin cloud edges face the glow.
         float rim = clamp(1.0 - abs(d - 0.42) * 7.0, 0.0, 1.0);
