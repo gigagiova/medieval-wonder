@@ -20,7 +20,7 @@ const lathe = (pts: [number, number][], seg = 12) => new THREE.LatheGeometry(pts
 let mats: ReturnType<typeof makeMats> | null = null;
 function makeMats() {
   return {
-    gold: matte(0x9a7a34, 0.32, 0.95),
+    gold: matte(0xc09a48, 0.38, 0.45, { emissive: 0x2a1c06 }),
     garnet: matte(0x5a0e10, 0.25, 0.1),
     clay: matte(0x8a5a3c, 0.85),
     clayDark: matte(0x5e3e2a, 0.9),
@@ -99,7 +99,7 @@ export function makeFibula(Ms: Measure, side: 'right' | 'throat') {
   const o = new THREE.Group();
   o.add(new THREE.Mesh(merge([disc, rim, ...pellets]), M().gold), new THREE.Mesh(boss, M().garnet));
   const p = side === 'throat'
-    ? new THREE.Vector3(n.x, n.y - 0.07, n.z + 0.105)
+    ? new THREE.Vector3(n.x, n.y - 0.15, n.z + 0.13)
     : new THREE.Vector3(n.x - 0.1, (n.y + s2.y) / 2 + 0.01, n.z + 0.11);
   const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.25, side === 'throat' ? 0 : -0.35, 0));
   return { obj: o, place: new THREE.Matrix4().compose(p, q, new THREE.Vector3(1, 1, 1)) };

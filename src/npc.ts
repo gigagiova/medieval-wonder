@@ -998,6 +998,8 @@ export interface TownOpts {
   places?: { name: string; x: number; z: number }[];
   /** How many people (default 18). */
   count?: number;
+  /** Beyond this distance people are not drawn (default 60 m). */
+  showDist?: number;
   /** Someone else decides who is about and where (src/npc/population.ts): the default plan is skipped. */
   director?: TownDirector;
 }
@@ -1387,7 +1389,7 @@ class Town {
       const p = a.p;
       sphere.center.copy(p.pos).y += 0.9;
       sphere.radius = 1.4;
-      const show = p.dist < 60 && frustum.intersectsSphere(sphere);
+      const show = p.dist < (this.o.showDist ?? 60) && frustum.intersectsSphere(sphere);
       p.setVisible(show);
       if (show && p.dist < npcDebug.simDist) sim.push(a);
     }
