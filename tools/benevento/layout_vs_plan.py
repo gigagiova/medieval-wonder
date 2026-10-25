@@ -1,7 +1,8 @@
-import json
+import json, os
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 from PIL import Image, ImageDraw, ImageFont
-D = '/tmp/claude-0/-home-user-medieval-wonder/bc93be6c-c281-5bc8-9970-42e320f63227/scratchpad/benevento/'
-g = json.load(open('/home/user/medieval-wonder/.claude/worktrees/agent-a6d696e568780419c/src/benevento/geo.json'))
+D = os.environ.get('SCRATCH', '/tmp/benevento').rstrip('/') + '/'
+g = json.load(open(os.path.join(ROOT, 'src/benevento/geo.json')))
 m = json.load(open(D + 'layout_meta.json'))
 lay = Image.open(D + 'layout.ppm').convert('RGB')
 X0, Z0, S = -560, -420, 1.4
@@ -33,6 +34,6 @@ for q in g['parcels']:
 finish(c, dc, 'C. Overlay: plan block outlines (cyan) on the generated town')
 out = Image.new('RGB', (Wd, Hd * 3), (255, 255, 255))
 out.paste(a, (0, 0)); out.paste(b, (0, Hd)); out.paste(c, (0, 2 * Hd))
-out.save('/home/user/medieval-wonder/.claude/worktrees/agent-a6d696e568780419c/docs/benevento/layout-vs-plan.png', optimize=True)
+out.save(os.path.join(ROOT, 'docs/benevento/layout-vs-plan.png'), optimize=True)
 c.crop((int(250 * S), int(150 * S), int(800 * S), int(500 * S))).save(D + 'cmp_zoom.png')
 print(out.size)

@@ -5,11 +5,13 @@ import { SITES, GATES, ROADS, EXPLORE_TARGETS, siteToWorld, type ExploreKind } f
 import { fastTerrain } from '../displace';
 import type { Lot, BridgeSpec } from '../town';
 
-// The town of AD 700 laid out on the user's plan: its blocks exactly as drawn
-// (houses stand only inside them, fronts on the block edge) and its street
-// spaces left open, with the lanes' centre lines for walkers; blocks are filled with houses where the
-// early-medieval town was dense, and with vegetable plots, ruins, meadows and
-// pens where it was not: the countryside had come inside the walls.
+// The town of AD 700 laid out on the user's plan, which is the authority for
+// what was built and what was open (docs/benevento/HISTORY.md §6): every
+// block of the plan is built up, houses wall to wall along all its edges and
+// back buildings filling it behind, with only small courtyards; the plan's
+// open (green) spaces are the only gardens, vineyards, pens, meadows and
+// ruins; its street spaces stay open, with the lanes' centre lines for
+// walkers and arches and pontili over the narrow alleys.
 
 export const FREE = 0, STREET = 1, RESERVED = 2, HOUSE = 3, OUTSIDE = 4, PLOT = 5;
 type V2 = THREE.Vector2;
@@ -75,10 +77,11 @@ export interface Layout {
   squares: { x: number; z: number; r: number }[];
 }
 
-// ---------------------------------------------------------------- density of settlement
+// ---------------------------------------------------------------- intensity of settlement
 // High along the decumanus, round the dukes' curtis and the bishop's church,
-// inside Porta Aurea; low on the steep slopes to the Calore and in patches
-// where the ruins of Roman houses had become gardens.
+// inside Porta Aurea; low on the steep slopes to the Calore. It no longer
+// decides what is built (the plan does): only how tall the houses are, and
+// where the wells and the arches over the lanes go.
 const DS = 8;
 let DEN: Float32Array | null = null, DNX = 0, DNZ = 0, DX0 = 0, DZ0 = 0;
 function hashNoise(x: number, z: number) {
@@ -254,34 +257,30 @@ export function layoutTown(seed = 700): Layout {
     }
   }
 
-  // 5. What each block was in 700: built up, built along its lanes with a
-  //    garden behind, or gardens, vines, pens and ruins.
-  type Use = 'built' | 'mixed' | 'site' | PlotKind;
+  // 5. What each block was in 700: as the plan says, a block is built up and
+  //    an open space is a garden, a vineyard, a pen, a meadow or a ruin.
+  type Use = 'built' | 'site' | PlotKind;
   const use: Use[] = [];
   // Blocks a landmark precinct cuts into belong to the landmark.
   const tot = new Uint32Array(parcels.length + 1), res = new Uint32Array(parcels.length + 1);
   for (let k = 0; k < r.grid.length; k++) { const q = r.parcel[k]; if (q && q <= parcels.length) { tot[q]++; if (r.grid[k] === RESERVED) res[q]++; } }
   parcels.forEach((p, n) => {
-    if (res[n + 1] > tot[n + 1] * 0.05) { use[n + 1] = 'site'; return; }
+    // Only blocks mostly inside a landmark's precinct (or the band along the
+    // curtain) are left to it; elsewhere the reserved cells just stay unbuilt.
+    if (res[n + 1] > tot[n + 1] * 0.5) { use[n + 1] = 'site'; return; }
     // A block a gate road was cut through keeps no fenced plot across the road.
     const cut = tot[n + 1] * r.res * r.res < p.a * 0.9;
     let cx = 0, cz = 0;
     for (const [x, z] of p.pts) { cx += x / p.pts.length; cz += z / p.pts.length; }
-    const D = density(cx, cz);
-    let pb = D * (p.a > 1600 ? 0.55 : p.a > 700 ? 0.85 : 1.05);
-    if (p.k === 'open') pb = 0;
-    if (cut && p.k !== 'open') pb = 1;
-    const u = rand();
     let k: Use;
-    if (u < pb) k = 'built';
-    else if (u < pb + 0.2 && p.a > 160) k = 'mixed';
+    if (p.k !== 'open') k = 'built';
     else {
       const v = rand();
       k = v < 0.42 ? 'orto' : v < 0.56 ? 'vinea' : v < 0.74 ? 'pratum' : v < 0.88 ? 'ruina' : 'stabulum';
       if ((p.a > 2500 && k === 'stabulum') || cut) k = 'pratum';
     }
     use[n + 1] = k;
-    if (k !== 'built' && k !== 'mixed') {
+    if (k !== 'built') {
       lay.plots.push({ pts: p.pts, kind: k, seed: Math.floor(rand() * 1e9), cx, cz });
       r.fill(p.pts, (kk) => { if (r.grid[kk] === FREE) r.grid[kk] = PLOT; });
     }
@@ -290,11 +289,12 @@ export function layoutTown(seed = 700): Layout {
   // 6. Houses along the lanes, wall to wall, each within one block.
   const quadClear = (c: V2[], allowHouse: number, needPid: (pid: number) => boolean, inBlock = false) => {
     let total = 0, house = 0, pid0 = -1;
-    const p = V(0, 0);
+    const [c0, c1, c2, c3] = c;
+    // A house may lean over part of another (allowHouse), never over a lane: fail fast.
+    let budget = Math.floor(49 * allowHouse);
     for (let u = 0.08; u < 1; u += 0.14) for (let w = 0.08; w < 1; w += 0.14) {
-      p.copy(c[0]).lerp(c[1], u);
-      p.lerp(c[3].clone().lerp(c[2], u), w);
-      const k = r.idx(p.x, p.y);
+      const ax = c0.x + (c1.x - c0.x) * u, az = c0.y + (c1.y - c0.y) * u, bx = c3.x + (c2.x - c3.x) * u, bz = c3.y + (c2.y - c3.y) * u;
+      const k = r.idx(ax + (bx - ax) * w, az + (bz - az) * w);
       if (k < 0) return false;
       const v = r.grid[k];
       if (v === STREET || v === RESERVED || v === OUTSIDE || v === PLOT) return false;
@@ -302,7 +302,7 @@ export function layoutTown(seed = 700): Layout {
       if (!pid && inBlock) return false;
       if (pid) { if (pid0 < 0) pid0 = pid; else if (pid !== pid0) return false; }
       total++;
-      if (v === HOUSE) house++;
+      if (v === HOUSE) { house++; if (--budget < 0) return false; }
     }
     if (pid0 > 0 && !needPid(pid0)) return false;
     return house / total <= allowHouse;
@@ -318,7 +318,7 @@ export function layoutTown(seed = 700): Layout {
   };
   const pidOf = (c: V2[]) => { const m = c[0].clone().add(c[1]).add(c[2]).add(c[3]).multiplyScalar(0.25); return r.pid(m.x, m.y); };
   let lotId = 0;
-  const frontOk = (pid: number) => use[pid] === 'built' || use[pid] === 'mixed';
+  const frontOk = (pid: number) => use[pid] === 'built';
   // Street width in front of a point, looking out along n.
   const widthAt = (p: V2, n: V2) => {
     let w = 0;
@@ -349,7 +349,6 @@ export function layoutTown(seed = 700): Layout {
       // A front only where the block meets the street (not a party wall).
       const ahead = r.at(mid.x + out.x * 1.2, mid.y + out.y * 1.2);
       if (ahead !== STREET) continue;
-      if (density(mid.x, mid.y) < 0.1 && rand() < 0.6) continue;
       const F0 = a.p.clone().addScaledVector(nIn, 0.1), F1 = b.p.clone().addScaledVector(nIn, 0.1);
       const main = r.main[r.idx(mid.x + out.x * 1.5, mid.y + out.y * 1.5)] > 0;
       let d0 = R(5, main ? 11 : 9), d1 = d0 + R(-1.4, 1.4);
@@ -364,10 +363,69 @@ export function layoutTown(seed = 700): Layout {
       lay.lots.push({ id: lotId++, c, front: { a: F0, b: F1, out }, h: R(5, 10.5) * (0.75 + 0.35 * density(F0.x, F0.y)), street: Math.max(1.5, widthAt(mid, out)), parcel: pid });
     }
   });
-  // Back buildings inside built blocks; mixed blocks keep a garden behind.
+  // Behind each front house: back ranges (kitchen, workshop, store, stable)
+  // on the same plot, now and then across a small yard.
+  for (const l of lay.lots.filter((q) => q.front)) {
+    const pid = l.parcel;
+    if (use[pid] !== 'built') continue;
+    const nIn = l.front!.out.clone().negate();
+    let A = l.c[3], B = l.c[2];
+    for (let row = 0; row < 3; row++) {
+      const yard = rand() < 0.25 ? R(1.5, 3.5) : 0.05;
+      let ok = false, c: V2[] = [];
+      const A0 = A.clone().addScaledVector(nIn, yard), B0 = B.clone().addScaledVector(nIn, yard);
+      for (let d = R(3.5, 7); d > 2.4; d -= 0.8) {
+        c = [A0, B0, B0.clone().addScaledVector(nIn, d), A0.clone().addScaledVector(nIn, d)];
+        if (quadClear(c, 0.12, strict(pid), true)) { ok = true; break; }
+      }
+      if (!ok) break;
+      markQuad(c);
+      lay.lots.push({ id: lotId++, c, h: R(3.6, 8), parcel: pid });
+      A = c[3]; B = c[2];
+    }
+  }
+  // Then the rest of each block, tiled with buildings on the block's own
+  // grain (its longest edge), shrinking where they meet the others; now and
+  // then a tile is left as a small courtyard.
+  for (const pass of [0, 1]) parcels.forEach((p, n) => {
+    const pid = n + 1;
+    if (use[pid] !== 'built') return;
+    let best = 0, ang = 0;
+    for (let i = 0; i < p.pts.length; i++) {
+      const a = p.pts[i], c = p.pts[(i + 1) % p.pts.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]);
+      if (L > best) { best = L; ang = Math.atan2(c[1] - a[1], c[0] - a[0]); }
+    }
+    const ex = V(Math.cos(ang), Math.sin(ang)), ez = V(-Math.sin(ang), Math.cos(ang));
+    let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity;
+    for (const [x, z] of p.pts) { const u = x * ex.x + z * ex.y, w = x * ez.x + z * ez.y; u0 = Math.min(u0, u); u1 = Math.max(u1, u); w0 = Math.min(w0, w); w1 = Math.max(w1, w); }
+    const at = (u: number, w: number) => V(ex.x * u + ez.x * w, ex.y * u + ez.y * w);
+    // A second pass on a shifted grid fills what the first left between.
+    for (let w = w0 + R(0, 1.5) + pass * 2.5; w < w1 - 1.5; ) {
+      const dw = R(4, 7);
+      for (let u = u0 + R(0, 1.5) + pass * 2.2; u < u1 - 1.5; ) {
+        const du = R(3.5, 7);
+        if (rand() < 0.04 - pass * 0.04) { u += du; continue; }
+        // The tile, or a smaller one anchored at one of its corners.
+        let placed = false;
+        for (const f of [1, 0.75, 0.55, 0.4]) for (const [su, sw] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+          if (placed) break;
+          const a = u + su * du * (1 - f), b2 = w + sw * dw * (1 - f), A2 = du * f, B2 = dw * f;
+          if (A2 < 2.2 || B2 < 2.2) continue;
+          const c = [at(a, b2), at(a + A2, b2), at(a + A2, b2 + B2), at(a, b2 + B2)];
+          if (!quadClear(c, pass ? 0.4 : 0.2, strict(pid), true)) continue;
+          markQuad(c);
+          lay.lots.push({ id: lotId++, c, h: R(3.6, 8), parcel: pid });
+          placed = true;
+        }
+        u += du;
+      }
+      w += dw;
+    }
+  });
+  // Last, sheds and lean-tos into the leftover corners.
   const free: number[] = [];
   for (let k = 0; k < r.grid.length; k++) if (r.grid[k] === FREE && use[r.parcel[k]] === 'built') free.push(k);
-  const tries = Math.min(9000, free.length / 30);
+  const tries = Math.min(15000, free.length / 6);
   for (let t = 0; t < tries && free.length; t++) {
     const k = free[Math.floor(rand() * free.length)];
     if (r.grid[k] !== FREE) continue;
@@ -375,23 +433,15 @@ export function layoutTown(seed = 700): Layout {
     const ang = R(-0.3, 0.3) + (rand() < 0.5 ? 0 : Math.PI / 2);
     const ex = V(Math.cos(ang), -Math.sin(ang)), ez = V(Math.sin(ang), Math.cos(ang));
     for (let s = 0; s < 4; s++) {
-      const w = R(2.6, 7) * (1 - s * 0.2), d = R(2.6, 7) * (1 - s * 0.2);
+      const w = R(2.2, 5) * (1 - s * 0.12), d = R(2.2, 5) * (1 - s * 0.12);
       const o = V(x, z).addScaledVector(ex, -w * R(0.2, 0.8)).addScaledVector(ez, -d * R(0.2, 0.8));
       const c = [o, o.clone().addScaledVector(ex, w), o.clone().addScaledVector(ex, w).addScaledVector(ez, d), o.clone().addScaledVector(ez, d)];
-      if (!quadClear(c, 0.6, (pid) => use[pid] === 'built', true)) continue;
+      if (!quadClear(c, 0.3, (pid) => use[pid] === 'built', true)) continue;
       markQuad(c);
-      lay.lots.push({ id: lotId++, c, h: R(3.5, 8), parcel: pidOf(c) });
+      lay.lots.push({ id: lotId++, c, h: R(3, 5.5), parcel: pidOf(c) });
       break;
     }
   }
-  // What is left inside mixed blocks is their garden.
-  parcels.forEach((p, n) => {
-    if (use[n + 1] !== 'mixed') return;
-    let cx = 0, cz = 0;
-    for (const [x, z] of p.pts) { cx += x / p.pts.length; cz += z / p.pts.length; }
-    lay.plots.push({ pts: p.pts, kind: rand() < 0.7 ? 'orto' : 'vinea', seed: Math.floor(rand() * 1e9), cx, cz });
-  });
-
   // 7. Houses you can enter.
   const taken = new Set<number>();
   for (const t of EXPLORE_TARGETS) {
@@ -430,7 +480,7 @@ export function layoutTown(seed = 700): Layout {
       };
       if (!beyond(1, wl) || !beyond(-1, wr)) continue;
       const c = a.p.clone().addScaledVector(n, (wl - wr) / 2);
-      if (density(a.p.x, a.p.y) < 0.35) continue;
+      if (density(a.p.x, a.p.y) < 0.2) continue;
       lay.bridges.push({ x: c.x, z: c.y, dx: a.d.x, dz: a.d.y, w: W, pontile: rand() < 0.55 && !s.main, main: s.main });
     }
   }

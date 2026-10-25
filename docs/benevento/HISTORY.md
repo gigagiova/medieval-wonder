@@ -150,11 +150,27 @@ World coordinates in metres (x, z).
 - The decumanus (*platea publica maior*) cannot be traced as one corridor in the plan; it is the cheapest
   path through the plan's lane graph that stays near the line of the later Via Magistrale (Dijkstra in
   `gen_geo.py`), paved at 3.3 m with the old Roman slabs.
-- Density: houses are dense along the decumanus, round the curtis, the bishop's church and inside Porta
-  Aurea; elsewhere blocks are gardens (*orti*), vines, pens (*stabula*), meadows and ruins of Roman
-  houses — "strong penetration of the countryside inside" (Bertelli). Houses of stone (*casae
-  fabritae*, single or with an upper storey, outside stair) and of wood; pontili bridge some lanes
-  (attested later, e.g. *pontile de aurificibus*, and surviving examples).
+- **Built and open: the plan decides.** The user's plan is the authority for what was built and what
+  was open in 700. Every block of the plan (grey in panel A of `layout-vs-plan.png`) is built up:
+  houses wall to wall along every edge that meets a lane, back ranges behind them on the same plots
+  (kitchens, workshops, stores, stables), and the rest of the block tiled with buildings on the block's
+  own grain, leaving only small courtyards. Only the plan's green open spaces are gardens (*orti*),
+  vines, pens (*stabula*), meadows and ruins; its street spaces stay open (with pontili and arches over
+  the narrow lanes). The exceptions are blocks taken by a landmark the game builds (the curtis, the
+  episcopium, the forum's precinct) and the 3–4 m band kept clear inside the curtain. An earlier version
+  thinned the plan's blocks into gardens by a "density" field following the *città ad isole* model
+  (islands of houses among fields and ruins, as Brogiolo and Gelichi describe for many north-Italian
+  towns, and the "strong penetration of the countryside inside" Bertelli notes for Benevento); that
+  contradicted the plan and was dropped. A ducal capital and bishop's see c. 700 can carry a dense core (on
+  Lombard cities staying the political and social centres of their territories: Wickham, *Framing the
+  Early Middle Ages*, 2005; on the continuity of urban living under the Lombards: C. La Rocca's work on
+  Lombard towns; the *isole* model itself is argued case by case, not as a rule), and the plan's
+  own open spaces keep the countryside inside the walls. `tools/benevento/test_layout.ts` reports the
+  match: about 81% of the plan's block area lies under house walls (about 92% under their roofs, eaves
+  included; the rest is joints under 1 m and small yards) and over 99% of the plan's open ground is
+  left open. Houses of stone (*casae fabritae*, single or with an upper storey, outside stair) and of
+  wood; pontili bridge some lanes (attested later, e.g. *pontile de aurificibus*, and surviving
+  examples). The density field now only sets how tall the houses are and where wells and arches go.
 - Quarters exposed to the game (`getMapData().districts`) with certainty flags: curtis and Lombard
   quarter (attested), episcopium (attested), forum market (inferred), Latin quarters along the decumanus
   and in the west (inferred), an eastern/Greek household by Porta Aurea (**hypothesis**: churches "de
