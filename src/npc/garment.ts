@@ -233,6 +233,141 @@ export function faceOnly(root: THREE.Object3D) {
 }
 
 /**
+ * Leather ankle boots (turnshoes) in place of a scan's modern shoes, which
+ * re-coloured still looked like trainers: a soft, close-fitting shoe of one
+ * thin leather, the sole barely thicker than the upper, a rounded, slightly
+ * pointed toe, and a short shaft round the ankle, closed with a thong and
+ * rolled over at the top (the leg wraps run into it).
+ *
+ * Each foot's shoe is lofted heel to toe inside the scan's shoe (whose bulk
+ * gives the foot's length and width), and the shaft is a tube round the
+ * ankle. The foot part moves with the foot (the toe with the toes), the top
+ * of the shaft with the shin.
+ */
+function makeBoots(m: THREE.SkinnedMesh, M: Measure, shaft: number) {
+  const P = m.geometry.attributes.position, idx = m.geometry.index!, w = new THREE.Vector3();
+  const used = new Set<number>(Array.from(idx.array as ArrayLike<number>));
+  const hips = M.bone('Hips');
+  const boxes = [new THREE.Box3(), new THREE.Box3()];
+  for (const i of used) {
+    m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld);
+    boxes[w.x > hips.x ? 0 : 1].expandByPoint(w);
+  }
+  const names = m.skeleton.bones.map((b) => canon(b.name));
+  const leather = fabric('leather', 0x2e2016, { attr: 'position' });
+  const thong = fabric('leather', 0x1a120c, { attr: 'position' });
+  const inv = m.matrixWorld.clone().invert();
+  const out: THREE.SkinnedMesh[] = [];
+  (['Left', 'Right'] as const).forEach((side, si) => {
+    const B = boxes[si];
+    if (B.isEmpty()) return;
+    const foot = M.bone(side + 'Foot'), toe = M.bone(side + 'ToeBase');
+    const iFoot = names.indexOf(side + 'Foot'), iToe = names.indexOf(side + 'ToeBase'), iLeg = names.indexOf(side + 'Leg');
+    const sole = B.min.y + 0.004, zH = B.min.z + 0.014, zT = B.max.z - 0.016;
+    const x0 = (B.min.x + B.max.x) / 2, W0 = Math.min(0.1, B.max.x - B.min.x - 0.022);
+    const pos: number[] = [], SI: number[] = [], SW: number[] = [], ix: number[] = [];
+    const weigh = (x: number, y: number, z: number) => {
+      const up = ss(foot.y + 0.012, foot.y + 0.06, y), tw = ss(toe.z - 0.025, toe.z + 0.02, z) * (1 - up);
+      SI.push(iFoot, iLeg, iToe, 0); SW.push(1 - up - tw, up, tw, 0);
+    };
+    const add = (x: number, y: number, z: number) => { pos.push(x, y, z); weigh(x, y, z); return pos.length / 3 - 1; };
+    // The foot: rings heel to toe, closed at both ends.
+    const NU = 18, NV = 18;
+    const ring: number[][] = [];
+    for (let u = 0; u < NU; u++) {
+      const t = u / (NU - 1), end = Math.sqrt(Math.max(0, 1 - Math.pow(2 * t - 1, 8)));
+      if (end < 1e-3) { ring.push([add(x0 + (t > 0.5 ? -0.002 : 0), sole + (t > 0.5 ? 0.014 : 0.03), zH + (zT - zH) * t)]); continue; }
+      // Narrow heel, widest across the ball, a rounded point.
+      const wd = W0 * (0.74 + 0.26 * ss(0.05, 0.62, t) - 0.16 * ss(0.8, 1, t)) * end;
+      const ht = (0.072 - 0.022 * ss(0.3, 0.75, t) - 0.012 * ss(0.8, 1, t)) * Math.pow(end, 0.5);
+      const row: number[] = [];
+      for (let v = 0; v < NV; v++) {
+        const th = (v / NV) * Math.PI * 2, c = Math.cos(th), s2 = Math.sin(th);
+        const xx = (wd / 2) * Math.sign(c) * Math.pow(Math.abs(c), 0.8);
+        const yy = s2 >= 0 ? (ht / 2) * Math.pow(s2, 0.85) : -(ht / 2) * Math.pow(-s2, 0.3);
+        row.push(add(x0 + xx, sole + ht / 2 + yy, zH + (zT - zH) * t));
+      }
+      ring.push(row);
+    }
+    for (let u = 0; u < NU - 1; u++) {
+      const a = ring[u], b = ring[u + 1];
+      for (let v = 0; v < NV; v++) {
+        const v1 = (v + 1) % NV;
+        if (a.length === 1) ix.push(a[0], b[v1], b[v]);
+        else if (b.length === 1) ix.push(a[v], a[v1], b[0]);
+        else ix.push(a[v], a[v1], b[v], a[v1], b[v1], b[v]);
+      }
+    }
+    // The shaft round the ankle, from inside the shoe to above the ankle bone.
+    const yTop = foot.y + shaft, NS = 7, cz = foot.z - 0.008;
+    const tube: number[][] = [];
+    for (let k = 0; k < NS; k++) {
+      const t = k / (NS - 1), y = sole + 0.03 + (yTop - sole - 0.03) * t;
+      const rx = 0.041 + 0.006 * (1 - t) + 0.004 * ss(0.8, 1, t), rz = rx * (1.25 - 0.15 * t);
+      const row: number[] = [];
+      for (let v = 0; v < NV; v++) {
+        const th = (v / NV) * Math.PI * 2;
+        row.push(add(foot.x + Math.sin(th) * rx, y, cz + Math.cos(th) * rz));
+      }
+      tube.push(row);
+    }
+    // ...rolled over at the top.
+    const roll = tube[NS - 1].map((i) => add(pos[i * 3] + (pos[i * 3] - foot.x) * 0.12, yTop - 0.012, cz + (pos[i * 3 + 2] - cz) * 1.12));
+    tube.push(roll);
+    for (let k = 0; k < tube.length - 1; k++) for (let v = 0; v < NV; v++) {
+      const a = tube[k], b = tube[k + 1], v1 = (v + 1) % NV;
+      ix.push(a[v], b[v], a[v1], a[v1], b[v], b[v1]);
+    }
+    const g = new THREE.BufferGeometry();
+    const lp = Float32Array.from(pos);
+    for (let i = 0; i < lp.length; i += 3) { w.set(lp[i], lp[i + 1], lp[i + 2]).applyMatrix4(inv); lp[i] = w.x; lp[i + 1] = w.y; lp[i + 2] = w.z; }
+    g.setAttribute('position', new THREE.BufferAttribute(lp, 3));
+    g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(SI, 4));
+    g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(SW, 4));
+    g.setIndex(ix);
+    g.computeVertexNormals();
+    const shoe = new THREE.SkinnedMesh(g, leather);
+    shoe.name = 'Boot';
+    out.push(shoe);
+    // A thong wound twice round the ankle.
+    const tg: number[] = [], tSI: number[] = [], tSW: number[] = [], tix: number[] = [];
+    const NT = 28, NR2 = 5;
+    for (let k = 0; k < NT; k++) {
+      const a = (k / NT) * Math.PI * 2;
+      for (let r = 0; r < NR2; r++) {
+        const b = (r / NR2) * Math.PI * 2, rr = 0.004;
+        const y = foot.y + shaft * 0.55 + Math.sin(a) * 0.006 + Math.sin(b) * rr * 0.6;
+        const R = 0.047 + Math.cos(b) * rr;
+        w.set(foot.x + Math.sin(a) * R, y, cz + Math.cos(a) * R * 1.17).applyMatrix4(inv);
+        tg.push(w.x, w.y, w.z);
+        const up = ss(foot.y + 0.012, foot.y + 0.06, y);
+        tSI.push(iFoot, iLeg, 0, 0); tSW.push(1 - up, up, 0, 0);
+      }
+    }
+    for (let k = 0; k < NT; k++) for (let r = 0; r < NR2; r++) {
+      const a = k * NR2 + r, b = ((k + 1) % NT) * NR2 + r, c = k * NR2 + ((r + 1) % NR2), d = ((k + 1) % NT) * NR2 + ((r + 1) % NR2);
+      tix.push(a, b, c, b, d, c);
+    }
+    const t2 = new THREE.BufferGeometry();
+    t2.setAttribute('position', new THREE.Float32BufferAttribute(tg, 3));
+    t2.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(tSI, 4));
+    t2.setAttribute('skinWeight', new THREE.Float32BufferAttribute(tSW, 4));
+    t2.setIndex(tix);
+    t2.computeVertexNormals();
+    const th2 = new THREE.SkinnedMesh(t2, thong);
+    th2.name = 'BootThong';
+    out.push(th2);
+  });
+  for (const s of out) {
+    s.frustumCulled = false;
+    s.bind(m.skeleton, m.bindMatrix);
+    s.position.copy(m.position); s.quaternion.copy(m.quaternion); s.scale.copy(m.scale);
+    m.parent!.add(s);
+  }
+  m.visible = false;
+}
+
+/**
  * Strip the modern outfit. The man keeps head, beard, hands, his trousers as
  * hose and his shoes; the woman keeps head, hands and feet. Everything else
  * the clothes cover goes.
@@ -420,10 +555,13 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure) {
 
 export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard: boolean; wraps: boolean; m: Measure }) {
   const leather = fabric('leather', 0x2a1d14, { attr: 'position' });
+  const shoes: THREE.SkinnedMesh[] = [];
   root.traverse((x) => {
     const m = x as THREE.SkinnedMesh;
     if (!m.isSkinnedMesh) return;
     m.frustumCulled = false;
+    // A scan's shoes give way to leather boots (makeBoots).
+    if (m.name === 'Scan_Footwear') { shoes.push(m); return; }
     if (/Outfit_Top|Headwear/.test(m.name) || (!o.beard && /Beard/.test(m.name))) { m.visible = false; return; }
     // A scanned body (scan.ts): its legs go under a woman's gown.
     if (kit === 'woman' && m.name === 'Scan_Bottom') { m.visible = false; return; }
@@ -547,6 +685,8 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
     } else nm = withAtmos(old.clone());
     m.material = kit === 'woman' && m.geometry.groups.length ? [nm, leather] : nm;
   });
+  // Laymen's run up over the foot of their leg wraps.
+  for (const m of shoes) makeBoots(m, o.m, o.wraps ? 0.075 : 0.058);
 }
 
 // ------------------------------------------------------------------ garment

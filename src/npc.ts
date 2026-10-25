@@ -401,13 +401,8 @@ export class Person {
   private equip(g: Gear) {
     const m = this.outfit.m, r = this.rnd;
     const on = (bone: string, obj: THREE.Object3D, place: THREE.Matrix4) => Props.hangOn(this.bones.get(bone)!, this.bindOf(bone), obj, place);
-    // Laymen's leg wraps run down into ankle shoes: a leather top laced round
-    // each ankle hides where wrap and shoe meet. It rides on the shin, the
-    // shoe's collar turning inside it about the ankle.
-    if (OUTFITS[this.outfit.id].wraps) for (const s of ['Left', 'Right']) {
-      const f = m.bone(s + 'Foot'), k = m.bone(s + 'Leg');
-      on(s + 'Leg', Props.makeShoeTop(0.056), Props.placeAt(new THREE.Vector3(f.x, f.y, f.z + 0.005), new THREE.Quaternion().setFromUnitVectors(UP, k.clone().sub(f).normalize())));
-    }
+    // (Laymen's leg wraps run down into their ankle boots: see garment.ts makeBoots.)
+
     // A cloak's brooch, on the right shoulder, facing out.
     const br = this.outfit.garment.brooch;
     if (br) {

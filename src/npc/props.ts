@@ -362,11 +362,6 @@ export function makeShield(paint: THREE.Color) {
 }
 
 /**
- * The soft leather top of an ankle shoe (a turnshoe laced round the ankle),
- * closing over the shoe's collar and the foot of the leg wraps. Origin on
- * the ankle's axis at the shoe's collar; up +Y.
- */
-/**
  * A disc brooch (fibula) of the kind Lombard men pinned their cloaks with:
  * gilt bronze, a beaded rim, a raised boss set with a garnet. Its face looks
  * along +Z.
@@ -389,6 +384,11 @@ export function makeBrooch() {
   return g;
 }
 
+/**
+ * The soft leather top of an ankle shoe (a turnshoe laced round the ankle),
+ * closing over the shoe's collar and the foot of the leg wraps. Origin on
+ * the ankle's axis at the shoe's collar; up +Y.
+ */
 export function makeShoeTop(r = 0.05) {
   const m = propMats();
   const g = lathe([[r * 0.95, -0.035], [r * 1.02, 0], [r * 1.04, 0.035], [r * 1.07, 0.05], [r * 1.08, 0.056], [r * 1.02, 0.06], [r * 0.95, 0.054]], 18);
