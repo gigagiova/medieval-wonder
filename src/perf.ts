@@ -41,8 +41,8 @@ export function initHud(renderer: THREE.WebGLRenderer, sceneRoot: THREE.Object3D
   hud.id = 'perfhud';
   Object.assign(hud.style, {
     position: 'fixed', left: 'max(6px, env(safe-area-inset-left, 0px))', top: 'max(6px, env(safe-area-inset-top, 0px))', zIndex: '20',
-    font: '10px/1.3 ui-monospace, Menlo, monospace', color: '#cfe8c8', background: 'rgba(0,0,0,0.55)', padding: '3px 5px',
-    borderRadius: '3px', pointerEvents: 'none', whiteSpace: 'pre', maxWidth: '62vw', overflow: 'hidden',
+    font: '9px/1.3 ui-monospace, Menlo, monospace', color: '#cfe8c8', background: 'rgba(0,0,0,0.55)', padding: '3px 5px',
+    borderRadius: '3px', pointerEvents: 'none', whiteSpace: 'pre-wrap', maxWidth: 'calc(100vw - 170px)', overflow: 'hidden',
   });
   document.body.appendChild(hud);
   gl = renderer.getContext() as WebGL2RenderingContext;

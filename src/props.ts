@@ -248,8 +248,9 @@ export function commitProps(scene: THREE.Object3D) {
     let k = kinds.get(key);
     if (!k) {
       const v = variants.get(pl.id)![pl.variant];
-      // Out to where the old per-patch culling cut them (patch centre within range + 0.6 patch).
-      const r = (RANGE[pl.id] ?? DEFAULT_RANGE) + chunkOf(pl.id) * 0.6;
+      // Out to the farthest the old per-patch culling could show one (patch centre within range
+      // + 0.6 patch, the prop up to ~0.7 patch from that centre): never fewer props than before.
+      const r = (RANGE[pl.id] ?? DEFAULT_RANGE) + chunkOf(pl.id) * 1.3;
       k = { variant: v, range2: r * r, under: pl.under, n: 0, mat: new Float32Array(16 * 8), pos: new Float32Array(3 * 8), rad: new Float32Array(8), buckets: new Map(), meshes: [], cap: 0 };
       kinds.set(key, k);
     }

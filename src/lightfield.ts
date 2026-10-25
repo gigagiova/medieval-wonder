@@ -153,7 +153,8 @@ export class LightField {
     if (!(far || fresh || force)) return;
     this.lastReady = readyChunks;
     this.wait = 1.5;
-    this.bake(eye.x, eye.z);
+    // A failed bake must never stop the frame loop: keep the last field.
+    try { this.bake(eye.x, eye.z); } catch (e) { console.warn('light field bake failed', e); this.scene.overrideMaterial = null; this.renderer.setRenderTarget(null); }
   }
 
   bake(cx: number, cz: number) {
@@ -172,9 +173,10 @@ export class LightField {
     }
     this.scene.traverse((o) => {
       const skin = (o as THREE.SkinnedMesh).isSkinnedMesh;
-      const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
+      const mm = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      const mat = Array.isArray(mm) ? mm[0] : mm;
       const odd = (o as THREE.Points).isPoints || (o as THREE.Sprite).isSprite || (o as THREE.Line).isLine
-        || skin || (mat && (mat.transparent || mat.userData.foliage || (mat as THREE.ShaderMaterial).isShaderMaterial));
+        || skin || (mat && (mat.transparent || mat.userData?.foliage || (mat as THREE.ShaderMaterial).isShaderMaterial));
       if ((odd || this.skip.includes(o)) && o.visible) { restore.push([o, true]); o.visible = false; }
     });
     this.cam.position.set(cx, 300, cz);
@@ -186,11 +188,14 @@ export class LightField {
     this.scene.background = null;
     r.setClearColor(0x000000, 0);
     r.setRenderTarget(this.hRT);
-    r.clear();
-    r.render(this.scene, this.cam);
-    this.scene.overrideMaterial = prevOverride;
-    this.scene.background = prevBg;
-    for (const [o, v] of restore) o.visible = v;
+    try {
+      r.clear();
+      r.render(this.scene, this.cam);
+    } finally {
+      this.scene.overrideMaterial = prevOverride;
+      this.scene.background = prevBg;
+      for (const [o, v] of restore) o.visible = v;
+    }
     // Mips come from the render target's automatic generation on unbind.
     const q = this.quad.material as THREE.ShaderMaterial;
     q.uniforms.uSun.value.copy(shared.uMoonDir.value);
