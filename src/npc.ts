@@ -11,6 +11,11 @@ import { Clothing, clothStats } from './npc/cloth';
 import * as Props from './npc/props';
 import { fabric, type FabricKind } from './npc/fabric';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
+import { loadV2, kitsV2, bodiesV2, outfitV2, type OutfitV2 } from './npc2/kit';
+import { dressV2 } from './npc2/dress';
+
+/** Townsfolk v2 (src/npc2): MakeHuman bodies in modelled garments. `?npc=v1|v2`. */
+export const NPC_V2 = typeof location !== 'undefined' && new URLSearchParams(location.search).get('npc') === 'v2';
 
 // Townsfolk: monks, peasant men and women, and Lombard soldiers (arimanni)
 // walking the streets, standing in talking groups and keeping the gates.
@@ -118,6 +123,10 @@ export function loadNpcAssets(): Promise<void> {
       t.traverse((o) => { if (canon(o.name) === 'HeadTop_End') top = o.getWorldPosition(new THREE.Vector3()).y; });
       kits![id] = { id, sex, template: t, motion: retarget(t, ual), m, scale: height / (top || 1.8) };
     });
+    if (NPC_V2) {
+      await loadV2(get, ual);
+      for (const [id, k] of kitsV2) (kits as Record<string, KitData>)[id] = k as unknown as KitData;
+    }
     npcDebug.buildMs.retarget = performance.now() - t0;
     (npcDebug as unknown as { heads: unknown }).heads = Object.fromEntries(Object.entries(kits).map(([k, v]) => [k, { ...v.m.head, c: v.m.head.c.toArray(), hb: v.m.bone('Head').toArray(), top: v.m.bone('HeadTop_End').toArray(), neck: v.m.bone('Neck').toArray(), hips: v.m.bone('Hips').toArray() }]));
     weave = makeWeave();
@@ -139,6 +148,7 @@ const faces = new Map<string, { geo: THREE.BufferGeometry; map: THREE.Texture }>
 
 /** An outfit on a body, tailored on first use (0.2-0.7 s each); `outfit:body#face` with another face. */
 function outfitFor(key: string): Outfit {
+  if (NPC_V2 && kitsV2.has(key.split(':')[1])) return outfitV2(key.split(':')[0], key.split(':')[1]) as unknown as Outfit;
   let o = outfits.get(key);
   if (!o && key.includes('#')) {
     const [base, fid] = key.split('#'), b = outfitFor(base), f = faces.get(fid)!;
@@ -302,6 +312,7 @@ export class Person {
     const mats = [fabric(kinds[0], tunic), fabric(kinds[1], over), belt, fabric(kinds[2], head)];
     // A long skirt is also skinned to helper bones that swing with the thighs.
     let skel = this.skeleton;
+    const v2 = (outfit as unknown as OutfitV2).v2;
     const extra = outfit.garment.extraBones;
     if (extra) {
       skel = new THREE.Skeleton([...skel.bones, ...extra.map((e) => this.bones.get(e.name)!)], [...skel.boneInverses, ...extra.map((e) => e.inv)]);
@@ -322,7 +333,9 @@ export class Person {
       this.thighBind = ['Left', 'Right'].map((s) => { const d = outfit.m.bone(s + 'Leg').sub(outfit.m.bone(s + 'UpLeg')); return Math.atan2(d.z, -d.y); });
       skel = new THREE.Skeleton([...skel.bones, ...this.skirt], [...skel.boneInverses, inv, inv.clone()]);
     }
-    this.cloth = new Clothing(scene, outfit.garment, skel, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
+    this.cloth = v2
+      ? dressV2(this.body, outfit as unknown as OutfitV2, { tunic, over, head, belt, leg: dye(pick(rnd, [...DYES.undyed, ...DYES.woad]), 0.3), shoe: new THREE.Color(0x8a7a6a).multiplyScalar(0.8 + rnd() * 0.3) }) as unknown as Clothing
+      : new Clothing(scene, outfit.garment, skel, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
 
     // Motion.
     this.mixer = new THREE.AnimationMixer(this.body);
@@ -910,8 +923,10 @@ function cast(role: Role, o: { outfit?: number; body?: number; seed?: number; ge
   const rnd = mulberry(o.seed ?? rngSeed++ * 7919);
   const ids = ROLE_OUTFITS[role];
   const id = ids[(o.outfit ?? Math.floor(rnd() * ids.length)) % ids.length];
-  const bs = OUTFITS[id].bodies;
+  const v2b = NPC_V2 ? bodiesV2(id, OUTFITS[id].sex) : [];
+  const bs: string[] = v2b.length ? v2b : OUTFITS[id].bodies;
   let key = `${id}:${bs[(o.body ?? Math.floor(rnd() * bs.length)) % bs.length]}`;
+  if (v2b.length) return { role, id, key, rnd, gear: o.gear };
   for (const [fid, f] of Object.entries(FACES)) if (f.outfits.includes(id) && faces.has(fid) && (o.face ?? rnd() < f.share)) { key += '#' + fid; break; }
   return { role, id, key, rnd, gear: o.gear };
 }
