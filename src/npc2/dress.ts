@@ -8,7 +8,7 @@ import type { OutfitV2 } from './kit';
 // dye of its layer, over its own modelled detail (the artist's normal map,
 // with seams and folds, and a grey map of the cloth's wear), mud at the hems.
 
-export interface Dyes { tunic: THREE.Color; over: THREE.Color; head: THREE.Color; belt: THREE.Material; leg: THREE.Color; shoe: THREE.Color }
+export interface Dyes { tunic: THREE.Color; over: THREE.Color; head: THREE.Color; belt: THREE.Material; leg: THREE.Color; shoe: THREE.Color; kinds?: [FabricKind, FabricKind, FabricKind] }
 
 /** Stands in for v1's Clothing (cloth.ts): v2 garments are plainly skinned. */
 export class ClothingV2 {
@@ -36,8 +36,10 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
     const col = g.layer === 'tunic' ? dyes.tunic : g.layer === 'over' ? dyes.over : g.layer === 'head' ? dyes.head : g.layer === 'leg' ? dyes.leg : g.layer === 'shoe' || g.layer === 'belt' ? dyes.shoe : dyes.tunic;
     if (g.layer === 'belt' && g.map !== 'color') { m.material = dyes.belt; return; }
     let mat: THREE.MeshStandardMaterial;
-    if (KIND[g.fabric]) {
-      mat = fabric(KIND[g.fabric], g.map === 'color' ? col.clone().lerp(new THREE.Color(1, 1, 1), 0.55) : col, { attr: 'rest', vertexColors: true });
+    // A persona's own cloth for tunic, overgarment and headcloth (src/npc/population.ts).
+    const kind = (dyes.kinds && { tunic: dyes.kinds[0], over: dyes.kinds[1], head: dyes.kinds[2] }[g.layer]) || KIND[g.fabric];
+    if (kind) {
+      mat = fabric(kind, g.map === 'color' ? col.clone().lerp(new THREE.Color(1, 1, 1), 0.55) : col, { attr: 'rest', vertexColors: true });
     } else {
       mat = matte(0xffffff, 0.95);
     }

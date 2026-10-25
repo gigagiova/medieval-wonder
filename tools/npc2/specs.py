@@ -48,6 +48,7 @@ BODIES = {
 GARMENTS = {
     'robe_src': {'sex': ['man'], 'mhclo': 'donitz_monk_robe/donitz_monk_robe.mhclo', 'only_source': True},
     'robe': {'sex': ['man'], 'derive': {'from': 'robe_src', 'drop': ['rope']}, 'fabric': 'tabby', 'layer': 'tunic', 'map': 'detail'},
+    'longrobe': {'sex': ['man'], 'derive': {'from': 'robe_src', 'drop': ['rope', 'capelet']}, 'fabric': 'twill', 'layer': 'tunic', 'map': 'detail'},
     'rope': {'sex': ['man'], 'derive': {'from': 'robe_src', 'keep': ['rope']}, 'fabric': 'rope', 'layer': 'belt', 'map': 'color'},
     'cowl': {'sex': ['man'], 'mhclo': 'donitz_monk_robe_hood_down/donitz_monk_robe_hood_down.mhclo', 'fabric': 'tabby', 'layer': 'over', 'map': 'detail'},
     'hood': {'sex': ['man'], 'mhclo': 'donitz_monk_robe_hood/donitz_monk_robe_hood.mhclo', 'fabric': 'felt', 'layer': 'head', 'map': 'detail'},
@@ -73,6 +74,9 @@ OUTFITS = {
     'peasantCloak': {'sex': 'man', 'garments': ['tunic', 'cloak', 'hose', 'boots']},
     'soldier': {'sex': 'man', 'garments': ['shirt', 'belt', 'hose', 'boots']},
     'soldierCloak': {'sex': 'man', 'garments': ['shirt', 'belt', 'cloak', 'hose', 'boots']},
+    # The long tunic of clergy, merchants and strangers, and the same under a mantle (src/npc/population.ts).
+    'robe': {'sex': 'man', 'garments': ['longrobe', 'belt', 'shoes']},
+    'robeCloak': {'sex': 'man', 'garments': ['longrobe', 'belt', 'cloak', 'shoes']},
     'woman': {'sex': 'woman', 'garments': ['gown', 'veil', 'shoes']},
     'womanShawl': {'sex': 'woman', 'garments': ['gown', 'veil', 'shawl', 'shoes']},
 }
