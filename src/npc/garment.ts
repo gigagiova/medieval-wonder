@@ -26,13 +26,10 @@ export interface GarmentSpec {
   belt: 'rope' | 'leather' | 'sash';
   tail?: boolean; // the rope's hanging end
   thighs?: number; // share of a skirt's skinning carried by the thighs (default: hung from the pelvis)
-  cloakClose?: boolean; // a cloak cut round the trunk (and the hanging arms), skinned like the tunic under it
   swing?: boolean; // skin to twist-free stand-ins for the limb bones (needs addSwingBones on the body first)
   stride?: number; // a long skirt: how much of it swings with the thighs (0-1)
   /** A short skirt pushed by the striding legs: how much of its front and back swing with the leading and trailing thigh. */
   legFollow?: number;
-  /** Skin the cloak like the tunic beneath it, so the two layers bend together. */
-  capeOnTunic?: boolean;
   /** Radians by which the cloak is thrown back off the left shoulder (to free a shield arm). */
   capeOpen?: number;
 }
@@ -957,7 +954,8 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     for (let r = 0; r < NR; r++) rad[r][k] = col[r];
   }
   // (A skirt that already strides with the legs needs less room to swing.)
-  const skirtD = 0.33 * Math.min(1, (yBelt - yHem) / 0.9) * (spec.stride ? 0.45 : 1);
+  // (Under a cloak, not at all: the two would swing through each other.)
+  const skirtD = 0.33 * Math.min(1, (yBelt - yHem) / 0.9) * (spec.stride ? 0.45 : 1) * (spec.cape === 'cloak' ? 0 : 1);
   for (let r = 0; r < NR; r++) {
     const y = ringY(r);
     for (let k = 0; k < NA; k++) {
@@ -1282,12 +1280,33 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   // --- A mantle: a cloak fastened on the right shoulder, or a woman's shawl (see layMantle).
   let cape: Grid | null = null, brooch: THREE.Vector3 | null = null;
   if (spec.cape) {
-    const under0 = [tunicGeo, ...sleeves.map(gridGeometry), ...scap.map(gridGeometry), ...(hood ? [gridGeometry(hood)] : [])];
+    // It is cut round the body with the arms hanging at its sides (as they
+    // mostly are), not round the arms held out in the bind pose: those would
+    // have it stand out from the body like a bell once they come down. Here
+    // stand-ins for the hanging arms (the cloth sim near the camera pushes it
+    // out of the real ones).
+    const arms = (['Left', 'Right'] as const).map((sd) => {
+      // (Roomy: the arms swing a little, and the sleeves are on them.)
+      const sh = bone(sd + 'Arm'), len = 0.58, r = 0.082;
+      const c = new THREE.CylinderGeometry(r, r * 0.9, len, 14, 1, false);
+      c.translate(sh.x + Math.sign(sh.x - hips.x) * 0.03, sh.y - len / 2 + 0.01, sh.z - 0.01);
+      return c;
+    });
+    // ...and for the belt (made later): a band round the tunic at the waist.
+    const belt = new Grid(3, NA, true);
+    {
+      let rb = 0;
+      for (let r = 1; r < NR; r++) if (Math.abs(ringY(r) - yBelt) < Math.abs(ringY(rb) - yBelt)) rb = r;
+      for (const dy of [-0.035, 0, 0.035]) for (let k = 0; k < NA; k++) {
+        const o = (rb * NA + k) * 3, x = tunic.pos[o] - cen[rb].x, z = tunic.pos[o + 2] - cen[rb].y, l = Math.hypot(x, z) || 1;
+        belt.pos.push(tunic.pos[o] + (x / l) * 0.03, yBelt + dy, tunic.pos[o + 2] + (z / l) * 0.03);
+      }
+    }
+    const under0 = [tunicGeo, gridGeometry(belt), ...arms, ...scap.map(gridGeometry), ...(hood ? [gridGeometry(hood)] : [])];
     const clothes = new MeshBVH(mergeGeometries(under0.map((g) => posOnly(g.clone()))));
+    const torso = new MeshBVH(mergeGeometries([...under0.map((g) => g.clone()), S.torso.geo.clone()].map(posOnly)));
     const yH = spec.cape === 'cloak' ? knee + 0.03 : yBelt + 0.05;
-    ({ g: cape, brooch } = layMantle(M, spec.cape, spec.capeOpen ?? 0, clothes,
-      new MeshBVH(mergeGeometries([...under0.map((g) => g.clone()), S.shoulders.geo.clone()].map(posOnly))),
-      new MeshBVH(mergeGeometries([...under0.map((g) => g.clone()), S.all.geo.clone()].map(posOnly))), yH - 0.15, yH));
+    ({ g: cape, brooch } = layMantle(M, spec.cape, spec.capeOpen ?? 0, clothes, torso, torso, yH - 0.15, yH));
   }
 
   // --- Belt: a rope, a leather belt, or a wide sash.
@@ -1674,23 +1693,29 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   // it falls over the arms it must come down with them. Take the weights of
   // the tunic or sleeve at the nearest point beneath instead.
   // (So, too, a veil where it falls onto the shoulders: the tunic's yoke moves with the arms beneath it.)
-  const onTunic: { g: Grid; f: (y: number) => number; ease: number }[] = [];
-  if (cape) onTunic.push({ g: cape, f: () => 1, ease: 4 });
+  const onTunic: { g: Grid; f: (y: number) => number; ease: number; body?: boolean }[] = [];
+  // (A mantle goes with the tunic's body, not with its sleeves: see the stand-ins for the arms above.)
+  // Over the shoulders, though, it goes with the tops of the sleeves too, as the arms rise and fall.
+  if (cape) onTunic.push({ g: cape, f: () => 1, ease: 4, body: true }, { g: cape, f: (y) => ss(yYoke - 0.1, yYoke + 0.02, y), ease: 2 });
   if (hood) onTunic.push({ g: hood, f: (y) => ss(jaw - 0.03, jaw - 0.12, y), ease: 3 });
   if (onTunic.length) {
-    const tix: number[] = [];
-    for (const g of [tunic, ...sleeves]) {
-      const b = baseOf.get(g)!, C = g.cols;
-      for (let r = 0; r < g.rows - 1; r++) for (let c = 0; c < (g.wrap ? C : C - 1); c++) {
-        const a = b + r * C + c, b2 = b + r * C + ((c + 1) % C);
-        tix.push(a, a + C, b2, b2, a + C, b2 + C);
+    const under = (gs: Grid[]) => {
+      const tix: number[] = [];
+      for (const g of gs) {
+        const b = baseOf.get(g)!, C = g.cols;
+        for (let r = 0; r < g.rows - 1; r++) for (let c = 0; c < (g.wrap ? C : C - 1); c++) {
+          const a = b + r * C + c, b2 = b + r * C + ((c + 1) % C);
+          tix.push(a, a + C, b2, b2, a + C, b2 + C);
+        }
       }
-    }
-    const ug = new THREE.BufferGeometry();
-    ug.setAttribute('position', new THREE.BufferAttribute(bind, 3));
-    ug.setIndex(tix);
-    const ubvh = new MeshBVH(ug), uix = ug.index!;
-    for (const { g, f, ease } of onTunic) {
+      const ug = new THREE.BufferGeometry();
+      ug.setAttribute('position', new THREE.BufferAttribute(bind, 3));
+      ug.setIndex(tix);
+      return new MeshBVH(ug);
+    };
+    const withSleeves = under([tunic, ...sleeves]), bodyOnly = under([tunic]);
+    for (const { g, f, ease, body } of onTunic) {
+      const ubvh = body ? bodyOnly : withSleeves, uix = ubvh.geometry.index!;
       const c0 = baseOf.get(g)!, n = g.pos.length / 3;
       for (let i = c0; i < c0 + n; i++) {
         const k = f(bind[i * 3 + 1]);
@@ -1937,8 +1962,10 @@ function layMantle(M: Measure, kind: 'cloak' | 'shawl', open: number, clothes: M
     g.pos.push(p.x, p.y, p.z);
     g.uv.push(c / NC * 4, t * 3);
     // It swings free below the shoulders (see cloth.ts), held along its upper edge.
-    // (Over the shoulders and back it lies on the tunic and goes as that does: only below the waist is it free to swing.)
-    g.maxD.push(r < 2 ? 0 : (cloak ? 0.28 : 0.04) * Math.pow(ss(0, 1, t), 0.8) * ss(nk.y - 0.3, nk.y - 0.6, p.y));
+    // Skinned only, with the tunic beneath (see buildGarment, onTunic): let
+    // swing, it dropped into the tunic and the legs (the cloth sim knows the
+    // limbs only as capsules, and not the clothes under it).
+    g.maxD.push(0);
     g.region.push(r < 3 ? 4 : 3);
   }
   return { g, brooch };
