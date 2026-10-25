@@ -56,6 +56,8 @@ const OUTFITS: Record<OutfitId, OutfitDef> = {
 /** More outfits (src/npc/population.ts), tailored on first use like the others. */
 export function registerOutfit(id: string, def: OutfitDef) { (OUTFITS as Record<string, OutfitDef>)[id] = def; }
 export const outfitBodies = (id: string) => (OUTFITS as Record<string, OutfitDef>)[id]?.bodies ?? [];
+/** Whether an `outfit:body` pairing is already tailored (dressing someone in it then costs nothing extra). */
+export const outfitTailored = (key: string) => outfits.has(key);
 const ROLE_OUTFITS: Record<Role, OutfitId[]> = { monk: ['monk'], peasant: ['peasantHood', 'peasantCloak'], woman: ['woman', 'womanShawl'], soldier: ['soldier', 'soldierCloak'] };
 
 // Natural dyes on wool and linen, muted and a little faded.

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makePerson, registerOutfit, type Gear, type Look, type EquipHooks, type TownApi, type TownDirector, type Role, type Person } from '../npc';
+import { makePerson, registerOutfit, outfitBodies, outfitTailored, type Gear, type Look, type EquipHooks, type TownApi, type TownDirector, type Role, type Person } from '../npc';
 import * as Props from './props';
 import { makeApron, makeFibula, makeScrip, makeWorkProp, type WorkProp } from './population-props';
 import { PEOPLE_LINES, type GroupId } from './lines-people';
@@ -298,7 +298,12 @@ function equipExtras(list: Extra[], h: EquipHooks) {
 export function makeOfGroup(scene: THREE.Scene, id: GroupId, seed: number, o: { name?: string; lines?: typeof PEOPLE_LINES[GroupId]; outfit?: number } = {}) {
   const g = G[id];
   const r = mulberry(seed);
-  const [outfitId, role] = g.outfits[(o.outfit ?? Math.floor(r() * g.outfits.length)) % g.outfits.length];
+  // Tailoring a new outfit/body pairing takes a few tenths of a second (on first use, src/npc.ts):
+  // mostly reuse pairings already made, so a walk through town stalls only a handful of times.
+  let pickI = (o.outfit ?? Math.floor(r() * g.outfits.length)) % g.outfits.length, body: number | undefined;
+  const ready = g.outfits.flatMap(([id], i) => outfitBodies(id).map((b, bi) => ({ i, bi, ok: outfitTailored(`${id}:${b}`) }))).filter((q) => q.ok);
+  if (o.outfit === undefined && ready.length && r() < 0.85) { const q = ready[Math.floor(r() * ready.length)]; pickI = q.i; body = q.bi; }
+  const [outfitId, role] = g.outfits[pickI];
   const name = o.name ?? pick(r, g.names);
   const extras = g.extras?.(r, outfitId) ?? [];
   const look: Look = {
@@ -315,7 +320,7 @@ export function makeOfGroup(scene: THREE.Scene, id: GroupId, seed: number, o: { 
   const gear = g.gear?.(r, outfitId);
   // Children never get the older scanned face; the old may.
   const face = g.scale ? false : g.grey && g.grey[0] >= 0.4 ? true : undefined;
-  const p = makePerson(scene, role, { outfitId, seed: Math.floor(r() * 1e9), gear, look, face });
+  const p = makePerson(scene, role, { outfitId, body, seed: Math.floor(r() * 1e9), gear, look, face });
   return { person: p, speed: g.speed ?? (role === 'soldier' ? 1.3 : 1.15) };
 }
 const mulberry = (a: number) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
