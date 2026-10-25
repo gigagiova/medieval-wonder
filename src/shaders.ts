@@ -40,40 +40,90 @@ uniform float uUnder;
 uniform float uFogBase;
 uniform vec3 uMoonDir;
 uniform sampler2D uNoise; // tiling low-frequency noise: R 4 cycles, G 8, B 16, A 6 (per tile)
+uniform sampler2D uLF;    // light field: R sun shadow height, GBA mean town height within ~0.5/5/12 m
+uniform vec4 uLFBox;      // x0, z0, 1/size, valid
+uniform vec4 uFogK;       // haze density, ground-mist density, mist falloff (1/m), sky fog distance
+
+// x: key light (1 lit, 0 in the shadow of the town), y: sky visibility.
+// p, n in world space. Two fetches of a small texture.
+#define WORLDLIGHT
+vec2 worldLight(vec3 p, vec3 n){
+  if (uLFBox.w < 0.5) return vec2(1.0);
+  vec2 uv = (p.xz - uLFBox.xy) * uLFBox.z;
+  vec2 e = min(uv, 1.0 - uv);
+  float inside = smoothstep(0.0, 0.1, min(e.x, e.y));
+  uv.y = 1.0 - uv.y;
+  vec2 nd = vec2(n.x, -n.z) * uLFBox.z;
+  vec4 a = texture2D(uLF, uv + nd * 0.6);
+  float sun = smoothstep(a.r - 0.15, a.r + 0.9, p.y + 0.2);
+  // Under a roof, a vault or an arch (the town within ~1 m is well above):
+  // the sky only gets in sideways, through doors and windows.
+  float cover = smoothstep(0.8, 3.0, a.g - p.y);
+  vec3 hb = texture2D(uLF, uv + nd * 2.5).gba;
+  vec3 occ = max(hb - p.y, 0.0);
+  vec3 v = vec3(1.0, 5.0, 14.0);
+  v = v / (v + occ * 1.6);
+  float sky = dot(v, vec3(0.25, 0.35, 0.4)) * (1.0 - 0.75 * cover);
+  return mix(vec2(1.0), vec2(sun, sky), inside);
+}
 
 vec3 applyAtmos(vec3 col, vec3 wpos){
   vec3 ro = cameraPosition;
   vec3 rd = wpos - ro; float L = max(length(rd), 1e-3); rd /= L;
-  float dens = mix(0.045, 0.075, uUnder);
-  float b = mix(0.06, 0.0, uUnder);
-  // Height fog anchored a little below the ground under the eye: looking out
-  // from the ridge the valleys lie in thicker mist.
-  float ground = uFogBase - 7.0 * uUnder;
-  float od;
+  // Two media, both integrated in closed form along the ray (no steps, no
+  // screen-space noise): a thin even haze, and a dense mist that pools at the
+  // ground and thins upward (scale height ~7 m). Its base trails the ground
+  // under the eye, so from the ridge the valleys lie drowned in it.
+  float haze = mix(uFogK.x, 0.05, uUnder);
+  float dG = mix(uFogK.y, 0.03, uUnder);
+  float b = mix(uFogK.z, 0.05, uUnder);
+  float ground = uFogBase - 4.0 * uUnder;
   float k = b * rd.y * L;
-  if (abs(k) > 1e-3) od = dens * exp(-b*(ro.y-ground)) * (1.0 - exp(-k)) / (b*rd.y);
-  else od = dens * exp(-b*(ro.y-ground)) * L;
-  // Drifting density: two lookups of the noise texture instead of 3D fbm.
-  vec3 mp = ro + rd * min(L, 25.0) * 0.6;
-  float n = texture2D(uNoise, mp.xz*0.0045 + vec2(uTime*0.0016, uTime*0.0009) + mp.y*0.003).r * 0.65
-          + texture2D(uNoise, mp.zx*0.011 - vec2(uTime*0.0021, -uTime*0.0013)).g * 0.35;
-  n = smoothstep(0.15, 0.85, n);
-  od *= mix(0.45, 1.6, n);
+  float g0 = dG * exp(-b * (ro.y - ground));
+  float odG = abs(k) > 1e-3 ? g0 * (1.0 - exp(-k)) / (b * rd.y) : g0 * L;
+  // Slow drifting banks of mist, anchored in the world: the density is read
+  // where the ray meets the surface (or 70 m out), at 15-60 m scales.
+  vec3 mp = ro + rd * min(L, 70.0);
+  vec2 drift = vec2(uTime * 0.0011, uTime * 0.0006);
+  float n = texture2D(uNoise, mp.xz * 0.0042 + drift).r * 0.6
+          + texture2D(uNoise, mp.zx * 0.0115 - drift * 1.7 + mp.y * 0.004).g * 0.4;
+  n = smoothstep(0.2, 0.8, n);
+  float od = haze * L + odG * mix(0.35, 1.65, n);
   float fogAmt = 1.0 - exp(-od);
-  vec3 fogC = mix(uFogCol, vec3(0.012,0.009,0.007), uUnder);
-  float md = max(dot(rd, uMoonDir), 0.0);
-  fogC *= 1.0 + 0.12 * pow(md, 3.0) * (1.0 - uUnder);
+  // Colour of the mist: lit by the overcast from above, brighter towards the
+  // bright west (forward scattering), cooler and darker away from it and
+  // towards the ground.
+  float md = dot(rd, uMoonDir);
+  // (the key light's own glow in the mist is added by the shaft pass, where it reaches)
+  float fwd = 0.85 + 0.15 * pow(max(md, 0.0), 4.0);
+  vec3 fogC = uFogCol * fwd * mix(vec3(0.93, 0.97, 1.05), vec3(1.04, 1.01, 0.97), max(md, 0.0));
+  fogC *= 0.86 + 0.14 * smoothstep(-0.25, 0.3, rd.y);
+  // The mist in a nave or a deep lane is not lit by the open sky: dim it by
+  // what the sky can reach a few metres along the ray (one fetch).
+#ifndef SKY_DOME
+  if (uLFBox.w > 0.5) {
+    vec3 q = ro + rd * min(L * 0.5, 6.0);
+    vec2 quv = (q.xz - uLFBox.xy) * uLFBox.z; quv.y = 1.0 - quv.y;
+    vec2 hq = texture2D(uLF, quv).gb;
+    float cq = smoothstep(0.8, 3.0, hq.x - q.y);
+    float oq = 5.0 / (5.0 + max(hq.y - q.y, 0.0) * 1.6);
+    fogC *= (0.35 + 0.65 * oq) * (1.0 - 0.7 * cq);
+  }
+#endif
+  fogC = mix(fogC, vec3(0.010, 0.008, 0.007), uUnder);
   // Closed-form integral of 1/(h^2+t^2) along the view ray for every lamp:
   // cheap volumetric halos that wrap around geometry edges.
   vec3 scat = vec3(0.0);
+  float dens = haze + g0;
   for (int i=0;i<${NLAMP};i++){
+    if (uLampCol[i].r + uLampCol[i].g < 1e-4) continue;
     vec3 lp = uLampPos[i] - ro;
     float t0 = dot(lp, rd);
-    float h = max(length(lp - rd*t0), 0.35);
+    float h = max(length(lp - rd*t0), 0.3);
     float a = (atan((L - t0)/h) - atan(-t0/h)) / h;
     scat += uLampCol[i] * a * exp(-dens*0.8*clamp(t0, 0.0, L));
   }
-  scat *= mix(0.011, 0.022, uUnder) * mix(0.5, 1.5, n);
+  scat *= mix(0.012, 0.02, uUnder) * mix(0.7, 1.3, n);
   return mix(col, fogC, fogAmt) + scat;
 }
 `;
@@ -83,7 +133,7 @@ vec3 applyAtmos(vec3 col, vec3 wpos){
 // (normal, OpenGL), tM (R ao, G roughness, B height). The ground also gets
 // tA2/tN2/tM2 (Roman basoli) and tA3/tN3/tM3 (mud).
 export const surfaceGLSL = /* glsl */ `
-struct Surf { vec3 alb; float rough; float ao; vec3 nrm; vec3 emi; };
+struct Surf { vec3 alb; float rough; float ao; vec3 nrm; vec3 emi; float h; };
 
 uniform sampler2D uTown; // R Roman paving, G street, B gutter, A terrain height
 uniform vec4 uTownBox;   // x0, z0, 1/width, 1/depth (metres)
@@ -106,6 +156,9 @@ float underAt(vec3 p){ return step(p.y, terrainY(p.xz) - 2.5); }
 
 #ifdef TILE
 uniform sampler2D tA; uniform sampler2D tN; uniform sampler2D tM;
+#endif
+#if MAT == 2
+uniform sampler2D tA2; uniform sampler2D tN2; uniform sampler2D tM2;
 #endif
 #if MAT == 1
 uniform sampler2D tA2; uniform sampler2D tN2; uniform sampler2D tM2;
@@ -195,31 +248,70 @@ Smp biplanar(vec3 p, vec3 n){
 void weather(inout Surf s, vec3 p, vec3 n, float mossAmt){
   vec4 nz = texture2D(uNoise, p.xz*0.021 + p.y*0.013);
   vec4 nz2 = texture2D(uNoise, vec2(p.x + p.z, p.y)*0.07);
-  s.alb *= 0.86 + 0.28*nz.r;
-  s.alb *= mix(vec3(1.0), vec3(1.05, 1.0, 0.92), nz.g);
+  // Tone and roughness drift at several scales: no two metres of wall alike.
+  s.alb *= 0.8 + 0.4*nz.r;
+  s.alb *= mix(vec3(1.0), vec3(1.06, 1.0, 0.9), nz.g);
+  // Stone by stone: the crowns (high in the height map) each take their own
+  // tone, the joints stay dark. (~3 cycles per metre.)
+  float sv = texture2D(uNoise, (vec2(p.x + p.z * 0.6, p.y + p.z * 0.4) + p.xz * 0.3) * 0.19).b;
+  float crown = smoothstep(0.35, 0.65, s.h);
+  s.alb *= mix(1.0, 0.78 + 0.44 * sv, crown);
+  s.rough = clamp(s.rough + (sv - 0.5) * 0.08 * crown, 0.0, 1.0);
   float y = p.y - groundY(p);
   float under = underAt(p);
-  float damp = (1.0 - smoothstep(0.0, 0.25 + 0.8*nz2.r, y)) * (1.0 - under) * (1.0 - smoothstep(0.5, 0.9, n.y));
-  s.alb *= mix(1.0, 0.72, damp);
-  s.alb = mix(s.alb, s.alb*vec3(0.85, 0.95, 0.7), damp*0.5);
-  s.rough = mix(s.rough, 0.75, damp*0.4);
-  // Rain streaks: vertical darkening on walls.
+  // Height-blended layers: water, dirt and moss fill the joints and pores
+  // first and climb onto the crowns only where they are thick.
+  float hb = (s.h - 0.5);
+  float dampLine = 0.3 + 0.9*nz2.r;
+  float damp = (1.0 - smoothstep(0.0, dampLine, y - hb * 0.8)) * (1.0 - under) * (1.0 - smoothstep(0.5, 0.9, n.y));
+  s.alb *= mix(1.0, 0.6, damp);
+  s.alb = mix(s.alb, s.alb*vec3(0.82, 0.92, 0.72), damp*0.5);
+  s.rough = mix(s.rough, 0.7, damp*0.5);
+  // Grime: soot and dust in every joint, more of it low on the wall.
+  float grime = smoothstep(0.45, 0.1, s.h) * (0.5 + 0.5 * (1.0 - smoothstep(0.0, 3.0, y)));
+  s.alb *= 1.0 - 0.35 * grime;
+  // Rain streaks: vertical darkening on walls, strongest in the joints.
   float streak = smoothstep(0.55, 0.9, texture2D(uNoise, vec2((p.x + p.z)*0.45, p.y*0.035)).b) * (1.0 - abs(n.y));
-  s.alb *= 1.0 - 0.22*streak*(1.0 - under);
-  float moss = smoothstep(0.35, 0.8, n.y) * smoothstep(0.45, 0.7, nz2.g) * mossAmt * (1.0 - under);
+  s.alb *= 1.0 - 0.28*streak*(1.0 - under)*(1.2 - s.h);
+  // Moss: on what faces the sky, and in the damp joints at the foot of walls.
+  float mossM = max(smoothstep(0.35, 0.8, n.y), damp * 0.8) * smoothstep(0.45, 0.7, nz2.g + (0.5 - s.h) * 0.6);
+  float moss = mossM * mossAmt * (1.0 - under);
   s.alb = mix(s.alb, vec3(0.045, 0.055, 0.025)*(0.7 + 0.6*nz.b), moss*0.75);
 }
 
 vec3 tintTex(vec3 c, vec3 tint, float k){ return c * mix(vec3(1.0), tint, k); }
 
 Surf surface(vec3 p, vec3 n){
-  Surf s; s.emi = vec3(0.); s.rough = 0.9; s.ao = 1.0; s.nrm = n; s.alb = vec3(0.2);
+  Surf s; s.emi = vec3(0.); s.rough = 0.9; s.ao = 1.0; s.nrm = n; s.alb = vec3(0.2); s.h = 0.5;
 #if defined(TILE) && MAT != 1 && MAT != 4
   Smp t = biplanar(p, n);
   s.alb = t.a * ALB_K;
   s.ao = t.m.r;
   s.rough = POROUS(t.m.g * ROUGH_K);
   s.nrm = normalize(n + t.n * NRM_K);
+  s.h = t.m.b;
+  #if MAT == 2
+  {
+    // Decaying render: patches (a metre or two across, more of them low on
+    // the wall and where the render is thin) have fallen off, baring the
+    // rubble core; a dark broken lip rims each patch. One planar projection.
+    vec2 wuv = abs(n.x) > abs(n.z) ? p.zy : p.xy;
+    vec4 lz = texture2D(uNoise, wuv * 0.035 + p.y * 0.0);
+    float yl = p.y - groundY(p);
+    float bare = lz.r * 0.65 + lz.b * 0.35 + (0.5 - t.m.b) * 0.35 + (1.0 - smoothstep(0.0, 2.5, yl)) * 0.18;
+    float e = smoothstep(0.56, 0.6, bare);
+    Smp r = sampleSet(tA2, tN2, tM2, wuv / 2.12);
+    vec3 rN = abs(n.x) > abs(n.z) ? vec3(0.0, r.n.y, r.n.x) : vec3(r.n.x, r.n.y, 0.0);
+    s.alb = mix(s.alb, r.a * 0.85, e);
+    s.ao = mix(s.ao, r.m.r, e);
+    s.rough = mix(s.rough, POROUS(r.m.g), e);
+    s.nrm = normalize(mix(s.nrm, normalize(n + rN * 1.6), e));
+    s.h = mix(s.h, r.m.b * 0.8, e);
+    float lip = smoothstep(0.5, 0.56, bare) * (1.0 - e);
+    s.alb *= 1.0 - 0.45 * lip;
+    s.h = mix(s.h, 0.15, lip * 0.7);
+  }
+  #endif
   #ifdef TINT
   s.alb = tintTex(s.alb, TINT, 1.0);
   #endif
@@ -233,6 +325,7 @@ Surf surface(vec3 p, vec3 n){
   s.ao = t.m.r;
   s.rough = POROUS(t.m.g * ROUGH_K);
   s.nrm = normalize(n + (t.n.x*A + t.n.y*B) * NRM_K);
+  s.h = t.m.b;
   weather(s, p, n, MOSS);
 #elif MAT == 1
   // Ground: river cobbles in the alleys, Roman basoli surviving on the main
@@ -273,8 +366,13 @@ Surf surface(vec3 p, vec3 n){
   a /= wsum; nn /= wsum; m /= wsum;
   s.alb = a * 0.85;
   s.ao = m.r;
+  s.h = m.b;
   s.rough = POROUS(m.g);
-  s.nrm = normalize(n + vec3(nn.x, 0.0, nn.y) * 1.0);
+  s.nrm = normalize(n + vec3(nn.x, 0.0, nn.y) * 1.4);
+  // Earth, dung and water lie in the gaps between the stones.
+  float gap = smoothstep(0.42, 0.12, m.b);
+  s.alb *= 1.0 - 0.4 * gap;
+  s.rough = mix(s.rough, 0.8, gap * 0.5);
   // Standing water: in the gutters and the low spots of the mud. Dull, not mirrors.
   float wet = clamp(tw.b * street + mud * smoothstep(0.62, 0.7, nz.g) * smoothstep(0.35, 0.15, m.b), 0.0, 1.0) * (1.0 - under);
   s.alb *= 1.0 - 0.4*wet;

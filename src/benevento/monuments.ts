@@ -13,8 +13,8 @@ import { placeProp } from '../props';
 // frame (world.ts sets the site): the Arch of Trajan, now the Porta Aurea of
 // the Lombard walls; the arch at the forum now a gate; the theatre lived in;
 // the amphitheatre quarried for the walls and burnt for lime; the 7th-century
-// Torre della Catena; S. Ilario outside Porta Aurea; the bridges; the ruins of
-// the Iseum with its obelisks; the Lombard cemetery with its poles; the stump
+// Torre della Catena; S. Ilario outside Porta Aurea; the bridges; the remains of
+// the Iseum before the bishop's church; the Lombard cemetery with its poles; the stump
 // of the sacred walnut by the Sabato; a mill; the forum and its market; a
 // Roman cistern under the dukes' orchard.
 
@@ -101,90 +101,8 @@ export function arcusSacramenti(b: Builder) {
 }
 
 // ---------------------------------------------------------------- the theatre, lived in
-/**
- * Cavea on local +x (east), scaena along x ≈ -3 (west). Outer radius 44 m:
- * two orders of 25 arches, the upper half fallen; houses fill the arches and
- * huts stand on the seats.
- */
-export function theatrum(b: Builder) {
-  seed(126);
-  const RI = 11, RO = 44, RC = RO - 5, HC = 13;
-  // Seating, three wedges with stairs between; the top rows robbed out.
-  const steps: THREE.Vector2[] = [new THREE.Vector2(RI - 0.6, -0.3)];
-  for (let k = 0, r = RI; r < RC - 0.5; k++, r += 0.78) {
-    const y = 0.4 + k * 0.36;
-    steps.push(new THREE.Vector2(r, y), new THREE.Vector2(r + 0.78, y));
-  }
-  steps.push(new THREE.Vector2(RC, HC), new THREE.Vector2(RC, -0.3));
-  for (const [a0, a1] of [[0.02, 0.98], [1.05, 2.09], [2.16, 3.12]]) {
-    const g = new THREE.LatheGeometry(steps, 18, a0, a1 - a0);
-    b.geo('block', g, 0, 0, 0, 0, true, 0, 0, false, new THREE.LatheGeometry([new THREE.Vector2(RI - 0.6, 0.2), new THREE.Vector2(RC, HC)], 8, a0, a1 - a0));
-  }
-  // Stairs up the gaps (walkable).
-  for (const a of [1.015, 2.125]) {
-    const g = new THREE.LatheGeometry([new THREE.Vector2(RI - 0.6, 0.0), new THREE.Vector2(RC, HC - 0.4), new THREE.Vector2(RC, -0.3)], 2, a - 0.03, 0.06);
-    b.geo('stone', g, 0, 0, 0, 0, true);
-  }
-  // Orchestra: worn slabs, mud, a puddle.
-  b.geo('slab', new THREE.CircleGeometry(RI - 0.6, 24, Math.PI / 2, Math.PI).rotateX(-Math.PI / 2), 0, 0.02, 0, 0, false);
-  // The cavea's back: the vaulted ambulatory behind two orders of arches.
-  const NB = 25;
-  for (let i = 0; i < NB; i++) {
-    const a0 = -Math.PI / 2 + (i / NB) * Math.PI, a1 = -Math.PI / 2 + ((i + 1) / NB) * Math.PI, am = (a0 + a1) / 2;
-    const bay = 2 * RO * Math.sin((a1 - a0) / 2);
-    const x = Math.cos(am) * RO, z = Math.sin(am) * RO, ry = -am - Math.PI / 2;
-    const infill = rand() < 0.55;
-    b.geo('block', arcadeGeo(bay + 0.05, 8.2, 1.4, 1, 3.4, 4.6), x, -0.3, z, ry);
-    archRings(b, 'block', x, -0.3, z, ry, 1.4, 3.4, 4.6, 0.55, 0.42);
-    if (infill) {
-      // A house walled into the arch: rubble, a door or a window, a vent.
-      b.geo('rubble', arcadeGeo(3.4, 6.3, 0.6, 1, 1.0, 1.7), x * 0.995, -0.3, z * 0.995, ry);
-      b.box('wood', 1.0, 1.9, 0.08, x * 0.99, -0.2, z * 0.99, ry, false);
-      if (rand() < 0.5) b.box('iron', 0.5, 0.6, 0.62, x * 0.995 + Math.cos(am) * 0.01, 4.3, z * 0.995, ry, false);
-      if (rand() < 0.35) b.lamp('window', V3(x * 0.98, 4.4, z * 0.98));
-    }
-    // Upper order: standing over the south half only, fallen elsewhere.
-    if (i < 13 || rand() < 0.25) {
-      b.geo('block', arcadeGeo(bay + 0.05, 5.6, 1.2, 1, 3.0, 3.2), x, 7.9, z, ry);
-      if (rand() < 0.6) ruin(b, 'rubble', bay, R(0.5, 2.4), 1.2, x, 13.4, z, ry, 0.8);
-    } else {
-      ruin(b, 'block', bay, R(0.6, 2.2), 1.3, x, 7.9, z, ry, 0.9);
-      for (let k = 0; k < 2; k++) b.box('block', R(0.6, 1.1), R(0.4, 0.6), R(0.5, 0.9), x * R(1.03, 1.12), -0.2, z * R(1.03, 1.12), R(0, 3));
-    }
-    // Radial wall between ambulatory bays; the vault over it.
-    b.box('rubble', 0.9, 8.0, RO - RC, Math.cos(a0) * (RO + RC) / 2, -0.3, Math.sin(a0) * (RO + RC) / 2, -a0 + Math.PI / 2);
-    vault(b, 'brick', RO - RC, bay / 2 - 0.2, Math.cos(am) * (RC + RO) / 2, 7.6, Math.sin(am) * (RC + RO) / 2, -am);
-  }
-  b.box('block', 0.9, 8.0, RO - RC, 0, -0.3, (RO + RC) / 2, Math.PI / 2);
-  // Ring wall behind the seats.
-  for (let i = 0; i < 24; i++) {
-    const a = -Math.PI / 2 + ((i + 0.5) / 24) * Math.PI;
-    b.box('rubble', 2 * RC * Math.sin(Math.PI / 48) + 0.2, HC, 1.0, Math.cos(a) * RC, -0.3, Math.sin(a) * RC, -a - Math.PI / 2, false);
-  }
-  // Scaena: the stage platform and the broken stage wall with its niches and a few columns.
-  b.box('rubble', 6.0, 1.3, 2 * RO * 0.86, -6.4, -0.3, 0);
-  for (let k = -3; k <= 3; k++) {
-    const z = k * 10.6;
-    const h = R(5, 13);
-    b.geo(rand() < 0.5 ? 'brick' : 'rubble', arcadeGeo(10.4, h, 1.8, 1, k === 0 ? 3.6 : 2.4, k === 0 ? 4 : 2.6), -9.8, -0.3, z, Math.PI / 2);
-    if (rand() < 0.6) ruin(b, 'rubble', 10.4, R(1, 3), 1.8, -9.8, h - 0.3, z, Math.PI / 2, 0.8);
-  }
-  for (let k = 0; k < 6; k++) column(b, -6.0 + R(-0.2, 0.2), 1.0, R(-24, 24), R(5, 7), 0.32, rand() < 0.5 ? R(0.3, 0.7) : 0);
-  for (let k = 0; k < 5; k++) fallenDrum(b, R(-8, 4), R(-20, 20), 0.35, R(1, 2.2), R(0, 3));
-  // Huts on the upper seats: the poor live here, outside the walls.
-  for (let k = 0; k < 9; k++) {
-    const a = R(-1.3, 1.3), r = R(RI + 12, RC - 4);
-    const y = 0.4 + Math.floor((r - RI) / 0.78) * 0.36;
-    const x = Math.cos(a) * r, z = Math.sin(a) * r;
-    const w = R(2.8, 4), d = R(2.6, 3.4), ry = -a + R(-0.2, 0.2);
-    b.box(rand() < 0.5 ? 'rubble' : 'wood', w, 2.3, d, x, y - 0.4, z, ry);
-    gable(b, w, d, 0.8, x, y + 1.9, z, ry, 'wood', 0.35);
-    if (rand() < 0.5) b.lamp('window', V3(x, y + 1.2, z));
-  }
-  brazier(b, 8, 4);
-  torch(b, RO + 0.9, 3.0, 4, Math.PI / 2);
-  markReadable('theatrum', -7.0, 1.6, 2.5);
-}
+// Built block by block in theatrum.ts.
+export { theatrum } from './theatrum';
 
 // ---------------------------------------------------------------- the amphitheatre, quarried
 export function amphitheatrum(b: Builder) {
@@ -353,32 +271,62 @@ export function bridge(b: Builder, A: [number, number], B2: [number, number], w:
 }
 
 // ---------------------------------------------------------------- the Iseum
-/** Ruins of Domitian's temple of Isis: a podium, granite columns, obelisks, the Apis bull in the mud. */
+/**
+ * What is left of Domitian's temple of Isis (AD 88) in AD 700, in the heart
+ * of the town before the bishop's church: authored in the Episcopium's frame
+ * (the church's atrium front is at z = -29.5, x -22…-9). The temple's podium
+ * stumps out of the square with a house built on it; one obelisk lies broken
+ * across the square, the other in pieces; two granite sphinxes have been set
+ * up as guardians at the atrium gate; the Apis bull sinks in the mud at the
+ * corner; a pharaoh's statue is walled into the house. See HISTORY.md §5.
+ */
 export function iseum(b: Builder) {
   seed(88);
-  ruin(b, 'block', 16, 2.0, 1.2, 0, -0.4, -11, 0, 0.5);
-  ruin(b, 'block', 22, 1.6, 1.2, -8, -0.4, 0, Math.PI / 2, 0.6);
-  ruin(b, 'block', 22, 2.2, 1.2, 8, -0.4, 0, Math.PI / 2, 0.7);
-  b.box('slab', 15, 0.5, 20, 0, -0.35, 0, 0.02, false);
-  for (let i = 0; i < 6; i++) column(b, -5 + (i % 3) * 5 + R(-0.2, 0.2), 0, -6 + Math.floor(i / 3) * 9, R(5, 7), 0.38, rand() < 0.6 ? R(0.25, 0.6) : 0, 'stone');
-  for (let i = 0; i < 4; i++) fallenDrum(b, R(-6, 6), R(-8, 9), 0.38, R(1.2, 2.6), R(0, 3));
-  // Obelisks of red granite: one tilted and half sunk, one broken across the floor.
-  const ob = (h: number, x: number, z: number, rx: number, rz: number, ry: number, y: number) => b.geo('stone', new THREE.CylinderGeometry(0.42, 0.62, h, 4, 6), x, y + h / 2, z, ry, true, rx, rz);
-  ob(6.5, -2.5, 6.5, 0.12, -0.18, Math.PI / 4 + 0.2, -1.8);
-  ob(3.2, 3.8, 3.0, 0, Math.PI / 2 - 0.05, 0.6, -2.7);
-  ob(2.4, 5.5, 4.7, 0.05, Math.PI / 2 + 0.08, 0.7, -2.7);
-  b.geo('stone', new THREE.ConeGeometry(0.55, 0.9, 4), 6.9, 0.2, 5.6, 0.3, false, 0.4, 1.2);
-  // The Apis bull, couchant, sunk to its belly; the sun-disc between its horns.
-  const bx = 1.5, bz = -3, by = -0.35;
-  b.geo('marble', new THREE.SphereGeometry(1, 16, 10).scale(1.25, 0.65, 0.55), bx, by + 0.45, bz, 0.3, false);
-  b.geo('marble', new THREE.SphereGeometry(0.42, 12, 8).scale(1.2, 0.9, 0.8), bx + Math.cos(0.3) * 1.35, by + 0.85, bz - Math.sin(0.3) * 1.35, 0.3, false);
-  for (const s of [-1, 1]) b.geo('marble', new THREE.CylinderGeometry(0.05, 0.08, 0.5, 6), bx + Math.cos(0.3) * 1.3 + Math.sin(0.3) * s * 0.25, by + 1.25, bz - Math.sin(0.3) * 1.3 + Math.cos(0.3) * s * 0.25, 0.3, false, 0, s * 0.6);
-  b.geo('bronze', new THREE.CylinderGeometry(0.28, 0.28, 0.06, 18), bx + Math.cos(0.3) * 1.25, by + 1.55, bz - Math.sin(0.3) * 1.25, 0.3 + Math.PI / 2, false, Math.PI / 2);
-  // Pools of standing water among the slabs.
-  hornLantern(b, -6.5, 1.4, -10.2);
-  markReadable('obeliscus', -2.4, 1.5, 6.2);
+  // The podium: walls of big blocks, its floor of slabs tilted and broken, a house on top.
+  const px = -19, pz = -16, pw = 12, pd = 15;
+  ruin(b, 'block', pw, 1.7, 1.1, px, -0.4, pz - pd / 2, 0, 0.35);
+  ruin(b, 'block', pd, 1.4, 1.1, px - pw / 2, -0.4, pz, Math.PI / 2, 0.4);
+  ruin(b, 'block', pd * 0.7, 1.9, 1.1, px + pw / 2, -0.4, pz + pd * 0.15, Math.PI / 2, 0.5);
+  b.box('slab', pw - 1, 0.4, pd - 1, px, 0.9, pz, 0.02, true, 0.03, -0.02);
+  // Steps up the front (south), half buried.
+  for (let k = 0; k < 3; k++) b.box('block', 6.5 - k * 0.3, 0.3, 0.6, px + R(-0.1, 0.1), -0.3 + k * 0.3, pz + pd / 2 + 1.6 - k * 0.55, R(-0.03, 0.03));
+  // Granite columns of the pronaos: two standing to their capitals, one snapped, drums in the mud.
+  column(b, px - 2.4, 1.2, pz + pd / 2 - 1.2, R(5, 6), 0.38, 0, 'stone');
+  column(b, px + 2.6, 1.2, pz + pd / 2 - 1.2, R(4.2, 5), 0.38, R(0.3, 0.5), 'stone');
+  column(b, px - 2.4, 1.2, pz + pd / 2 - 4.6, R(2, 3), 0.36, R(0.5, 0.8), 'stone');
+  for (let i = 0; i < 4; i++) fallenDrum(b, px + R(-4, 6), pz + pd / 2 + R(1, 6), 0.38, R(1.2, 2.4), R(0, 3));
+  // A house built onto the back of the podium, of its own blocks.
+  b.box('rubble', 6.5, 3.4, 5.0, px - 1.5, 1.1, pz - 4.5, 0.04);
+  gable(b, 6.5, 5.0, 1.4, px - 1.5, 4.5, pz - 4.5, 0.04, 'rubble', 0.4);
+  b.box('wood', 1.0, 1.9, 0.08, px - 1.2, 1.1, pz - 1.98, 0.04, false);
+  // A granite pharaoh, headless, walled upright into the house's corner.
+  b.box('stone', 0.75, 1.9, 0.55, px + 1.75, 1.1, pz - 2.05, 0.04, false);
+  b.box('stone', 1.0, 0.3, 0.6, px + 1.75, 2.95, pz - 2.05, 0.04, false);
+  // Obelisks of red granite: one lying broken across the square, the other in pieces.
+  const ob = (h: number, x: number, z: number, rx: number, rz: number, ry: number, y: number) => b.geo('stone', new THREE.CylinderGeometry(0.4, 0.58, h, 4, 6), x, y + h / 2, z, ry, true, rx, rz);
+  // (Lying pieces: the cylinder's centre sits at y + h/2, so lift y by -h/2 to lay them on the ground.)
+  ob(4.8, -8.0, -19.5, Math.PI / 2 - 0.04, 0, 0.35, 0.25 - 2.4);
+  ob(2.6, -6.4, -24.4, Math.PI / 2 + 0.06, 0, 0.35, 0.2 - 1.3);
+  ob(2.2, -4.6, -12.2, 0.05, Math.PI / 2 + 0.08, 1.1, 0.2 - 1.1);
+  b.geo('stone', new THREE.ConeGeometry(0.5, 0.85, 4), -5.2, 0.15, -27.0, 0.3, false, 0.4, 1.2);
+  // Two sphinxes set up as guardians at the gate of the atrium.
+  for (const sx of [-18.6, -13.4]) {
+    const fz = -28.3;
+    b.box('block', 1.0, 0.5, 2.2, sx, -0.3, fz + 0.2, 0);
+    b.box('stone', 0.75, 0.62, 1.8, sx, 0.2, fz + 0.15, 0);
+    b.box('stone', 0.62, 0.95, 0.6, sx, 0.4, fz + 0.95, 0);
+    b.box('stone', 0.5, 0.55, 0.5, sx, 1.3, fz + 1.05, 0, false);
+    b.geo('stone', new THREE.CylinderGeometry(0.1, 0.36, 0.55, 4), sx, 1.45, fz + 0.9, Math.PI / 4, false);
+  }
+  // Where the Apis bull lies, sunk to its belly at the corner of the square.
+  const bx = -5.5, bz = -9.5;
+  // (The bull itself is the scanned Apis among the spolia: src/benevento/spolia.ts.)
+  // The relief of the Lady with the serpent at her brow, propped against the podium.
+  b.box('marble', 1.1, 1.5, 0.22, px + pw / 2 + 0.75, -0.2, pz + 3.5, Math.PI / 2 - 0.2, false, 0.12);
+  hornLantern(b, px - 4.6, 2.2, pz - 2.0);
+  markReadable('obeliscus', -8.0, 0.8, -18.6);
   markReadable('apis', bx + 0.4, 0.9, bz + 0.9);
-  markReadable('isisVipera', 7.7, 1.2, -1.0);
+  markReadable('isisVipera', px + pw / 2 + 0.95, 0.9, pz + 3.5);
 }
 
 // ---------------------------------------------------------------- the Lombard cemetery
@@ -531,6 +479,100 @@ export function cisterna(b: Builder) {
   for (const s of [-1, 1]) b.box('rubble', 0.4, 0.6, stairLen, s * (w / 2 + 0.2), -0.2, (C.top + C.bottom) / 2, 0, true);
   for (let i = 0; i < 4; i++) b.geo('wood', new THREE.ConeGeometry(0.35, 0.7, 10), 5 + i * 0.9, 0.35, 4, 0, false);
   b.box('wood', 2.2, 0.45, 0.4, -5, 0, 2, 0.3);
+  // Roman columns stacked in the orchard by the duke's men: six granite and marble shafts, two set
+  // upright to carry a vine, the rest lying in a rough ring. Sixty years on Arechis II will raise
+  // S. Sophia here on a ring of six Roman columns (the plan is a star; the columns are spolia).
+  const ring = (k: number) => [9 + Math.cos((k / 6) * Math.PI * 2) * 3.4, 9 + Math.sin((k / 6) * Math.PI * 2) * 3.4];
+  for (let k = 0; k < 6; k++) {
+    const [x, z] = ring(k), m: MatName = k % 2 ? 'marble' : 'stone';
+    if (k === 1 || k === 4) column(b, x, -0.1, z, R(3.2, 3.8), 0.3, 0, m);
+    else fallenDrum(b, x + R(-0.5, 0.5), z + R(-0.5, 0.5), 0.3, R(2.6, 3.6), (k / 6) * Math.PI * 2 + Math.PI / 2 + R(-0.3, 0.3));
+  }
+  { const [x1, z1] = ring(1), [x4, z4] = ring(4); b.box('wood', 0.16, 0.16, Math.hypot(x4 - x1, z4 - z1), (x1 + x4) / 2, 3.35, (z1 + z4) / 2, Math.atan2(x4 - x1, z4 - z1), false); }
+  markReadable('sophia', 9, 1.0, 9 - 3.4 + 0.9);
+}
+
+
+// ---------------------------------------------------------------- the castellum aquae (where the Rocca will stand)
+/**
+ * The Roman water-castle on the height outside Porta Summa, where the
+ * aqueduct from the Serino reached the town: a brick-faced hall of two
+ * barrel vaults over a cistern (enterable through a broken arch; water
+ * still stands in it), the distribution tank on its roof, and the last
+ * arches of the aqueduct coming in from the east, two of them fallen. On
+ * the roof the Lombards keep a timber watch platform over the Via Summa.
+ * The papal rectors' Rocca (1321) and the Lombard Torrione (871/875) will
+ * stand here; the Benedictine nuns come later in the 8th century.
+ * Frame: the hall's long axis along local x, its door on local +z.
+ */
+export function castellumAquae(b: Builder) {
+  seed(1321);
+  const L = 16, W = 11, H = 6.6, T = 1.1;
+  // Long walls: the front (+z) with three arches, one open, two walled up with rubble.
+  b.geo('brick', arcadeGeo(L, H, T, 3, 2.6, 2.6), 0, -0.3, W / 2, 0);
+  for (const k of [-1, 0, 1]) archRings(b, 'brick', k * L / 3, -0.3, W / 2, 0, T, 2.6, 2.6, 0.45, 0.24);
+  b.geo('rubble', arcadeGeo(2.7, 3.9, 0.5, 1, 0.7, 2.6), 0, -0.3, W / 2 - 0.2, 0);
+  b.geo('rubble', arcadeGeo(2.7, 3.9, 0.5, 1, 0.8, 1.2), L / 3, -0.3, W / 2 - 0.2, 0);
+  b.box('brick', L, H, T, 0, -0.3, -W / 2, 0);
+  for (const s of [-1, 1]) b.box('brick', T, H, W, s * (L / 2 - T / 2), -0.3, 0, 0);
+  // Buttresses on the downhill side.
+  for (const x of [-5.5, 0.6, 5.5]) b.box('rubble', 1.6, 4.5, 1.2, x, -0.3, -W / 2 - T / 2 - 0.55, 0);
+  // Inside: a row of piers down the middle, two barrel vaults, standing water.
+  for (let k = -1; k <= 1; k++) b.box('brick', 1.0, 3.4, 1.0, k * 4.6, -0.3, 0, 0);
+  for (const z of [-W / 4 + 0.25, W / 4 - 0.25]) vault(b, 'brick', L - 2 * T, W / 4 - 0.25, 0, 3.1, z, 0);
+  b.box('slab', L - 2 * T, 0.06, W - 2 * T, 0, -0.32, 0, 0, true);
+  b.box('ground', L - 2 * T - 0.4, 0.04, W / 2 - T - 0.6, 0, -0.27, -W / 4, 0, false);
+  // A channel along the back wall: the water still comes in a trickle.
+  b.box('slab', L - 2 * T, 0.3, 0.6, 0, -0.32, -W / 2 + T + 0.35, 0, false);
+  // The roof: the distribution tank, its rim broken; a mantle of earth and grass.
+  b.box('rubble', L, 0.7, W, 0, H - 0.6, 0, 0);
+  for (const [x, z, l, ry] of [[0, -W / 2 + 0.3, L, 0], [-L / 2 + 0.3, 0, W, Math.PI / 2], [L / 2 - 0.3, 0, W, Math.PI / 2]] as const) ruin(b, 'brick', l, R(0.6, 1.2), 0.55, x, H + 0.1, z, ry, 0.8);
+  ruin(b, 'brick', L * 0.55, R(0.4, 1.0), 0.55, -L * 0.2, H + 0.1, W / 2 - 0.3, 0, 0.9);
+  // The Lombard watch platform on the roof's east corner: posts, planks, a rail, a ladder.
+  const px = -L / 2 + 2.4, pz = -W / 2 + 2.4;
+  for (const [dx, dz] of [[-1.3, -1.3], [1.3, -1.3], [1.3, 1.3], [-1.3, 1.3]]) b.box('wood', 0.22, 4.2, 0.22, px + dx, H + 0.1, pz + dz, 0, true, R(-0.03, 0.03), R(-0.03, 0.03));
+  b.box('wood', 3.0, 0.14, 3.0, px, H + 2.6, pz, 0.05, true);
+  for (const s of [-1, 1]) {
+    b.box('wood', 3.0, 0.1, 0.1, px, H + 3.5, pz + s * 1.45, 0.05, false);
+    b.box('wood', 0.1, 0.1, 3.0, px + s * 1.45, H + 3.5, pz, 0.05, false);
+  }
+  gable(b, 3.2, 3.2, 0.9, px, H + 4.3, pz, 0.05, 'wood', 0.3);
+  // A cleated plank up to it from the roof.
+  b.box('wood', Math.hypot(4, 2.64), 0.1, 0.9, px + 3.3, H + 0.1 + 1.32 - 0.05, pz, 0, true, 0, -Math.atan2(2.64, 4));
+  for (let i = 1; i < 7; i++) b.box('wood', 0.06, 0.05, 0.85, px + 5.3 - i * 0.57, H + 0.1 + i * 0.377, pz, 0, false);
+  // A stair of reused blocks up the far end to the roof, walkable as a ramp.
+  for (let i = 0; i < 12; i++) b.box('block', 1.3, 0.55, 0.9, L / 2 + 1.0, -0.3 + i * 0.55, W / 2 - 1.0 - i * 0.82, 0, false);
+  {
+    const x0 = L / 2 + 0.35, x1 = L / 2 + 1.65, z0 = W / 2 - 0.5, z1 = W / 2 - 0.5 - 12 * 0.82, y1 = H + 0.1;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([x0, 0, z0, x1, 0, z0, x1, y1, z1, x0, 0, z0, x1, y1, z1, x0, y1, z1], 3));
+    b.collide(g);
+  }
+  
+  // The aqueduct from the Serino coming in from the east (local -x) on arches; two have fallen.
+  const n = 6, span = 4.2, pier = 1.5;
+  for (let i = 0; i < n; i++) {
+    const x = -(L / 2 + 1.5 + pier / 2 + span / 2 + i * (span + pier));
+    const hy = H + 0.4 - i * 0.12;
+    if (i === 3 || i === 4) {
+      ruin(b, 'brick', span + pier, R(1, 2.5), 2.2, x, -0.3, 0, 0, 0.9);
+      for (let k = 0; k < 4; k++) b.box('brick', R(0.8, 1.6), R(0.5, 0.9), R(0.8, 1.6), x + R(-2, 2), -0.3, R(-3, 3), R(0, 3));
+      continue;
+    }
+    b.geo('brick', arcadeGeo(span + pier, hy, 2.2, 1, span, hy - span / 2 - 1.3), x, -0.3, 0, 0);
+    archRings(b, 'brick', x, -0.3, 0, 0, 2.2, span, hy - span / 2 - 1.3, 0.5, 0.36);
+    // The specus on top, its cover slabs gone in places.
+    b.box('rubble', span + pier, 1.0, 1.8, x, hy - 0.3, 0, 0, false);
+    if (rand() < 0.6) b.box('slab', span + pier - 0.3, 0.2, 1.9, x, hy + 0.7, 0, 0, false);
+  }
+  // Tombs of the old cemetery on the slope, a spring trough by the door.
+  for (let k = 0; k < 4; k++) b.box('block', R(1.8, 2.4), R(0.6, 0.9), R(0.9, 1.2), R(4, 12), -0.4, R(9, 15), R(-0.3, 0.3));
+  b.box('stone', 2.2, 0.7, 0.9, 3.5, -0.3, W / 2 + 1.6, 0.05);
+  torch(b, -L / 3 - 1.6, 2.6, W / 2 + T / 2 + 0.1, 0);
+  lucerna(b, -2, 0.1, 2.2, 0, false);
+  torch(b, px + 1.3, H + 3.2, pz + 1.45, 0);
+  markReadable('castellum', -L / 3, 1.5, W / 2 + 0.7);
+  markReadable('rocca', px, H + 3.1, pz + 1.4);
 }
 
 export { wellHead, placeProp, SITE, toLocalXZ, toWorldXZ, tiledGable, Acc };

@@ -1,4 +1,4 @@
-import { Builder } from '../builder';
+import { Builder, DETAIL } from '../builder';
 import { buildChunk, bake, packLights, type ChunkItems, type ChunkResult } from './fabric';
 import { setTessScale } from '../displace';
 
@@ -11,9 +11,12 @@ import { setTessScale } from '../displace';
 // count falls by about three quarters).
 setTessScale(1.9);
 
-self.onmessage = (e: MessageEvent<{ items: ChunkItems }>) => {
-  const it = e.data.items;
+self.onmessage = (e: MessageEvent<{ items: ChunkItems; mid?: boolean }>) => {
+  const it = e.data.items, mid = !!e.data.mid;
   const t0 = performance.now();
+  // Middle detail (seen from 48-112 m): see DETAIL in builder.ts.
+  DETAIL.mid = mid;
+  setTessScale(mid ? 5 : 1.9);
   const b = new Builder();
   b.mode = 'render';
   let res: ChunkResult;
@@ -21,12 +24,12 @@ self.onmessage = (e: MessageEvent<{ items: ChunkItems }>) => {
     buildChunk(b, it);
     const baked = bake(b);
     const { lamps, flames } = packLights(b.lamps, b.flames);
-    res = { key: it.key, baked, lamps, flames, ms: performance.now() - t0 };
+    res = { key: it.key, baked, lamps: mid ? [] : lamps, flames: mid ? [] : flames, ms: performance.now() - t0 };
   } catch (err) {
     console.error('chunk failed', it.key, err);
     res = { key: it.key, baked: [], lamps: [], flames: [], ms: performance.now() - t0 };
   }
   const transfer: Transferable[] = [];
   for (const x of res.baked) transfer.push(x.pos.buffer, x.nor.buffer);
-  (self as unknown as Worker).postMessage(res, transfer);
+  (self as unknown as Worker).postMessage({ ...res, mid }, transfer);
 };

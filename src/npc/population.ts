@@ -244,7 +244,7 @@ const G: Record<GroupId, GroupDef> = {
     gear: () => ({}), beard: [0, 0], grey: [0, 0.2], speed: 1.0,
   },
   monachus: {
-    outfits: [['monk', 'monk']], title: 'monachus', prefix: 'Frater', names: [...N.latinM, ...N.greekM.slice(0, 3)], skin: SKIN.pale,
+    outfits: [['monk', 'monk'], ['monkBare', 'monk']], title: 'monachus', prefix: 'Frater', names: [...N.latinM, ...N.greekM.slice(0, 3)], skin: SKIN.pale,
     dress: (r) => ({ tunic: pick(r, P.habit), over: pick(r, P.habit), head: pick(r, P.habit), kinds: ['tabby', 'tabby', 'tabby'] }),
     gear: (r) => ({ lantern: r() < 0.3 }), beard: [0, 0], speed: 0.95,
   },
