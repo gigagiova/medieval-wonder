@@ -160,19 +160,19 @@ export function fabric(kind: FabricKind, color: THREE.ColorRepresentation, o: Fa
           // Hand-spun, hand-woven, hand-dyed and worn. (Fine detail fades out
           // with distance, where it would only shimmer.)
           vec2 fq = fabProj(vFab, fMa.x);
-          float fNear = 1.0 - smoothstep(0.0012, 0.005, length(fwidth(vFab)));
+          float fNear = 1.0 - smoothstep(0.002, 0.008, length(fwidth(vFab)));
           // Slubs: thick and thin runs of single yarns across the cloth.
           float sl1 = texture2D(uNoise, vec2(fq.x * 0.6, fq.y * 24.0)).b, sl2 = texture2D(uNoise, vec2(fq.x * 21.0 + 0.3, fq.y * 0.55)).a;
-          float slub = (smoothstep(0.6, 0.85, sl1) - 0.6 * smoothstep(0.62, 0.88, 1.0 - sl1)) * 0.16 + smoothstep(0.66, 0.9, sl2) * 0.08;
+          float slub = (smoothstep(0.6, 0.85, sl1) - 0.6 * smoothstep(0.62, 0.88, 1.0 - sl1)) * 0.28 + smoothstep(0.66, 0.9, sl2) * 0.14;
           diffuseColor.rgb *= 1.0 + slub * uFabHand.x * fNear;
           // Pilling and felted fluff: pale specks of loose fibre.
           float pill = smoothstep(0.8, 0.93, texture2D(uNoise, fq * 7.3 + 0.17).b) * smoothstep(0.5, 0.8, texture2D(uNoise, fq * 0.9).g);
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.3 + 0.008, pill * uFabHand.z * fNear * 0.7);
           // Uneven dye: the colour clouds and drifts towards the undyed fibre in patches.
           vec4 fM = texture2D(uNoise, vFab.xy * 0.33 + vFab.zy * 0.21), fM2 = texture2D(uNoise, vFab.zx * 1.2 + vFab.y * 0.43);
-          diffuseColor.rgb *= 1.0 + ((fM.r - 0.5) * 0.26 + (fM2.g - 0.5) * 0.16) * uFabHand.y;
+          diffuseColor.rgb *= 1.0 + ((fM.r - 0.5) * 0.42 + (fM2.g - 0.5) * 0.26) * uFabHand.y;
           float fL = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
-          diffuseColor.rgb = mix(diffuseColor.rgb, fL * vec3(1.1, 1.0, 0.82), smoothstep(0.45, 0.85, fM2.b) * 0.22 * uFabHand.y);
+          diffuseColor.rgb = mix(diffuseColor.rgb, fL * vec3(1.1, 1.0, 0.82), smoothstep(0.45, 0.85, fM2.b) * 0.32 * uFabHand.y);
           ${rest ? `
           // Faded by the sun where it faces up and out; grey with dust.
           fL = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
@@ -186,6 +186,18 @@ export function fabric(kind: FabricKind, color: THREE.ColorRepresentation, o: Fa
         // Hollows between threads are rougher still than their crowns.
         roughnessFactor = clamp(roughnessFactor * (1.06 - 0.12 * fD), 0.0, 1.0);`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        ${rest ? `{
+          // Creases too small to model: long soft wrinkles running down the
+          // cloth as it hangs, some short and crossing (bump from screen derivatives).
+          vec2 fq = fabProj(vFab, fMa.x);
+          float hb = (texture2D(uNoise, vec2(fq.x * 4.0, fq.y * 0.45)).r - 0.5) * 0.006
+                   + (texture2D(uNoise, vec2(fq.x * 3.7 + 0.31, fq.y * 0.9 + fq.x * 1.1)).g - 0.5) * 0.003;
+          vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition);
+          vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx);
+          float det = dot(dpx, r1);
+          vec3 grad = sign(det) * (dFdx(hb) * r1 + dFdy(hb) * r2);
+          normal = normalize(abs(det) * normal - grad * uFabHand.w);
+        }` : ''}
         {
           vec3 fPert = fabPerturb(fG1x, fG1y, fN1, normal, fQx, fQy) * fW.x;
           if (fW.y > 0.0) fPert += fabPerturb(fG2x, fG2y, fN2, normal, fQx, fQy) * fW.y;

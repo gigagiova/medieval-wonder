@@ -377,7 +377,7 @@ const BOTTOM = /^(Wolf3D_Outfit_Bottom|Scan_Bottom)$/, FOOTWEAR = /^(Wolf3D_Outf
  * skin at the base of the neck. Shirt collars, ties, cuffs, watches, rings
  * and earrings go: they don't look like skin (the packed `_skin` likeness).
  */
-function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure) {
+function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure, tonsure = false) {
   m.frustumCulled = false;
   const cls = boneClassOf(m), g = (m.geometry = m.geometry.clone()), idx = g.index!;
   const skin = g.attributes._skin, w = new THREE.Vector3();
@@ -395,6 +395,8 @@ function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure) {
     if (kit === 'woman' && cls[i] === 'head' && w.z < eyes.z - 0.07 && (s < 0.6 || (w.z < eyes.z - 0.1 && y > nk.y + 0.02))) { ok[i] = 0; continue; }
     // Under a man's jaw, only clear skin: a shirt's collar (dark, and skinned to the neck) went for a leather band.
     if (kit === 'man' && c === 'head' && y < eyes.y - 0.15 && s < 0.6 && !(w.z > eyes.z - 0.05 && y > eyes.y - 0.17)) { ok[i] = 0; continue; }
+    // ...and at the nape, below the hair, only the clearest (the neck's own skin goes on under it, see fillNeck).
+    if (kit === 'man' && c === 'head' && w.z < eyes.z - 0.075 && y < eyes.y - 0.07 && s < 0.75 && !face) { ok[i] = 0; continue; }
     // (Skin of the trunk only within the neckline: elsewhere the tunic is fitted close and it would show through.)
     const inNeck = Math.hypot(w.x - nk.x, w.z - nk.z) < 0.07 && y > nk.y - 0.07;
     ok[i] = c === 'hand' || (c === 'head' && (s > 0.35 || face || (kit === 'man' && y > head - 0.01))) || (c === 'head' && s > 0.5 && y > collar) || ((c === 'torso' || c === 'arm') && s > 0.5 && inNeck) ? 1 : 0;
@@ -465,7 +467,82 @@ function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure) {
   }
   g.setAttribute('beard', new THREE.BufferAttribute(beard, 1));
   m.material = skinMaterial(m.material as THREE.MeshStandardMaterial);
-  fillNeck(m, M, kit);
+  const skinMat = fillNeck(m, M, kit);
+  if (tonsure) makeTonsure(m, M, skinMat);
+}
+
+/**
+ * A monk's tonsure (the Roman, St Peter's: the crown shaven in a round, a
+ * ring of hair left about the head). The hair over the crown is pressed down
+ * to the skull and a cap of skin laid over it, a millimetre or two above,
+ * with the neck's skin (the scan's forehead), rigid with the head.
+ */
+function makeTonsure(m: THREE.SkinnedMesh, M: Measure, mat: THREE.Material) {
+  const g = m.geometry, P = g.attributes.position, w = new THREE.Vector3(), inv = m.matrixWorld.clone().invert();
+  const eyes = M.bone('LeftEye').add(M.bone('RightEye')).multiplyScalar(0.5), hb = M.bone('Head');
+  // The crown: above the head's axis, a little behind the eyes.
+  const cx = hb.x, cz = eyes.z - 0.085, R = 0.062, NV = P.count;
+  for (let i = 0; i < NV; i++) {
+    m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld);
+    const d = Math.hypot(w.x - cx, w.z - cz);
+    if (d > R + 0.02 || w.y < eyes.y + 0.05) continue;
+    // Down onto the skull: an ellipsoid round the head's middle.
+    const sk = eyes.y + 0.025 + Math.sqrt(Math.max(0, 1 - (d / 0.105) ** 2)) * 0.08;
+    if (w.y > sk) { w.y = sk + (w.y - sk) * ss(R - 0.01, R + 0.02, d); P.setXYZ(i, ...w.applyMatrix4(inv).toArray()); }
+  }
+  P.needsUpdate = true;
+  // The cap: rings out from the crown's middle, laid down onto the head from above.
+  const W = new Float32Array(NV * 3);
+  for (let i = 0; i < NV; i++) m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld).toArray(W, i * 3);
+  const vis = new THREE.BufferGeometry();
+  vis.setAttribute('position', new THREE.BufferAttribute(W, 3));
+  vis.setIndex(Array.from(g.index!.array as ArrayLike<number>));
+  const bvh = new MeshBVH(vis), ray = new THREE.Ray(), down = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3();
+  const NRg = 8, NS = 28, pos: number[] = [], uv: number[] = [], ix: number[] = [];
+  const at = (x: number, z: number) => {
+    ray.set(o.set(x, eyes.y + 0.4, z), down);
+    const h = bvh.raycastFirst(ray, THREE.DoubleSide);
+    return new THREE.Vector3(x, (h ? h.point.y : eyes.y + 0.1) + 0.003, z);
+  };
+  const push = (p: THREE.Vector3) => { p.applyMatrix4(inv); pos.push(p.x, p.y, p.z); uv.push(0.5 + (p.x - cx) * 6, 0.5 + (p.z - cz) * 6); };
+  push(at(cx, cz));
+  for (let r = 1; r <= NRg; r++) for (let k = 0; k < NS; k++) {
+    const a = (k / NS) * Math.PI * 2, rr = (R * r) / NRg;
+    push(at(cx + Math.sin(a) * rr, cz + Math.cos(a) * rr));
+  }
+  // (Wound to face up, out of the head.)
+  for (let k = 0; k < NS; k++) ix.push(0, 1 + k, 1 + ((k + 1) % NS));
+  for (let r = 1; r < NRg; r++) for (let k = 0; k < NS; k++) {
+    const a = 1 + (r - 1) * NS + k, b = 1 + (r - 1) * NS + ((k + 1) % NS);
+    ix.push(a, a + NS, b, b, a + NS, b + NS);
+  }
+  // (Uvs again in the cap's own frame: the patch's texture, as round the neck.)
+  for (let i = 0; i < uv.length; i += 2) { uv[i] = (uv[i] - 0.5) * 2 + 0.5; uv[i + 1] = (uv[i + 1] - 0.5) * 2 + 0.5; }
+  const n = pos.length / 3, ng = new THREE.BufferGeometry();
+  ng.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  ng.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  const headI = m.skeleton.bones.findIndex((b) => canon(b.name) === 'Head');
+  ng.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Array(n * 4).fill(0).map((_, i) => (i % 4 === 0 ? headI : 0)), 4));
+  ng.setAttribute('skinWeight', new THREE.Float32BufferAttribute(new Array(n * 4).fill(0).map((_, i) => (i % 4 === 0 ? 1 : 0)), 4));
+  // Other per-vertex data the skin shader reads (the scan's oil and skin likeness): the forehead's.
+  let ref = 0, rd = Infinity;
+  for (let i = 0; i < NV; i++) {
+    const d = (W[i * 3] - eyes.x) ** 2 + (W[i * 3 + 1] - eyes.y - 0.04) ** 2 + (W[i * 3 + 2] - eyes.z) ** 2;
+    if (d < rd) { rd = d; ref = i; }
+  }
+  for (const k of Object.keys(g.attributes)) if (!ng.attributes[k] && g.attributes[k].itemSize <= 4 && k !== 'normal') {
+    const at2 = g.attributes[k], arr = new Float32Array(n * at2.itemSize);
+    if (k !== 'beard') for (let i = 0; i < n; i++) for (let j = 0; j < at2.itemSize; j++) arr[i * at2.itemSize + j] = at2.getComponent(ref, j);
+    ng.setAttribute(k, new THREE.BufferAttribute(arr, at2.itemSize));
+  }
+  ng.setIndex(ix);
+  ng.computeVertexNormals();
+  const cap = new THREE.SkinnedMesh(ng, mat);
+  cap.name = 'Tonsure';
+  cap.frustumCulled = false;
+  cap.bind(m.skeleton, m.bindMatrix);
+  cap.position.copy(m.position); cap.quaternion.copy(m.quaternion); cap.scale.copy(m.scale);
+  m.parent!.add(cap);
 }
 
 /**
@@ -477,7 +554,7 @@ function skinPatch(m: THREE.SkinnedMesh, W: Float32Array, used: Set<number>, eye
   const map = (m.material as THREE.MeshStandardMaterial).map;
   const img = map?.image as (CanvasImageSource & { width: number; height: number }) | undefined;
   if (!map || !img || !img.width || typeof document === 'undefined') return null;
-  const U = m.geometry.attributes.uv, S = 0.03; // the patch: 3% of the atlas, ~3 cm of skin
+  const U = m.geometry.attributes.uv, S = 0.022, SC = 0.014; // its island checked 2.2% of the atlas round, a patch of 1.4% cut
   const near: number[] = [];
   for (const i of used) {
     const x = W[i * 3] - eyes.x, y = W[i * 3 + 1] - eyes.y, z = W[i * 3 + 2] - eyes.z;
@@ -505,7 +582,14 @@ function skinPatch(m: THREE.SkinnedMesh, W: Float32Array, used: Set<number>, eye
     const u = U.getX(best), v = tex.flipY ? 1 - U.getY(best) : U.getY(best);
     const c = document.createElement('canvas');
     c.width = c.height = 64;
-    c.getContext('2d')!.drawImage(im, (u - S / 2) * im.width, (v - S / 2) * im.height, S * im.width, S * im.height, 0, 0, 64, 64);
+    const cx = c.getContext('2d')!;
+    cx.drawImage(im, (u - SC / 2) * im.width, (v - SC / 2) * im.height, SC * im.width, SC * im.height, 0, 0, 64, 64);
+    if (tex === map) {
+      // A neck is a shade darker and less rosy than a brow in the light.
+      cx.globalCompositeOperation = 'multiply';
+      cx.fillStyle = 'rgb(224, 214, 208)';
+      cx.fillRect(0, 0, 64, 64);
+    }
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = tex.colorSpace;
     t.wrapS = t.wrapT = THREE.MirroredRepeatWrapping;
@@ -561,7 +645,7 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure, kit: 'man' | 'woman') {
   const NRg = 12, NCg = 28, ray = new THREE.Ray(), o = new THREE.Vector3(), d = new THREE.Vector3();
   const R: number[][] = [], C: THREE.Vector3[] = [];
   for (let r = 0; r < NRg; r++) {
-    const t = -0.35 + (kit === 'man' ? 1.4 : 1.2) * (r / (NRg - 1));
+    const t = -0.35 + (kit === 'man' ? 1.6 : 1.2) * (r / (NRg - 1));
     const c = nk.clone().lerp(hb, t);
     c.z += 0.008;
     C.push(c);
@@ -611,14 +695,16 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure, kit: 'man' | 'woman') {
     const bone = x > 0.035 && x < 0.055 && y < -0.012 && y > -0.03 && z > -0.04;
     if (brow || bone) cheek.push([g.attributes.uv.getX(i), g.attributes.uv.getY(i)]);
   }
-  const patch = skinPatch(m, W, used, eyes);
   const avg = averageTexel((m.material as THREE.MeshStandardMaterial).map, cheek);
+  const patch = skinPatch(m, W, used, eyes);
   // Skin weights: the nearest vertex of the whole (untrimmed) body.
   const si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
   const pos: number[] = [], uv: number[] = [], SI: number[] = [], SW: number[] = [], ix: number[] = [];
   const inv = m.matrixWorld.clone().invert();
   for (let r = 0; r < NRg; r++) for (let k = 0; k < NCg; k++) {
-    const a = (k / NCg) * Math.PI * 2, rr = Math.abs(R[r][k]);
+    // (Spreading at its base into the shoulders, as the muscles of a neck do: it reads shorter.)
+    const tr = -0.35 + (kit === 'man' ? 1.6 : 1.2) * (r / (NRg - 1));
+    const a = (k / NCg) * Math.PI * 2, rr = Math.abs(R[r][k]) * (1 + 0.22 * ss(0.4, -0.15, tr) * (0.6 + 0.4 * Math.abs(Math.sin(a))));
     v.set(C[r].x + Math.sin(a) * rr, C[r].y, C[r].z + Math.cos(a) * rr);
     let bi = 0, bdd = Infinity;
     for (let i = 0; i < NV; i++) { const dd = (W[i * 3] - v.x) ** 2 + (W[i * 3 + 1] - v.y) ** 2 + (W[i * 3 + 2] - v.z) ** 2; if (dd < bdd) { bdd = dd; bi = i; } }
@@ -626,7 +712,8 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure, kit: 'man' | 'woman') {
     v.applyMatrix4(inv);
     pos.push(v.x, v.y, v.z);
     // Its skin: a patch of the scan's own forehead, tiled (mirrored) round the neck.
-    if (patch) uv.push((k / NCg) * 5, (r / (NRg - 1)) * 1.6);
+    // (Round the neck and back again, mirrored: no seam where the tube closes.)
+    if (patch) uv.push(0.3 + 1.5 * (1 - Math.abs(1 - (2 * k) / NCg)), (r / (NRg - 1)) * 1.1 + 0.5);
     else uv.push(uv0[0], uv0[1]);
   }
   for (let r = 0; r < NRg - 1; r++) for (let k = 0; k < NCg; k++) {
@@ -647,6 +734,18 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure, kit: 'man' | 'woman') {
   }
   ng.setIndex(ix);
   ng.computeVertexNormals();
+  // Under the jaw a neck is in shade: its normals there turned down, away from the sky.
+  {
+    const N = ng.attributes.normal, dn = new THREE.Vector3(0, -1, 0).transformDirection(inv), n = new THREE.Vector3();
+    for (let r = 0; r < NRg; r++) {
+      const tr = -0.35 + (kit === 'man' ? 1.6 : 1.2) * (r / (NRg - 1)), w = ss(0.25, 0.85, tr);
+      for (let k = 0; k < NCg; k++) {
+        const i = r * NCg + k, f = 0.5 + 0.5 * Math.cos((k / NCg) * Math.PI * 2);
+        n.fromBufferAttribute(N, i).addScaledVector(dn, 0.9 * w * f).normalize();
+        N.setXYZ(i, n.x, n.y, n.z);
+      }
+    }
+  }
   let mat = m.material as THREE.Material;
   if (patch) {
     // The face's skin shader, on the forehead's patch (its tone is set per person with the rest).
@@ -662,9 +761,10 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure, kit: 'man' | 'woman') {
   nm.bind(m.skeleton, m.bindMatrix);
   nm.position.copy(m.position); nm.quaternion.copy(m.quaternion); nm.scale.copy(m.scale);
   m.parent!.add(nm);
+  return mat;
 }
 
-export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard: boolean; wraps: boolean; m: Measure }) {
+export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard: boolean; wraps: boolean; m: Measure; tonsure?: boolean }) {
   const leather = fabric('leather', 0x2a1d14, { attr: 'position' });
   const shoes: THREE.SkinnedMesh[] = [];
   root.traverse((x) => {
@@ -676,7 +776,7 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
     if (/Outfit_Top|Headwear/.test(m.name) || (!o.beard && /Beard/.test(m.name))) { m.visible = false; return; }
     // A scanned body (scan.ts): its legs go under a woman's gown.
     if (kit === 'woman' && m.name === 'Scan_Bottom') { m.visible = false; return; }
-    if (m.name === 'Scan_Top') { trimScan(m, kit, o.m); return; }
+    if (m.name === 'Scan_Top') { trimScan(m, kit, o.m, o.tonsure); return; }
     const trim = kit === 'woman' || m.name === 'Wolf3D_Body';
     if (trim) {
       const cls = boneClassOf(m);
@@ -984,7 +1084,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   const hipProfile = new Float32Array(NA);
   for (let r = 0; r < NR; r++) {
     const y = ringY(r);
-    if (y < yBelt && y > hips.y - 0.22) for (let k = 0; k < NA; k++) hipProfile[k] = Math.max(hipProfile[k], rad[r][k]);
+    if (y < yBelt && y > hips.y - 0.15) for (let k = 0; k < NA; k++) hipProfile[k] = Math.max(hipProfile[k], rad[r][k]);
   }
   const fp = Math.random() * 6; // each garment folds its own way
   for (let r = 0; r < NR; r++) {
@@ -1006,7 +1106,9 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
         rr += 0.01;
       } else {
         const back = 0.5 + 0.5 * Math.cos(a - Math.PI);
-        rr = Math.max(rr + 0.045, hipProfile[k] + 0.035 + below * (spec.flare + (0.05 + (spec.trail ?? 0)) * back));
+        // (Out over the hips gradually, not standing out from under the belt like a frill.)
+        const hp = THREE.MathUtils.lerp(rr + 0.03, hipProfile[k] + 0.035, ss(yBelt - 0.02, hips.y - 0.1, y));
+        rr = Math.max(rr + 0.03, hp + below * (spec.flare + (0.05 + (spec.trail ?? 0)) * back));
         const fold = Math.sin(a * 11 + Math.sin(a * 3.1 + fp) * 1.7 + fp) * 0.6 + Math.sin(a * 6 + 1.3 + fp * 0.7) * 0.4;
         rr += fold * (0.006 + below * spec.folds);
         // Gathered in by the belt just under it.
@@ -1564,7 +1666,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     // A mantle's hem, all round.
     if (cape) {
       const b0 = baseOf.get(cape)!, { path, inw } = gridBoundary(cape.rows, cape.cols);
-      addBand(path.map((i) => b0 + i), inw.map((i) => b0 + i), true, BAND.wool, G_OVER, 0.95);
+      addBand(path.map((i) => b0 + i), inw.map((i) => b0 + i), true, BAND.wool, cape.group, 0.95);
     }
     // A veil's rolled linen hem round the face, down both front edges and
     // along the hem; a hood's wool, turned back round the face, and its cape's hem.
@@ -2121,6 +2223,14 @@ function layMantle(M: Measure, kind: 'cloak' | 'shawl', open: number, clothes: M
     }));
   }
   clearFall(Pt, nk, 1, 1, true, clothes, under, all);
+  // Its folds again, only ever outwards (clearing it smoothed them away):
+  // broad upright folds falling from the shoulders, deepest at the hem.
+  for (let f = 1; f <= NF; f++) for (let c = 0; c <= NC; c++) {
+    const p = Pt[f][c], t = f / NF, dx = p.x - nk.x, dz = p.z - nk.z, dl = Math.hypot(dx, dz) || 1;
+    const S = Math.sin(c * 0.62 + ph0 * 1.3 + Math.sin(c * 0.23 + ph0) * 1.2) * 0.65 + Math.sin(c * 1.3 + ph0 * 0.4) * 0.35;
+    const o = (cloak ? 0.03 : 0.018) * ss(0, 0.8, t) * (0.5 + 0.5 * S);
+    p.x += (dx / dl) * o; p.z += (dz / dl) * o;
+  }
   const g = new Grid(NR, NC + 1, false);
   g.group = G_OVER;
   g.cap = cloak ? CAP_CLOAK : CAP_SHAWL;
@@ -2255,6 +2365,13 @@ function layHood(M: Measure, kind: HoodKind, clothes: MeshBVH, under: MeshBVH, a
     }));
   }
   clearFall(Pt, nk, NH - 5, NH, o1 > 0, clothes, under, all);
+  // Its folds again, only ever outwards (clearing it smoothed them away).
+  for (let f = 1; f <= NF; f++) for (let c = 0; c <= NC; c++) {
+    const p = Pt[NH - 1 + f][c], t = f / NF, dx = p.x - nk.x, dz = p.z - nk.z, dl = Math.hypot(dx, dz) || 1;
+    const S = Math.sin(c * 0.75 + ph0 * 1.3 + Math.sin(c * 0.29 + ph0) * 1.2) * 0.65 + Math.sin(c * 1.5 + ph0 * 0.4) * 0.35;
+    const o = K.fold * 1.4 * ss(0, 0.8, t) * (0.5 + 0.5 * S);
+    p.x += (dx / dl) * o; p.z += (dz / dl) * o;
+  }
   for (let r = 0; r < NR; r++) for (let c = 0; c < NC; c++) {
     const p = Pt[r][c];
     g.pos.push(p.x, p.y, p.z);

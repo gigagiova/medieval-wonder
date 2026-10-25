@@ -39,11 +39,13 @@ const BODIES: Record<BodyId, { sex: Sex; height: number }> = {
   claudia: { sex: 'woman', height: 1.6 }, sophia: { sex: 'woman', height: 1.57 },
 };
 export type Role = Speaker;
-type OutfitId = 'monk' | 'peasantHood' | 'peasantCloak' | 'soldier' | 'soldierCloak' | 'woman' | 'womanShawl';
+type OutfitId = 'monk' | 'monkBare' | 'peasantHood' | 'peasantCloak' | 'soldier' | 'soldierCloak' | 'woman' | 'womanShawl';
 
 // Which bodies wear an outfit: every pairing is tailored once at load.
-const OUTFITS: Record<OutfitId, { sex: Sex; bodies: BodyId[]; spec: GarmentSpec; beard: boolean; wraps: boolean }> = {
+const OUTFITS: Record<OutfitId, { sex: Sex; bodies: BodyId[]; spec: GarmentSpec; beard: boolean; wraps: boolean; tonsure?: boolean }> = {
   monk: { sex: 'man', bodies: ['manuel', 'eric'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
+  // A monk in habit and scapular without his cowl, the crown of his head shaven.
+  monkBare: { sex: 'man', bodies: ['manuel', 'eric'], beard: false, wraps: false, tonsure: true, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: null, scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
   peasantHood: { sex: 'man', bodies: ['nathan'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather', thighs: 0.6, swing: true } },
   peasantCloak: { sex: 'man', bodies: ['eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.35, swing: true } },
   soldier: { sex: 'man', bodies: ['nathan', 'manuel'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 0.6 } },
@@ -51,7 +53,7 @@ const OUTFITS: Record<OutfitId, { sex: Sex; bodies: BodyId[]; spec: GarmentSpec;
   woman: { sex: 'woman', bodies: ['claudia', 'sophia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
   womanShawl: { sex: 'woman', bodies: ['sophia', 'claudia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
 };
-const ROLE_OUTFITS: Record<Role, OutfitId[]> = { monk: ['monk'], peasant: ['peasantHood', 'peasantCloak'], woman: ['woman', 'womanShawl'], soldier: ['soldier', 'soldierCloak'] };
+const ROLE_OUTFITS: Record<Role, OutfitId[]> = { monk: ['monk', 'monkBare'], peasant: ['peasantHood', 'peasantCloak'], woman: ['woman', 'womanShawl'], soldier: ['soldier', 'soldierCloak'] };
 
 // Natural dyes on wool and linen, muted and a little faded.
 const DYES = {
@@ -133,7 +135,7 @@ export function loadNpcAssets(): Promise<void> {
  * cowl hides where face and head meet.
  */
 const FACES: Record<string, { outfits: OutfitId[]; share: number }> = {
-  face_grandpa: { outfits: ['monk', 'peasantHood'], share: 0.4 },
+  face_grandpa: { outfits: ['monk', 'monkBare', 'peasantHood'], share: 0.4 },
 };
 const faces = new Map<string, { geo: THREE.BufferGeometry; map: THREE.Texture }>();
 
@@ -163,7 +165,7 @@ function tailor(id: OutfitId, body: BodyId): Outfit {
   const o = OUTFITS[id], k = kits![body];
   const t = SkeletonUtils.clone(k.template);
   t.updateMatrixWorld(true);
-  dressBody(t, o.sex, { beard: o.beard, wraps: o.wraps, m: k.m });
+  dressBody(t, o.sex, { beard: o.beard, wraps: o.wraps, m: k.m, tonsure: o.tonsure });
   t.traverse((x) => { if (/Teeth/.test(x.name)) x.visible = false; });
   if (o.spec.swing) addSwingBones(t);
   if (o.spec.stride) {
