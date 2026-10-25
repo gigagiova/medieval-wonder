@@ -4,7 +4,7 @@ import { loadGltf } from './gltf';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { Lamp } from './builder';
 import { isReading } from './codex';
-import { retarget, relaxArms, poseOf, wool, matte, makeWeave, withAtmos, canon, type ClipName, type Motion } from './npc/rig';
+import { retarget, relaxArms, legIK, wool, matte, makeWeave, withAtmos, canon, type ClipName, type Motion } from './npc/rig';
 import { dressBody, stripHeadPieces, faceOnly, buildGarment, bakeHeadShade, measure, addSkirtBones, addSwingBones, swingRig, type GarmentSpec, type Garment, type Measure } from './npc/garment';
 import { Clothing, clothStats } from './npc/cloth';
 import * as Props from './npc/props';
@@ -34,8 +34,8 @@ const OUTFITS: Record<OutfitId, { kit: Kit; spec: GarmentSpec; beard: boolean; w
   monk: { kit: 'man', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
   peasantHood: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather', thighs: 0.6, swing: true } },
   peasantCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.6, swing: true, cloakClose: true } },
-  soldier: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 1 } },
-  soldierCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 1, capeOnTunic: true, capeOpen: 0.8 } },
+  soldier: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 0.6 } },
+  soldierCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 0.6, capeOnTunic: true, capeOpen: 0.8 } },
   woman: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
   womanShawl: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
 };
@@ -71,7 +71,7 @@ export function loadNpcAssets(): Promise<void> {
   loading ??= (async () => {
     const loader = new GLTFLoader();
     const get = (u: string) => loadGltf(u, loader);
-    const [man, woman, tpose, ual] = await Promise.all([get(DIR + 'man.json'), get(DIR + 'woman.json'), get(DIR + 'tpose.json'), get(DIR + 'ual.json')]);
+    const [man, woman, ual] = await Promise.all([get(DIR + 'man.json'), get(DIR + 'woman.json'), get(DIR + 'ual.json')]);
     // Michelle is bound in a T-pose; lower her arms first, as the man's are.
     relaxArms(woman.scene, 0.92);
     (npcDebug as unknown as { stripped: number[] }).stripped = stripHeadPieces(woman.scene);
@@ -79,18 +79,18 @@ export function loadNpcAssets(): Promise<void> {
     const scan = (id: string, top = false) => get(PROPS_DIR + id + '.json').then((g) => Props.prepScan(g.scene, top)).catch(() => null);
     const [basket, bucket, jar] = await Promise.all([scan('wicker_basket_02', true), scan('wooden_bucket_01', true), scan('planter_pot_clay')]);
     scans = { basket, bucket, jar };
-    const kit = (g: GLTF, pose: Map<string, THREE.Quaternion>, height: number, skull?: { rx: number; rz: number }): KitData => {
+    const kit = (g: GLTF, height: number, skull?: { rx: number; rz: number }): KitData => {
       const t = g.scene;
       t.updateMatrixWorld(true);
       const m = measure(t, skull);
       let top = 0;
       t.traverse((o) => { if (canon(o.name) === 'HeadTop_End') top = o.getWorldPosition(new THREE.Vector3()).y; });
-      return { template: t, motion: retarget(t, pose, ual), m, scale: height / (top || 1.8) };
+      return { template: t, motion: retarget(t, ual), m, scale: height / (top || 1.8) };
     };
     const t0 = performance.now();
     kits = {
-      man: kit(man, poseOf(tpose.animations.find((c) => c.name === 'TPose')!), 1.74),
-      woman: kit(woman, poseOf(woman.animations.find((c) => c.name === 'TPose')!), 1.6, { rx: 0.074, rz: 0.094 }),
+      man: kit(man, 1.74),
+      woman: kit(woman, 1.6, { rx: 0.074, rz: 0.094 }),
     };
     npcDebug.buildMs.retarget = performance.now() - t0;
     (npcDebug as unknown as { heads: unknown }).heads = Object.fromEntries(Object.entries(kits).map(([k, v]) => [k, { ...v.m.head, c: v.m.head.c.toArray(), hb: v.m.bone('Head').toArray(), top: v.m.bone('HeadTop_End').toArray(), neck: v.m.bone('Neck').toArray(), hips: v.m.bone('Hips').toArray() }]));
@@ -274,12 +274,23 @@ export class Person {
       this.w[n] = this.want[n] = n === 'idle' ? 1 : 0;
     }
     this.walkSpeed = k.motion.speed[walkClip] > 0.3 && k.motion.speed[walkClip] < 3 ? k.motion.speed[walkClip] : 1.2;
+    this.walkStart = k.motion.start[walkClip];
+    this.legs = (['Left', 'Right'] as const).map((S) => ({
+      chain: [S + 'UpLeg', S + 'Leg', S + 'Foot'].map((n) => this.bones.get(n)!), toe: this.bones.get(S + 'ToeBase')!,
+      hA: k.m.bone(S + 'Foot').y, hT: k.m.bone(S + 'ToeBase').y,
+    }));
 
     this.equip(gear);
   }
   walkSpeed = 1.2;
   /** Half the width of a bucket or basket a peasant carries (0: none). */
   carryHalf = 0;
+  private walkStart = 0;
+  /** How fast the body is turning (rad/s), and how far it is lifted to stand on uneven ground. */
+  yawRate = 0;
+  private lastYaw = 0;
+  private lift = 0;
+  private legs: { chain: THREE.Bone[]; toe: THREE.Bone; hA: number; hT: number }[] = [];
   /** A lantern held out before him by its bail, the right arm bent at the elbow, whatever the clip does with it. */
   private grip: ReturnType<Person['makeGrip']> | null = null;
   private makeGrip() {
@@ -354,6 +365,13 @@ export class Person {
   private equip(g: Gear) {
     const m = this.outfit.m, r = this.rnd;
     const on = (bone: string, obj: THREE.Object3D, place: THREE.Matrix4) => Props.hangOn(this.bones.get(bone)!, this.bindOf(bone), obj, place);
+    // Laymen's leg wraps run down into ankle shoes: a leather top laced round
+    // each ankle hides where wrap and shoe meet. It rides on the shin, the
+    // shoe's collar turning inside it about the ankle.
+    if (OUTFITS[this.outfit.id].wraps) for (const s of ['Left', 'Right']) {
+      const f = m.bone(s + 'Foot'), k = m.bone(s + 'Leg');
+      on(s + 'Leg', Props.makeShoeTop(0.056), Props.placeAt(new THREE.Vector3(f.x, f.y, f.z + 0.005), new THREE.Quaternion().setFromUnitVectors(UP, k.clone().sub(f).normalize())));
+    }
     if (g.helmet) { const h = Props.makeHelmet(m, g.helmet === true ? 'spangen' : g.helmet); on('Head', h.obj, h.place); }
     // Felt in the colours of undyed and walnut-dyed wool.
     else if (g.cap) { const c = Props.makeCap(m, new THREE.Color(pick(r, [0x7e6a4e, 0x6e5a40, 0x8c7a5c, 0x5e4a34, 0x74603f]))); on('Head', c.obj, c.place); }
@@ -361,7 +379,7 @@ export class Person {
     if (g.arms) {
       on('Hips', Props.makeBeltFittings(belt, r() * 10), new THREE.Matrix4());
       // Spatha at the left hip, point trailing back.
-      const aL = 1.42, rL = belt.r(aL) + 0.055;
+      const aL = g.shield === 'arm' ? 1.85 : 1.42, rL = belt.r(aL) + 0.055; // behind the shield arm's wrist
       // It slants back and, below the belt, out over the flare of the skirt.
       const nL = new THREE.Vector3(Math.sin(aL), 0, Math.cos(aL)), tL = new THREE.Vector3(-Math.cos(aL), 0, Math.sin(aL));
       const yL = new THREE.Vector3(0, Math.cos(0.6), 0).addScaledVector(tL, Math.sin(0.6)).addScaledVector(nL, -0.1).normalize();
@@ -369,7 +387,7 @@ export class Person {
       const spatha = Props.makeSpatha(), qS = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(yL.clone().cross(zL), yL, zL));
       // Walking or standing, his left hand rests on the hilt, palm down and in.
       const palm = new THREE.Vector3(-1, -1, 0).normalize().applyQuaternion(qS.clone().invert());
-      if (g.shield !== 'arm') this.leftGrip = { obj: spatha, at: new THREE.Vector3(0, 0.07, 0), axis: new THREE.Vector3(0, -1, 0), palm, depth: 0.02, always: false, pole: new THREE.Vector3(0.5, -0.2, -1) };
+      if (g.shield !== 'arm') this.leftGrip = { obj: spatha, at: new THREE.Vector3(0, 0.055, 0), axis: new THREE.Vector3(0, -1, 0), palm, depth: 0.028, always: false, pole: new THREE.Vector3(0.5, -0.2, -1) };
       on('Hips', spatha, Props.placeAt(new THREE.Vector3(belt.cx + Math.sin(aL) * rL, belt.y - 0.01, belt.cz + Math.cos(aL) * rL - 0.02), qS));
       // The scramasax hangs flat against his right hip, behind the spear
       // hand, its point slanting down and back (under a cloak, out of sight).
@@ -577,22 +595,36 @@ export class Person {
   }
 
   /** Blend towards the wanted clip weights and advance the animation. */
-  animate(dt: number, every: number, lookAt: THREE.Vector3 | null) {
-    const k = Math.min(1, dt * 4);
-    let walkW = 0;
+  animate(dt: number, every: number, lookAt: THREE.Vector3 | null, ground?: (x: number, z: number) => number) {
+    let dy = this.yaw - this.lastYaw;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    this.lastYaw = this.yaw;
+    this.yawRate += (Math.abs(dy) / Math.max(dt, 1e-4) - this.yawRate) * Math.min(1, dt * 8);
+    // Setting off from standing: from the step where one foot is planted
+    // under the body and the other passes it.
+    if (this.w.walk === 0 && this.want.walk > 0) this.acts.walk.time = this.walkStart;
+    // Gestures cross-fade over a quarter second; starting and stopping, the
+    // walk follows the speed more tightly. Weights are normalised: a total under 1 would let the
+    // bind pose show through.
+    let sum = 0;
+    const rate = this.want.walk > 0 || this.w.walk > 0.01 ? 8 : 4;
     for (const n of ANIMS) {
-      this.w[n] += (this.want[n] - this.w[n]) * k;
+      this.w[n] += (this.want[n] - this.w[n]) * Math.min(1, dt * rate);
       if (this.w[n] < 0.002) this.w[n] = 0;
-      this.acts[n].setEffectiveWeight(this.w[n]);
-      if (n === 'walk') walkW = this.w[n];
+      sum += this.w[n];
     }
-    this.acts.walk.timeScale = THREE.MathUtils.clamp(this.speed / (this.walkSpeed * this.scale), 0.55, 1.6);
-    void walkW;
+    for (const n of ANIMS) this.acts[n].setEffectiveWeight(sum > 0 ? this.w[n] / sum : n === 'idle' ? 1 : 0);
+    // Steps keep pace with the ground: the clips' ground speed is measured
+    // when they are retargeted.
+    // Turning on the spot, the feet shuffle round.
+    this.acts.walk.timeScale = THREE.MathUtils.clamp(Math.max(this.speed / (this.walkSpeed * this.scale), Math.min(0.8, this.yawRate * 0.3)), 0.3, 1.6);
     this.group.position.copy(this.pos);
+    this.group.position.y += this.lift;
     this.group.rotation.set(0, this.yaw, 0);
     this.animAcc += dt;
     if (++this.tick % every !== 0) return false;
     this.mixer.update(this.animAcc);
+    this.plant(this.animAcc, ground);
     this.animAcc = 0;
     // Skirt bones: the thighs' swing (relative to the pelvis), without their twist.
     for (const k of this.strideBones) {
@@ -661,6 +693,31 @@ export class Person {
     fore.getWorldPosition(pF);
     hand.getWorldPosition(pH);
     turn(fore, _h7.copy(pH).sub(pF).normalize(), 0.85);
+  }
+
+  /**
+   * Feet on the ground. The clips stand on flat ground; here the body is
+   * raised or lowered onto the lower foot over the real ground (and over the
+   * odd blend of two clips), and a foot the ground rises under is lifted by
+   * bending its leg.
+   */
+  private plant(dt: number, ground?: (x: number, z: number) => number) {
+    const g = ground ?? (() => this.pos.y), s = this.scale;
+    const clear = (L: Person['legs'][number]) => {
+      const a = L.chain[2].getWorldPosition(_v), t = L.toe.getWorldPosition(_v2);
+      return Math.min(a.y - g(a.x, a.z) - L.hA * s, t.y - g(t.x, t.z) - L.hT * s);
+    };
+    this.group.updateMatrixWorld(true);
+    const low = Math.min(...this.legs.map(clear));
+    const want = THREE.MathUtils.clamp(this.lift - low, -0.3, 0.15);
+    this.lift += (want - this.lift) * Math.min(1, dt * 10);
+    this.group.position.y = this.pos.y + this.lift;
+    this.group.updateMatrixWorld(true);
+    _v3.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    for (const L of this.legs) {
+      const c = clear(L);
+      if (c < -0.005) legIK(L.chain, L.chain[2].getWorldPosition(_v).setY(_v.y - c), _v3);
+    }
   }
 
   /**
@@ -1031,6 +1088,7 @@ class Town {
   /** Steering: follow the street, keep clear of others and of the player. */
   private walk(a: Agent, dt: number, player: THREE.Vector3) {
     const S = this.streets, st = S[a.st], p = a.p;
+    const x0 = p.pos.x, z0 = p.pos.z;
     // Junctions.
     for (let j = 0; j < st.junc.length; j++) {
       const J = st.junc[j];
@@ -1088,8 +1146,10 @@ class Town {
     const m = pointAt(cur, a.s);
     const lat = (p.pos.x - m.x) * -m.tz + (p.pos.z - m.z) * m.tx;
     if (Math.abs(lat) > half) { const k = Math.sign(lat) * half - lat; p.pos.x += -m.tz * k; p.pos.z += m.tx * k; }
-    p.speed = Math.hypot(a.vel.x, a.vel.y);
-    if (p.speed > 0.15) p.yaw = turn(p.yaw, Math.atan2(a.vel.x, a.vel.y), dt * 4);
+    // The steps follow how far the body actually went: held back by the
+    // street's edge or by someone in the way, it walks no faster than it moves.
+    p.speed += (Math.min(Math.hypot(a.vel.x, a.vel.y), Math.hypot(p.pos.x - x0, p.pos.z - z0) / Math.max(dt, 1e-4)) - p.speed) * Math.min(1, dt * 12);
+    if (p.speed > 0.15) p.yaw = turn(p.yaw, Math.atan2(a.vel.x, a.vel.y), dt * 4, dt * 2.5);
     a.nextPause -= dt;
     if (a.nextPause < 0) { a.mode = 'pause'; a.timer = 3 + p.rnd() * 6; a.nextPause = 15 + p.rnd() * 30; p.look.timer = 0; }
   }
@@ -1097,13 +1157,16 @@ class Town {
   private wants(a: Agent) {
     const p = a.p, W = p.want;
     for (const n of ANIMS) W[n] = 0;
-    if (a.mode === 'walk' && p.speed > 0.1) W.walk = 1;
-    else if (a.mode === 'talk') W[p.lines[(p.line + p.lines.length - 1) % p.lines.length].bless ? 'bless' : 'talk'] = 1;
+    if (a.mode === 'talk') W[p.lines[(p.line + p.lines.length - 1) % p.lines.length].bless ? 'bless' : 'talk'] = 1;
     else if (a.mode === 'chat' || (a.mode === 'post' && a.chatCool === -1)) {
       // In a group, people take turns to speak.
       const k = Math.sin(a.talkCycle * 0.45) + Math.sin(a.talkCycle * 0.27 + 1);
       W[k > 0.6 ? 'talk' : 'idle'] = 1;
     } else W.idle = 1;
+    // Walking, starting and stopping, the walk's share follows the speed;
+    // turning on the spot, it shuffles the feet round.
+    const mv = Math.max(THREE.MathUtils.smoothstep(p.speed, 0.06, 0.45), 0.5 * THREE.MathUtils.smoothstep(p.yawRate, 0.4, 1.4));
+    if (mv > 0) { for (const n of ANIMS) W[n] *= 1 - mv; W.walk += mv; }
   }
 
   update(dt: number, camera: THREE.Camera, player: THREE.Vector3) {
@@ -1119,22 +1182,25 @@ class Town {
       a.talkCycle += dt;
       if (a.mode === 'walk') this.walk(a, dt, player);
       else {
-        p.speed = 0;
-        a.vel.set(0, 0);
+        // Stopping takes a step or two, not an instant.
+        a.vel.multiplyScalar(Math.exp(-dt * 7));
+        if (a.vel.lengthSq() < 0.0025) a.vel.set(0, 0);
+        p.pos.x += a.vel.x * dt; p.pos.z += a.vel.y * dt;
+        p.speed = a.vel.length();
         if (a.mode === 'pause' || a.mode === 'chat') {
           a.timer -= dt;
           if (a.mode === 'pause') {
             p.look.timer -= dt;
             if (p.look.timer < 0) { p.look.target = (p.rnd() - 0.5) * 1.8; p.look.timer = 1 + p.rnd() * 2.5; }
           }
-          if (a.mode === 'chat' && a.partner) p.yaw = turn(p.yaw, Math.atan2(a.partner.p.pos.x - p.pos.x, a.partner.p.pos.z - p.pos.z), dt * 3);
+          if (a.mode === 'chat' && a.partner) p.yaw = turn(p.yaw, Math.atan2(a.partner.p.pos.x - p.pos.x, a.partner.p.pos.z - p.pos.z), dt * 3, dt * 1.6);
           if (a.timer < 0) { a.mode = 'walk'; p.look.target = 0; a.partner = null; }
         } else if (a.mode === 'post') {
-          p.yaw = turn(p.yaw, a.homeYaw, dt * 2);
+          p.yaw = turn(p.yaw, a.homeYaw, dt * 2, dt * 1.6);
           _v.copy(a.home);
           if (p.pos.distanceToSquared(_v) > 0.01) p.pos.lerp(_v, Math.min(1, dt * 2));
         } else if (a.mode === 'talk') {
-          p.yaw = turn(p.yaw, Math.atan2(player.x - p.pos.x, player.z - p.pos.z), dt * 4);
+          p.yaw = turn(p.yaw, Math.atan2(player.x - p.pos.x, player.z - p.pos.z), dt * 4, dt * 1.6);
         }
       }
       p.pos.y = this.o.ground(p.pos.x, p.pos.z);
@@ -1175,7 +1241,7 @@ class Town {
       const near = simSet.has(a);
       const every = !p.visible ? 8 : near || p.dist < 18 ? 1 : p.dist < 35 ? 2 : 3;
       const lookAt = p.dist < 7 || a.mode === 'talk' ? player : a.partner ? a.partner.p.pos : null;
-      const moved = p.animate(dt, every, lookAt);
+      const moved = p.animate(dt, every, lookAt, this.o.ground);
       if (!p.visible) continue;
       p.cloth.setSimulating(near);
       if (moved || near) {
@@ -1235,10 +1301,11 @@ class Town {
   }
 }
 
-const turn = (from: number, to: number, k: number) => {
+/** Turn towards an angle; standing still, no faster than `max` per frame (feet can't spin). */
+const turn = (from: number, to: number, k: number, max = Infinity) => {
   let d = to - from;
   d = Math.atan2(Math.sin(d), Math.cos(d));
-  return from + d * Math.min(1, k);
+  return from + THREE.MathUtils.clamp(d * Math.min(1, k), -max, max);
 };
 
 // ------------------------------------------------------------------ UI

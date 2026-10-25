@@ -217,7 +217,7 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
       const idx = m.geometry.index!;
       const skin: number[] = [], feet: number[] = [];
       // The base of the neck and the top of the chest show in the collar.
-      const collar = o.m.bone('Neck').y - 0.1, w = new THREE.Vector3();
+      const collar = o.m.bone('Neck').y - (kit === 'man' ? 0.16 : 0.1), w = new THREE.Vector3();
       const high = new Uint8Array(cls.length);
       for (let i = 0; i < cls.length; i++) if (cls[i] === 'torso') high[i] = m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld).y > collar ? 1 : 0;
       for (let t = 0; t < idx.count; t += 3) {
@@ -245,14 +245,77 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
         v.fromBufferAttribute(n, i).normalize();
         p.setXYZ(i, p.getX(i) - v.x * k, p.getY(i) - v.y * k, p.getZ(i) - v.z * k);
       }
-      void inv;
+      // ...and taper the flared trouser cuffs in round the ankle and end them
+      // level inside the leather shoe tops (props.ts makeShoeTop, on the shin).
+      const shin = (['Left', 'Right'] as const).map((s) => ({ a: o.m.bone(s + 'Leg'), b: o.m.bone(s + 'Foot') }));
+      const top = shin[0].b.y + 0.13, c = new THREE.Vector3(), d = new THREE.Vector3();
+      for (let i = 0; i < p.count; i++) {
+        m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld);
+        if (w.y > top) continue;
+        const { a, b } = shin[Math.abs(w.x - shin[0].b.x) < Math.abs(w.x - shin[1].b.x) ? 0 : 1];
+        d.subVectors(b, a);
+        c.copy(a).addScaledVector(d, w.clone().sub(a).dot(d) / d.lengthSq());
+        const f = THREE.MathUtils.smoothstep(top - w.y, 0, 0.1), r = w.distanceTo(c);
+        if (r < 1e-4) continue;
+        const rr = THREE.MathUtils.lerp(r, Math.min(r, 0.043), f);
+        w.sub(c).multiplyScalar(rr / r).add(c);
+        w.y = Math.max(w.y, b.y - 0.025);
+        w.applyMatrix4(inv);
+        p.setXYZ(i, w.x, w.y, w.z);
+      }
+      // The bit inside the shoe top rides on the shin, as the shoe top does,
+      // so its cut edge never swings out of it when the ankle bends.
+      const si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
+      const footI = (['Left', 'Right'] as const).map((s) => m.skeleton.bones.findIndex((x) => canon(x.name) === s + 'Leg'));
+      for (let i = 0; i < p.count; i++) {
+        m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld);
+        const side = Math.abs(w.x - shin[0].b.x) < Math.abs(w.x - shin[1].b.x) ? 0 : 1;
+        const t = THREE.MathUtils.smoothstep(shin[side].b.y + 0.07 - w.y, 0, 0.04);
+        if (t <= 0 || footI[side] < 0) continue;
+        const ws = [0, 1, 2, 3].map((k) => sw.getComponent(i, k) * (1 - t));
+        const is = [0, 1, 2, 3].map((k) => si.getComponent(i, k));
+        const j = is.indexOf(footI[side]);
+        if (j >= 0) ws[j] += t;
+        else { const lo = ws.indexOf(Math.min(...ws)); ws[lo] = t; is[lo] = footI[side]; }
+        const sum = ws.reduce((a, b) => a + b, 0);
+        for (let k = 0; k < 4; k++) { si.setComponent(i, k, is[k]); sw.setComponent(i, k, ws[k] / sum); }
+      }
     }
     const old = m.material as THREE.MeshStandardMaterial;
     let nm: THREE.Material;
-    if (m.name === 'Wolf3D_Outfit_Footwear') nm = leather;
+    if (m.name === 'Wolf3D_Outfit_Footwear') {
+      nm = leather;
+      // Stiff leather: the shoe moves with the foot alone. Shin weights on its
+      // collar tore it into spikes whenever the ankle bent.
+      const g = (m.geometry = m.geometry.clone()), si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
+      const names = m.skeleton.bones.map((b) => canon(b.name));
+      const foot = (s: string) => names.indexOf(s + 'Foot');
+      for (let i = 0; i < si.count; i++) {
+        let side = '', wf = 0;
+        for (let k = 0; k < 4; k++) {
+          const n = names[si.getComponent(i, k)], s = n.startsWith('Left') ? 'Left' : n.startsWith('Right') ? 'Right' : '';
+          if (s && sw.getComponent(i, k) > wf) { wf = sw.getComponent(i, k); side = s; }
+        }
+        if (!side) continue;
+        for (let k = 0; k < 4; k++) {
+          const n = names[si.getComponent(i, k)];
+          if (!/Foot|Toe/.test(n)) si.setComponent(i, k, foot(side));
+        }
+      }
+      // Its collar and tongue (laces, a modern shoe's) cut down level, under
+      // the leather ankle top (props.ts makeShoeTop).
+      const p = g.attributes.position, w = new THREE.Vector3(), inv = m.matrixWorld.clone().invert(), cut = o.m.bone('LeftFoot').y + 0.005;
+      if (o.wraps) for (let i = 0; i < p.count; i++) {
+        m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld);
+        if (w.y <= cut) continue;
+        w.y = cut + (w.y - cut) * 0.15;
+        w.applyMatrix4(inv);
+        p.setXYZ(i, w.x, w.y, w.z);
+      }
+    }
     else if (m.name === 'Wolf3D_Outfit_Bottom') {
       // Wool hose, with linen fasciae wound from ankle to knee on laymen.
-      const ankle = o.m.bone('LeftFoot').y + 0.03, knee = o.m.bone('LeftLeg').y + 0.02;
+      const ankle = o.m.bone('LeftFoot').y + 0.01, knee = o.m.bone('LeftLeg').y + 0.02;
       nm = fabric('tabby', 0x2b241d, { attr: 'position', wraps: o.wraps ? { knee, ankle, color: new THREE.Color(0x6e6656) } : undefined });
     } else if (/Body|Head|^Mesh$/.test(m.name) || kit === 'woman') {
       // Weathered skin: matte, slight wrap-around softness.
@@ -707,8 +770,12 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       neckR[k] = hit && hit.distance < 0.27 ? 0.3 - hit.distance : 0.06;
     }
     smooth(neckR, NA, true, 2);
+    // An open neck: round and close, not slid out along the slope of the
+    // shoulders (where the rays above meet the trapezius), which bared half
+    // the shoulders and left the collar riding on the collarbones.
+    if (!spec.hood) for (let k = 0; k < NA; k++) neckR[k] = Math.min(neckR[k], 0.068);
     for (let k = 0; k < NA; k++) {
-      const a = (k / NA) * Math.PI * 2, rn = neckR[k] + 0.02;
+      const a = (k / NA) * Math.PI * 2, rn = neckR[k] + (spec.hood ? 0.02 : 0.014);
       tunic.pos.splice(k * 3, 3, nk.x + Math.sin(a) * rn, nk.y - 0.008 - 0.03 * Math.max(0, Math.cos(a)) ** 2, nk.z + Math.cos(a) * rn);
     }
     // Between it and the armpit row the yoke turns over the shoulder in a
@@ -743,7 +810,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
         ys[k] = vv.y;
       }
       // Smoothed round, so no single column stands up in a spike.
-      smooth(ys, NA, true, 2);
+      smooth(ys, NA, true, r === 0 && !spec.hood ? 10 : 2); // an open neckline: one easy rise over each shoulder
       for (let k = 0; k < NA; k++) tunic.pos[(r * NA + k) * 3 + 1] = ys[k];
     }
   }
@@ -1024,7 +1091,25 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   }
 
   // --- Assemble one geometry: positions, uvs, colours, index, groups, constraints.
-  const pieces: { g: Grid; wrapRows?: boolean }[] = [{ g: tunic }, ...sleeves.map((g) => ({ g })), ...(hood ? [{ g: hood }] : []), ...scap.map((g) => ({ g })), ...(cape ? [{ g: cape }] : []), { g: beltRing, wrapRows: true }];
+  // --- An open neckline is finished with a rolled edge: a thin tube round its top row.
+  let collarRing: Grid | null = null;
+  if (!spec.hood) {
+    const NT2 = 6, nk = bone('Neck');
+    collarRing = new Grid(NT2, NA, true);
+    for (let t = 0; t < NT2; t++) for (let k = 0; k < NA; k++) {
+      const x = tunic.pos[k * 3], y = tunic.pos[k * 3 + 1], z = tunic.pos[k * 3 + 2];
+      const ox = x - nk.x, oz = z - nk.z, ol = Math.hypot(ox, oz) || 1;
+      const ta = (t / NT2) * Math.PI * 2, rr = 0.007;
+      // Centred a little out from and above the cut edge, so it rolls over it.
+      const out = 0.003 + Math.cos(ta) * rr, up = 0.002 + Math.sin(ta) * rr;
+      collarRing.pos.push(x + (ox / ol) * out, y + up, z + (oz / ol) * out);
+      collarRing.uv.push((k / NA) * 8, t / NT2);
+      collarRing.maxD.push(0);
+      collarRing.region.push(4);
+    }
+    collarRing.flip = true;
+  }
+  const pieces: { g: Grid; wrapRows?: boolean }[] = [{ g: tunic }, ...sleeves.map((g) => ({ g })), ...(hood ? [{ g: hood }] : []), ...scap.map((g) => ({ g })), ...(cape ? [{ g: cape }] : []), { g: beltRing, wrapRows: true }, ...(collarRing ? [{ g: collarRing, wrapRows: true }] : [])];
   const pos: number[] = [], uv: number[] = [], col: number[] = [], maxD: number[] = [], region: number[] = [], capOf: number[] = [];
   const index: number[][] = [[], [], [], []];
   const E: number[] = [], ES: number[] = [];
@@ -1054,7 +1139,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       if (g.flip) index[g.group].push(a, b, cc, b, d, cc);
       else index[g.group].push(a, cc, b, b, cc, d);
     }
-    if (g === beltRing) continue; // rigid
+    if (g === beltRing || g === collarRing) continue; // rigid
     for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
       const a = id(r, c);
       if (g.wrap || c < C - 1) { E.push(a, id(r, c + 1)); ES.push(1); }
@@ -1173,6 +1258,20 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
         if (!w || k < 0) continue;
         m.delete(k);
         m.set(spineI, (m.get(spineI) ?? 0) + w);
+      }
+    }
+    // An open neckline rides on the upper back alone: weights from the
+    // collarbones and arms there dragged it down and into shards whenever the
+    // shoulders dropped from the bind pose.
+    if (!spec.hood) {
+      const nk = bone('Neck');
+      for (let i = 0; i < N; i++) {
+        if (region[i] !== 4) continue;
+        const t = ss(0.15, 0.09, Math.hypot(bind[i * 3] - nk.x, bind[i * 3 + 2] - nk.z));
+        if (t <= 0) continue;
+        const m = wmap[i];
+        for (const [k, w] of m) m.set(k, w * (1 - t));
+        m.set(spineI, (m.get(spineI) ?? 0) + t);
       }
     }
   }

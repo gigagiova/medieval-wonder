@@ -361,6 +361,22 @@ export function makeShield(paint: THREE.Color) {
   return o;
 }
 
+/**
+ * The soft leather top of an ankle shoe (a turnshoe laced round the ankle),
+ * closing over the shoe's collar and the foot of the leg wraps. Origin on
+ * the ankle's axis at the shoe's collar; up +Y.
+ */
+export function makeShoeTop(r = 0.05) {
+  const m = propMats();
+  const g = lathe([[r * 0.95, -0.035], [r * 1.02, 0], [r * 1.04, 0.035], [r * 1.07, 0.05], [r * 1.08, 0.056], [r * 1.02, 0.06], [r * 0.95, 0.054]], 18);
+  const lace = at(new THREE.TorusGeometry(r * 1.07, 0.0035, 4, 18), 0, 0.03, 0, Math.PI / 2);
+  // Longer than wide, over the instep.
+  for (const x of [g, lace]) x.scale(1, 1, 1.3).translate(0, 0, r * 0.25);
+  const o = new THREE.Group();
+  o.add(new THREE.Mesh(g, m.darkLeather), new THREE.Mesh(lace, m.leather));
+  return o;
+}
+
 /** A spear: ash shaft, leaf-shaped iron head, butt ferrule. Origin at the grip, point up (+Y). */
 export function makeSpear() {
   const m = propMats();

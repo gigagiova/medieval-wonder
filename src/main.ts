@@ -10,7 +10,7 @@ import { makeFire } from './fire';
 import { makeBones } from './bones';
 import { NLAMP } from './shaders';
 import { buildWorld, SPAWN, regionName, getTeleports, getMapData, type Teleport } from './world';
-import { terrain } from './displace';
+import { field } from './displace';
 import { Player } from './player';
 import { Soundscape } from './audio';
 import { initMap } from './map';
@@ -184,7 +184,10 @@ const summonTownsfolk = () => setTimeout(async () => {
   try {
     await loadNpcAssets();
     say('The townsfolk are dressing…', true);
-    spawnTownsfolk(scene, { streets: getMapData().streets, ground: terrain, lamps, places: getMapData().landmarks });
+    // Townsfolk stand on the ground as drawn (the hill, its bumps and the
+    // gutters), not on the bare hill or the coarse collision grid.
+    const gv = new THREE.Vector3();
+    spawnTownsfolk(scene, { streets: getMapData().streets, ground: (x, z) => field(x, 0, z, 'ground', gv).y, lamps, places: getMapData().landmarks });
     const n = npcDebug.people.length;
     say(n ? `${n} townsfolk are about (${((performance.now() - t0) / 1000).toFixed(0)} s)` : 'No townsfolk could be placed', !n);
   } catch (e) {
