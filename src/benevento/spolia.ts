@@ -196,6 +196,22 @@ const WALL_KINDS: SpoliaId[] = ['relief_couple', 'relief_funerary', 'tondo', 'li
 const HOUSE_KINDS: SpoliaId[] = ['head_priestess', 'bust_man', 'head_priestess', 'relief_funerary'];
 const RUIN_KINDS: SpoliaId[] = ['torso_apollo', 'torso_woman', 'torso_dionysus', 'capital', 'foot_colossal', 'bust_aurelius', 'altar_grave', 'lion_corbridge', 'relief_funerary', 'tondo', 'sarcophagus'];
 
+/**
+ * The blocks curtain() in fabric.ts sets in a wall piece's outer face (a marble
+ * block, a band of brick patching), replayed from the same seed, as rectangles
+ * (u along a → b, v up from the ground) for the spolia to keep clear of.
+ */
+function wallDressing(w: { a: P2; b: P2; h: number; seed: number }, L: number) {
+  const r = rng(w.seed + 2), out: { u0: number; u1: number; v0: number; v1: number }[] = [];
+  r(); // footing height
+  if (r() < 0.45) {
+    const t = r() - 0.5, y = 1 + r() * 4, bw = 0.8 + r() * 0.9, bh = 0.5 + r() * 0.4, u = L / 2 + t * L * 0.8;
+    out.push({ u0: u - bw / 2, u1: u + bw / 2, v0: y, v1: y + bh });
+  }
+  if (r() < 0.4) { const bw = L * (0.3 + r() * 0.4); out.push({ u0: L / 2 - bw / 2, u1: L / 2 + bw / 2, v0: w.h * 0.55, v1: w.h * 0.55 + 1.2 }); }
+  return out;
+}
+
 function walls(b: Builder, occ: Occupancy) {
   const wp = wallPlan();
   const g = (id: string) => GATES.find((q) => q.id === id)?.at;
@@ -210,25 +226,35 @@ function walls(b: Builder, occ: Occupancy) {
     let p = 0.16;
     for (const h of hot) if (h.at && Math.hypot(mx - h.at[0], mz - h.at[1]) < h.r) p += h.w;
     if (rand() > p) continue;
-    const t = R(0.2, 0.8), x = w.a[0] + (w.b[0] - w.a[0]) * t + w.out[0] * 1.25, z = w.a[1] + (w.b[1] - w.a[1]) * t + w.out[1] * 1.25;
-    if (towersNear(x, z) || !occ.free(x + w.out[0] * 2.2, z + w.out[1] * 2.2, 0.3)) continue;
     // By Porta Summa the Iseum's beasts were built into the wall.
-    if (summa && egypt < 2 && Math.hypot(mx - summa[0], mz - summa[1]) < 60) {
-      const id: SpoliaId = egypt === 0 ? 'sphinx' : 'ram_amun';
-      inWall(id, x, z, w.out, R(0.2, 0.5), { proud: 0.35, roll: id === 'ram_amun' ? 0 : 0 });
+    const egy = summa && egypt < 2 && Math.hypot(mx - summa[0], mz - summa[1]) < 60;
+    const id: SpoliaId = egy ? (egypt === 0 ? 'sphinx' : 'ram_amun') : pick(WALL_KINDS);
+    const lying = id.startsWith('torso');
+    // Torsos go in as building blocks, on their sides; a few slabs upside down.
+    const roll = lying ? (rand() < 0.5 ? Math.PI / 2 : -Math.PI / 2) : id === 'altar_grave' || id.startsWith('relief') ? (rand() < 0.2 ? Math.PI : 0) : 0;
+    // Funerary stelae and portraits came in all sizes; most built in are big ones.
+    const sc = id.startsWith('relief') || id === 'tondo' || id === 'altar_grave' ? R(1.25, 1.7) : id.startsWith('head') ? R(1.3, 1.8) : id.startsWith('bust') ? R(1.05, 1.3) : 1;
+    const sz = SIZE(id).multiplyScalar(sc), hw = (lying ? sz.y : sz.x) / 2 + 0.15, hh = (lying ? sz.x : sz.y) / 2 + 0.15;
+    const obst = wallDressing(w, L);
+    let spot: [number, number] | null = null;
+    for (let k = 0; k < 8 && !spot; k++) {
+      const u = R(hw + 0.3, L - hw - 0.3);
+      const h = egy ? R(2.0, 2.4) : lying ? R(2.0, 3.5) : id === 'sarcophagus_seasons' ? R(1.8, 2.6) : R(2.2, 6.2);
+      if (u < hw) break;
+      if (obst.every((o) => u + hw < o.u0 || u - hw > o.u1 || h + hh * 2 < o.v0 || h > o.v1)) spot = [u, h];
+    }
+    if (!spot) continue;
+    const t = spot[0] / L, x = w.a[0] + (w.b[0] - w.a[0]) * t + w.out[0] * 1.25, z = w.a[1] + (w.b[1] - w.a[1]) * t + w.out[1] * 1.25;
+    if (towersNear(x, z) || !occ.free(x + w.out[0] * 2.2, z + w.out[1] * 2.2, 0.3)) continue;
+    if (egy) {
+      inWall(id, x, z, w.out, spot[1] + hh - 0.15, { proud: 0.35 });
       egypt++; count('wall'); count('wall:egyptian');
       if (id === 'sphinx') markReadableWorld('spoliaSphinx', x + w.out[0] * 0.8, 1.2, z + w.out[1] * 0.8);
       continue;
     }
-    const id = pick(WALL_KINDS);
-    const lying = id.startsWith('torso');
-    const h = lying ? R(2.0, 3.5) : id === 'sarcophagus_seasons' ? R(1.8, 2.6) : R(2.2, 6.2);
-    // Torsos go in as building blocks, on their sides; a few slabs upside down.
-    const roll = lying ? (rand() < 0.5 ? Math.PI / 2 : -Math.PI / 2) : id === 'altar_grave' || id.startsWith('relief') ? (rand() < 0.2 ? Math.PI : 0) : 0;
-    const proud = id.startsWith('head') || id.startsWith('bust') ? 0.55 : lying ? 0.45 : id === 'capital' || id === 'altar_grave' ? 0.3 : 0.4;
-    // Funerary stelae and portraits came in all sizes; most built in are big ones.
-    const sc = id.startsWith('relief') || id === 'tondo' || id === 'altar_grave' ? R(1.25, 1.7) : id.startsWith('head') ? R(1.3, 1.8) : id.startsWith('bust') ? R(1.05, 1.3) : 1;
-    inWall(id, x, z, w.out, h, { roll, proud, s: sc, range: id.startsWith('head') ? 50 : 80 });
+    const proud = id.startsWith('head') || id.startsWith('bust') ? 0.55 : lying ? 0.45 : id === 'capital' || id === 'altar_grave' ? 0.3 : 0.6;
+    // inWall's height is the piece's centre less half its height: pass the bottom.
+    inWall(id, x, z, w.out, spot[1] + hh - 0.15, { roll, proud, s: sc, range: id.startsWith('head') ? 50 : 80 });
     count('wall');
   }
   // The gravestone with a readable text, low by Porta Rufina.
@@ -403,10 +429,10 @@ function weather(m: THREE.MeshStandardMaterial) {
           // Weathered limestone and marble: grey, a little warm.
           c = mix(c, vec3(lum) * vec3(1.03, 1.0, 0.93), 0.4);
           // Dirt settles in the hollows the scan already shows dark.
-          c *= mix(0.45, 1.0, smoothstep(0.05, 0.42, lum));
+          c *= mix(0.6, 1.0, smoothstep(0.05, 0.4, lum));
           // Rain streaks running down.
           float st = vnoise(vec3(o.x * 9.0, o.y * 0.7, o.z * 9.0));
-          c *= 1.0 - 0.38 * smoothstep(0.5, 0.85, st);
+          c *= 1.0 - 0.3 * smoothstep(0.5, 0.85, st);
           // Crustose lichen in patches, grey-green, now and then orange.
           float li = vnoise(o * 4.7) * 0.65 + vnoise(o * 13.0) * 0.35;
           float lm = smoothstep(0.64, 0.72, li);
@@ -417,7 +443,7 @@ function weather(m: THREE.MeshStandardMaterial) {
           c = mix(c, vec3(0.07, 0.09, 0.035) * (0.8 + 0.5 * vnoise(o * 22.0)), up * 0.6);
           // Soil at the foot.
           c = mix(c, vec3(0.07, 0.06, 0.045), (1.0 - smoothstep(0.0, 0.3, vObjS.y)) * 0.55);
-          diffuseColor.rgb = c * 0.82;
+          diffuseColor.rgb = c * 1.1;
         }`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         reflectedLight.directSpecular *= 0.3;
@@ -520,7 +546,7 @@ function draw(scene: THREE.Scene) {
   scene.add(ticker);
   (window as unknown as { __spolia: () => unknown }).__spolia = () => {
     const near = PIECES.map((p) => ({ id: p.id, p: new THREE.Vector3().setFromMatrixPosition(p.m) })).map((q) => ({ id: q.id, d: +q.p.distanceTo(cp).toFixed(1), at: q.p.toArray().map((v) => +v.toFixed(1)) })).sort((a, b) => a.d - b.d).slice(0, 4);
-    return { list: PIECES.map((p) => ({ id: p.id, label: p.label, at: new THREE.Vector3().setFromMatrixPosition(p.m).toArray(), view: p.view })), pieces: PIECES.length, chunks: chunks.length, visible: chunks.reduce((a, c) => a + c.hi.concat(c.lo).filter((m) => m.visible).length, 0), near, stats: SPOLIA_STATS };
+    return { list: PIECES.map((p) => ({ id: p.id, label: p.label, at: new THREE.Vector3().setFromMatrixPosition(p.m).toArray(), view: p.view })), pieces: PIECES.length, chunks: chunks.length, visible: chunks.reduce((a, c) => a + c.hi.concat(c.lo).filter((m) => m.visible).length, 0), tris: chunks.reduce((a, c) => a + c.hi.concat(c.lo).filter((m) => m.visible).reduce((t, m) => t + (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3 * m.count, 0), 0), near, stats: SPOLIA_STATS };
   };
 }
 
