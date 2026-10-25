@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { Builder, rng, type Lamp } from '../builder';
+import { Builder, rng, DETAIL, type Lamp } from '../builder';
 import type { MatName } from '../materials';
 import type { FireSource } from '../fire';
 import { buildHouse, buildBridge, reseedTown, type BridgeSpec, type Lot } from '../town';
@@ -261,7 +261,7 @@ function plot(b: Builder, p: PlotData) {
 // ---------------------------------------------------------------- the ground
 const GSTEP = 0.64;
 function ground(b: Builder, it: ChunkItems) {
-  const x0 = it.i * CHUNK, z0 = it.j * CHUNK, n = Math.round(CHUNK / GSTEP);
+  const x0 = it.i * CHUNK, z0 = it.j * CHUNK, n = Math.round(CHUNK / (DETAIL.mid ? 2 : GSTEP));
   const st = CHUNK / n;
   const pos = new Float32Array((n + 1) * (n + 1) * 3), nor = new Float32Array((n + 1) * (n + 1) * 3);
   for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {

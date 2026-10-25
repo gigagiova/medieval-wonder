@@ -9,6 +9,8 @@ import { shared, mat, MAT, makeSurfaceMaterial, makeSky, makeMotes, texturesRead
 import { makeFire } from './fire';
 import { makeBones } from './bones';
 import { NLAMP } from './shaders';
+import { LightField } from './lightfield';
+import { ShaftPass } from './shafts';
 import { buildWorld, SPAWN, SPAWN_YAW, STAIR_ZONES, TOWN_TEX, siteGroups, regionName, getTeleports, getMapData, type Teleport } from './world';
 import { terrain, fastTerrain, field } from './displace';
 import { SITES } from './benevento/sites';
@@ -17,11 +19,17 @@ import { Player } from './player';
 import { Soundscape } from './audio';
 import { initMap } from './map';
 import { loadProps } from './props';
+import { loadForest } from './forest';
 import { updateLibrary, pushOutOfSecretDoor } from './library';
 import { isReading } from './codex';
 import { loadNpcAssets, spawnTownsfolk, updateTownsfolk, pushOutOfTownsfolk, npcDebug } from './npc';
+import { registerPopulationOutfits, populationDirector, popDebug } from './npc/population';
 Object.assign(window, { __npc: npcDebug });
 import type { Lamp, Cell, PropKind } from './builder';
+import { fogHides } from './fogcull';
+import { OcclusionBuffer, chunkPrisms, indexLotsFrom, OCC_RANGE } from './occlusion';
+import { setKtx2Renderer } from './ktx2';
+import { perfT, perfAdd, perfFrame, perfStats, initHud, gpuBegin, gpuEnd } from './perf';
 
 const params = new URLSearchParams(location.search);
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -29,10 +37,11 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMapping = THREE.AgXToneMapping;
+renderer.toneMappingExposure = 1.0;
 renderer.info.autoReset = false;
 document.body.appendChild(renderer.domElement);
+setKtx2Renderer(renderer);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 900);
@@ -49,7 +58,7 @@ const progress = async (label: string, frac: number) => {
 addEventListener('error', (e) => { enterEl.textContent = 'Something went wrong: ' + (e.message || e.error); });
 addEventListener('unhandledrejection', (e) => { enterEl.textContent = 'Something went wrong: ' + (e.reason?.message ?? e.reason); });
 await progress('Gathering the furnishings', 0);
-await loadProps();
+await Promise.all([loadProps(), loadForest()]);
 await progress('Lighting the lamps', 0.01);
 const t0 = performance.now();
 const { collider, cells, lamps, flames, props, townTex, stream } = await buildWorld(scene, progress);
@@ -80,7 +89,7 @@ stream.uploader = gpuUpload;
 // Moonlight and a faint sky fill.
 // Overcast dusk: the sun is just down; light comes from the whole sky,
 // a little warmer from the west. No hard shadows.
-const moon = new THREE.DirectionalLight(0xc4ccd6, 0.5);
+const moon = new THREE.DirectionalLight(0xd2cec6, 1.6);
 moon.castShadow = false;
 moon.shadow.mapSize.set(2048, 2048);
 Object.assign(moon.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 300 });
@@ -179,11 +188,16 @@ function updateBones(showAbove: boolean, showUnder: boolean) {
       else g.lo.setMatrixAt(nl++, p.matrix);
     });
     g.hi.count = nh; g.lo.count = nl;
+    // An instanced mesh with no instances still costs a draw call.
+    g.hi.visible = nh > 0; g.lo.visible = nl > 0;
     g.hi.instanceMatrix.needsUpdate = true;
     g.lo.instanceMatrix.needsUpdate = true;
   }
 }
 scene.add(makeMotes());
+// Sun shadow and sky occlusion, baked from above around the player.
+const lightField = new LightField(renderer, scene, cells, [sky]);
+Object.assign(window, { __lf: lightField });
 
 // Townsfolk (monks, peasants, Lombard soldiers) arrive a little after you do:
 // their models load and are dressed in the background, never holding up the start.
@@ -203,14 +217,20 @@ const summonTownsfolk = () => setTimeout(async () => {
   say('The townsfolk are coming…', true);
   const t0 = performance.now();
   try {
+    // The people of AD 700 by group and quarter (src/npc/population.ts): their extra cuts are tailored with the rest.
+    registerPopulationOutfits();
     await loadNpcAssets();
     say('The townsfolk are dressing…', true);
     // Townsfolk stand on the ground as drawn (the hill, its bumps and the
-    // gutters), not on the bare hill or the coarse collision grid.
+    // gutters), not on the bare hill or the coarse collision grid: the
+    // hill's height plus the ground's displacement field.
     const gv = new THREE.Vector3();
-    spawnTownsfolk(scene, { streets: getMapData().streets.filter((st) => st.kind === 'lane'), ground: (x, z) => field(x, 0, z, 'ground', gv).y, lamps, places: getMapData().landmarks });
-    const n = npcDebug.people.length;
-    say(n ? `${n} townsfolk are about (${((performance.now() - t0) / 1000).toFixed(0)} s)` : 'No townsfolk could be placed', !n);
+    // Lanes in the town and roads outside it; who is about is decided near the player as they go.
+    const md = getMapData();
+    const phoneLike = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 500;
+    spawnTownsfolk(scene, { streets: md.streets, ground: (x, z) => terrain(x, z) + field(x, 0, z, 'ground', gv).y, lamps, places: md.landmarks, director: populationDirector(scene, md), showDist: phoneLike ? 45 : 60 });
+    say(`The townsfolk are about (${((performance.now() - t0) / 1000).toFixed(0)} s)`);
+    Object.assign(window, { __pop: popDebug, __npcDebug: npcDebug, __player: player });
   } catch (e) {
     const err = e as Error;
     console.warn('townsfolk unavailable', e);
@@ -224,6 +244,7 @@ player.yaw = SPAWN_YAW;
 let held = params.has('hold');
 Object.assign(window, {
   __teleports: getTeleports,
+  __map: getMapData,
   __setPitch: (p: number) => { player.pitch = p; },
 });
 /** First floor below (x, y, z) within `depth` m, or null. */
@@ -265,29 +286,31 @@ initMap();
 let audio: Soundscape | null = null;
 player.onStep = (run) => audio?.step(run, player.pos.y < -2);
 
-// Post: bloom, ACES, then our own grade / grain / vignette / fringe.
-// 4x multisampled HDR target: every geometric edge (stones, arches, tiles)
-// is anti-aliased instead of stair-stepping and crawling.
-const msaaTarget = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: 4 });
-const composer = new EffectComposer(renderer, msaaTarget);
+// Post: AO, bloom, ACES, then our own grade / vignette.
+// The scene itself is drawn by the AO pass into its own (single-sampled) HDR
+// target; the composer's ping-pong targets only carry full-screen passes, so
+// multisampling them (as before) anti-aliased nothing and cost two 4x HDR
+// buffers. (Multisampling the AO pass's target instead crashed SwiftShader
+// at some views, so it stays off.)
+const postTarget = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType });
+const composer = new EffectComposer(renderer, postTarget);
 composer.setPixelRatio(renderer.getPixelRatio());
 // Ambient occlusion: contact shadows where walls meet the street, under eaves,
 // in reveals, between stones. Its absence is what made everything float.
 const ao = new N8AOPass(scene, camera, innerWidth, innerHeight);
-Object.assign(ao.configuration, { aoRadius: 1.6, distanceFalloff: 1.2, intensity: 2.6, halfRes: true, screenSpaceRadius: false, gammaCorrection: false });
+Object.assign(ao.configuration, { aoRadius: 1.6, distanceFalloff: 1.2, intensity: 2.6, halfRes: true, screenSpaceRadius: false, gammaCorrection: false,
+  // Fixed, so N8AO does not walk the whole scene every frame looking for
+  // transparent materials and then redraw the scene twice more for them.
+  transparencyAware: false });
+(ao as { autoDetectTransparency: boolean }).autoDetectTransparency = false;
 ao.setQualityMode('Medium');
 composer.addPass(ao);
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.35, 0.5, 0.95);
-// One bad pixel (NaN/inf) would be smeared over the whole screen by the bloom:
-// clear any non-finite or absurd values first.
-composer.addPass(new ShaderPass({
-  uniforms: { tDiffuse: { value: null } },
-  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
-  fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
-    void main(){ vec4 c = texture2D(tDiffuse, vUv);
-      if (any(isnan(c)) || any(isinf(c))) c = vec4(0.0, 0.0, 0.0, 1.0);
-      gl_FragColor = vec4(min(c.rgb, vec3(64.0)), c.a); }`,
-}));
+// Key light scattered in the mist (shafts), composited together with the
+// NaN guard: one bad pixel (NaN/inf) would be smeared over the whole screen
+// by the bloom, so non-finite or absurd values are cleared in the same pass.
+const shafts = new ShaftPass(camera, () => (ao as { beautyRenderTarget: THREE.WebGLRenderTarget }).beautyRenderTarget.depthTexture!, moon);
+composer.addPass(shafts);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 const grade = new ShaderPass({
@@ -299,8 +322,7 @@ const grade = new ShaderPass({
     float h(vec2 p){ vec3 p3=fract(vec3(p.xyx)*.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
     void main(){
       vec2 c = vUv - 0.5; float r = dot(c,c);
-      vec2 off = c * r * 0.018;
-      vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+      vec3 col = texture2D(tDiffuse, vUv).rgb;
       float l = dot(col, vec3(0.299,0.587,0.114));
       // Cold, sick-green shadows; fire stays warm; blacks crushed.
       // Grey overcast: cool neutral shadows, no warm push; firelight keeps its own colour.
@@ -310,7 +332,8 @@ const grade = new ShaderPass({
       float sat = mix(0.6, 0.85, smoothstep(0.15, 0.6, l));
       col = mix(vec3(dot(col, vec3(0.299,0.587,0.114))), col, sat);
       col *= 1.0 - r*0.9;
-      col += (h(vUv*uRes + fract(uTime*7.13)*391.) - 0.5) * 0.045;
+      // Dither below one 8-bit step: breaks banding in the fog, invisible as grain.
+      col += (h(vUv*uRes) - 0.5) / 255.0;
       gl_FragColor = vec4(max(col, 0.0), 1.0);
     }`,
 });
@@ -386,7 +409,9 @@ const tmp = new THREE.Vector3();
 
 // ?shot=x,y,z,yaw,pitch places the camera for screenshots.
 if (params.has('shot') && !params.has('at')) {
-  const [x, y, z, yaw, pitch] = params.get('shot')!.split(',').map(Number);
+  const [x, y0, z, yaw, pitch] = params.get('shot')!.split(',').map(Number);
+  // y may be left out ('-'): stand on the ground there.
+  const y = Number.isFinite(y0) ? y0 : fastTerrain(x, z) + 1.65;
   player.pos.set(x, y, z); player.yaw = yaw; player.pitch = pitch ?? 0;
   overlay.classList.add('hidden');
   if (params.has('lantern')) setLantern(true);
@@ -396,9 +421,14 @@ if (params.has('shot') && !params.has('at')) {
 // 1. Zones: the earth is the biggest occluder. Underground cells are hidden
 //    above ground and vice versa, except around the ossuary stair.
 // 2. Distance: past ~120 m the fog has swallowed everything.
-// 3. Occlusion: rays from the eye to the cell's bounds against the collision
-//    BVH; a cell whose every ray is blocked twice in a row is hidden.
+// 3. Occlusion above ground: the houses near the eye are drawn into a small
+//    software depth buffer every frame and a cell is hidden only when its
+//    whole box is behind them (conservative, see occlusion.ts). Underground:
+//    rays from the eye to the cell's bounds against the collision BVH; a cell
+//    whose every ray is blocked twice in a row is hidden.
 // Three.js frustum-culls each cell's meshes on top of this.
+const occBuf = new OcclusionBuffer();
+indexLotsFrom([...stream.chunks.values()].flatMap((c) => c.it.lots));
 const ray = new THREE.Ray();
 const pts: THREE.Vector3[] = Array.from({ length: 10 }, () => new THREE.Vector3());
 const cen = new THREE.Vector3(), hit = new THREE.Vector3(), eye = new THREE.Vector3();
@@ -433,12 +463,19 @@ function cull(isUnder: boolean, camLocal: number) {
   const live: Cell[] = [];
   for (const c of cells) {
     const zoneOk = c.under ? showUnder : showAbove;
-    const near = c.box.distanceToPoint(eye) < (c.range ?? 120);
-    if (zoneOk && near && !c.lod) live.push(c);
+    // Past its draw distance, or wholly inside the fog (see fogcull.ts).
+    const near = c.box.distanceToPoint(eye) < (c.range ?? 120) && !(zoneOk && !c.under && fogHides(c.box, eye, shared.uFogBase.value, shared.uUnder.value));
+    if (zoneOk && near && c.under && !c.lod) live.push(c);
     else c.occluded = 0;
     c.visible = zoneOk && near;
   }
-  // Re-test a slice of the live cells each frame.
+  if (!isUnder) {
+    const t = perfT();
+    if (occBuf.begin(camera)) for (const it of stream.itemsNear(eye.x, eye.z, OCC_RANGE)) occBuf.drawPrisms(chunkPrisms(it), eye);
+    perfAdd('occl', t);
+    for (const c of cells) if (c.visible && !c.under) c.occluded = occBuf.hidden(c.box) ? 2 : 0;
+  }
+  // Underground: re-test a slice of the live cells each frame.
   const per = Math.max(4, Math.ceil(live.length / 6));
   for (let i = 0; i < per && live.length; i++) {
     const c = live[(rr++) % live.length];
@@ -482,6 +519,8 @@ function adaptResolution(frameDt: number) {
   }
 }
 
+// Light levels (also tweakable from the console / screenshot tools via __look).
+const look = { key: 3.5, env: 0.3 };
 const clock = new THREE.Clock();
 let fps = 60;
 let frames = 0;
@@ -489,18 +528,21 @@ function frame() {
   frames++;
   const rawDt = clock.getDelta();
   const dt = Math.min(rawDt, 0.05);
-  const t = clock.elapsedTime;
+  const t = fixedTime ?? clock.elapsedTime;
   shared.uTime.value = t;
   grade.uniforms.uTime.value = t;
   fps += (1 / Math.max(dt, 1e-3) - fps) * 0.05;
   renderer.info.reset();
 
+  let pt = perfT();
   if (!isReading() && !isReadingSecret()) player.update(dt);
   guardFall(dt);
   pushOutOfSecretDoor(player.pos);
   updateLibrary(libCam());
   pushOutOfTownsfolk(player.pos);
+  perfAdd('player', pt); pt = perfT();
   updateTownsfolk(dt, camera, player);
+  perfAdd('npc', pt); pt = perfT();
 
   const camY = camera.position.y;
   sky.position.copy(camera.position);
@@ -509,10 +551,10 @@ function frame() {
   const under = THREE.MathUtils.smoothstep(-camLocal, 1.0, 4.0);
   shared.uFogBase.value += (groundHere - 1.0 - shared.uFogBase.value) * Math.min(1, dt * 2);
   shared.uUnder.value = under;
-  moon.intensity = 0.5 * (1 - under);
+  moon.intensity = look.key * (1 - under);
   hemi.intensity = (envReady ? 0.0 : 1.2) * (1 - under) + 0.015;
   // The sky was captured by day: dusk is about half of it.
-  scene.environmentIntensity = 0.55 * (1 - under) + 0.004;
+  scene.environmentIntensity = look.env * (1 - under) + 0.004;
   moon.position.copy(camera.position).addScaledVector(shared.uMoonDir.value, 120);
   moon.target.position.copy(camera.position);
   moon.position.x = Math.round(moon.position.x); moon.position.z = Math.round(moon.position.z);
@@ -561,16 +603,32 @@ function frame() {
   if (regionTimer < 0) regionEl.classList.remove('show');
   hintEl.classList.toggle('show', isUnder && !lanternOn);
 
+  perfAdd('misc', pt); pt = perfT();
   stream.update(camera.position, camera.getWorldDirection(tmpDir));
+  perfAdd('stream', pt); pt = perfT();
+  lightField.update(camera.position, stream.stats.ready, dt);
   cull(isUnder, camLocal);
+  perfAdd('cull', pt); pt = perfT();
   updateSecrets(camera);
   audio?.update(dt, under, Math.hypot(player.pos.x - SITES.episcopium.x, player.pos.z - SITES.episcopium.z));
   if (!params.has('shot')) adaptResolution(rawDt);
+  perfAdd('misc', pt); pt = perfT();
+  gpuBegin();
   composer.render(dt);
+  gpuEnd();
+  perfAdd('render', pt);
+  if (captureNext && frames > 12) { captureNext = false; (window as unknown as { __shot: string }).__shot = renderer.domElement.toDataURL('image/png'); }
+  const mi = renderer.info;
+  perfFrame({ calls: mi.render.calls, tris: mi.render.triangles, textures: mi.memory.textures, geometries: mi.memory.geometries, ratio, chunks: stream.stats.ready, extra: debugHud ? `cells ${cullStats.visible}/${cells.length} · occluded ${cullStats.occluded} · mid ${stream.stats.mid}` : undefined });
   if (params.has('debug')) document.title = `${fps.toFixed(0)} fps · cells ${cullStats.visible}/${cells.length} · occluded ${cullStats.occluded} · ${renderer.info.render.calls} calls · ${(renderer.info.render.triangles / 1000).toFixed(0)}k tris · chunks ${stream.stats.ready}`;
-  if (params.has('shot') && !held && frames > 12) { (window as unknown as { __done: boolean }).__done = true; return; }
+  if (params.has('shot') && !held && frames > 12) { (window as unknown as { __done: boolean }).__done = true; running = false; return; }
   requestAnimationFrame(frame);
 }
+// Benchmarks: restart the frame loop after a ?shot run has finished.
+let running = true, captureNext = false, fixedTime: number | null = null;
+Object.assign(window, { __THREE: THREE, __cells: cells, __cullStats: cullStats, __fixTime: (v: number | null) => { fixedTime = v; }, __renderer: renderer, __perf: perfStats, __resume: (n = 12, capture = false) => { captureNext = capture; (window as unknown as { __done: boolean }).__done = false; frames = 12 - n; if (!running) { running = true; requestAnimationFrame(frame); } } });
+const debugHud = params.has('debug');
+if (debugHud) initHud(renderer, scene);
 // ?at=<teleport name>[&yaw=..&pitch=..]: start at a named place (also for screenshots).
 if (params.has('at')) {
   const want = params.get('at')!.toLowerCase();
@@ -583,4 +641,9 @@ if (params.has('at')) {
 }
 frame();
 (window as unknown as { __ready: boolean }).__ready = true;
+// Screenshot tools: tweak the look and draw single frames after a shot has settled.
+Object.assign(window, {
+  __look: { look, shafts, moon, scene, renderer, ao, bloom, grade, shared, lightField, composer },
+  __step: () => { frames = 1000; held = false; frame(); },
+});
 (window as unknown as { __stats: () => string }).__stats = () => `build ${buildMs.toFixed(0)}ms, ${renderer.info.render.triangles} tris drawn, ${renderer.info.render.calls} calls, cells ${cullStats.visible}/${cells.length} visible, ${cullStats.occluded} occluded, chunks ready ${stream.stats.ready} (built ${stream.stats.built}, avg ${(stream.stats.ms / Math.max(1, stream.stats.built)).toFixed(0)} ms), geo ${renderer.info.memory.geometries}, tex ${renderer.info.memory.textures}`;

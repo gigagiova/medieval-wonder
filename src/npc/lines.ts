@@ -48,7 +48,7 @@ export const LINES: Record<Speaker, Line[]> = {
   ],
   soldier: [
     { la: 'Sta! Quis es tu? …Peregrinus. Bene, transi.', en: 'Halt! Who are you? …A pilgrim. Fine, go through.' },
-    { la: 'Arimannus sum domni Liutprandi regis. Lanceam habeo et scutum, et caballum — quando non claudicat.', en: 'I am an arimannus of our lord King Liutprand. I have spear and shield, and a horse — when it isn’t lame.' },
+    { la: 'Arimannus sum domni Gisulfi ducis. Lanceam habeo et scutum, et caballum — quando non claudicat.', en: 'I am an arimannus of our lord Duke Gisulf. I have spear and shield, and a horse — when it isn’t lame.' },
     { la: 'Gastaldius dormit. Nemo in palatio intrat sine verbo eius.', en: 'The gastald is sleeping. No one enters the palace without his word.' },
     { la: 'Ad Ravennam ibimus contra Graecos, dicunt. Melius quam hic in nebula stare.', en: 'We’ll march on Ravenna against the Greeks, they say. Better than standing here in the fog.' },
     { la: 'Spatha ista fuit avi mei. Nomen eius tibi non dico.', en: 'This spatha was my grandfather’s. I won’t tell you its name.' },

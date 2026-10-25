@@ -279,7 +279,7 @@ function cellaMemoriae(b: Builder) {
 
 // ---------------------------------------------------------------- the nunnery of St Peter
 /**
- * Theodorada's foundation (before 687) across the Sabato: the church (built
+ * Theuderada's foundation (before 687) across the Sabato: the church (built
  * like the cathedral's, in its own frame), a cloister-less enclosure of
  * rubble, two ranges of cells and a refectory, the nuns' graves.
  */

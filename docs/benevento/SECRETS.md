@@ -22,6 +22,18 @@ game turns this legend into a trail of five clues. Each clue points to the next 
 | 4 | `cisterna` (The serpent hollow) | Cisterna, below the duke's garden (Hortus Curtis, 566, -16); reached by a stair | An empty niche with the print of a snake. "Look at his altar." |
 | 5 | `calix` (The chalice of Barbatus) | Altar of S. Maria, the bishop's church (Episcopium) | The idol became the chalice. The trail ends here. |
 
+### People who know (rumours along the trail)
+
+The townsfolk (`src/npc/lines-people.ts`, see `PEOPLE.md`) pass on the trail as gossip, never as fact:
+
+| Clue | Who says it | Where they are |
+|------|-------------|----------------|
+| 1, the stump | washerwomen at the Sabato; aldii (peasants) | below the mill; everywhere |
+| 2, Audoin's keepsake | Aio, an old Lombard veteran who saw the tree | by Domus Audoini |
+| 3, the Lady of the Egyptians | old women; the Greek merchant | the widow's house, the theatre, the walnut stump; the eastern house by Porta Aurea |
+| 4, the hollow under the dukes' apples | slaves | the duke's orchard, the granary, the streets |
+| 5, the chalice | Lombard women, priests, the nuns of St Peter | the curtis, the atrium of S. Maria, St Peter's |
+
 ## Places you can enter
 
 These are the **interiors**: houses and workshops picked from the generated town nearest to their
