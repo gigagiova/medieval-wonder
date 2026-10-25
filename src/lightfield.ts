@@ -172,9 +172,10 @@ export class LightField {
     }
     this.scene.traverse((o) => {
       const skin = (o as THREE.SkinnedMesh).isSkinnedMesh;
-      const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
+      const mm = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      const mat = Array.isArray(mm) ? mm[0] : mm;
       const odd = (o as THREE.Points).isPoints || (o as THREE.Sprite).isSprite || (o as THREE.Line).isLine
-        || skin || (mat && (mat.transparent || mat.userData.foliage || (mat as THREE.ShaderMaterial).isShaderMaterial));
+        || skin || (mat && (mat.transparent || mat.userData?.foliage || (mat as THREE.ShaderMaterial).isShaderMaterial));
       if ((odd || this.skip.includes(o)) && o.visible) { restore.push([o, true]); o.visible = false; }
     });
     this.cam.position.set(cx, 300, cz);
