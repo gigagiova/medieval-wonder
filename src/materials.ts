@@ -100,16 +100,21 @@ export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
   const uniforms: Record<string, { value: unknown }> = {};
   if (cfg) {
     const t = textureSet(cfg.set);
-    Object.assign(defines, { TILE: f(cfg.tile), ALB_K: f(cfg.alb ?? 0.75), ROUGH_K: f(cfg.rough ?? 1), NRM_K: f(cfg.nrm ?? 1), MOSS: f(cfg.moss ?? 0.5) });
+    Object.assign(defines, { TILE: f(cfg.tile), ALB_K: f(cfg.alb ?? 0.75), ROUGH_K: f(cfg.rough ?? 1), NRM_K: f(cfg.nrm ?? 1.5), MOSS: f(cfg.moss ?? 0.5) });
     if (cfg.tint) defines.TINT = `vec3(${cfg.tint.map(f).join(',')})`;
     Object.assign(uniforms, { tA: { value: t.a }, tN: { value: t.n }, tM: { value: t.m } });
+    if (id === MAT.plaster) {
+      // Lime render that has fallen away in patches shows the rubble beneath.
+      const u = textureSet('rubble');
+      Object.assign(uniforms, { tA2: { value: u.a }, tN2: { value: u.n }, tM2: { value: u.m } });
+    }
     if (id === MAT.ground) {
       const b2 = textureSet('basoli'), b3 = textureSet('mud');
       Object.assign(uniforms, { tA2: { value: b2.a }, tN2: { value: b2.n }, tM2: { value: b2.m }, tA3: { value: b3.a }, tN3: { value: b3.n }, tM3: { value: b3.m } });
     }
   }
   (m as unknown as { defines: Record<string, string | number> }).defines = defines;
-  m.customProgramCacheKey = () => 'surf2-' + id;
+  m.customProgramCacheKey = () => 'surf3-' + id;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, shared, uniforms);
     sh.vertexShader = sh.vertexShader
@@ -134,7 +139,9 @@ export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
         '#include <map_fragment>',
         `vec3 nW = normalize(vWNrm);
          Surf S = surface(vWPos, nW);
-         diffuseColor.rgb *= S.alb * mix(1.0, S.ao, 0.85);
+         diffuseColor.rgb *= S.alb;
+         // Occlusion from the scan's AO, deepened in the joints by its height.
+         float sAO = clamp(S.ao * mix(0.5, 1.0, smoothstep(0.05, 0.5, S.h)), 0.0, 1.0);
          totalEmissiveRadiance += S.emi;`,
       )
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = S.rough;')
@@ -143,8 +150,27 @@ export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
         `#include <normal_fragment_maps>\n normal = normalize(mat3(viewMatrix) * S.nrm) * faceDirection;`,
       )
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
-        reflectedLight.directSpecular *= SPEC_K;
-        reflectedLight.indirectSpecular *= SPEC_K * S.ao;`)
+        {
+          // Occlusion done the way engines do it (see docs/REALISM.md):
+          // micro-shadowing of direct light by the relief (Uncharted 4 /
+          // HDRP: saturate(|NoL| + 2 ao^2 - 1), against the key light),
+          // multi-bounce AO on indirect diffuse (Jimenez et al., GTAO), and
+          // specular occlusion (Lagarde, Frostbite) on reflections.
+          #if NUM_DIR_LIGHTS > 0
+          float nlK = dot(normal, directionalLights[0].direction);
+          #else
+          float nlK = 1.0;
+          #endif
+          float ms = clamp(abs(nlK) + 2.0 * sAO * sAO - 1.0, 0.0, 1.0);
+          reflectedLight.directDiffuse *= ms;
+          reflectedLight.directSpecular *= ms * SPEC_K;
+          vec3 alb = diffuseColor.rgb;
+          vec3 ga = 2.0404 * alb - 0.3324, gb = -4.7951 * alb + 0.6417, gc = 2.7552 * alb + 0.6903;
+          reflectedLight.indirectDiffuse *= max(vec3(sAO), ((sAO * ga + gb) * sAO + gc) * sAO);
+          float nv = clamp(dot(normal, geometryViewDir), 0.0, 1.0);
+          float so = clamp(pow(nv + sAO, exp2(-16.0 * roughnessFactor - 1.0)) - 1.0 + sAO, 0.0, 1.0);
+          reflectedLight.indirectSpecular *= SPEC_K * so;
+        }`)
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = applyAtmos(gl_FragColor.rgb, vWPos);');
   };
   return m;

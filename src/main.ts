@@ -96,7 +96,7 @@ scene.add(moon, moon.target);
 // street, and every material gets matching soft reflections. This replaces the
 // flat hemisphere light, which lit everything evenly and looked like plastic.
 // A dim hemisphere stays only as a fallback until the sky has loaded.
-const hemi = new THREE.HemisphereLight(0xb4bcc6, 0x4a4842, 1.2);
+const hemi = new THREE.HemisphereLight(0xb4bcc6, 0x2a2723, 1.2);
 scene.add(hemi);
 let envReady = false;
 const envLoaded = (async () => {
@@ -523,7 +523,7 @@ function adaptResolution(frameDt: number) {
 }
 
 // Light levels (also tweakable from the console / screenshot tools via __look).
-const look = { key: 3.5, env: 0.3 };
+const look = { key: 3.5, env: 0.12, hemi: 0.8 };
 const clock = new THREE.Clock();
 let fps = 60;
 let frames = 0;
@@ -552,7 +552,7 @@ function frame() {
   shared.uFogBase.value += (groundHere - 1.0 - shared.uFogBase.value) * Math.min(1, dt * 2);
   shared.uUnder.value = under;
   moon.intensity = look.key * (1 - under);
-  hemi.intensity = (envReady ? 0.0 : 1.2) * (1 - under) + 0.015;
+  hemi.intensity = (envReady ? look.hemi : 1.2) * (1 - under) + 0.015;
   // The sky was captured by day: dusk is about half of it.
   scene.environmentIntensity = look.env * (1 - under) + 0.004;
   moon.position.copy(camera.position).addScaledVector(shared.uMoonDir.value, 120);

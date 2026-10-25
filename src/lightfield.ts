@@ -53,15 +53,25 @@ const OFS = 20;         // heights are stored + OFS so the clear value (0) means
 	#endif
 #endif
 `;
-  // Debug: ?wl shows the key light's shadow (red) and the sky visibility (green).
-  if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('wl'))
+  // Debug views (?dbg=wl|albedo|normal|rough|light|ao): what each lit
+  // material feeds the lighting, for diagnosing flat or plastic surfaces.
+  const dbg = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('dbg') : null;
+  const views: Record<string, string> = {
+    wl: '#ifdef WORLDLIGHT\n vec3 dbgC = vec3(wl.x, wl.y, 0.0) * 0.5;\n#else\n vec3 dbgC = vec3(0.0);\n#endif',
+    albedo: 'vec3 dbgC = material.diffuseColor;',
+    normal: 'vec3 dbgC = (normalize(geometryNormal * mat3(viewMatrix)) * 0.5 + 0.5) * 0.5;',
+    rough: 'vec3 dbgC = vec3(material.roughness) * 0.5;',
+    light: 'vec3 dbgC = 0.18 * (reflectedLight.directDiffuse + reflectedLight.indirectDiffuse) / max(material.diffuseColor, vec3(0.02));',
+    spec: 'vec3 dbgC = reflectedLight.directSpecular + reflectedLight.indirectSpecular;',
+  };
+  if (dbg && views[dbg])
     C.lights_fragment_end += `
-#ifdef WORLDLIGHT
+	{ ${views[dbg]}
 	reflectedLight.directDiffuse = vec3(0.0); reflectedLight.directSpecular = vec3(0.0); reflectedLight.indirectSpecular = vec3(0.0);
-	reflectedLight.indirectDiffuse = vec3(wl.x, wl.y, 0.0) * 0.5;
-#endif
+	reflectedLight.indirectDiffuse = dbgC; }
 `;
 }
+
 
 const quadVS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
 

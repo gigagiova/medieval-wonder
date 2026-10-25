@@ -133,7 +133,7 @@ vec3 applyAtmos(vec3 col, vec3 wpos){
 // (normal, OpenGL), tM (R ao, G roughness, B height). The ground also gets
 // tA2/tN2/tM2 (Roman basoli) and tA3/tN3/tM3 (mud).
 export const surfaceGLSL = /* glsl */ `
-struct Surf { vec3 alb; float rough; float ao; vec3 nrm; vec3 emi; };
+struct Surf { vec3 alb; float rough; float ao; vec3 nrm; vec3 emi; float h; };
 
 uniform sampler2D uTown; // R Roman paving, G street, B gutter, A terrain height
 uniform vec4 uTownBox;   // x0, z0, 1/width, 1/depth (metres)
@@ -156,6 +156,9 @@ float underAt(vec3 p){ return step(p.y, terrainY(p.xz) - 2.5); }
 
 #ifdef TILE
 uniform sampler2D tA; uniform sampler2D tN; uniform sampler2D tM;
+#endif
+#if MAT == 2
+uniform sampler2D tA2; uniform sampler2D tN2; uniform sampler2D tM2;
 #endif
 #if MAT == 1
 uniform sampler2D tA2; uniform sampler2D tN2; uniform sampler2D tM2;
@@ -245,35 +248,70 @@ Smp biplanar(vec3 p, vec3 n){
 void weather(inout Surf s, vec3 p, vec3 n, float mossAmt){
   vec4 nz = texture2D(uNoise, p.xz*0.021 + p.y*0.013);
   vec4 nz2 = texture2D(uNoise, vec2(p.x + p.z, p.y)*0.07);
-  s.alb *= 0.86 + 0.28*nz.r;
-  s.alb *= mix(vec3(1.0), vec3(1.05, 1.0, 0.92), nz.g);
+  // Tone and roughness drift at several scales: no two metres of wall alike.
+  s.alb *= 0.8 + 0.4*nz.r;
+  s.alb *= mix(vec3(1.0), vec3(1.06, 1.0, 0.9), nz.g);
+  // Stone by stone: the crowns (high in the height map) each take their own
+  // tone, the joints stay dark. (~3 cycles per metre.)
+  float sv = texture2D(uNoise, (vec2(p.x + p.z * 0.6, p.y + p.z * 0.4) + p.xz * 0.3) * 0.19).b;
+  float crown = smoothstep(0.35, 0.65, s.h);
+  s.alb *= mix(1.0, 0.78 + 0.44 * sv, crown);
+  s.rough = clamp(s.rough + (sv - 0.5) * 0.08 * crown, 0.0, 1.0);
   float y = p.y - groundY(p);
   float under = underAt(p);
-  float damp = (1.0 - smoothstep(0.0, 0.25 + 0.8*nz2.r, y)) * (1.0 - under) * (1.0 - smoothstep(0.5, 0.9, n.y));
-  s.alb *= mix(1.0, 0.72, damp);
-  s.alb = mix(s.alb, s.alb*vec3(0.85, 0.95, 0.7), damp*0.5);
-  s.rough = mix(s.rough, 0.75, damp*0.4);
-  // Rain streaks: vertical darkening on walls.
+  // Height-blended layers: water, dirt and moss fill the joints and pores
+  // first and climb onto the crowns only where they are thick.
+  float hb = (s.h - 0.5);
+  float dampLine = 0.3 + 0.9*nz2.r;
+  float damp = (1.0 - smoothstep(0.0, dampLine, y - hb * 0.8)) * (1.0 - under) * (1.0 - smoothstep(0.5, 0.9, n.y));
+  s.alb *= mix(1.0, 0.6, damp);
+  s.alb = mix(s.alb, s.alb*vec3(0.82, 0.92, 0.72), damp*0.5);
+  s.rough = mix(s.rough, 0.7, damp*0.5);
+  // Grime: soot and dust in every joint, more of it low on the wall.
+  float grime = smoothstep(0.45, 0.1, s.h) * (0.5 + 0.5 * (1.0 - smoothstep(0.0, 3.0, y)));
+  s.alb *= 1.0 - 0.35 * grime;
+  // Rain streaks: vertical darkening on walls, strongest in the joints.
   float streak = smoothstep(0.55, 0.9, texture2D(uNoise, vec2((p.x + p.z)*0.45, p.y*0.035)).b) * (1.0 - abs(n.y));
-  s.alb *= 1.0 - 0.22*streak*(1.0 - under);
-  float moss = smoothstep(0.35, 0.8, n.y) * smoothstep(0.45, 0.7, nz2.g) * mossAmt * (1.0 - under);
+  s.alb *= 1.0 - 0.28*streak*(1.0 - under)*(1.2 - s.h);
+  // Moss: on what faces the sky, and in the damp joints at the foot of walls.
+  float mossM = max(smoothstep(0.35, 0.8, n.y), damp * 0.8) * smoothstep(0.45, 0.7, nz2.g + (0.5 - s.h) * 0.6);
+  float moss = mossM * mossAmt * (1.0 - under);
   s.alb = mix(s.alb, vec3(0.045, 0.055, 0.025)*(0.7 + 0.6*nz.b), moss*0.75);
 }
 
 vec3 tintTex(vec3 c, vec3 tint, float k){ return c * mix(vec3(1.0), tint, k); }
 
 Surf surface(vec3 p, vec3 n){
-  Surf s; s.emi = vec3(0.); s.rough = 0.9; s.ao = 1.0; s.nrm = n; s.alb = vec3(0.2);
+  Surf s; s.emi = vec3(0.); s.rough = 0.9; s.ao = 1.0; s.nrm = n; s.alb = vec3(0.2); s.h = 0.5;
 #if defined(TILE) && MAT != 1 && MAT != 4
   Smp t = biplanar(p, n);
   s.alb = t.a * ALB_K;
   s.ao = t.m.r;
   s.rough = POROUS(t.m.g * ROUGH_K);
   s.nrm = normalize(n + t.n * NRM_K);
-  // Cavities: dirt and shadow settle in the joints and pores (height map),
-  // so the relief reads even where the light is flat.
-  float cav = smoothstep(0.5, 0.08, t.m.b);
-  s.alb *= 1.0 - 0.35 * cav;
+  s.h = t.m.b;
+  #if MAT == 2
+  {
+    // Decaying render: patches (a metre or two across, more of them low on
+    // the wall and where the render is thin) have fallen off, baring the
+    // rubble core; a dark broken lip rims each patch. One planar projection.
+    vec2 wuv = abs(n.x) > abs(n.z) ? p.zy : p.xy;
+    vec4 lz = texture2D(uNoise, wuv * 0.035 + p.y * 0.0);
+    float yl = p.y - groundY(p);
+    float bare = lz.r * 0.65 + lz.b * 0.35 + (0.5 - t.m.b) * 0.35 + (1.0 - smoothstep(0.0, 2.5, yl)) * 0.18;
+    float e = smoothstep(0.56, 0.6, bare);
+    Smp r = sampleSet(tA2, tN2, tM2, wuv / 2.12);
+    vec3 rN = abs(n.x) > abs(n.z) ? vec3(0.0, r.n.y, r.n.x) : vec3(r.n.x, r.n.y, 0.0);
+    s.alb = mix(s.alb, r.a * 0.85, e);
+    s.ao = mix(s.ao, r.m.r, e);
+    s.rough = mix(s.rough, POROUS(r.m.g), e);
+    s.nrm = normalize(mix(s.nrm, normalize(n + rN * 1.6), e));
+    s.h = mix(s.h, r.m.b * 0.8, e);
+    float lip = smoothstep(0.5, 0.56, bare) * (1.0 - e);
+    s.alb *= 1.0 - 0.45 * lip;
+    s.h = mix(s.h, 0.15, lip * 0.7);
+  }
+  #endif
   #ifdef TINT
   s.alb = tintTex(s.alb, TINT, 1.0);
   #endif
@@ -287,6 +325,7 @@ Surf surface(vec3 p, vec3 n){
   s.ao = t.m.r;
   s.rough = POROUS(t.m.g * ROUGH_K);
   s.nrm = normalize(n + (t.n.x*A + t.n.y*B) * NRM_K);
+  s.h = t.m.b;
   weather(s, p, n, MOSS);
 #elif MAT == 1
   // Ground: river cobbles in the alleys, Roman basoli surviving on the main
@@ -327,8 +366,13 @@ Surf surface(vec3 p, vec3 n){
   a /= wsum; nn /= wsum; m /= wsum;
   s.alb = a * 0.85;
   s.ao = m.r;
+  s.h = m.b;
   s.rough = POROUS(m.g);
-  s.nrm = normalize(n + vec3(nn.x, 0.0, nn.y) * 1.0);
+  s.nrm = normalize(n + vec3(nn.x, 0.0, nn.y) * 1.4);
+  // Earth, dung and water lie in the gaps between the stones.
+  float gap = smoothstep(0.42, 0.12, m.b);
+  s.alb *= 1.0 - 0.4 * gap;
+  s.rough = mix(s.rough, 0.8, gap * 0.5);
   // Standing water: in the gutters and the low spots of the mud. Dull, not mirrors.
   float wet = clamp(tw.b * street + mud * smoothstep(0.62, 0.7, nz.g) * smoothstep(0.35, 0.15, m.b), 0.0, 1.0) * (1.0 - under);
   s.alb *= 1.0 - 0.4*wet;
