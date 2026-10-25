@@ -5,7 +5,7 @@ import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { Lamp } from './builder';
 import { isReading } from './codex';
 import { retarget, relaxArms, poseOf, wool, matte, makeWeave, withAtmos, canon, type ClipName, type Motion } from './npc/rig';
-import { dressBody, stripHeadPieces, faceOnly, buildGarment, bakeHeadShade, measure, type GarmentSpec, type Garment, type Measure } from './npc/garment';
+import { dressBody, stripHeadPieces, faceOnly, buildGarment, bakeHeadShade, measure, addSwingBones, swingRig, type GarmentSpec, type Garment, type Measure } from './npc/garment';
 import { Clothing, clothStats } from './npc/cloth';
 import * as Props from './npc/props';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
@@ -31,8 +31,8 @@ type OutfitId = 'monk' | 'peasantHood' | 'peasantCloak' | 'soldier' | 'soldierCl
 
 const OUTFITS: Record<OutfitId, { kit: Kit; spec: GarmentSpec; beard: boolean; wraps: boolean }> = {
   monk: { kit: 'man', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true } },
-  peasantHood: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather' } },
-  peasantCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather' } },
+  peasantHood: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather', thighs: 0.6, swing: true } },
+  peasantCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.6, swing: true } },
   soldier: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather' } },
   soldierCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather' } },
   woman: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.12, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
@@ -111,6 +111,7 @@ function tailor(id: OutfitId): Outfit {
   t.updateMatrixWorld(true);
   dressBody(t, o.kit, { beard: o.beard, wraps: o.wraps, m: k.m });
   t.traverse((x) => { if (/Teeth/.test(x.name)) x.visible = false; });
+  if (o.spec.swing) addSwingBones(t);
   const garment = buildGarment(t, k.template, k.m, o.spec);
   if (o.spec.hood) bakeHeadShade(t, garment.geo, o.spec.hood === 'cowl' ? 0.1 : 0.32);
   return { id, kit: o.kit, template: t, garment, m: k.m };
@@ -154,6 +155,7 @@ export class Person {
   dist = 0;
   private bones = new Map<string, THREE.Bone>();
   private kit: KitData;
+  private swing: (() => void) | null;
 
   constructor(private scene: THREE.Scene, public outfit: Outfit, public role: Role, public rnd: () => number, gear: Gear) {
     const k = (this.kit = kits![outfit.kit]);
@@ -167,6 +169,7 @@ export class Person {
       if ((o as THREE.Bone).isBone) this.bones.set(canon(o.name), o as THREE.Bone);
       if (m.isSkinnedMesh && !this.skeleton) this.skeleton = m.skeleton;
     });
+    this.swing = swingRig(this.body, (n) => this.bones.get(n)!);
     this.name = pick(rnd, NAMES[role]);
     this.lines = LINES[role];
     this.line = Math.floor(rnd() * this.lines.length);
@@ -338,6 +341,7 @@ export class Person {
         b.quaternion.premultiply(_q).premultiply(_q2).premultiply(_q.invert());
       }
     }
+    this.swing?.();
     return true;
   }
 
