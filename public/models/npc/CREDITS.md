@@ -17,6 +17,12 @@ and rings painted out).
 - **sophia.json**: "Sophia Animated 003 - Animated 3D Woman" by Renderpeople,
   https://sketchfab.com/3d-models/dc448c3be0e74f96a55fb475a13433cf — CC BY 4.0 (its baked clip is not used)
 
+Older faces (worn under hoods and cowls, see src/npc/garment.ts faceSwap), packed by `tools/fetch-faces.ts`
+(the face cut from the scanned head, simplified to ~4.5k triangles, its colour re-baked to a 1024² map):
+
+- **face_grandpa.json / .webp**: "Grandpa - RealityScan" by teddygbg,
+  https://sketchfab.com/3d-models/35316e9640384a5589ab662a4f4998c8 — CC BY 4.0
+
 Animations: **ual.json**, from Quaternius' **Universal Animation Library** (Standard), CC0 1.0,
 https://quaternius.itch.io/universal-animation-library — clips: A_TPose, Idle_Loop, Idle_Talking_Loop,
 Idle_Torch_Loop, Walk_Loop, Walk_Formal_Loop, Interact, PickUp_Table, Sword_Idle, Spell_Simple_Idle_Loop,

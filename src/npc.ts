@@ -6,7 +6,7 @@ import type { Lamp } from './builder';
 import { isReading } from './codex';
 import { retarget, relaxArms, legIK, wool, matte, makeWeave, withAtmos, canon, type ClipName, type Motion } from './npc/rig';
 import { prepScanBody } from './npc/scan';
-import { dressBody, faceOnly, buildGarment, bakeHeadShade, measure, addSkirtBones, addSwingBones, swingRig, type GarmentSpec, type Garment, type Measure } from './npc/garment';
+import { dressBody, faceSwap, faceOnly, buildGarment, bakeHeadShade, measure, addSkirtBones, addSwingBones, swingRig, type GarmentSpec, type Garment, type Measure } from './npc/garment';
 import { Clothing, clothStats } from './npc/cloth';
 import * as Props from './npc/props';
 import { fabric, type FabricKind } from './npc/fabric';
@@ -89,6 +89,13 @@ export function loadNpcAssets(): Promise<void> {
     const scan = (id: string, top = false) => get(PROPS_DIR + id + '.json').then((g) => Props.prepScan(g.scene, top)).catch(() => null);
     const [basket, bucket, jar] = await Promise.all([scan('wicker_basket_02', true), scan('wooden_bucket_01', true), scan('planter_pot_clay')]);
     scans = { basket, bucket, jar };
+    // Older faces (see faceSwap).
+    await Promise.all(Object.keys(FACES).map((id) => get(DIR + id + '.json').then((g) => {
+      const m = g.scene.getObjectByProperty('isMesh', true) as THREE.Mesh;
+      const map = (m.material as THREE.MeshStandardMaterial).map!;
+      map.colorSpace = THREE.SRGBColorSpace;
+      faces.set(id, { geo: m.geometry, map });
+    }).catch((e) => console.warn('face', id, e))));
     const t0 = performance.now();
     kits = {} as Record<BodyId, KitData>;
     ids.forEach((id, i) => {
@@ -120,9 +127,28 @@ export function loadNpcAssets(): Promise<void> {
   return loading;
 }
 
-/** An outfit on a body, tailored on first use (0.2-0.7 s each). */
+/**
+ * Older faces, scanned (tools/fetch-faces.ts; see public/models/npc/CREDITS.md),
+ * worn by some of those whose head is covered (`share` of them): the hood or
+ * cowl hides where face and head meet.
+ */
+const FACES: Record<string, { outfits: OutfitId[]; share: number }> = {
+  face_grandpa: { outfits: ['monk', 'peasantHood'], share: 0.4 },
+};
+const faces = new Map<string, { geo: THREE.BufferGeometry; map: THREE.Texture }>();
+
+/** An outfit on a body, tailored on first use (0.2-0.7 s each); `outfit:body#face` with another face. */
 function outfitFor(key: string): Outfit {
   let o = outfits.get(key);
+  if (!o && key.includes('#')) {
+    const [base, fid] = key.split('#'), b = outfitFor(base), f = faces.get(fid)!;
+    const t = SkeletonUtils.clone(b.template);
+    t.updateMatrixWorld(true);
+    faceSwap(t, f.geo, f.map, b.m);
+    if (OUTFITS[b.id].spec.hood) bakeHeadShade(t, b.garment.geo, OUTFITS[b.id].spec.hood === 'cowl' ? 0.1 : 0.32);
+    o = { ...b, template: t };
+    outfits.set(key, o);
+  }
   if (!o) {
     const [id, body] = key.split(':') as [OutfitId, BodyId];
     const t1 = performance.now();
@@ -880,16 +906,18 @@ export class Person {
 
 /** Who a person will be: their outfit (by key), dice and gear, decided before they are dressed. */
 interface Casting { role: Role; key: string; id: OutfitId; rnd: () => number; gear?: Gear }
-function cast(role: Role, o: { outfit?: number; body?: number; seed?: number; gear?: Gear } = {}): Casting {
+function cast(role: Role, o: { outfit?: number; body?: number; seed?: number; gear?: Gear; face?: boolean } = {}): Casting {
   const rnd = mulberry(o.seed ?? rngSeed++ * 7919);
   const ids = ROLE_OUTFITS[role];
   const id = ids[(o.outfit ?? Math.floor(rnd() * ids.length)) % ids.length];
   const bs = OUTFITS[id].bodies;
-  return { role, id, key: `${id}:${bs[(o.body ?? Math.floor(rnd() * bs.length)) % bs.length]}`, rnd, gear: o.gear };
+  let key = `${id}:${bs[(o.body ?? Math.floor(rnd() * bs.length)) % bs.length]}`;
+  for (const [fid, f] of Object.entries(FACES)) if (f.outfits.includes(id) && faces.has(fid) && (o.face ?? rnd() < f.share)) { key += '#' + fid; break; }
+  return { role, id, key, rnd, gear: o.gear };
 }
 
 /** Make one person (also used by the test page). */
-export function makePerson(scene: THREE.Scene, role: Role, o: { outfit?: number; body?: number; seed?: number; gear?: Gear } = {}) {
+export function makePerson(scene: THREE.Scene, role: Role, o: { outfit?: number; body?: number; seed?: number; gear?: Gear; face?: boolean } = {}) {
   return dress(scene, cast(role, o));
 }
 

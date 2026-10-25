@@ -58,7 +58,7 @@ if (view === 'lineup') {
   // &cast=woman:0:jar,woman:1:basket — just these people (gear flags joined by +).
   if (params.get('cast')) cast.splice(0, cast.length, ...params.get('cast')!.split(',').map((c) => { const [r, o, g, b] = c.split(':'); return [r as Role, Number(o), Object.fromEntries((g ?? '').split('+').filter(Boolean).map((k) => [k, true])), b ? Number(b) : undefined] as [Role, number, object, number?]; }));
   const people: Person[] = cast.map(([r, o, g, bi], i) => {
-    const p = makePerson(scene, r, { outfit: o, body: bi, seed: 11 + i * 31, gear: g });
+    const p = makePerson(scene, r, { outfit: o, body: bi, seed: 11 + i * 31, gear: g, face: params.has('face') ? params.get('face') === '1' : undefined });
     p.pos.set((i - (cast.length - 1) / 2) * 1.15, 0, 0);
     if (p.lamp) lamps.push(p.lamp);
     return p;

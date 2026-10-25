@@ -2085,6 +2085,47 @@ export function addSkirtBones(root: THREE.Object3D) {
 }
 
 /**
+ * Another face on a body: an older one, scanned (tools/fetch-faces.ts), for
+ * someone whose head is covered by a hood or cowl, which hides where the
+ * new face meets the old head. The face (in its own frame: eyes' midpoint at
+ * the origin, a 63 mm eye span, facing +Z) is set on the body's eyes and
+ * scaled to their span, rigid with the head; the body's own face, under it,
+ * is cut away.
+ */
+export function faceSwap(root: THREE.Object3D, face: THREE.BufferGeometry, map: THREE.Texture, M: Measure) {
+  const top = root.getObjectByName('Scan_Top') as THREE.SkinnedMesh | undefined;
+  if (!top) return;
+  const L = M.bone('LeftEye'), R = M.bone('RightEye'), E = L.clone().add(R).multiplyScalar(0.5), k = L.distanceTo(R) / 0.063;
+  // The body's face goes (within a little more than the new one covers).
+  const cls = boneClassOf(top), g = (top.geometry = top.geometry.clone()), idx = g.index!, w = new THREE.Vector3();
+  const gone = new Uint8Array(cls.length);
+  for (let i = 0; i < cls.length; i++) {
+    if (cls[i] !== 'head') continue;
+    top.getVertexPosition(i, w).applyMatrix4(top.matrixWorld);
+    const y = w.y - E.y, a = Math.atan2(w.x - E.x, w.z - (E.z - 0.085 * k));
+    gone[i] = y > -0.13 * k && y < 0.085 * k && Math.abs(a) < 1.12 ? 1 : 0;
+  }
+  const keep: number[] = [];
+  for (let t = 0; t < idx.count; t += 3) if (!gone[idx.getX(t)] || !gone[idx.getX(t + 1)] || !gone[idx.getX(t + 2)]) keep.push(idx.getX(t), idx.getX(t + 1), idx.getX(t + 2));
+  g.setIndex(keep);
+  // The new face, rigid with the head.
+  const f = face.clone(), P = f.attributes.position, inv = top.matrixWorld.clone().invert();
+  for (let i = 0; i < P.count; i++) { w.fromBufferAttribute(P, i).multiplyScalar(k).add(E).applyMatrix4(inv); P.setXYZ(i, w.x, w.y, w.z); }
+  f.computeVertexNormals();
+  const head = top.skeleton.bones.findIndex((b) => canon(b.name) === 'Head');
+  f.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Uint16Array(P.count * 4).fill(0).map((_, j) => (j % 4 === 0 ? head : 0)), 4));
+  f.setAttribute('skinWeight', new THREE.Float32BufferAttribute(new Float32Array(P.count * 4).map((_, j) => (j % 4 === 0 ? 1 : 0)), 4));
+  const mat = withAtmos(new THREE.MeshStandardMaterial({ map, roughness: 0.62, metalness: 0 }), { skin: true });
+  mat.userData.skin = true;
+  const m = new THREE.SkinnedMesh(f, mat);
+  m.name = 'Face';
+  m.frustumCulled = false;
+  m.bind(top.skeleton, top.bindMatrix);
+  m.position.copy(top.position); m.quaternion.copy(top.quaternion); m.scale.copy(top.scale);
+  top.parent!.add(m);
+}
+
+/**
  * Faces deep in a hood: bake how much of the sky each head vertex sees past
  * the garment into vertex colours.
  */
