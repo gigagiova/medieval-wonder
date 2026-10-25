@@ -335,7 +335,7 @@ await progress('Building the lanes about you', 0.9);
   const at = named ? [named.x, 0, named.z] : params.has('shot') ? params.get('shot')!.split(',').map(Number) : [SPAWN.x, 0, SPAWN.z];
   stream.update(new THREE.Vector3(at[0], 0, at[2]));
   const pump = setInterval(() => stream.update(new THREE.Vector3(at[0], 0, at[2])), 100);
-  await stream.ready(at[0], at[2], params.has('shot') ? 60 : 36, (f) => { enterEl.textContent = `Building the lanes about you… ${Math.round(f * 100)}%`; });
+  await stream.ready(at[0], at[2], params.has('shot') ? 44 : 36, (f) => { enterEl.textContent = `Building the lanes about you… ${Math.round(f * 100)}%`; });
   clearInterval(pump);
 }
 await progress('Mixing the pigments', 0.94);

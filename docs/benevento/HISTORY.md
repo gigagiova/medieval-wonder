@@ -168,3 +168,18 @@ World coordinates in metres (x, z).
 - The Iseum's location; the walnut (legend); the cistern (invented); the Santi Quaranta hypogea used
   as catacombs (a reconstruction choice: the complex was a Roman cryptoporticus).
 - The 700 ground level was several metres below today's in places; the DEM is modern.
+
+## 8. How it is built (for whoever continues)
+
+- Data: `src/benevento/geo.json` (terrain, rivers, circuit, plan blocks and lanes), made by
+  `tools/benevento/*.py` (see each script's header); `sites.ts` (landmark frames, gates, roads,
+  districts, explorable targets); `layout.ts` (the 0.5 m town raster: blocks, lanes, lots, plots,
+  pontili); `fabric.ts` + `fabric.worker.ts` + `stream.ts` (32 m chunks built in workers, 128 m LOD
+  super-chunks of plain prisms beyond 48–68 m); `monuments.ts`, `interiors.ts`, `lore.ts`, `secrets.ts`.
+- Check the town against the plan: `tools/benevento/test_layout.ts` (writes the raster), then
+  `tools/benevento/layout_vs_plan.py` (writes `layout-vs-plan.png`).
+- Measured in headless Chromium (SwiftShader, CPU rendering), phone viewport 390×844: world build
+  16–23 s, title to *Enter* 40–75 s; at the busiest places 220k–640k triangles and 100–190 draw calls
+  per frame; JS heap ~340–365 MB after GC (it was ~900 MB before the CPU copies of the meshes were
+  freed). Collision is one merged proxy mesh (boxes and prisms) with a BVH.
+- Secrets, explorables and easter eggs: `SECRETS.md`.

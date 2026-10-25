@@ -65,7 +65,12 @@ export function getTeleports(): Teleport[] {
     out.push(tp(name, x, z, lx2, lz2));
   };
   at('Porta Aurea', S.arcusTraiani, 0, 14, 0, 0);
-  at('Arcus Sacramenti', S.arcusSacramenti, 0, 9, 0, 0);
+  {
+    // On the paved way inside the arch (the one the layout cuts through), looking out at it.
+    const g = GATES.find((q) => q.id === 'sacramenti')!, dx = 0.62, dz = -0.79;
+    const sgn = insideness(g.at[0] - dx * 12, g.at[1] - dz * 12) > insideness(g.at[0] + dx * 12, g.at[1] + dz * 12) ? -1 : 1;
+    out.push(tp('Arcus Sacramenti', g.at[0] + sgn * dx * 14, g.at[1] + sgn * dz * 14, g.at[0], g.at[1]));
+  }
   at('Curtis Ducis', S.curtis, 39.6, -4.5, 39.6, -16);
   at('Episcopium', S.episcopium, -15.5, -31, -17, -45);
   at('Sancta Maria', S.episcopium, -17.6, -45, -17, -62);
