@@ -25,6 +25,7 @@ import { PLACED, markReadable, markReadableWorld } from './benevento/readables';
 import { LORE, explorableLore } from './benevento/lore';
 import { buildPonteFratto, ponsTeleport, inPons, PONS as PONS_FRATTO, PONS_LANDMARK } from './benevento/pontefratto';
 import { buildSpolia } from './benevento/spolia';
+import { planFront } from './arch/dress';
 
 // Benevento in AD 700, under Duke Gisulf I: the town of the first Lombard
 // circuit on its ridge between the Calore and the Sabato, laid out on the
@@ -598,6 +599,8 @@ function townProps(scene: THREE.Scene) {
   for (const l of lay.lots) {
     if (!l.front || (k++ % 4) !== 0) continue;
     const f = l.front, t = rand01(l.id * 1.7);
+    // Not where the house already has its stair, woodpile, bench or cart (arch/dress.ts).
+    { const fp = planFront(f, l.street ?? 2, l.h, 1000 + l.id * 7919); if (fp.stair || fp.items.length) continue; }
     const x = f.a.x + (f.b.x - f.a.x) * t + f.out.x * 0.45, z = f.a.y + (f.b.y - f.a.y) * t + f.out.y * 0.45;
     const u = rand01(l.id * 3.1);
     if (u < 0.22) P('wine_barrel_01', x, z, u * 20, 0.85);

@@ -15,6 +15,16 @@ let rand = rng(90210);
 
 /** Restart the kit's random sequence (each streamed chunk builds from its own seed). */
 export function reseedKit(seed: number) { rand = rng(seed); }
+/**
+ * Run fn on its own random stream (seeded), then give the kit its old stream
+ * back: decoration built only at full detail must not shift the draws of
+ * what comes after it, or the middle detail would no longer match.
+ */
+export function withStream<T>(seed: number, fn: () => T): T {
+  const keep = rand;
+  rand = rng(seed);
+  try { return fn(); } finally { rand = keep; }
+}
 export const R = (a: number, b: number) => a + (b - a) * rand();
 export const chance = (p: number) => rand() < p;
 

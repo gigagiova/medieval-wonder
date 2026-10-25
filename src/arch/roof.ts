@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Builder } from '../builder';
 import type { MatName } from '../materials';
 import { Acc, R, chance, coppo } from './kit';
+import { DETAIL } from '../builder';
 
 // Low Italian roofs of coppi: a sagging boarded underlay, real half-round
 // cover tiles laid in courses down the slope (tapered, each course lapping the
@@ -16,6 +17,10 @@ export interface RoofOpts {
   course?: number;
   smoke?: boolean;
   gableMat?: MatName | null;
+  /** Wooden shingles (*scandulae*) in lapped courses instead of coppi. */
+  shingle?: boolean;
+  /** Extra sag of the ridge (old, tired roofs). */
+  sag?: number;
 }
 
 /**
@@ -28,7 +33,7 @@ export function tiledGable(b: Builder, acc: Acc, w: number, d: number, hr: numbe
   const run = d / 2 + over;
   const tanA = hr / (d / 2);
   const W = w + over * 1.2;
-  const sag = R(0.03, 0.12);
+  const sag = R(0.03, 0.12) + (o.sag ?? 0);
   const top = (lx: number, lz: number) => hr + 0.14 - tanA * Math.abs(lz) - sag * Math.sin(Math.PI * THREE.MathUtils.clamp((lx + W / 2) / W, 0, 1)) * (1 - Math.abs(lz) / run * 0.6);
   // Gable-end walls.
   if (o.gableMat !== null) {
@@ -51,13 +56,31 @@ export function tiledGable(b: Builder, acc: Acc, w: number, d: number, hr: numbe
     };
     const inside = P(0, -5, 0);
     for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) {
-      acc.quad('roof', pt(i, k, 0), pt(i + 1, k, 0), pt(i + 1, k + 1, 0), pt(i, k + 1, 0), inside);
+      acc.quad(o.shingle ? 'wood' : 'roof', pt(i, k, 0), pt(i + 1, k, 0), pt(i + 1, k + 1, 0), pt(i, k + 1, 0), inside);
       acc.quad('wood', pt(i, k, -0.1), pt(i + 1, k, -0.1), pt(i + 1, k + 1, -0.1), pt(i, k + 1, -0.1), P(0, 10, 0));
     }
     for (let i = 0; i < nx; i++) acc.quad('wood', pt(i, nz, 0), pt(i + 1, nz, 0), pt(i + 1, nz, -0.1), pt(i, nz, -0.1), P(0, top(0, 0) - 0.3, 0));
+    if (o.shingle) {
+      // Shingles: courses of split boards lapping down the slope, each course
+      // a run of boards of uneven length with a ragged butt edge.
+      const crs = 0.3;
+      const nCr = Math.max(2, Math.round(run / crs));
+      for (let k = 0; k < nCr; k++) {
+        const z0 = s * (run * k) / nCr, z1 = s * Math.min(run, (run * (k + 1)) / nCr + 0.08);
+        for (let lx = -W / 2; lx < W / 2 - 0.05;) {
+          const bw = Math.min(W / 2 - lx, R(0.5, 1.4));
+          const a = lx + 0.01, c = lx + bw - 0.01;
+          const dz = s * R(-0.04, 0.03);
+          const ya = (x: number, z: number) => top(x, z) - 0.05;
+          if (!DETAIL.mid) acc.hexa('wood', [P(a, ya(a, z0), z0), P(c, ya(c, z0), z0), P(c, ya(c, z1 + dz) , z1 + dz), P(a, ya(a, z1 + dz), z1 + dz),
+            P(a, ya(a, z0) + 0.025, z0), P(c, ya(c, z0) + 0.025, z0), P(c, ya(c, z1 + dz) + 0.045, z1 + dz), P(a, ya(a, z1 + dz) + 0.045, z1 + dz)], true);
+          lx += bw;
+        }
+      }
+    }
     // Cover tiles, row by row.
     const up = v3(), side = X;
-    for (let lx = -W / 2 + R(0.1, 0.25); lx < W / 2 - 0.1; lx += pitch + R(-0.02, 0.02)) {
+    for (let lx = -W / 2 + R(0.1, 0.25); lx < W / 2 - 0.1 && !o.shingle; lx += pitch + R(-0.02, 0.02)) {
       const len = run + R(-0.1, 0.05);
       const nC = Math.max(1, Math.round(Math.hypot(len, len * tanA) / course));
       for (let k = 0; k < nC; k++) {
@@ -80,7 +103,12 @@ export function tiledGable(b: Builder, acc: Acc, w: number, d: number, hr: numbe
   }
   // Ridge: bigger coppi along the top.
   const nR = Math.max(2, Math.round(W / 0.42));
-  for (let i = 0; i < nR; i++) {
+  if (o.shingle) {
+    // A capping board on each side of the ridge.
+    for (const sd of [-1, 1]) acc.hexa('wood', [P(-W / 2, top(-W / 2, 0), 0), P(W / 2, top(W / 2, 0), 0), P(W / 2, top(W / 2, sd * 0.22) + 0.01, sd * 0.22), P(-W / 2, top(-W / 2, sd * 0.22) + 0.01, sd * 0.22),
+      P(-W / 2, top(-W / 2, 0) + 0.07, 0), P(W / 2, top(W / 2, 0) + 0.07, 0), P(W / 2, top(W / 2, sd * 0.22) + 0.06, sd * 0.22), P(-W / 2, top(-W / 2, sd * 0.22) + 0.06, sd * 0.22)], true);
+  }
+  for (let i = 0; i < nR && !o.shingle; i++) {
     const a = -W / 2 + (W * i) / nR - 0.03, c = -W / 2 + (W * (i + 1)) / nR;
     coppo(acc, 'roof', P(a, top(a, 0) + 0.04, 0), P(c, top(c, 0) + 0.02, 0), Y, Z, 0.12, 0.105);
   }
