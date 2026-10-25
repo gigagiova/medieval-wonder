@@ -115,17 +115,19 @@ export function getTeleports(): Teleport[] {
   // The gates: stand outside on the road that leaves each one (or straight out from the wall), a few
   // metres off, looking back at the gateway (inside, the houses of the plan come right up to them).
   for (const g of GATES) if (g.kind !== 'arch') {
-    let dx = 0, dz = 0;
+    // Straight out from the wall...
+    const w = onWall(g.at[0], g.at[1]), a = WALL700[w.k], c = WALL700[(w.k + 1) % WALL700.length];
+    const L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
+    let dx = -(c[1] - a[1]) / L, dz = (c[0] - a[0]) / L;
+    if (insideness(g.at[0] + dx * 10, g.at[1] + dz * 10) > insideness(g.at[0] - dx * 10, g.at[1] - dz * 10)) { dx = -dx; dz = -dz; }
+    // ...or along the road that leaves the gate, when it does leave roughly straight out.
     for (const r of ROADS) {
       const [p0, p1] = [r.pts[0], r.pts[r.pts.length - 1]];
       const q = Math.hypot(p0[0] - g.at[0], p0[1] - g.at[1]) < 2 ? r.pts[1] : Math.hypot(p1[0] - g.at[0], p1[1] - g.at[1]) < 2 ? r.pts[r.pts.length - 2] : null;
-      if (q) { const L = Math.hypot(q[0] - g.at[0], q[1] - g.at[1]); dx = (q[0] - g.at[0]) / L; dz = (q[1] - g.at[1]) / L; break; }
-    }
-    if (!dx && !dz) {
-      const w = onWall(g.at[0], g.at[1]), a = WALL700[w.k], c = WALL700[(w.k + 1) % WALL700.length];
-      const L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
-      dx = -(c[1] - a[1]) / L; dz = (c[0] - a[0]) / L;
-      if (insideness(g.at[0] + dx * 10, g.at[1] + dz * 10) > insideness(g.at[0] - dx * 10, g.at[1] - dz * 10)) { dx = -dx; dz = -dz; }
+      if (!q) continue;
+      const Lq = Math.hypot(q[0] - g.at[0], q[1] - g.at[1]), rx = (q[0] - g.at[0]) / Lq, rz = (q[1] - g.at[1]) / Lq;
+      if (rx * dx + rz * dz > 0.75) { dx = rx; dz = rz; }
+      break;
     }
     out.push(tp(g.name, g.at[0] + dx * 9, g.at[1] + dz * 9, g.at[0], g.at[1]));
   }

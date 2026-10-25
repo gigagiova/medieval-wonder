@@ -64,7 +64,7 @@ export const SITES: Record<string, SiteDef> = {
   forum: { id: 'forum', name: 'Forum', x: -40, z: -168, rot: GRID_ROT, flat: [16, 30], clear: 18 },
   // The Roman castellum aquae on the height outside Porta Summa, where the Rocca dei Rettori will stand
   // (OSM: the Rocca at 41.1290 N, 14.7820 E); the aqueduct comes in from the east-south-east.
-  castellumAquae: { id: 'castellumAquae', name: 'Castellum Aquae', x: 622, z: 160, rot: 2.64, flat: [14, 24] },
+  castellumAquae: { id: 'castellumAquae', name: 'Castellum Aquae', x: 622, z: 160, rot: 2.64, flat: [14, 30] },
   hortusSophiae: { id: 'hortusSophiae', name: 'Hortus Curtis', x: 566, z: -16, rot: GRID_ROT, clear: 20 },
 };
 
