@@ -182,6 +182,19 @@ function tailor(id: OutfitId, body: BodyId): Outfit {
       m.geometry.setIndex(keep);
     });
   }
+  if (o.spec.hem === 'knee') {
+    // Under a tunic to the knee, the trousers' thighs are never seen.
+    const keepBelow = k.m.bone('LeftLeg').y + 0.14, v = new THREE.Vector3();
+    t.traverse((x) => {
+      const m = x as THREE.SkinnedMesh;
+      if (!m.isSkinnedMesh || !/^(Wolf3D_Outfit_Bottom|Scan_Bottom)$/.test(m.name)) return;
+      const ix = m.geometry.index!, keep: number[] = [];
+      const low = (i: number) => m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld).y < keepBelow;
+      for (let i = 0; i < ix.count; i += 3) if (low(ix.getX(i)) || low(ix.getX(i + 1)) || low(ix.getX(i + 2))) keep.push(ix.getX(i), ix.getX(i + 1), ix.getX(i + 2));
+      m.geometry = m.geometry.clone();
+      m.geometry.setIndex(keep);
+    });
+  }
   const garment = buildGarment(t, k.template, k.m, o.spec);
   if (o.spec.hood) bakeHeadShade(t, garment.geo, o.spec.hood === 'cowl' ? 0.1 : 0.32);
   return { id, body, sex: o.sex, template: t, garment, m: k.m };

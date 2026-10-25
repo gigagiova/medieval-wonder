@@ -269,7 +269,7 @@ function makeBoots(m: THREE.SkinnedMesh, M: Measure, shaft: number) {
     };
     const add = (x: number, y: number, z: number) => { pos.push(x, y, z); weigh(x, y, z); return pos.length / 3 - 1; };
     // The foot: rings heel to toe, closed at both ends.
-    const NU = 18, NV = 18;
+    const NU = 14, NV = 14;
     const ring: number[][] = [];
     for (let u = 0; u < NU; u++) {
       const t = u / (NU - 1), end = Math.sqrt(Math.max(0, 1 - Math.pow(2 * t - 1, 8)));
@@ -296,7 +296,7 @@ function makeBoots(m: THREE.SkinnedMesh, M: Measure, shaft: number) {
       }
     }
     // The shaft round the ankle, from inside the shoe to above the ankle bone.
-    const yTop = foot.y + shaft, NS = 7, cz = foot.z - 0.008;
+    const yTop = foot.y + shaft, NS = 5, cz = foot.z - 0.008;
     const tube: number[][] = [];
     for (let k = 0; k < NS; k++) {
       const t = k / (NS - 1), y = sole + 0.03 + (yTop - sole - 0.03) * t;
@@ -328,7 +328,7 @@ function makeBoots(m: THREE.SkinnedMesh, M: Measure, shaft: number) {
     out.push(shoe);
     // A thong wound twice round the ankle.
     const tg: number[] = [], tSI: number[] = [], tSW: number[] = [], tix: number[] = [];
-    const NT = 28, NR2 = 5;
+    const NT = 20, NR2 = 3;
     for (let k = 0; k < NT; k++) {
       const a = (k / NT) * Math.PI * 2;
       for (let r = 0; r < NR2; r++) {
@@ -463,8 +463,8 @@ function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure, tonsur
     // Under the nose, down past the mouth's corners, then up the line of the cheekbone to the sideburns.
     const top = -0.05 - 0.02 * S(dx, 0.02, 0.04) + 0.045 * S(dx, 0.045, 0.08);
     // (Down to the jawline and under the chin, no further: below it a painted beard read as a dark collar round the neck.)
-    const bot = -0.16 + 0.04 * S(dx, 0.025, 0.07);
-    let b = S(dy, top + 0.02, top - 0.014) * S(dy, bot - 0.012, bot + 0.022) * S(dz, -0.13, -0.095) * (1 - S(dx, 0.085, 0.1));
+    const bot = -0.15 + 0.035 * S(dx, 0.025, 0.07);
+    let b = S(dy, top + 0.02, top - 0.014) * S(dy, bot - 0.02, bot + 0.03) * S(dz, -0.13, -0.095) * (1 - S(dx, 0.085, 0.1));
     // The lips themselves are bare.
     b *= 1 - (1 - S(dx, 0.022, 0.03)) * S(dy, -0.066, -0.072) * (1 - S(dy, -0.094, -0.1)) * S(dz, -0.03, -0.02);
     beard[i] = b;
@@ -1482,9 +1482,9 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   const arms = (['Left', 'Right'] as const).map((sd) => {
     // (Round-topped, as a shoulder is: a flat top made a shelf the cloth fell off at a corner.)
     // (A woman's arms slimmer, her sleeves fitted.)
-    const fem = spec.hood === 'veil', sh = bone(sd + 'Arm'), len = 0.5, r = fem ? 0.068 : 0.09;
+    const fem = spec.hood === 'veil', sh = bone(sd + 'Arm'), len = 0.5, r = fem ? 0.078 : 0.09;
     const c = new THREE.CapsuleGeometry(r, len, 6, 14);
-    c.translate(sh.x + Math.sign(sh.x - hips.x) * (fem ? 0.012 : 0.03), sh.y - len / 2 - r + 0.035, sh.z - (fem ? 0.01 : 0.02));
+    c.translate(sh.x + Math.sign(sh.x - hips.x) * (fem ? 0.015 : 0.03), sh.y - len / 2 - r + 0.035, sh.z - 0.025);
     return c;
   });
 
@@ -1936,10 +1936,12 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   const onTunic: { g: Grid; f: (y: number) => number; ease: number; body?: boolean }[] = [];
   // (A mantle goes with the tunic's body, not with its sleeves: see the stand-ins for the arms above.)
   // Over the shoulders, though, it goes with the tops of the sleeves too, as the arms rise and fall.
-  if (cape) onTunic.push({ g: cape, f: () => 1, ease: 4, body: true }, { g: cape, f: (y) => ss(yYoke - 0.1, yYoke + 0.02, y), ease: 2 });
+  // (A shawl, short, over the upper arms: with the sleeves beneath it all the way down, or they came through it.)
+  const armDown = spec.cape === 'shawl' ? 0.25 : 0;
+  if (cape) onTunic.push({ g: cape, f: () => 1, ease: 4, body: true }, { g: cape, f: (y) => ss(yYoke - 0.1 - armDown, yYoke + 0.02 - armDown, y), ease: 2 });
   // (A head covering's fall likewise: with the tunic's body and yoke, over the hanging arms.)
   // (Over the shoulders with the sleeves' heads too, as a mantle over it does: the two keep their distance.)
-  if (hood) onTunic.push({ g: hood, f: (y) => ss(jaw - 0.03, jaw - 0.12, y), ease: 3, body: true }, { g: hood, f: (y) => Math.min(ss(jaw - 0.03, jaw - 0.12, y), ss(yYoke - 0.1, yYoke + 0.02, y)), ease: 2 });
+  if (hood) onTunic.push({ g: hood, f: (y) => ss(jaw - 0.03, jaw - 0.12, y), ease: 3, body: true }, { g: hood, f: (y) => Math.min(ss(jaw - 0.03, jaw - 0.12, y), ss(yYoke - 0.35, yYoke - 0.1, y)), ease: 2 });
   if (onTunic.length) {
     const under = (gs: Grid[]) => {
       const tix: number[] = [];
@@ -2291,7 +2293,7 @@ const HOODS: Record<HoodKind, {
   fold: number; point: number; group: number;
 }> = {
   // A woman's veil: linen laid close over the hair, open down the front.
-  veil: { off: 0.008, top: 0.06, bottom: null, open: 0.86, hem: [-0.12, -0.06, -0.19], flare: [0.04, 0.06], fold: 0.016, point: 0.022, group: G_HEAD },
+  veil: { off: 0.008, top: 0.06, bottom: null, open: 0.86, hem: [-0.17, -0.14, -0.23], flare: [0.04, 0.1], fold: 0.016, point: 0.022, group: G_HEAD },
   // A layman's hood (cucullus) with its cape over the shoulders, closed under the chin.
   hood: { off: 0.024, top: 0.07, bottom: -0.105, open: 0.72, hem: [-0.2, -0.07, -0.19], flare: [0.05, 0.14], fold: 0.013, point: 0.02, group: G_HEAD },
   // A monk's cowl: deeper, pointed behind, its capelet to the middle of the upper arm.
@@ -2330,7 +2332,7 @@ function layHood(M: Measure, kind: HoodKind, clothes: MeshBVH, under: MeshBVH, a
     const a = Math.sqrt(1 - Math.min(1, ((y - (yTop - 0.06)) / 0.06) ** 2) * (y > yTop - 0.06 ? 1 : 0)) * (K.bottom === null ? 1 : Math.sqrt(ss(yBot, yBot + 0.045, y)));
     return K.open * a + (K.bottom === null ? 0.1 * ss(yLeave(0), yLeave(0) - 0.15, y) : 0);
   };
-  const NC = 44, NH = kind === 'veil' ? 20 : 17, NF = kind === 'veil' ? 14 : 11, NR = NH + NF;
+  const NC = 36, NH = kind === 'veil' ? 18 : 16, NF = kind === 'veil' ? 13 : 11, NR = NH + NF;
   const ph0 = Math.random() * 6;
   // A cowl's point: the cloth drawn out behind the crown (a veil's: over the hair gathered up behind).
   const point = (ph: number, th: number) => K.point * Math.exp(-((ph - Math.PI) ** 2) / 0.35 - ((th - 0.7) ** 2) / 0.18);

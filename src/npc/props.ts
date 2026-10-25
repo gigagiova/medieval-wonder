@@ -205,7 +205,7 @@ export function makeCap(Ms: Measure, color: THREE.Color) {
     const f = (d - L[i - 1]) / (L[i] - L[i - 1]);
     return [prof[i - 1][0] + (prof[i][0] - prof[i - 1][0]) * f, prof[i - 1][1] + (prof[i][1] - prof[i - 1][1]) * f];
   };
-  const g = surface(22, 48, (u, s) => {
+  const g = surface(12, 32, (u, s) => {
     const a = s * Math.PI * 2, [k, y] = along(u);
     // Felt is never true: soft dents in the sides, the crown sunk off-centre.
     const dent = 1 + Math.sin(a * 3 + seed) * 0.012 * k + Math.sin(a * 5 + seed * 2) * 0.006 * k;
@@ -221,8 +221,8 @@ export function makeCap(Ms: Measure, color: THREE.Color) {
 /** Rivets: small domes at the given points, facing out from the axis. */
 function rivets(pts: THREE.Vector3[], r: number) {
   return pts.map((p) => {
-    // (A rivet head is a few millimetres across: five sides and two rings read as round.)
-    const g = new THREE.SphereGeometry(r, 5, 2, 0, Math.PI * 2, 0, Math.PI / 2);
+    // (A rivet head is a few millimetres across: four sides and two rings read as round.)
+    const g = new THREE.SphereGeometry(r, 4, 2, 0, Math.PI * 2, 0, Math.PI / 2);
     const n = new THREE.Vector3(p.x, 0, p.z).normalize();
     g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n));
     return g.translate(p.x, p.y, p.z);
@@ -280,7 +280,7 @@ export function makeHelmet(Ms: Measure, kind: 'spangen' | 'lamellar' = 'spangen'
   const iron: THREE.BufferGeometry[] = [], bronze: THREE.BufferGeometry[] = [], lace: THREE.BufferGeometry[] = [];
   const studs: THREE.Vector3[] = [];
   if (kind === 'spangen') {
-    iron.push(surface(14, 36, (t, s) => sh.at(t, s * Math.PI * 2), [4, 2]));
+    iron.push(surface(12, 32, (t, s) => sh.at(t, s * Math.PI * 2), [4, 2]));
     // Six bands over the seams, each with rivets down both edges.
     for (let k = 0; k < 6; k++) {
       const ak = (k / 6) * Math.PI * 2 + Math.PI / 6;
@@ -288,15 +288,15 @@ export function makeHelmet(Ms: Measure, kind: 'spangen' | 'lamellar' = 'spangen'
         const tt = t * 0.93, w = (0.016 * (1 - 0.55 * tt)) / Math.max(0.05, sh.ax(tt));
         return sh.at(tt, ak + (s - 0.5) * 2 * w, 0.003 + (1 - Math.abs(s - 0.5) * 2) * 0.0015);
       }));
-      for (let i = 1; i < 7; i++) {
-        const t = i * 0.125, w = (0.011 * (1 - 0.55 * t)) / Math.max(0.05, sh.ax(t));
+      for (let i = 1; i < 5; i++) {
+        const t = i * 0.18, w = (0.011 * (1 - 0.55 * t)) / Math.max(0.05, sh.ax(t));
         studs.push(sh.at(t, ak - w, 0.005), sh.at(t, ak + w, 0.005));
       }
     }
     // The brow band, with a beaded lower edge.
     bronze.push(surface(3, 40, (t, s) => sh.at(t * 0.16 - 0.01, s * Math.PI * 2, 0.003 + Math.sin(t * Math.PI) * 0.0012)));
     bronze.push(at(new THREE.TorusGeometry(1, 0.003 / sh.ax(0), 3, 40), 0, -0.002, 0, Math.PI / 2).scale(sh.ax(0) + 0.004, 1, sh.az(0) + 0.004));
-    for (let k = 0; k < 16; k++) studs.push(sh.at(0.07, (k / 16) * Math.PI * 2, 0.007));
+    for (let k = 0; k < 12; k++) studs.push(sh.at(0.07, (k / 12) * Math.PI * 2, 0.007));
     // The finial: a cap over the apex and a short plume tube.
     const top = sh.at(0.93, 0);
     bronze.push(lathe([[0.001, 0], [0.026, 0], [0.022, 0.008], [0.01, 0.016], [0.008, 0.02]], 14).translate(0, top.y - 0.004, 0));
@@ -340,7 +340,7 @@ export function makeHelmet(Ms: Measure, kind: 'spangen' | 'lamellar' = 'spangen'
 export function makeShield(paint: THREE.Color) {
   const m = propMats();
   const R = 0.4;
-  const board = lathe([[0.001, 0.03], [0.1, 0.027], [0.2, 0.02], [0.3, 0.011], [R, 0], [R, -0.011], [0.25, 0.006], [0.001, 0.016]], 32);
+  const board = lathe([[0.001, 0.03], [0.1, 0.027], [0.2, 0.02], [0.3, 0.011], [R, 0], [R, -0.011], [0.25, 0.006], [0.001, 0.016]], 24);
   // Planks run straight across: planar UVs.
   const p = board.attributes.position, uv = board.attributes.uv;
   for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) * 1.1 + 0.5, p.getZ(i) * 0.45);
@@ -350,11 +350,11 @@ export function makeShield(paint: THREE.Color) {
   face.color = paint;
   face.onBeforeCompile = (propMats().board as THREE.MeshStandardMaterial).onBeforeCompile;
   face.customProgramCacheKey = (propMats().board as THREE.MeshStandardMaterial).customProgramCacheKey;
-  const rim = new THREE.TorusGeometry(R, 0.009, 5, 40);
-  const boss = lathe([[0.088, 0], [0.088, 0.005], [0.062, 0.006], [0.06, 0.04], [0.052, 0.062], [0.03, 0.09], [0.012, 0.108], [0.016, 0.116], [0.001, 0.122]], 20);
+  const rim = new THREE.TorusGeometry(R, 0.009, 4, 32);
+  const boss = lathe([[0.088, 0], [0.088, 0.005], [0.062, 0.006], [0.06, 0.04], [0.052, 0.062], [0.03, 0.09], [0.012, 0.108], [0.016, 0.116], [0.001, 0.122]], 14);
   boss.rotateX(Math.PI / 2).translate(0, 0, 0.026);
   const rivets: THREE.BufferGeometry[] = [];
-  for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; rivets.push(at(new THREE.SphereGeometry(0.009, 6, 4), Math.sin(a) * 0.075, Math.cos(a) * 0.075, 0.03)); }
+  for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; rivets.push(at(new THREE.SphereGeometry(0.009, 5, 3), Math.sin(a) * 0.075, Math.cos(a) * 0.075, 0.03)); }
   // The grip stands off the back on two cleats, room for a fist and a sleeve behind the boss.
   const grip = merge([at(new THREE.BoxGeometry(0.03, 0.34, 0.02), 0, 0, -0.065), at(new THREE.BoxGeometry(0.03, 0.03, 0.065), 0, 0.155, -0.035), at(new THREE.BoxGeometry(0.03, 0.03, 0.065), 0, -0.155, -0.035)]);
   const o = new THREE.Group();
@@ -370,14 +370,14 @@ export function makeShield(paint: THREE.Color) {
 export function makeBrooch() {
   const m = propMats();
   const g = new THREE.Group();
-  const disc = lathe([[0, 0], [0.021, 0], [0.023, 0.002], [0.022, 0.004], [0.016, 0.005], [0.01, 0.008], [0.006, 0.0095], [0, 0.01]], 20);
+  const disc = lathe([[0, 0], [0.021, 0], [0.023, 0.002], [0.022, 0.004], [0.016, 0.005], [0.01, 0.008], [0.006, 0.0095], [0, 0.01]], 16);
   disc.rotateX(Math.PI / 2);
   const gilt = withAtmos(new THREE.MeshStandardMaterial({ color: 0x8a6a2c, roughness: 0.38, metalness: 0.85 }));
   g.add(new THREE.Mesh(disc, gilt));
   const beads: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < 18; i++) {
-    const a = (i / 18) * Math.PI * 2;
-    beads.push(at(new THREE.SphereGeometry(0.0018, 5, 4), Math.cos(a) * 0.0195, Math.sin(a) * 0.0195, 0.0045));
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    beads.push(at(new THREE.SphereGeometry(0.0018, 4, 2), Math.cos(a) * 0.0195, Math.sin(a) * 0.0195, 0.0045));
   }
   g.add(new THREE.Mesh(merge(beads), gilt));
   const garnet = withAtmos(new THREE.MeshStandardMaterial({ color: 0x5a0a0c, roughness: 0.15, metalness: 0.1, emissive: 0x1a0204 }));
@@ -484,7 +484,7 @@ export function makeSticks(seed: number) {
   const sticks: THREE.BufferGeometry[] = [];
   let s = seed;
   const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 13; i++) {
     const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * 0.07;
     const L = 0.9 + rnd() * 0.35, y0 = (rnd() - 0.5) * 0.15;
     const pts: THREE.Vector3[] = [];
@@ -492,9 +492,9 @@ export function makeSticks(seed: number) {
       const t = k / 4;
       pts.push(new THREE.Vector3(Math.cos(a) * r + (rnd() - 0.5) * 0.025, y0 + (t - 0.5) * L, Math.sin(a) * r * 0.7 + (rnd() - 0.5) * 0.025));
     }
-    sticks.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 6, 0.008 + rnd() * 0.008, 4, false));
+    sticks.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 4, 0.008 + rnd() * 0.008, 4, false));
   }
-  const ties = [-0.25, 0.22].map((y) => at(new THREE.TorusGeometry(0.075, 0.007, 4, 14), 0, y, 0, Math.PI / 2).scale(1, 1, 0.75));
+  const ties = [-0.25, 0.22].map((y) => at(new THREE.TorusGeometry(0.075, 0.007, 3, 12), 0, y, 0, Math.PI / 2).scale(1, 1, 0.75));
   const bark = (m.ash as THREE.MeshStandardMaterial).clone();
   bark.color = new THREE.Color(0x8a7458);
   bark.onBeforeCompile = m.ash.onBeforeCompile;
