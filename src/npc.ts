@@ -5,7 +5,7 @@ import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { Lamp } from './builder';
 import { isReading } from './codex';
 import { retarget, relaxArms, poseOf, wool, matte, makeWeave, withAtmos, canon, type ClipName, type Motion } from './npc/rig';
-import { dressBody, stripHeadPieces, faceOnly, buildGarment, bakeHeadShade, measure, type GarmentSpec, type Garment, type Measure } from './npc/garment';
+import { dressBody, stripHeadPieces, faceOnly, buildGarment, bakeHeadShade, measure, addSkirtBones, type GarmentSpec, type Garment, type Measure } from './npc/garment';
 import { Clothing, clothStats } from './npc/cloth';
 import * as Props from './npc/props';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
@@ -30,7 +30,7 @@ export type Role = Speaker;
 type OutfitId = 'monk' | 'peasantHood' | 'peasantCloak' | 'soldier' | 'soldierCloak' | 'woman' | 'womanShawl';
 
 const OUTFITS: Record<OutfitId, { kit: Kit; spec: GarmentSpec; beard: boolean; wraps: boolean }> = {
-  monk: { kit: 'man', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true } },
+  monk: { kit: 'man', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
   peasantHood: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather' } },
   peasantCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather' } },
   soldier: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather' } },
@@ -111,6 +111,20 @@ function tailor(id: OutfitId): Outfit {
   t.updateMatrixWorld(true);
   dressBody(t, o.kit, { beard: o.beard, wraps: o.wraps, m: k.m });
   t.traverse((x) => { if (/Teeth/.test(x.name)) x.visible = false; });
+  if (o.spec.stride) {
+    addSkirtBones(t);
+    // Under a robe to the ankles the hose show only below the knee; above it
+    // the trousers' wide seat and thighs would only poke through the skirt.
+    const knee = k.m.bone('LeftLeg').y + 0.06, v = new THREE.Vector3();
+    t.traverse((x) => {
+      const m = x as THREE.SkinnedMesh;
+      if (!m.isSkinnedMesh || m.name !== 'Wolf3D_Outfit_Bottom') return;
+      const ix = m.geometry.index!, keep: number[] = [];
+      const low = (i: number) => m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld).y < knee;
+      for (let i = 0; i < ix.count; i += 3) if (low(ix.getX(i)) || low(ix.getX(i + 1)) || low(ix.getX(i + 2))) keep.push(ix.getX(i), ix.getX(i + 1), ix.getX(i + 2));
+      m.geometry.setIndex(keep);
+    });
+  }
   const garment = buildGarment(t, k.template, k.m, o.spec);
   if (o.spec.hood) bakeHeadShade(t, garment.geo, o.spec.hood === 'cowl' ? 0.1 : 0.32);
   return { id, kit: o.kit, template: t, garment, m: k.m };
@@ -123,6 +137,9 @@ interface Held { obj: THREE.Object3D; kind: 'hang' | 'spear'; drop: number; swin
 
 const ANIMS: ClipName[] = ['walk', 'idle', 'talk', 'bless', 'kneel'];
 const UP = new THREE.Vector3(0, 1, 0);
+const _sv = new THREE.Vector3();
+const _gs = new THREE.Vector3(), _ge = new THREE.Vector3(), _gp = new THREE.Vector3();
+const _gq = new THREE.Quaternion(), _gw = new THREE.Quaternion(), _gr = new THREE.Quaternion(), _gx = new THREE.Vector3(), _gd = new THREE.Vector3(), _gt = new THREE.Vector3(), _gz = new THREE.Vector3(), _gm = new THREE.Matrix4();
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 
 let rngSeed = 1;
@@ -212,7 +229,17 @@ export class Person {
       belt = matte(0x3a2618, 0.82);
     }
     const mats = [wool(tunic, W), wool(over, W), belt, role === 'woman' ? wool(head, W, { linen: true }) : wool(head, W)];
-    this.cloth = new Clothing(scene, outfit.garment, this.skeleton, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
+    // A long skirt is also skinned to helper bones that swing with the thighs.
+    let skel = this.skeleton;
+    const extra = outfit.garment.extraBones;
+    if (extra) {
+      skel = new THREE.Skeleton([...skel.bones, ...extra.map((e) => this.bones.get(e.name)!)], [...skel.boneInverses, ...extra.map((e) => e.inv)]);
+      this.skirt = extra.map((e, i) => {
+        const up = this.bones.get(i ? 'RightUpLeg' : 'LeftUpLeg')!, leg = this.bones.get(i ? 'RightLeg' : 'LeftLeg')!, bone = this.bones.get(e.name)!;
+        return { up, leg, bone, rest: bone.quaternion.clone(), bind: leg.position.clone().applyQuaternion(up.quaternion).normalize() };
+      });
+    }
+    this.cloth = new Clothing(scene, outfit.garment, skel, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
 
     // Motion.
     this.mixer = new THREE.AnimationMixer(this.body);
@@ -230,6 +257,63 @@ export class Person {
     this.equip(gear);
   }
   walkSpeed = 1.2;
+  /** A lantern held out before him by its bail, the right arm bent at the elbow, whatever the clip does with it. */
+  private grip: ReturnType<Person['makeGrip']> | null = null;
+  private makeGrip() {
+    const b = (n: string) => this.bones.get(n)!;
+    const w = (n: string) => b(n).getWorldPosition(new THREE.Vector3());
+    const fingers = ['Index', 'Middle', 'Ring', 'Pinky'].flatMap((f) => [1, 2, 3].map((j) => ({ bone: b(`RightHand${f}${j}`), rest: b(`RightHand${f}${j}`).quaternion.clone(), curl: [1.25, 1.45, 0.85][j - 1] })));
+    return {
+      arm: b('RightArm'), fore: b('RightForeArm'), hand: b('RightHand'),
+      upper: w('RightArm').distanceTo(w('RightForeArm')), lower: w('RightForeArm').distanceTo(w('RightHand')),
+      // In the bind pose's frame (metres, facing +Z, his left +X): where the wrist is held, which way the elbow points.
+      wrist: new THREE.Vector3(-0.33, 1.15, 0.26), pole: new THREE.Vector3(-0.6, -0.2, -1).normalize(), palm: new THREE.Vector3(-0.1, -0.75, 1).normalize(),
+      fingers, knuckles: [b('RightHandIndex2'), b('RightHandMiddle2'), b('RightHandRing2'), b('RightHandPinky2')], across: [b('RightHandPinky1'), b('RightHandIndex1')],
+    };
+  }
+  private holdLantern() {
+    const G = this.grip!;
+    // Two-bone IK in his own frame, not his chest's: whatever the torso does, the lantern is held out ahead, clear of the robe.
+    const C = _gq.copy(this.group.quaternion);
+    const medial = _gx.set(1, 0, 0).applyQuaternion(C);
+    const S = G.arm.getWorldPosition(_gs), T = this.group.localToWorld(_ge.copy(G.wrist));
+    const a = G.upper, bl = G.lower;
+    const u = _gt.copy(T).sub(S);
+    const d = THREE.MathUtils.clamp(u.length(), Math.abs(a - bl) + 1e-3, a + bl - 1e-3);
+    u.normalize();
+    const cosA = (a * a + d * d - bl * bl) / (2 * a * d), sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
+    const pole = _gz.copy(G.pole).applyQuaternion(C);
+    pole.addScaledVector(u, -pole.dot(u)).normalize();
+    const E = _ge.copy(S).addScaledVector(u, a * cosA).addScaledVector(pole, a * sinA);
+    const wrist = _gp.copy(S).addScaledVector(u, d);
+    // Upper arm and forearm swung onto the elbow and the wrist (their twist left to the clip)...
+    const swing = (bone: THREE.Bone, child: THREE.Bone, to: THREE.Vector3) => {
+      bone.getWorldQuaternion(_gw);
+      _gd.copy(child.position).applyQuaternion(_gw).normalize();
+      _gw.premultiply(_gr.setFromUnitVectors(_gd, to));
+      bone.quaternion.copy(bone.parent!.getWorldQuaternion(_gr).invert().multiply(_gw));
+      return _gw;
+    };
+    swing(G.arm, G.fore, _gt.copy(E).sub(S).normalize());
+    const fy = _gs.copy(wrist).sub(E).normalize();
+    const fw = swing(G.fore, G.hand, fy);
+    // ...then the forearm turns half way towards palm-down, so the wrist need not wring the whole turn.
+    _gd.copy(medial).addScaledVector(fy, -medial.dot(fy)).normalize();
+    _gz.set(1, 0, 0).applyQuaternion(fw);
+    const tw = Math.atan2(_gt.crossVectors(_gz, _gd).dot(fy), _gz.dot(_gd));
+    G.fore.quaternion.multiply(_gr.setFromAxisAngle(_gt.set(0, 1, 0), tw * 0.5));
+    // The hand palm-down: its Y along the fingers, X towards the thumb side.
+    const basis = (bone: THREE.Bone, y: THREE.Vector3) => {
+      _gd.copy(medial).addScaledVector(y, -medial.dot(y)).normalize();
+      _gm.makeBasis(_gd, y, _gz.crossVectors(_gd, y));
+      _gw.setFromRotationMatrix(_gm);
+      bone.quaternion.copy(bone.parent!.getWorldQuaternion(_gr).invert().multiply(_gw));
+    };
+    basis(G.hand, _gt.copy(G.palm).applyQuaternion(C));
+    // Fingers closed round the bail.
+    for (const f of G.fingers) f.bone.quaternion.copy(f.rest).multiply(_gr.setFromAxisAngle(_gx.set(1, 0, 0), f.curl));
+  }
+  private skirt: { up: THREE.Bone; leg: THREE.Bone; bone: THREE.Bone; rest: THREE.Quaternion; bind: THREE.Vector3 }[] = [];
 
   private bindOf(name: string) {
     const b = this.bones.get(name)!;
@@ -284,6 +368,7 @@ export class Person {
       const l = Props.makeLantern();
       hang(l.group, 'hang', 0.03);
       this.lanternLight = l.light;
+      this.grip = this.makeGrip();
       this.lamp = { pos: new THREE.Vector3(), color: new THREE.Color(1, 0.5, 0.18), intensity: 0.5, under: false, seed: r() * 50 };
     }
     if (g.bucket && scans.bucket) { const b = scans.bucket.clone(); b.scale.setScalar(0.8); const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.02); }
@@ -319,6 +404,12 @@ export class Person {
     if (++this.tick % every !== 0) return false;
     this.mixer.update(this.animAcc);
     this.animAcc = 0;
+    // Skirt bones: the thighs' swing (relative to the pelvis), without their twist.
+    for (const k of this.skirt) {
+      _sv.copy(k.leg.position).applyQuaternion(k.up.quaternion).normalize();
+      k.bone.quaternion.setFromUnitVectors(k.bind, _sv).multiply(k.rest);
+    }
+    if (this.grip) this.holdLantern();
     // Head and neck turn towards whatever holds their attention.
     let target = this.look.target;
     if (lookAt) {
@@ -347,6 +438,16 @@ export class Person {
     const hand = this.bones.get('RightHand')!;
     hand.getWorldPosition(_v);
     const fwd = _v2.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    // A lantern's bail runs through the closed fingers, across the hand.
+    let yaw = this.yaw;
+    const G = this.grip;
+    if (G) {
+      _v.set(0, 0, 0);
+      for (const k of G.knuckles) _v.add(k.getWorldPosition(_v3));
+      _v.divideScalar(G.knuckles.length);
+      G.across[1].getWorldPosition(_v3).sub(G.across[0].getWorldPosition(_gt));
+      yaw = Math.atan2(-_v3.z, _v3.x);
+    }
     for (const h of this.held) {
       if (h.kind === 'spear') {
         // Upright in the right hand on the march; standing or talking, its
@@ -367,7 +468,30 @@ export class Person {
       s.a = THREE.MathUtils.clamp(s.a + s.v * dt, -0.6, 0.6);
       const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
       s.w += (-s.b * 28 - hv.dot(side) * 0.5 - s.w * 3.2) * dt;
-      s.b = THREE.MathUtils.clamp(s.b + s.w * dt, -0.4, 0.4);
+      // (Held by its bail, a lantern barely tips along it.)
+      const lim = G ? 0.12 : 0.4;
+      s.b = THREE.MathUtils.clamp(s.b + s.w * dt, -lim, lim);
+      if (G) {
+        // A striding knee (and the robe over it) bumps the lantern aside rather
+        // than passing through it: keep its body clear of the thigh's line.
+        const sc = this.scale / this.kit.scale, L = 0.2 * sc;
+        const hip = this.bones.get('RightUpLeg')!.getWorldPosition(_gs), knee = this.bones.get('RightLeg')!.getWorldPosition(_ge);
+        const side = _gx.set(fwd.z, 0, -fwd.x); // his left
+        _gp.copy(_v).addScaledVector(fwd, -Math.sin(s.a) * L).addScaledVector(side, Math.sin(s.b) * L).y -= L; // the lantern's middle
+        const kd = _gd.copy(knee).sub(hip), t = THREE.MathUtils.clamp(_gt.copy(_gp).sub(hip).dot(kd) / kd.lengthSq(), 0, 1);
+        const away = _gt.copy(_gp).sub(hip.addScaledVector(kd, t)).setY(0);
+        const clear = 0.27 * sc, dist = away.length();
+        if (dist < clear && dist > 1e-4) {
+          away.multiplyScalar((clear - dist) / dist);
+          s.a -= away.dot(fwd) / L; s.b += away.dot(side) / L;
+          s.a = THREE.MathUtils.clamp(s.a, -0.6, 0.6); s.b = THREE.MathUtils.clamp(s.b, -lim, lim);
+          s.v *= 0.5; s.w *= 0.5;
+        }
+        // Hung by the top of its bail (0.015 above its origin), swinging about the bail.
+        h.obj.quaternion.setFromEuler(new THREE.Euler(s.a, yaw, s.b, 'YXZ'));
+        h.obj.position.copy(_v).sub(_v3.set(0, 0.015 * this.scale / this.kit.scale, 0).applyQuaternion(h.obj.quaternion));
+        continue;
+      }
       h.obj.position.copy(_v).addScaledVector(fwd, 0.03).y -= h.drop;
       h.obj.quaternion.setFromEuler(new THREE.Euler(s.a, this.yaw, s.b, 'YXZ'));
     }
