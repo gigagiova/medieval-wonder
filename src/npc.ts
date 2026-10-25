@@ -4,8 +4,8 @@ import { loadGltf } from './gltf';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { Lamp } from './builder';
 import { isReading } from './codex';
-import { retarget, relaxArms, poseOf, wool, matte, makeWeave, withAtmos, canon, type ClipName, type Motion } from './npc/rig';
-import { dressBody, stripHeadPieces, faceOnly, buildGarment, bakeHeadShade, measure, addSkirtBones, type GarmentSpec, type Garment, type Measure } from './npc/garment';
+import { retarget, relaxArms, legIK, wool, matte, makeWeave, withAtmos, canon, type ClipName, type Motion } from './npc/rig';
+import { dressBody, stripHeadPieces, faceOnly, buildGarment, bakeHeadShade, measure, addSkirtBones, addSwingBones, swingRig, type GarmentSpec, type Garment, type Measure } from './npc/garment';
 import { Clothing, clothStats } from './npc/cloth';
 import * as Props from './npc/props';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
@@ -31,12 +31,12 @@ type OutfitId = 'monk' | 'peasantHood' | 'peasantCloak' | 'soldier' | 'soldierCl
 
 const OUTFITS: Record<OutfitId, { kit: Kit; spec: GarmentSpec; beard: boolean; wraps: boolean }> = {
   monk: { kit: 'man', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
-  peasantHood: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather' } },
-  peasantCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather' } },
+  peasantHood: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather', thighs: 0.6, swing: true } },
+  peasantCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.6, swing: true, cloakClose: true } },
   soldier: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 1 } },
   soldierCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 1, capeOnTunic: true, capeOpen: 0.8 } },
-  woman: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.12, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
-  womanShawl: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.12, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
+  woman: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
+  womanShawl: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
 };
 const ROLE_OUTFITS: Record<Role, OutfitId[]> = { monk: ['monk'], peasant: ['peasantHood', 'peasantCloak'], woman: ['woman', 'womanShawl'], soldier: ['soldier', 'soldierCloak'] };
 
@@ -70,7 +70,7 @@ export function loadNpcAssets(): Promise<void> {
   loading ??= (async () => {
     const loader = new GLTFLoader();
     const get = (u: string) => loadGltf(u, loader);
-    const [man, woman, tpose, ual] = await Promise.all([get(DIR + 'man.json'), get(DIR + 'woman.json'), get(DIR + 'tpose.json'), get(DIR + 'ual.json')]);
+    const [man, woman, ual] = await Promise.all([get(DIR + 'man.json'), get(DIR + 'woman.json'), get(DIR + 'ual.json')]);
     // Michelle is bound in a T-pose; lower her arms first, as the man's are.
     relaxArms(woman.scene, 0.92);
     (npcDebug as unknown as { stripped: number[] }).stripped = stripHeadPieces(woman.scene);
@@ -78,18 +78,18 @@ export function loadNpcAssets(): Promise<void> {
     const scan = (id: string, top = false) => get(PROPS_DIR + id + '.json').then((g) => Props.prepScan(g.scene, top)).catch(() => null);
     const [basket, bucket, jar] = await Promise.all([scan('wicker_basket_02', true), scan('wooden_bucket_01', true), scan('planter_pot_clay')]);
     scans = { basket, bucket, jar };
-    const kit = (g: GLTF, pose: Map<string, THREE.Quaternion>, height: number, skull?: { rx: number; rz: number }): KitData => {
+    const kit = (g: GLTF, height: number, skull?: { rx: number; rz: number }): KitData => {
       const t = g.scene;
       t.updateMatrixWorld(true);
       const m = measure(t, skull);
       let top = 0;
       t.traverse((o) => { if (canon(o.name) === 'HeadTop_End') top = o.getWorldPosition(new THREE.Vector3()).y; });
-      return { template: t, motion: retarget(t, pose, ual), m, scale: height / (top || 1.8) };
+      return { template: t, motion: retarget(t, ual), m, scale: height / (top || 1.8) };
     };
     const t0 = performance.now();
     kits = {
-      man: kit(man, poseOf(tpose.animations.find((c) => c.name === 'TPose')!), 1.74),
-      woman: kit(woman, poseOf(woman.animations.find((c) => c.name === 'TPose')!), 1.6, { rx: 0.074, rz: 0.094 }),
+      man: kit(man, 1.74),
+      woman: kit(woman, 1.6, { rx: 0.074, rz: 0.094 }),
     };
     npcDebug.buildMs.retarget = performance.now() - t0;
     (npcDebug as unknown as { heads: unknown }).heads = Object.fromEntries(Object.entries(kits).map(([k, v]) => [k, { ...v.m.head, c: v.m.head.c.toArray(), hb: v.m.bone('Head').toArray(), top: v.m.bone('HeadTop_End').toArray(), neck: v.m.bone('Neck').toArray(), hips: v.m.bone('Hips').toArray() }]));
@@ -111,6 +111,7 @@ function tailor(id: OutfitId): Outfit {
   t.updateMatrixWorld(true);
   dressBody(t, o.kit, { beard: o.beard, wraps: o.wraps, m: k.m });
   t.traverse((x) => { if (/Teeth/.test(x.name)) x.visible = false; });
+  if (o.spec.swing) addSwingBones(t);
   if (o.spec.stride) {
     addSkirtBones(t);
     // Under a robe to the ankles the hose show only below the knee; above it
@@ -133,7 +134,7 @@ function tailor(id: OutfitId): Outfit {
 // ------------------------------------------------------------------ a person
 
 interface Gear { lantern?: boolean; cap?: boolean; helmet?: boolean | 'spangen' | 'lamellar'; shield?: 'back' | 'arm'; spear?: boolean; arms?: boolean; sticks?: boolean; bucket?: boolean; basket?: boolean; jar?: boolean }
-interface Held { obj: THREE.Object3D; kind: 'hang' | 'spear'; drop: number; swing: { a: number; v: number; b: number; w: number }; last: THREE.Vector3 }
+interface Held { obj: THREE.Object3D; kind: 'hang' | 'spear' | 'arm'; drop: number; swing: { a: number; v: number; b: number; w: number }; last: THREE.Vector3 }
 
 const ANIMS: ClipName[] = ['walk', 'idle', 'talk', 'bless', 'kneel'];
 const UP = new THREE.Vector3(0, 1, 0), _X = new THREE.Vector3(1, 0, 0);
@@ -141,6 +142,7 @@ const _sv = new THREE.Vector3();
 const _gs = new THREE.Vector3(), _ge = new THREE.Vector3(), _gp = new THREE.Vector3();
 const _gq = new THREE.Quaternion(), _gw = new THREE.Quaternion(), _gr = new THREE.Quaternion(), _gx = new THREE.Vector3(), _gd = new THREE.Vector3(), _gt = new THREE.Vector3(), _gz = new THREE.Vector3(), _gm = new THREE.Matrix4();
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
+const _h1 = new THREE.Vector3(), _h2 = new THREE.Vector3(), _h3 = new THREE.Vector3(), _h4 = new THREE.Vector3(), _h5 = new THREE.Vector3(), _h6 = new THREE.Vector3(), _h7 = new THREE.Vector3(), _h8 = new THREE.Vector3(), _hq = new THREE.Quaternion();
 
 let rngSeed = 1;
 const mulberry = (a: number) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -171,6 +173,9 @@ export class Person {
   dist = 0;
   private bones = new Map<string, THREE.Bone>();
   private kit: KitData;
+  private swing: (() => void) | null;
+  /** A woman's load: a jar balanced on the head, or a basket over the right forearm. */
+  private load: { jar: THREE.Object3D | null; jarQ: THREE.Quaternion; basket: boolean } = { jar: null, jarQ: new THREE.Quaternion(), basket: false };
 
   constructor(private scene: THREE.Scene, public outfit: Outfit, public role: Role, public rnd: () => number, gear: Gear) {
     const k = (this.kit = kits![outfit.kit]);
@@ -184,6 +189,7 @@ export class Person {
       if ((o as THREE.Bone).isBone) this.bones.set(canon(o.name), o as THREE.Bone);
       if (m.isSkinnedMesh && !this.skeleton) this.skeleton = m.skeleton;
     });
+    this.swing = swingRig(this.body, (n) => this.bones.get(n)!);
     this.name = pick(rnd, NAMES[role]);
     this.lines = LINES[role];
     this.line = Math.floor(rnd() * this.lines.length);
@@ -249,7 +255,7 @@ export class Person {
       this.skirtRest = this.skirt[0].quaternion.clone();
       this.hipsBindQ = new THREE.Quaternion().setFromRotationMatrix(this.bindOf('Hips'));
       this.thighBind = ['Left', 'Right'].map((s) => { const d = outfit.m.bone(s + 'Leg').sub(outfit.m.bone(s + 'UpLeg')); return Math.atan2(d.z, -d.y); });
-      skel = new THREE.Skeleton([...this.skeleton.bones, ...this.skirt], [...this.skeleton.boneInverses, inv, inv.clone()]);
+      skel = new THREE.Skeleton([...skel.bones, ...this.skirt], [...skel.boneInverses, inv, inv.clone()]);
     }
     this.cloth = new Clothing(scene, outfit.garment, skel, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
 
@@ -265,10 +271,23 @@ export class Person {
       this.w[n] = this.want[n] = n === 'idle' ? 1 : 0;
     }
     this.walkSpeed = k.motion.speed[walkClip] > 0.3 && k.motion.speed[walkClip] < 3 ? k.motion.speed[walkClip] : 1.2;
+    this.walkStart = k.motion.start[walkClip];
+    this.legs = (['Left', 'Right'] as const).map((S) => ({
+      chain: [S + 'UpLeg', S + 'Leg', S + 'Foot'].map((n) => this.bones.get(n)!), toe: this.bones.get(S + 'ToeBase')!,
+      hA: k.m.bone(S + 'Foot').y, hT: k.m.bone(S + 'ToeBase').y,
+    }));
 
     this.equip(gear);
   }
   walkSpeed = 1.2;
+  /** Half the width of a bucket or basket a peasant carries (0: none). */
+  carryHalf = 0;
+  private walkStart = 0;
+  /** How fast the body is turning (rad/s), and how far it is lifted to stand on uneven ground. */
+  yawRate = 0;
+  private lastYaw = 0;
+  private lift = 0;
+  private legs: { chain: THREE.Bone[]; toe: THREE.Bone; hA: number; hT: number }[] = [];
   /** A lantern held out before him by its bail, the right arm bent at the elbow, whatever the clip does with it. */
   private grip: ReturnType<Person['makeGrip']> | null = null;
   private makeGrip() {
@@ -393,11 +412,16 @@ export class Person {
     }
     if (g.sticks) {
       const sp = m.bone('Spine2');
-      on('Spine2', Props.makeSticks(Math.floor(r() * 1e6) + 1), Props.placeAt(new THREE.Vector3(sp.x + 0.02, sp.y - 0.12, sp.z - 0.21), new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, 0, 0.42))));
+      // Clear of the hood's cape on his shoulders, its top end behind his head.
+      const cape = this.outfit.id === 'peasantHood';
+      on('Spine2', Props.makeSticks(Math.floor(r() * 1e6) + 1), Props.placeAt(new THREE.Vector3(sp.x + 0.02, sp.y - 0.12, sp.z - (cape ? 0.27 : 0.21)), new THREE.Quaternion().setFromEuler(new THREE.Euler(cape ? -0.2 : -0.12, 0, 0.42))));
     }
     if (g.jar) {
       const h = m.head;
-      on('Head', Props.makeHeadJar(scans.jar), Props.placeAt(new THREE.Vector3(h.c.x, h.top + 0.022, h.c.z - 0.01)));
+      const jar = Props.makeHeadJar(scans.jar);
+      on('Head', jar, Props.placeAt(new THREE.Vector3(h.c.x, h.top + 0.022, h.c.z - 0.01)));
+      this.load.jar = jar;
+      this.load.jarQ.copy(jar.quaternion);
     }
     const hang = (obj: THREE.Object3D, kind: Held['kind'], drop: number) => {
       obj.traverse((o) => { o.frustumCulled = false; });
@@ -412,8 +436,16 @@ export class Person {
       this.grip = this.makeGrip();
       this.lamp = { pos: new THREE.Vector3(), color: new THREE.Color(1, 0.5, 0.18), intensity: 0.5, under: false, seed: r() * 50 };
     }
-    if (g.bucket && scans.bucket) { const b = scans.bucket.clone(); b.scale.setScalar(0.8); const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.02); }
-    if (g.basket && scans.basket) { const b = scans.basket.clone(); b.scale.setScalar(1.25); const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.0); }
+    // A peasant's are a size a man carries in one hand, the basket long side forward.
+    const pz = this.role === 'peasant';
+    if (g.bucket && scans.bucket) { const b = scans.bucket.clone(); b.scale.setScalar(pz ? 0.62 : 0.8); const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.02); this.carryHalf = 0.115; }
+    if (g.basket && scans.basket && this.role === 'woman') {
+      // Over the crook of her right arm, clear of her skirts.
+      const b = Props.makeArmBasket(scans.basket);
+      b.scale.setScalar(0.8);
+      hang(b, 'arm', 0);
+      this.load.basket = true;
+    } else if (g.basket && scans.basket) { const b = scans.basket.clone(); b.scale.setScalar(pz ? 1.0 : 1.25); if (pz) b.rotation.y = Math.PI / 2; const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.0); this.carryHalf = 0.14; }
     if (g.spear) {
       // Held in the right fist (see gripSpear): it rides on the hand bone.
       const s = (this.spear = Props.makeSpear());
@@ -560,22 +592,36 @@ export class Person {
   }
 
   /** Blend towards the wanted clip weights and advance the animation. */
-  animate(dt: number, every: number, lookAt: THREE.Vector3 | null) {
-    const k = Math.min(1, dt * 4);
-    let walkW = 0;
+  animate(dt: number, every: number, lookAt: THREE.Vector3 | null, ground?: (x: number, z: number) => number) {
+    let dy = this.yaw - this.lastYaw;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    this.lastYaw = this.yaw;
+    this.yawRate += (Math.abs(dy) / Math.max(dt, 1e-4) - this.yawRate) * Math.min(1, dt * 8);
+    // Setting off from standing: from the step where one foot is planted
+    // under the body and the other passes it.
+    if (this.w.walk === 0 && this.want.walk > 0) this.acts.walk.time = this.walkStart;
+    // Gestures cross-fade over a quarter second; starting and stopping, the
+    // walk follows the speed more tightly. Weights are normalised: a total under 1 would let the
+    // bind pose show through.
+    let sum = 0;
+    const rate = this.want.walk > 0 || this.w.walk > 0.01 ? 8 : 4;
     for (const n of ANIMS) {
-      this.w[n] += (this.want[n] - this.w[n]) * k;
+      this.w[n] += (this.want[n] - this.w[n]) * Math.min(1, dt * rate);
       if (this.w[n] < 0.002) this.w[n] = 0;
-      this.acts[n].setEffectiveWeight(this.w[n]);
-      if (n === 'walk') walkW = this.w[n];
+      sum += this.w[n];
     }
-    this.acts.walk.timeScale = THREE.MathUtils.clamp(this.speed / (this.walkSpeed * this.scale), 0.55, 1.6);
-    void walkW;
+    for (const n of ANIMS) this.acts[n].setEffectiveWeight(sum > 0 ? this.w[n] / sum : n === 'idle' ? 1 : 0);
+    // Steps keep pace with the ground: the clips' ground speed is measured
+    // when they are retargeted.
+    // Turning on the spot, the feet shuffle round.
+    this.acts.walk.timeScale = THREE.MathUtils.clamp(Math.max(this.speed / (this.walkSpeed * this.scale), Math.min(0.8, this.yawRate * 0.3)), 0.3, 1.6);
     this.group.position.copy(this.pos);
+    this.group.position.y += this.lift;
     this.group.rotation.set(0, this.yaw, 0);
     this.animAcc += dt;
     if (++this.tick % every !== 0) return false;
     this.mixer.update(this.animAcc);
+    this.plant(this.animAcc, ground);
     this.animAcc = 0;
     // Skirt bones: the thighs' swing (relative to the pelvis), without their twist.
     for (const k of this.strideBones) {
@@ -593,6 +639,8 @@ export class Person {
       a = Math.atan2(Math.sin(a), Math.cos(a));
       if (Math.abs(a) < 1.9) target = THREE.MathUtils.clamp(a, -1.1, 1.1);
     }
+    // A veil is pinned at the shoulders: she turns her body sooner than wring her neck in it.
+    if (this.role === 'woman') target = THREE.MathUtils.clamp(target, -0.6, 0.6);
     this.look.yaw += (target - this.look.yaw) * Math.min(1, dt * every * 3);
     if (Math.abs(this.look.yaw) > 0.01) {
       for (const [n, f] of [['Neck', 0.4], ['Head', 0.6]] as const) {
@@ -604,7 +652,112 @@ export class Person {
         b.quaternion.premultiply(_q).premultiply(_q2).premultiply(_q.invert());
       }
     }
+    if (this.load.jar || this.load.basket) this.poseLoad();
+    if (this.carryHalf && this.role === 'peasant') this.holdOut();
+    this.swing?.();
     return true;
+  }
+
+  /**
+   * A peasant carrying a bucket or basket keeps that arm down and out, the
+   * load clear of his skirts, whatever the clip does with it: talking, he
+   * gestures with the other hand; walking, it swings only a little.
+   */
+  private holdOut() {
+    const arm = this.bones.get('RightArm')!, fore = this.bones.get('RightForeArm')!, hand = this.bones.get('RightHand')!;
+    this.group.updateMatrixWorld(true);
+    const pA = arm.getWorldPosition(_h1), pF = fore.getWorldPosition(_h2), pH = hand.getWorldPosition(_h3);
+    const right = _h4.set(-Math.cos(this.yaw), 0, Math.sin(this.yaw)), fwd = _h5.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    const hips = this.bones.get('Hips')!.getWorldPosition(_h6);
+    // Out from the hips' line by the skirt's flare and half the load.
+    const L = pA.distanceTo(pF) + pF.distanceTo(pH) + 0.07 * this.scale;
+    const lat = _h7.copy(pA).sub(hips).dot(right);
+    const sin = THREE.MathUtils.clamp(((0.33 + this.carryHalf) * this.scale - lat) / L, 0, 0.6);
+    const cur = _h7.copy(pF).sub(pA).normalize();
+    const walk = THREE.MathUtils.clamp(this.w.walk ?? 0, 0, 1);
+    const swing = THREE.MathUtils.clamp(cur.dot(fwd), -0.5, 0.5) * (0.2 + 0.4 * walk);
+    const dir = _h8.set(0, -Math.sqrt(1 - sin * sin), 0).addScaledVector(right, sin).addScaledVector(fwd, swing).normalize();
+    const turn = (b: THREE.Bone, from: THREE.Vector3, k: number) => {
+      _q.setFromUnitVectors(from, dir);
+      if (k < 1) _q.slerp(_hq.identity(), 1 - k);
+      b.parent!.getWorldQuaternion(_q2);
+      b.getWorldQuaternion(_hq).premultiply(_q);
+      b.quaternion.copy(_q2.invert().multiply(_hq));
+      b.updateMatrixWorld(true);
+    };
+    turn(arm, cur, 1);
+    // The elbow nearly straight under the weight.
+    fore.getWorldPosition(pF);
+    hand.getWorldPosition(pH);
+    turn(fore, _h7.copy(pH).sub(pF).normalize(), 0.85);
+  }
+
+  /**
+   * Feet on the ground. The clips stand on flat ground; here the body is
+   * raised or lowered onto the lower foot over the real ground (and over the
+   * odd blend of two clips), and a foot the ground rises under is lifted by
+   * bending its leg.
+   */
+  private plant(dt: number, ground?: (x: number, z: number) => number) {
+    const g = ground ?? (() => this.pos.y), s = this.scale;
+    const clear = (L: Person['legs'][number]) => {
+      const a = L.chain[2].getWorldPosition(_v), t = L.toe.getWorldPosition(_v2);
+      return Math.min(a.y - g(a.x, a.z) - L.hA * s, t.y - g(t.x, t.z) - L.hT * s);
+    };
+    this.group.updateMatrixWorld(true);
+    const low = Math.min(...this.legs.map(clear));
+    const want = THREE.MathUtils.clamp(this.lift - low, -0.3, 0.15);
+    this.lift += (want - this.lift) * Math.min(1, dt * 10);
+    this.group.position.y = this.pos.y + this.lift;
+    this.group.updateMatrixWorld(true);
+    _v3.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    for (const L of this.legs) {
+      const c = clear(L);
+      if (c < -0.005) legIK(L.chain, L.chain[2].getWorldPosition(_v).setY(_v.y - c), _v3);
+    }
+  }
+
+  /**
+   * Turn a bone (in world space, by the least rotation) so that the line to
+   * its child points along `dir`, `k` of the way. World matrices of the
+   * bone's ancestors must be current; its own subtree is updated.
+   */
+  private aim(name: string, child: string, dir: THREE.Vector3, k = 1) {
+    const b = this.bones.get(name), c = this.bones.get(child);
+    if (!b || !c) return;
+    const cur = c.getWorldPosition(_v3).sub(b.getWorldPosition(_v2)).normalize();
+    _q2.setFromUnitVectors(cur, dir);
+    if (k < 1) _q2.slerp(_q.identity(), 1 - k);
+    b.parent!.getWorldQuaternion(_q);
+    // local' = P⁻¹ · R · P · local
+    b.quaternion.premultiply(_q).premultiply(_q2).premultiply(_q.invert());
+    b.updateMatrixWorld(true);
+  }
+
+  /** What a woman carries shapes how she holds herself. */
+  private poseLoad() {
+    this.group.updateMatrixWorld(true);
+    const yq = this.group.quaternion, d = new THREE.Vector3();
+    if (this.load.jar) {
+      // A jar on the head: she keeps her head level under it and the jar
+      // stays upright, whatever the clip does with her head.
+      const m = this.outfit.m, bind = m.bone('HeadTop_End').sub(m.bone('Head')).normalize();
+      this.aim('Head', 'HeadTop_End', d.copy(bind).applyQuaternion(yq), 0.75);
+      const jar = this.load.jar;
+      jar.quaternion.copy(this.load.jarQ);
+      jar.updateMatrixWorld(true);
+      const up = _v.set(0, 1, 0).applyQuaternion(jar.getWorldQuaternion(_q2));
+      _q2.setFromUnitVectors(up, UP);
+      jar.parent!.getWorldQuaternion(_q);
+      jar.quaternion.premultiply(_q).premultiply(_q2).premultiply(_q.invert());
+    }
+    if (this.load.basket) {
+      // The right arm bent at the elbow, the forearm carried forward level
+      // with the basket's handle over it; the wrist relaxed.
+      this.aim('RightArm', 'RightForeArm', d.set(-0.5, -1, 0.16).normalize().applyQuaternion(yq));
+      this.aim('RightForeArm', 'RightHand', d.set(-0.5, 0.1, 1).normalize().applyQuaternion(yq));
+      this.aim('RightHand', 'RightHandMiddle1', d.set(0.06, -0.35, 1).normalize().applyQuaternion(yq));
+    }
   }
 
   /** Lanterns, buckets and spears follow the hand. */
@@ -624,16 +777,24 @@ export class Person {
       yaw = Math.atan2(-_v3.z, _v3.x);
     }
     for (const h of this.held) {
+      const arm = h.kind === 'arm';
+      if (arm) {
+        // Where the handle rests: on the forearm, just short of the wrist.
+        this.bones.get('RightForeArm')!.getWorldPosition(_v3);
+        _v.lerp(_v3, 0.12);
+      }
       const hv = _v.clone().sub(h.last).divideScalar(Math.max(dt, 1e-3));
       if (h.last.lengthSq() === 0 || hv.lengthSq() > 100) hv.set(0, 0, 0);
       h.last.copy(_v);
       const s = h.swing;
       s.v += (-s.a * 28 - hv.dot(fwd) * 0.7 - s.v * 3.2) * dt;
-      s.a = THREE.MathUtils.clamp(s.a + s.v * dt, -0.6, 0.6);
+      const pz = this.role === 'peasant' && this.carryHalf > 0; // a full bucket swings less
+      const la = arm ? 0.12 : pz ? 0.3 : 0.6;
+      s.a = THREE.MathUtils.clamp(s.a + s.v * dt, -la, la);
       const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
       s.w += (-s.b * 28 - hv.dot(side) * 0.5 - s.w * 3.2) * dt;
       // (Held by its bail, a lantern barely tips along it.)
-      const lim = G ? 0.12 : 0.4;
+      const lim = G ? 0.12 : pz ? 0.15 : 0.4;
       s.b = THREE.MathUtils.clamp(s.b + s.w * dt, -lim, lim);
       if (G) {
         // A striding knee (and the robe over it) bumps the lantern aside rather
@@ -656,8 +817,12 @@ export class Person {
         h.obj.position.copy(_v).sub(_v3.set(0, 0.015 * this.scale / this.kit.scale, 0).applyQuaternion(h.obj.quaternion));
         continue;
       }
-      h.obj.position.copy(_v).addScaledVector(fwd, 0.03).y -= h.drop;
-      h.obj.quaternion.setFromEuler(new THREE.Euler(s.a, this.yaw, s.b, 'YXZ'));
+      // A peasant's load is held in the palm (between wrist and knuckles), not at the wrist.
+      if (pz) this.bones.get('RightHandMiddle1')!.getWorldPosition(_v3).add(_v).multiplyScalar(0.5), _v.copy(_v3);
+      h.obj.position.copy(_v).addScaledVector(fwd, arm || pz ? 0 : 0.03).y -= h.drop;
+      // Over the forearm, the handle's arch square across it.
+      const ay = arm ? Math.atan2(_v.x - _v3.x, _v.z - _v3.z) : this.yaw;
+      h.obj.quaternion.setFromEuler(new THREE.Euler(s.a, ay, s.b, 'YXZ'));
     }
     if (this.lamp && this.lanternLight) {
       this.held[0].obj.updateMatrixWorld(true);
@@ -920,6 +1085,7 @@ class Town {
   /** Steering: follow the street, keep clear of others and of the player. */
   private walk(a: Agent, dt: number, player: THREE.Vector3) {
     const S = this.streets, st = S[a.st], p = a.p;
+    const x0 = p.pos.x, z0 = p.pos.z;
     // Junctions.
     for (let j = 0; j < st.junc.length; j++) {
       const J = st.junc[j];
@@ -977,8 +1143,10 @@ class Town {
     const m = pointAt(cur, a.s);
     const lat = (p.pos.x - m.x) * -m.tz + (p.pos.z - m.z) * m.tx;
     if (Math.abs(lat) > half) { const k = Math.sign(lat) * half - lat; p.pos.x += -m.tz * k; p.pos.z += m.tx * k; }
-    p.speed = Math.hypot(a.vel.x, a.vel.y);
-    if (p.speed > 0.15) p.yaw = turn(p.yaw, Math.atan2(a.vel.x, a.vel.y), dt * 4);
+    // The steps follow how far the body actually went: held back by the
+    // street's edge or by someone in the way, it walks no faster than it moves.
+    p.speed += (Math.min(Math.hypot(a.vel.x, a.vel.y), Math.hypot(p.pos.x - x0, p.pos.z - z0) / Math.max(dt, 1e-4)) - p.speed) * Math.min(1, dt * 12);
+    if (p.speed > 0.15) p.yaw = turn(p.yaw, Math.atan2(a.vel.x, a.vel.y), dt * 4, dt * 2.5);
     a.nextPause -= dt;
     if (a.nextPause < 0) { a.mode = 'pause'; a.timer = 3 + p.rnd() * 6; a.nextPause = 15 + p.rnd() * 30; p.look.timer = 0; }
   }
@@ -986,13 +1154,16 @@ class Town {
   private wants(a: Agent) {
     const p = a.p, W = p.want;
     for (const n of ANIMS) W[n] = 0;
-    if (a.mode === 'walk' && p.speed > 0.1) W.walk = 1;
-    else if (a.mode === 'talk') W[p.lines[(p.line + p.lines.length - 1) % p.lines.length].bless ? 'bless' : 'talk'] = 1;
+    if (a.mode === 'talk') W[p.lines[(p.line + p.lines.length - 1) % p.lines.length].bless ? 'bless' : 'talk'] = 1;
     else if (a.mode === 'chat' || (a.mode === 'post' && a.chatCool === -1)) {
       // In a group, people take turns to speak.
       const k = Math.sin(a.talkCycle * 0.45) + Math.sin(a.talkCycle * 0.27 + 1);
       W[k > 0.6 ? 'talk' : 'idle'] = 1;
     } else W.idle = 1;
+    // Walking, starting and stopping, the walk's share follows the speed;
+    // turning on the spot, it shuffles the feet round.
+    const mv = Math.max(THREE.MathUtils.smoothstep(p.speed, 0.06, 0.45), 0.5 * THREE.MathUtils.smoothstep(p.yawRate, 0.4, 1.4));
+    if (mv > 0) { for (const n of ANIMS) W[n] *= 1 - mv; W.walk += mv; }
   }
 
   update(dt: number, camera: THREE.Camera, player: THREE.Vector3) {
@@ -1008,22 +1179,25 @@ class Town {
       a.talkCycle += dt;
       if (a.mode === 'walk') this.walk(a, dt, player);
       else {
-        p.speed = 0;
-        a.vel.set(0, 0);
+        // Stopping takes a step or two, not an instant.
+        a.vel.multiplyScalar(Math.exp(-dt * 7));
+        if (a.vel.lengthSq() < 0.0025) a.vel.set(0, 0);
+        p.pos.x += a.vel.x * dt; p.pos.z += a.vel.y * dt;
+        p.speed = a.vel.length();
         if (a.mode === 'pause' || a.mode === 'chat') {
           a.timer -= dt;
           if (a.mode === 'pause') {
             p.look.timer -= dt;
             if (p.look.timer < 0) { p.look.target = (p.rnd() - 0.5) * 1.8; p.look.timer = 1 + p.rnd() * 2.5; }
           }
-          if (a.mode === 'chat' && a.partner) p.yaw = turn(p.yaw, Math.atan2(a.partner.p.pos.x - p.pos.x, a.partner.p.pos.z - p.pos.z), dt * 3);
+          if (a.mode === 'chat' && a.partner) p.yaw = turn(p.yaw, Math.atan2(a.partner.p.pos.x - p.pos.x, a.partner.p.pos.z - p.pos.z), dt * 3, dt * 1.6);
           if (a.timer < 0) { a.mode = 'walk'; p.look.target = 0; a.partner = null; }
         } else if (a.mode === 'post') {
-          p.yaw = turn(p.yaw, a.homeYaw, dt * 2);
+          p.yaw = turn(p.yaw, a.homeYaw, dt * 2, dt * 1.6);
           _v.copy(a.home);
           if (p.pos.distanceToSquared(_v) > 0.01) p.pos.lerp(_v, Math.min(1, dt * 2));
         } else if (a.mode === 'talk') {
-          p.yaw = turn(p.yaw, Math.atan2(player.x - p.pos.x, player.z - p.pos.z), dt * 4);
+          p.yaw = turn(p.yaw, Math.atan2(player.x - p.pos.x, player.z - p.pos.z), dt * 4, dt * 1.6);
         }
       }
       p.pos.y = this.o.ground(p.pos.x, p.pos.z);
@@ -1064,7 +1238,7 @@ class Town {
       const near = simSet.has(a);
       const every = !p.visible ? 8 : near || p.dist < 18 ? 1 : p.dist < 35 ? 2 : 3;
       const lookAt = p.dist < 7 || a.mode === 'talk' ? player : a.partner ? a.partner.p.pos : null;
-      const moved = p.animate(dt, every, lookAt);
+      const moved = p.animate(dt, every, lookAt, this.o.ground);
       if (!p.visible) continue;
       p.cloth.setSimulating(near);
       if (moved || near) {
@@ -1124,10 +1298,11 @@ class Town {
   }
 }
 
-const turn = (from: number, to: number, k: number) => {
+/** Turn towards an angle; standing still, no faster than `max` per frame (feet can't spin). */
+const turn = (from: number, to: number, k: number, max = Infinity) => {
   let d = to - from;
   d = Math.atan2(Math.sin(d), Math.cos(d));
-  return from + d * Math.min(1, k);
+  return from + THREE.MathUtils.clamp(d * Math.min(1, k), -max, max);
 };
 
 // ------------------------------------------------------------------ UI
