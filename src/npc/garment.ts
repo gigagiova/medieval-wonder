@@ -14,6 +14,7 @@ export type HoodKind = 'cowl' | 'hood' | 'veil';
 export interface GarmentSpec {
   hem: 'ankle' | 'calf' | 'knee';
   flare: number; // skirt flare per metre below the belt
+  trail?: number; // extra flare at the back (room for the heel kicking up behind in a long skirt)
   folds: number; // fold depth per metre below the belt
   sleeve: 'bell' | 'fitted';
   hood: HoodKind | null;
@@ -370,6 +371,8 @@ const ss = (e0: number, e1: number, x: number) => { const t = THREE.MathUtils.cl
 // Capsules (see cloth.ts): 0-1 thighs, 2-3 shins, 4-5 feet, 6 pelvis, 7 torso, 8-9 upper arms, 10-11 forearms.
 const CAP_SKIRT = 0b000001111111, CAP_SLEEVE = 0b000010000000, CAP_CLOAK = 0b111111000011, CAP_SHAWL = 0b111110000000;
 
+/** Where a veil leaves the head and begins to hang (elevation from the head's centre). */
+const VEIL_J = -0.45;
 const HOODS: Record<HoodKind, { off: number; minD: number; point: number; brim: number; cape: number; mid: number; top: number; drape: number }> = {
   // The monk's cowl: deep, pointed, with a capelet.
   cowl: { off: 0.055, minD: 0.1, point: 0.1, brim: 0.055, cape: 0.06, mid: 0.62, top: 0.1, drape: 0 },
@@ -458,7 +461,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
         rr += 0.01;
       } else {
         const back = 0.5 + 0.5 * Math.cos(a - Math.PI);
-        rr = Math.max(rr + 0.045, hipProfile[k] + 0.035 + below * (spec.flare + 0.05 * back));
+        rr = Math.max(rr + 0.045, hipProfile[k] + 0.035 + below * (spec.flare + (0.05 + (spec.trail ?? 0)) * back));
         const fold = Math.sin(a * 11 + Math.sin(a * 3.1 + fp) * 1.7 + fp) * 0.6 + Math.sin(a * 6 + 1.3 + fp * 0.7) * 0.4;
         rr += fold * (0.006 + below * spec.folds);
       }
@@ -557,12 +560,31 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     hood.group = spec.hood === 'cowl' ? G_TUNIC : G_HEAD;
     hood.flip = true;
     const th0 = -1.22, th1 = 1.5;
+    const veil = spec.hood === 'veil';
     for (let r = 0; r < NH; r++) {
       const th = th0 + (th1 - th0) * (r / (NH - 1));
-      const open = th < -0.62 ? 0.2 : th < -0.42 ? THREE.MathUtils.lerp(0.2, H.mid, (th + 0.62) / 0.2)
+      let open = th < -0.62 ? 0.2 : th < -0.42 ? THREE.MathUtils.lerp(0.2, H.mid, (th + 0.62) / 0.2)
         : th < 0.45 ? H.mid : THREE.MathUtils.lerp(H.mid, H.top, Math.min(1, (th - 0.45) / 0.7));
+      // A veil frames the face, straight across the brow, and its edges fall open down the front.
+      if (veil) open = th < VEIL_J ? H.mid + (VEIL_J - th) * 0.12 : THREE.MathUtils.lerp(H.mid, 0.02, ss(0.22, 0.5, th));
       for (let c = 0; c < NC; c++) {
         const ph = open + (Math.PI * 2 - 2 * open) * (c / (NC - 1));
+        if (veil && th < VEIL_J) {
+          // Below the jaw it hangs: straight down from where it leaves the
+          // head, over the neck onto the shoulders and the top of the back
+          // (laid onto the tunic once that is fitted, below).
+          const s = (VEIL_J - th) / (VEIL_J - th0), back = 0.5 - 0.5 * Math.cos(ph);
+          const dj = new THREE.Vector3(Math.sin(ph) * Math.cos(VEIL_J), Math.sin(VEIL_J), Math.cos(ph) * Math.cos(VEIL_J));
+          const ell = 1 / Math.sqrt((dj.x / M.head.rx) ** 2 + (dj.y / ((M.head.top - Hc.y) * 1.02)) ** 2 + (dj.z / M.head.rz) ** 2);
+          const J = Hc.clone().addScaledVector(dj, Math.max(ell, H.minD) + H.off);
+          const R0 = Math.hypot(J.x - Hc.x, J.z - Hc.z) + s * 0.015;
+          hood.pos.push(Hc.x + Math.sin(ph) * R0, J.y - s * (0.1 + 0.1 * back), Hc.z + Math.cos(ph) * R0);
+          hood.uv.push((c / NC) * 4, (r / NH) * 3);
+          // Pinned: it lies on the shoulders, and loose it sank through them.
+          hood.maxD.push(0);
+          hood.region.push(2);
+          continue;
+        }
         const dir = new THREE.Vector3(Math.sin(ph) * Math.cos(th), Math.sin(th), Math.cos(ph) * Math.cos(th));
         ray.set(Hc, dir);
         const hit = S.all.bvh.raycastFirst(ray, THREE.DoubleSide);
@@ -708,7 +730,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     rad[r][k] = Math.hypot(tunic.pos[o] - cen[r].x, tunic.pos[o + 2] - cen[r].y);
   }
   // A head kept without its skull has nothing to push the hood out of above the jaw.
-  if (hood && spec.hood !== 'cowl') fit(hood, spec.hood === 'veil' ? 0.016 : 0.03, M.head.skull ? Infinity : bone('Head').y);
+  if (hood && spec.hood === 'hood') fit(hood, 0.03, M.head.skull ? Infinity : bone('Head').y);
   if (hood && spec.hood === 'cowl') {
     // Below the jaw the cowl is a capelet lying over the tunic's shoulders,
     // not a ring through its collar: the rows under the face are laid, from
@@ -747,6 +769,36 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
 
   const tunicGeo = gridGeometry(tunic);
   const tunicBVH = new MeshBVH(tunicGeo);
+  if (hood && spec.hood === 'veil') {
+    // The veil's fall lies on the tunic: each column, from the jaw down,
+    // keeps clear of the tunic and body seen from the head's axis and never
+    // tucks back in (cloth hangs, it does not cling). Rays, not closest
+    // points: those threw single vertices about.
+    const ax = M.head.c, NHh = hood.rows, NCh = hood.cols;
+    const rJ = Math.floor(((VEIL_J + 1.22) / 2.72) * (NHh - 1));
+    const d = new THREE.Vector3();
+    for (let c = 0; c < NCh; c++) {
+      let prev = 0;
+      for (let r = rJ + 1; r >= 0; r--) {
+        const o = (r * NCh + c) * 3;
+        vv.fromArray(hood.pos, o);
+        d.set(vv.x - ax.x, 0, vv.z - ax.z);
+        let R = d.length();
+        d.divideScalar(R || 1);
+        if (r <= rJ) {
+          let need = 0;
+          for (const [b, gap] of [[tunicBVH, 0.02], [S.all.bvh, 0.045]] as const) {
+            ray.set(o2.set(ax.x, vv.y, ax.z).addScaledVector(d, 0.6), d.clone().negate());
+            const hit = b.raycastFirst(ray, THREE.DoubleSide);
+            if (hit) need = Math.max(need, 0.6 - hit.distance + gap);
+          }
+          R = Math.max(R, need, prev - 0.002);
+          vv.set(ax.x + d.x * R, vv.y, ax.z + d.z * R).toArray(hood.pos, o);
+        }
+        prev = R;
+      }
+    }
+  }
 
   // --- Scapular: front and back panels over the tunic (monks).
   const scap: Grid[] = [];
@@ -791,7 +843,8 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       return n;
     }));
     const ubvh = new MeshBVH(under);
-    const yT = neck.y - 0.045, yB = long ? knee + 0.06 : hips.y + 0.12;
+    // A shawl stops clear above the sash: lower, the sash cut through it as she swayed.
+    const yT = neck.y - 0.045, yB = long ? knee + 0.06 : yBelt + 0.085;
     const NR2 = long ? 28 : 16, NC2 = long ? 26 : 34, oL = spec.capeOpen ?? 0;
     const g = new Grid(NR2, NC2, false);
     g.group = G_OVER;
@@ -834,8 +887,9 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
         const R = row[c] + 0.022 + t * (long ? 0.04 : 0.02) + fold + 0.02 * Math.exp(-Math.pow((y - yBelt) / 0.05, 2)) + 0.025 * side;
         g.pos.push(cx + Math.sin(a) * R, y, cz + Math.cos(a) * R);
         g.uv.push((c / NC2) * 3, t * (long ? 3 : 1.6));
-        g.maxD.push(r < 2 ? 0 : (long ? 0.3 : 0.1) * Math.pow(ss(0, 1, t), 0.8));
-        g.region.push(y > yYoke - 0.03 ? 4 : 3);
+        g.maxD.push(r < 2 ? 0 : (long ? 0.3 : 0.035) * Math.pow(ss(0, 1, t), 0.8));
+        // A shawl is wrapped round the arms too: where it lies on them, it goes with them.
+        g.region.push(y > yYoke - 0.03 || !long ? 4 : 3);
       }
     }
     // Over the shoulders it lies on the yoke, not in a level ring through it.
@@ -956,7 +1010,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   for (let i = 0; i < N; i++) {
     const y = bind[i * 3 + 1];
     if (region[i] !== 0 || y > yBelt) continue;
-    const t = 0.8 * ss(yBelt, yBelt - 0.3, y);
+    const t = (spec.trail ? 1 : 0.8) * ss(yBelt, yBelt - 0.3, y);
     const m = wmap[i];
     for (const [k, w] of m) m.set(k, w * (1 - t));
     m.set(hipsI, (m.get(hipsI) ?? 0) + t);
