@@ -59,6 +59,14 @@ function fog(m: THREE.Material) {
   const sm = m as THREE.MeshStandardMaterial;
   // Scans are lit by dusk and lamps only: keep them matte.
   if ('roughness' in sm) sm.envMapIntensity = 0;
+  // Leaves and blades come in as alpha-blended: cut them out instead, so they
+  // write depth, sort freely and stay out of every transparency pass.
+  if (m.transparent) {
+    m.transparent = false;
+    m.alphaTest = 0.5;
+    m.depthWrite = true;
+    m.userData.foliage = true;
+  }
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, shared);
     sh.vertexShader = sh.vertexShader
@@ -203,66 +211,151 @@ export function placeProp(_scene: THREE.Scene | null, id: PropId, x: number, y: 
   return p;
 }
 
-interface Chunk { center: THREE.Vector3; range: number; meshes: THREE.InstancedMesh[]; under: boolean }
-const chunks: Chunk[] = [];
+/**
+ * All placements of one prop variant (above or below ground) share one
+ * InstancedMesh per part, whose instance list is refilled with the placements
+ * in range and in view whenever the view changes. A few hundred meshes stand
+ * for every prop in the world (instead of one mesh per part per 20-64 m patch,
+ * tens of thousands of objects), and each kind is at most one draw call.
+ */
+interface Kind {
+  variant: Variant; range2: number; under: boolean;
+  n: number; mat: Float32Array; pos: Float32Array; rad: Float32Array;
+  buckets: Map<number, number[]>; meshes: THREE.InstancedMesh[]; cap: number;
+}
+const kinds = new Map<string, Kind>();
+const PBK = 24; // bucket size (m) for finding placements near the camera
 const CHUNK = 64;
-/** Small near-only plants are grouped finer, so they can be dropped close by. */
+/** Small near-only plants used to be grouped finer, so they could be dropped close by. */
 const chunkOf = (id: PropId) => ((RANGE[id] ?? DEFAULT_RANGE) < 40 ? 20 : CHUNK);
 let ticker: THREE.Object3D | null = null;
+const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _q = new THREE.Quaternion();
 
-/** Turn all pending placements into instanced meshes, chunked for culling. */
+function grow(a: Float32Array, need: number) {
+  if (a.length >= need) return a;
+  const b = new Float32Array(Math.max(need, a.length * 2));
+  b.set(a);
+  return b;
+}
+
+/** Turn all pending placements into instances of their kind's meshes. */
 export function commitProps(scene: THREE.Object3D) {
   // Placements are in world space: add to the root, not to a site's group.
   while (scene.parent) scene = scene.parent;
-  const groups = new Map<string, Placement[]>();
+  const touched = new Set<Kind>();
   for (const pl of pending) {
-    const pos = new THREE.Vector3().setFromMatrixPosition(pl.matrix);
-    const C = chunkOf(pl.id);
-    const key = `${pl.id}|${pl.variant}|${Math.floor(pos.x / C)}|${Math.floor(pos.z / C)}|${pl.under ? 'u' : 'a'}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(pl);
+    const key = `${pl.id}|${pl.variant}|${pl.under ? 'u' : 'a'}`;
+    let k = kinds.get(key);
+    if (!k) {
+      const v = variants.get(pl.id)![pl.variant];
+      // Out to where the old per-patch culling cut them (patch centre within range + 0.6 patch).
+      const r = (RANGE[pl.id] ?? DEFAULT_RANGE) + chunkOf(pl.id) * 0.6;
+      k = { variant: v, range2: r * r, under: pl.under, n: 0, mat: new Float32Array(16 * 8), pos: new Float32Array(3 * 8), rad: new Float32Array(8), buckets: new Map(), meshes: [], cap: 0 };
+      kinds.set(key, k);
+    }
+    const i = k.n++;
+    k.mat = grow(k.mat, k.n * 16); k.pos = grow(k.pos, k.n * 3); k.rad = grow(k.rad, k.n);
+    pl.matrix.toArray(k.mat, i * 16);
+    pl.matrix.decompose(_p, _q, _s);
+    k.pos[i * 3] = _p.x; k.pos[i * 3 + 1] = _p.y; k.pos[i * 3 + 2] = _p.z;
+    // Bounding sphere round the base point: the variant's whole box, scaled.
+    const b = k.variant.box;
+    const ext = Math.max(Math.abs(b.min.x), Math.abs(b.max.x), Math.abs(b.min.z), Math.abs(b.max.z), Math.abs(b.min.y), Math.abs(b.max.y));
+    k.rad[i] = ext * 1.7321 * Math.max(_s.x, _s.y, _s.z);
+    const bk = Math.floor(_p.x / PBK) * 65536 + Math.floor(_p.z / PBK);
+    let list = k.buckets.get(bk);
+    if (!list) k.buckets.set(bk, (list = []));
+    list.push(i);
+    touched.add(k);
   }
   pending.length = 0;
-  for (const [, list] of groups) {
-    const { id, variant } = list[0];
-    const v = variants.get(id)![variant];
-    const center = new THREE.Vector3();
-    for (const pl of list) center.add(new THREE.Vector3().setFromMatrixPosition(pl.matrix));
-    center.divideScalar(list.length);
-    const chunk: Chunk = { center, range: (RANGE[id] ?? DEFAULT_RANGE) + chunkOf(id) * 0.6, meshes: [], under: list[0].under };
-    for (const part of v.parts) {
-      const im = new THREE.InstancedMesh(part.geometry, part.material, list.length);
-      list.forEach((pl, i) => im.setMatrixAt(i, pl.matrix));
-      im.instanceMatrix.needsUpdate = true;
-      im.computeBoundingSphere();
-      im.computeBoundingBox();
+  for (const k of touched) {
+    if (k.cap >= k.n) continue;
+    // (Re)allocate the meshes with room for every placement of this kind.
+    for (const m of k.meshes) { m.removeFromParent(); m.dispose(); }
+    k.cap = k.n;
+    k.meshes = k.variant.parts.map((part) => {
+      const im = new THREE.InstancedMesh(part.geometry, part.material, k.cap);
+      im.count = 0;
+      im.visible = false;
+      im.frustumCulled = false; // culled per instance in refill()
       im.receiveShadow = true;
+      im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      im.matrixAutoUpdate = false;
       scene.add(im);
-      chunk.meshes.push(im);
-    }
-    chunks.push(chunk);
+      return im;
+    });
   }
   if (!ticker) {
-    // A tiny invisible mesh whose onBeforeRender culls the chunks by distance
-    // from whichever camera renders the scene.
+    // A tiny invisible mesh whose onBeforeRender refills the instances from
+    // whichever camera renders the scene.
     const empty = new THREE.BufferGeometry();
     empty.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
     ticker = new THREE.Mesh(empty, new THREE.MeshBasicMaterial());
     ticker.frustumCulled = false;
-    let n = 0;
-    ticker.onBeforeRender = (_r, _s, camera) => {
-      if (n++ % 4) return;
-      const cp = camera.getWorldPosition(tmp);
-      const under = cp.y - fastTerrain(cp.x, cp.z) < -2.4;
-      for (const c of chunks) {
-        const vis = c.center.distanceTo(cp) < c.range && c.under === under || c.center.distanceTo(cp) < 6;
-        for (const m of c.meshes) m.visible = vis;
-      }
-    };
+    ticker.onBeforeRender = (_r, _s2, camera) => refill(camera);
     scene.add(ticker);
   }
+  lastKey = ''; // refill on the next render
 }
-const tmp = new THREE.Vector3();
+
+const frustum = new THREE.Frustum(), pm = new THREE.Matrix4(), sph = new THREE.Sphere();
+const cp = new THREE.Vector3(), cd = new THREE.Vector3();
+let lastKey = '', frame = 0;
+/** Refill each kind's instances: in range (on the camera's side of the ground) and in view. */
+function refill(camera: THREE.Camera) {
+  frame++;
+  camera.getWorldPosition(cp);
+  camera.getWorldDirection(cd);
+  // Only when the view has changed (5 cm, about 1°), or every 30 frames.
+  const key = `${Math.round(cp.x * 20)},${Math.round(cp.y * 20)},${Math.round(cp.z * 20)},${Math.round(cd.x * 60)},${Math.round(cd.y * 60)},${Math.round(cd.z * 60)}`;
+  if (key === lastKey && frame % 30) return;
+  lastKey = key;
+  pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  frustum.setFromProjectionMatrix(pm);
+  const camUnder = cp.y - fastTerrain(cp.x, cp.z) < -2.4;
+  for (const k of kinds.values()) {
+    if (!k.meshes.length) continue;
+    // On the other side of the ground only right by it (the stair mouths).
+    const r2 = k.under === camUnder ? k.range2 : 36;
+    const r = Math.sqrt(r2);
+    const bx0 = Math.floor((cp.x - r) / PBK), bx1 = Math.floor((cp.x + r) / PBK), bz0 = Math.floor((cp.z - r) / PBK), bz1 = Math.floor((cp.z + r) / PBK);
+    let n = 0;
+    const dst = k.meshes[0].instanceMatrix.array as Float32Array;
+    const walk = (i: number) => {
+      const x = k.pos[i * 3] - cp.x, y = k.pos[i * 3 + 1] - cp.y, z = k.pos[i * 3 + 2] - cp.z;
+      if (x * x + y * y + z * z > r2) return;
+      sph.center.set(k.pos[i * 3], k.pos[i * 3 + 1], k.pos[i * 3 + 2]);
+      sph.radius = k.rad[i];
+      if (!frustum.intersectsSphere(sph)) return;
+      dst.set(k.mat.subarray(i * 16, i * 16 + 16), n * 16);
+      n++;
+    };
+    // Walk the buckets round the camera, or every placement if that is fewer.
+    if ((bx1 - bx0 + 1) * (bz1 - bz0 + 1) < k.buckets.size) {
+      for (let bi = bx0; bi <= bx1; bi++) for (let bj = bz0; bj <= bz1; bj++) {
+        const list = k.buckets.get(bi * 65536 + bj);
+        if (list) for (const i of list) walk(i);
+      }
+    } else for (let i = 0; i < k.n; i++) walk(i);
+    k.meshes.forEach((im, j) => {
+      if (j > 0 && n) (im.instanceMatrix.array as Float32Array).set(dst.subarray(0, n * 16));
+      im.count = n;
+      im.visible = n > 0;
+      if (n) {
+        im.instanceMatrix.clearUpdateRanges();
+        im.instanceMatrix.addUpdateRange(0, n * 16);
+        im.instanceMatrix.needsUpdate = true;
+      }
+    });
+  }
+}
+/** How many prop kinds, placements and drawn instances there are (debug). */
+export function propStats() {
+  let kindsN = 0, inst = 0, drawn = 0;
+  for (const k of kinds.values()) { kindsN++; inst += k.n; drawn += k.meshes[0]?.count ?? 0; }
+  return { kinds: kindsN, instances: inst, drawn };
+}
 
 /** Is there room for a prop here? (cheap rejection helper for scatterers) */
 export function rand01(seed: number) {

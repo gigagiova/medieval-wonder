@@ -1,4 +1,5 @@
 import RAW from './geo.json';
+import { cellaruloHeight } from './cellarulo';
 
 // Benevento as it lay c. AD 700, baked by tools/benevento/*.py: EU-DEM 25 m
 // elevations (smoothed, river channels carved), the Calore and Sabato from
@@ -76,6 +77,8 @@ export function baseHeight(x: number, z: number) {
     for (let a = 0; a < 4; a++) r += wx[a] * hAt(i - 1 + a, j - 1 + b);
     s += wz[b] * r;
   }
+  // North of the baked map: the Cellarulo plain (Ponte Fratto), see cellarulo.ts.
+  if (z < TT.z0) { const c = cellaruloHeight(x, z, s + DATUM); if (c !== null) return c - DATUM; }
   return s;
 }
 

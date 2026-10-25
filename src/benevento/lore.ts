@@ -70,7 +70,7 @@ const L: Lore[] = [
   {
     id: 'obeliscus', title: 'Signs of Egypt', kind: 'inscription', status: 'paraphrase', range: 6,
     latin: '[ an owl · a reed · the throne-sign of Isis · a seated woman · a coiled serpent · a falcon on a standard · … ]',
-    english: 'No one in Beneventum can read these signs. Scholars twelve centuries later will: the obelisk was set up for Isis, the Great, Lady of Beneventum, by one Lucilius Rufus, for the health and safe return of the emperor Domitian. Its broken brothers lie in the mud of the goddess\'s temple.',
+    english: 'No one in Beneventum can read these signs. Scholars twelve centuries later will: the obelisk was set up for Isis, the Great, Lady of Beneventum, by one Rutilius Lupus, for the health and safe return of the emperor Domitian. Its broken brothers lie in the mud of the goddess\'s temple.',
     source: 'Obelisks of the Iseum of Benevento (AD 88); reading after A. Erman (1893).',
   },
   {
@@ -84,6 +84,30 @@ const L: Lore[] = [
     latin: 'TE TIBI · VNA QVAE ES OMNIA · DEA ISIS',
     english: '"To you, goddess Isis, who being one are all things." On the relief the goddess wears a serpent at her brow, the uraeus. Scratched below, newer: "the gold one sleeps under the dukes\' apples."',
     source: 'Formula of a dedication from Capua (CIL X 3800), standing in for the lost texts of the Iseum. The scratched line is fiction.',
+  },
+  {
+    id: 'pontisTitulus', title: 'Three emperors on the parapet', kind: 'inscription', status: 'paraphrase', range: 6,
+    latin: 'DDD · NNN · VALENTINIANVS · VALENS · ET · GRATIANVS · PERPETVI · AVGGG …',
+    english: '"Our lords Valentinian, Valens and Gratian, ever Augusti…" The rest is broken away. Three hundred years ago the emperors had this bridge of the Appia repaired; their names run along the parapet. The townsfolk call it the marble bridge.',
+    source: 'Two fragments naming the three emperors (AD 367-375), from the parapet, now reused in a pier: Notizie degli Scavi 1891; Meomartini (1889). "Pontem marmoreum quod dicitur de Leprosis": charter of 1077 (Chronicon S. Sophiae). The wording after the names is reconstruction.',
+  },
+  {
+    id: 'castellum', title: 'The water-castle', kind: 'note', status: 'paraphrase',
+    latin: 'castellum aquae',
+    english: 'The Romans brought the water of the Serino here, to the highest ground of the town, and shared it out from this vaulted house to the baths and fountains below. The channel on the arches is dry now except after rain; a trickle still fills the dark hall, and the poor fetch it in jars. The watchmen on the roof can see the Via Summa a mile out.',
+    source: 'Roman bath building / castellum aquae of the Serino aqueduct under the Rocca dei Rettori, and the Samnite rampart and necropolis below it: excavations of 1998 (Rete museale della Provincia di Benevento, "Rocca dei Rettori"). The Lombard lookout is inferred.',
+  },
+  {
+    id: 'rocca', title: 'What the height will carry', kind: 'note', status: 'paraphrase',
+    latin: 'castrum vetus · turris · rocca rectorum',
+    english: 'Nobody here knows it yet: on this height a Lombard prince will raise a great tower (871/875); Arechis II will join a nunnery to a fortified house here (the castrum vetus); and in 1321 the governors sent by the Pope will build their castle, the Rocca of the Rectors, over this hall, with stones of the goddess\'s temple in its walls.',
+    source: 'Rocca dei Rettori: Torrione (871/875), Benedictine monastery (8th c.), papal works from 1321 (Pope John XXII). Isiac fragments built into the Rocca: Müller (1969).',
+  },
+  {
+    id: 'sophia', title: 'Six columns in the orchard', kind: 'note', status: 'paraphrase',
+    latin: 'columnae sex',
+    english: 'The duke\'s men have carted six Roman columns here, granite and marble, and propped a vine on two of them. Some sixty years on, Arechis II will build on this ground the church of Holy Wisdom, Sancta Sophia, for the whole Lombard people: a star of walls round a ring of eight pillars and, at its heart, six Roman columns like these.',
+    source: 'S. Sofia, founded c. 760 by Gisulf II / Arechis II (Chronicon Sanctae Sophiae); centrally planned, its inner hexagon of six reused Roman columns. The orchard and the stacked columns are reconstruction.',
   },
   {
     id: 'perticae', title: 'Why the poles', kind: 'note', status: 'attested',

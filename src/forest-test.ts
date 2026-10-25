@@ -5,8 +5,8 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { shared, makeSky, makeSurfaceMaterial, MAT } from './materials';
 import { Builder } from './builder';
-import { buildForest } from './forest';
-import { field } from './displace';
+import { buildForest, loadForest } from './forest';
+import { field, fastTerrain } from './displace';
 import { loadProps } from './props';
 
 // Dev page: ?cam=x,y,z,yaw,pitch [&world] [&frames=n]
@@ -28,7 +28,7 @@ scene.add(dl);
 const t0 = performance.now();
 let inside = (x: number, z: number) => Math.hypot(x, z) < 72;
 let keepOut = (x: number, z: number) => Math.abs(x - 3) < 7 && z > 60 && z < 200;
-await loadProps();
+await Promise.all([loadProps(), loadForest()]);
 const b = new Builder();
 if (params.has('world')) {
   const w = await import('./world');
@@ -42,12 +42,12 @@ if (params.has('world')) {
   const n = 240, S = 480;
   const g = new THREE.PlaneGeometry(S, S, n, n).rotateX(-Math.PI / 2);
   const p = g.attributes.position, v = new THREE.Vector3();
-  for (let i = 0; i < p.count; i++) { field(p.getX(i), 0, p.getZ(i), 'ground', v); p.setY(i, v.y); }
+  for (let i = 0; i < p.count; i++) { field(p.getX(i), 0, p.getZ(i), 'ground', v); p.setY(i, v.y + fastTerrain(p.getX(i), p.getZ(i))); }
   g.computeVertexNormals();
   scene.add(new THREE.Mesh(g, makeSurfaceMaterial(MAT.ground)));
   // A stand-in for the town wall.
   const wall = new THREE.Mesh(new THREE.CylinderGeometry(72, 72, 9, 48, 1, true), new THREE.MeshStandardMaterial({ color: 0x5a524a, side: THREE.DoubleSide }));
-  wall.position.y = 4;
+  wall.position.y = 4 + fastTerrain(72, 0);
   scene.add(wall);
 }
 const forest = buildForest(scene, b, { inside, keepOut });
@@ -59,17 +59,18 @@ composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeig
 composer.addPass(new OutputPass());
 
 const [x, y, z, yaw, pitch] = (params.get('cam') ?? '0,1.7,110,0,0').split(',').map(Number);
-camera.position.set(x, y + field(x, 0, z, 'ground', new THREE.Vector3()).y, z);
+camera.position.set(x, y + field(x, 0, z, 'ground', new THREE.Vector3()).y + fastTerrain(x, z), z);
 camera.rotation.set(pitch ?? 0, yaw ?? 0, 0, 'YXZ');
 camera.updateMatrixWorld();
 shared.uTime.value = 3;
+shared.uFogBase.value = camera.position.y - (y + 1.0);
 const frames = +(params.get('frames') ?? 4);
 let f = 0;
 function loop() {
   composer.render();
   if (++f >= frames) {
     const st = forest.userData.stats();
-    (window as any).__stats = () => `build ${buildMs.toFixed(0)}ms kinds ${st.kinds} instances ${st.instances} tris/set ${st.trianglesPerSet} drawn ${st.drawn} colliderTris ${b.colliders.reduce((a, g) => a + g.attributes.position.count / 3, 0)}`;
+    (window as any).__stats = () => `build ${buildMs.toFixed(0)}ms trees ${JSON.stringify(st)} calls ${renderer.info.render.calls} tris ${renderer.info.render.triangles} colliderTris ${b.colliders.reduce((a, g) => a + g.attributes.position.count / 3, 0)}`;
     (window as any).__done = true;
     return;
   }
