@@ -160,7 +160,7 @@ function water(scene: THREE.Scene) {
   }
   for (let k = 0; k < n - 1; k++) for (let i = 0; i < ACROSS; i++) {
     const a = k * (ACROSS + 1) + i, b2 = a + 1, c = a + ACROSS + 1, d = c + 1;
-    idx.push(a, c, b2, b2, c, d);
+    idx.push(a, b2, c, b2, d, c); // facing up (see rivers.ts)
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
