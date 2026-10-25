@@ -393,15 +393,14 @@ function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure, tonsur
     const face = w.z > hb.z + 0.03 && y > eyes.y - 0.14 && Math.abs(w.x - eyes.x) < 0.05;
     // Under a veil, nothing of her head behind the ears but skin (hair gathered at the nape would come through it).
     if (kit === 'woman' && cls[i] === 'head' && w.z < eyes.z - 0.07 && (s < 0.6 || (w.z < eyes.z - 0.1 && y > nk.y + 0.02))) { ok[i] = 0; continue; }
-    // Under a man's jaw, only the chin's clear skin: a shirt's collar (dark, and skinned to the neck) went for a
+    // Under the jaw, only the chin's clear skin: a shirt's collar (dark, and skinned to the neck) went for a
     // leather band, and the scan's own neck, lit and tinted otherwise, showed as a patch on the neck that goes on below.
-    if (kit === 'man' && c === 'head' && y < eyes.y - 0.13 && (s < 0.6 || Math.abs(w.x - eyes.x) > 0.035) && !(w.z > eyes.z - 0.05 && Math.abs(w.x - eyes.x) < 0.035 && y > eyes.y - 0.17)) { ok[i] = 0; continue; }
+    if (c === 'head' && y < eyes.y - (kit === 'man' ? 0.13 : 0.12) && (s < 0.6 || Math.abs(w.x - eyes.x) > 0.035) && !(w.z > eyes.z - 0.05 && Math.abs(w.x - eyes.x) < 0.035 && y > eyes.y - 0.17)) { ok[i] = 0; continue; }
     // ...and at the nape, below the hair, only the clearest (the neck's own skin goes on under it, see fillNeck).
     if (kit === 'man' && c === 'head' && w.z < eyes.z - 0.075 && y < eyes.y - 0.07 && s < 0.75 && !face) { ok[i] = 0; continue; }
-    // (Skin of the trunk only within a woman's neckline: elsewhere the tunic is fitted close and it would show
-    // through; a man's neck is filled in down into the tunic, see fillNeck, and his collar's edge came out ragged.)
-    const inNeck = Math.hypot(w.x - nk.x, w.z - nk.z) < 0.07 && y > nk.y - 0.07;
-    ok[i] = c === 'hand' || (c === 'head' && (s > 0.35 || face || (kit === 'man' && y > head - 0.01))) || (c === 'head' && s > 0.5 && y > collar) || (kit === 'woman' && (c === 'torso' || c === 'arm') && s > 0.5 && inNeck) ? 1 : 0;
+    // (No skin of the trunk: the neck is filled in from the jaw down into the tunic (see fillNeck);
+    // the scan's own, lit and tinted otherwise, showed in ragged strips round it.)
+    ok[i] = c === 'hand' || (c === 'head' && (s > 0.35 || face || (kit === 'man' && y > head - 0.01))) || (c === 'head' && s > 0.5 && y > collar) ? 1 : 0;
   }
   const keep: number[] = [];
   for (let t = 0; t < idx.count; t += 3) if (ok[idx.getX(t)] && ok[idx.getX(t + 1)] && ok[idx.getX(t + 2)]) keep.push(idx.getX(t), idx.getX(t + 1), idx.getX(t + 2));
@@ -649,7 +648,7 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure, kit: 'man' | 'woman') {
   const NRg = 12, NCg = 28, ray = new THREE.Ray(), o = new THREE.Vector3(), d = new THREE.Vector3();
   const R: number[][] = [], C: THREE.Vector3[] = [];
   for (let r = 0; r < NRg; r++) {
-    const t = -0.35 + (kit === 'man' ? 1.6 : 1.2) * (r / (NRg - 1));
+    const t = -0.35 + (kit === 'man' ? 1.6 : 1.45) * (r / (NRg - 1));
     const c = nk.clone().lerp(hb, t);
     c.z += 0.008;
     C.push(c);
@@ -707,7 +706,7 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure, kit: 'man' | 'woman') {
   const inv = m.matrixWorld.clone().invert();
   for (let r = 0; r < NRg; r++) for (let k = 0; k < NCg; k++) {
     // (Spreading at its base into the shoulders, as the muscles of a neck do: it reads shorter.)
-    const tr = -0.35 + (kit === 'man' ? 1.6 : 1.2) * (r / (NRg - 1));
+    const tr = -0.35 + (kit === 'man' ? 1.6 : 1.45) * (r / (NRg - 1));
     // (Within the neckline's own round at its foot: wider, it came out through the tunic's collar.)
     const a = (k / NCg) * Math.PI * 2, rr = Math.min(tr < 0.2 ? 0.06 : 1, Math.abs(R[r][k]) * (1 + 0.12 * ss(0.5, 0.1, tr) * (0.6 + 0.4 * Math.abs(Math.sin(a)))));
     v.set(C[r].x + Math.sin(a) * rr, C[r].y, C[r].z + Math.cos(a) * rr);
@@ -743,7 +742,7 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure, kit: 'man' | 'woman') {
   {
     const N = ng.attributes.normal, dn = new THREE.Vector3(0, -1, 0).transformDirection(inv), n = new THREE.Vector3();
     for (let r = 0; r < NRg; r++) {
-      const tr = -0.35 + (kit === 'man' ? 1.6 : 1.2) * (r / (NRg - 1)), w = ss(0.25, 0.85, tr);
+      const tr = -0.35 + (kit === 'man' ? 1.6 : 1.45) * (r / (NRg - 1)), w = ss(0.25, 0.85, tr);
       for (let k = 0; k < NCg; k++) {
         const i = r * NCg + k, f = 0.5 + 0.5 * Math.cos((k / NCg) * Math.PI * 2);
         n.fromBufferAttribute(N, i).addScaledVector(dn, 0.9 * w * f).normalize();
@@ -1482,7 +1481,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   const arms = (['Left', 'Right'] as const).map((sd) => {
     // (Round-topped, as a shoulder is: a flat top made a shelf the cloth fell off at a corner.)
     // (A woman's arms slimmer, her sleeves fitted.)
-    const fem = spec.hood === 'veil', sh = bone(sd + 'Arm'), len = 0.5, r = fem ? 0.078 : 0.09;
+    const fem = spec.hood === 'veil', sh = bone(sd + 'Arm'), len = 0.5, r = fem ? 0.088 : 0.09;
     const c = new THREE.CapsuleGeometry(r, len, 6, 14);
     c.translate(sh.x + Math.sign(sh.x - hips.x) * (fem ? 0.015 : 0.03), sh.y - len / 2 - r + 0.035, sh.z - 0.025);
     return c;
@@ -2293,7 +2292,7 @@ const HOODS: Record<HoodKind, {
   fold: number; point: number; group: number;
 }> = {
   // A woman's veil: linen laid close over the hair, open down the front.
-  veil: { off: 0.008, top: 0.06, bottom: null, open: 0.86, hem: [-0.17, -0.14, -0.23], flare: [0.04, 0.1], fold: 0.016, point: 0.022, group: G_HEAD },
+  veil: { off: 0.008, top: 0.06, bottom: null, open: 0.7, hem: [-0.17, -0.14, -0.23], flare: [0.04, 0.1], fold: 0.016, point: 0.022, group: G_HEAD },
   // A layman's hood (cucullus) with its cape over the shoulders, closed under the chin.
   hood: { off: 0.024, top: 0.07, bottom: -0.105, open: 0.72, hem: [-0.2, -0.07, -0.19], flare: [0.05, 0.14], fold: 0.013, point: 0.02, group: G_HEAD },
   // A monk's cowl: deeper, pointed behind, its capelet to the middle of the upper arm.
@@ -2328,8 +2327,8 @@ function layHood(M: Measure, kind: HoodKind, clothes: MeshBVH, under: MeshBVH, a
   // The face's opening (half its angle round the head's axis), by height: rounded at the top and, for a hood, at the chin.
   const open = (y: number) => {
     if (y >= yTop || y <= yBot) return 0;
-    // (Round over the brow: an ellipse's quarter, not a point.)
-    const a = Math.sqrt(1 - Math.min(1, ((y - (yTop - 0.06)) / 0.06) ** 2) * (y > yTop - 0.06 ? 1 : 0)) * (K.bottom === null ? 1 : Math.sqrt(ss(yBot, yBot + 0.045, y)));
+    // (A veil's edge runs straight across the brow from temple to temple; a hood's is round over it.)
+    const a = (kind === 'veil' ? ss(yTop, yTop - 0.015, y) : Math.sqrt(1 - Math.min(1, ((y - (yTop - 0.06)) / 0.06) ** 2) * (y > yTop - 0.06 ? 1 : 0))) * (K.bottom === null ? 1 : Math.sqrt(ss(yBot, yBot + 0.045, y)));
     return K.open * a + (K.bottom === null ? 0.1 * ss(yLeave(0), yLeave(0) - 0.15, y) : 0);
   };
   const NC = 36, NH = kind === 'veil' ? 18 : 16, NF = kind === 'veil' ? 13 : 11, NR = NH + NF;
@@ -2377,6 +2376,11 @@ function layHood(M: Measure, kind: HoodKind, clothes: MeshBVH, under: MeshBVH, a
       return p;
     }));
   }
+  // A veil's brow: straight across, its middle no higher than its two ends.
+  if (kind === 'veil') {
+    const r0 = opens.findIndex((o) => o > 0);
+    if (r0 > 0) Pt[r0 - 1][0].copy(Pt[r0][0]).lerp(Pt[r0][NC], 0.5).lerp(Pt[r0 - 1][0], 0.35);
+  }
   // The fall: each column from where it left the head, out and down, laid
   // over the shoulders and back.
   const colliders = [capsule(new THREE.Vector3(nk.x, nk.y - 0.03, nk.z - 0.01), new THREE.Vector3(Hc.x, Hc.y - 0.03, Hc.z), 0.066), starField(under, nk.x, nk.z, yLow, H.top + 0.02)];
@@ -2384,7 +2388,8 @@ function layHood(M: Measure, kind: HoodKind, clothes: MeshBVH, under: MeshBVH, a
   const outOf = (q: THREE.Vector3, m: number) => { q.toArray(tmp); for (let it = 0; it < 2; it++) for (const c of colliders) c(tmp, 0, m); return q.fromArray(tmp); };
   const o1 = opens[NH - 1];
   for (let f = 1; f <= NF; f++) {
-    const t = f / NF, o = o1 > 0 ? o1 + 0.12 * t : 0;
+    // (A veil's two ends fall away from the face to the sides, its front edges aslant.)
+    const t = f / NF, o = o1 > 0 ? o1 + (kind === 'veil' ? 0.45 : 0.12) * t : 0;
     Pt.push(bearings(o).map((ph, c) => {
       // (A hand-cut, hand-hemmed edge: never quite level.)
       const jag = (Math.sin(ph * 3 + ph0) * 0.6 + Math.sin(ph * 7 + ph0 * 2.3) * 0.4) * 0.011;
