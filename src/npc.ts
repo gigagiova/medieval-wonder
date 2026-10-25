@@ -114,15 +114,23 @@ export function loadNpcAssets(): Promise<void> {
     npcDebug.buildMs.retarget = performance.now() - t0;
     (npcDebug as unknown as { heads: unknown }).heads = Object.fromEntries(Object.entries(kits).map(([k, v]) => [k, { ...v.m.head, c: v.m.head.c.toArray(), hb: v.m.bone('Head').toArray(), top: v.m.bone('HeadTop_End').toArray(), neck: v.m.bone('Neck').toArray(), hips: v.m.bone('Hips').toArray() }]));
     weave = makeWeave();
-    // Tailoring takes a while: one outfit per slice, so the page stays responsive.
-    for (const id of Object.keys(OUTFITS) as OutfitId[]) for (const body of OUTFITS[id].bodies) {
-      await new Promise((r) => setTimeout(r, 0));
-      const t1 = performance.now();
-      outfits.set(`${id}:${body}`, tailor(id, body));
-      npcDebug.buildMs[`${id}:${body}`] = performance.now() - t1;
-    }
+    // Outfits are tailored when first needed (see outfitFor): the town dresses
+    // the people nearest the camera first, one outfit a frame.
   })();
   return loading;
+}
+
+/** An outfit on a body, tailored on first use (0.2-0.7 s each). */
+function outfitFor(key: string): Outfit {
+  let o = outfits.get(key);
+  if (!o) {
+    const [id, body] = key.split(':') as [OutfitId, BodyId];
+    const t1 = performance.now();
+    o = tailor(id, body);
+    npcDebug.buildMs[key] = Math.round(performance.now() - t1);
+    outfits.set(key, o);
+  }
+  return o;
 }
 
 function tailor(id: OutfitId, body: BodyId): Outfit {
@@ -875,14 +883,25 @@ export class Person {
   }
 }
 
-/** Make one person (also used by the test page). */
-export function makePerson(scene: THREE.Scene, role: Role, o: { outfit?: number; body?: number; seed?: number; gear?: Gear } = {}) {
+/** Who a person will be: their outfit (by key), dice and gear, decided before they are dressed. */
+interface Casting { role: Role; key: string; id: OutfitId; rnd: () => number; gear?: Gear }
+function cast(role: Role, o: { outfit?: number; body?: number; seed?: number; gear?: Gear } = {}): Casting {
   const rnd = mulberry(o.seed ?? rngSeed++ * 7919);
   const ids = ROLE_OUTFITS[role];
   const id = ids[(o.outfit ?? Math.floor(rnd() * ids.length)) % ids.length];
   const bs = OUTFITS[id].bodies;
-  const outfit = outfits.get(`${id}:${bs[(o.body ?? Math.floor(rnd() * bs.length)) % bs.length]}`)!;
-  let gear = o.gear;
+  return { role, id, key: `${id}:${bs[(o.body ?? Math.floor(rnd() * bs.length)) % bs.length]}`, rnd, gear: o.gear };
+}
+
+/** Make one person (also used by the test page). */
+export function makePerson(scene: THREE.Scene, role: Role, o: { outfit?: number; body?: number; seed?: number; gear?: Gear } = {}) {
+  return dress(scene, cast(role, o));
+}
+
+function dress(scene: THREE.Scene, c: Casting) {
+  const { role, id, rnd } = c;
+  const outfit = outfitFor(c.key);
+  let gear = c.gear;
   if (!gear) {
     const x = rnd();
     gear = role === 'monk' ? { lantern: x < 0.6 }
@@ -1002,6 +1021,8 @@ class Town {
   talking: Agent | null = null;
   candidate: Agent | null = null;
   private frame = 0;
+  /** People placed but not yet dressed (see admit). */
+  private pending: { a: Agent; c: Casting; pos: THREE.Vector3; yaw: number }[] = [];
 
   constructor(private scene: THREE.Scene, private o: TownOpts) {
     this.streets = prepStreets(o.streets);
@@ -1068,9 +1089,10 @@ class Town {
     for (const pl of plan) if (pl.kind === 'group') { const k = `${pl.at!.x},${pl.at!.z}`; groups.set(k, (groups.get(k) ?? 0) + 1); }
     const placed = new Map<string, number>();
     for (const pl of plan) {
-      const p = makePerson(this.scene, pl.role);
+      // Placed now, dressed later (nearest first, see admit).
+      const p = { pos: new THREE.Vector3(), yaw: 0 };
       const a: Agent = {
-        p, mode: 'walk', resume: 'walk', timer: 0, nextPause: 8 + rnd() * 25,
+        p: null as unknown as Person, mode: 'walk', resume: 'walk', timer: 0, nextPause: 8 + rnd() * 25,
         st: 0, s: 0, dir: 1, off: 0, allowed: pl.zone ?? null,
         home: new THREE.Vector3(), homeYaw: 0, chatCool: 10, partner: null, talkCycle: rnd() * 5, lastJ: -1,
         maxSpeed: (pl.role === 'monk' ? 1.0 : pl.role === 'soldier' ? 1.3 : 1.15) * (0.9 + rnd() * 0.2), vel: new THREE.Vector2(),
@@ -1104,10 +1126,35 @@ class Town {
         a.chatCool = -1; // marks a group member
       }
       p.pos.y = o.ground(p.pos.x, p.pos.z);
-      if (p.lamp) o.lamps.push(p.lamp);
-      this.agents.push(a);
+      this.pending.push({ a, c: cast(pl.role), pos: p.pos, yaw: p.yaw });
     }
     this.ui.onActivate = () => this.activate();
+    // The first two at once (the gate's guards, as the plan begins), so the town is not empty.
+    this.admit(null, 2);
+  }
+
+  /**
+   * Dress the waiting person nearest the camera: tailor their outfit if no
+   * one wears it yet (one outfit a frame: tailoring takes a few tenths of a
+   * second), then bring them in (up to `n` a frame when their outfits are ready).
+   */
+  private admit(cam: THREE.Vector3 | null, n = 1) {
+    for (let k = 0; k < n && this.pending.length; k++) {
+      let bi = 0;
+      if (cam) {
+        let bd = Infinity;
+        this.pending.forEach((q, i) => { const d = q.pos.distanceToSquared(cam); if (d < bd) { bd = d; bi = i; } });
+      }
+      const q = this.pending[bi], ready = outfits.has(q.c.key);
+      if (!ready && k > 0) return;
+      this.pending.splice(bi, 1);
+      const p = (q.a.p = dress(this.scene, q.c));
+      p.pos.copy(q.pos);
+      p.yaw = q.yaw;
+      if (p.lamp) this.o.lamps.push(p.lamp);
+      this.agents.push(q.a);
+      if (!ready) return;
+    }
   }
 
   dispose() {
@@ -1209,6 +1256,7 @@ class Town {
     const t0 = performance.now();
     this.frame++;
     const cam = camera.position;
+    if (this.pending.length) this.admit(cam, 2);
     const frustum = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     const sphere = new THREE.Sphere();
     // --- behaviour
