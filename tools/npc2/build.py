@@ -94,6 +94,9 @@ for gid, g in GARMENTS.items():
         garments[gid] = o
         zd = [l.split()[1] for l in open(path, encoding='utf-8', errors='replace') if l.startswith('z_depth')]
         gspec[gid] = {'depth': int(zd[0]) if zd else 50, 'delete': 'Delete.' + os.path.basename(path)[:-6].replace(' ', '_')}
+        if g.get('lift'):
+            import derive as _d
+            log('hood lifted', gid, round(_d.lift_hood(o, basemesh), 3), 'pushed out', _d.relax(o, basemesh, 0, gap=0.008))
         if g.get('relax'):
             import derive as _d
             log('relaxed', gid, _d.relax(o, basemesh, g['relax']))
