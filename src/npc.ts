@@ -33,8 +33,8 @@ const OUTFITS: Record<OutfitId, { kit: Kit; spec: GarmentSpec; beard: boolean; w
   monk: { kit: 'man', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
   peasantHood: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather', thighs: 0.6, swing: true } },
   peasantCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.6, swing: true, cloakClose: true } },
-  soldier: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 1 } },
-  soldierCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 1, capeOnTunic: true, capeOpen: 0.8 } },
+  soldier: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 0.6 } },
+  soldierCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 0.6, capeOnTunic: true, capeOpen: 0.8 } },
   woman: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
   womanShawl: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
 };
@@ -367,7 +367,7 @@ export class Person {
     // shoe's collar turning inside it about the ankle.
     if (OUTFITS[this.outfit.id].wraps) for (const s of ['Left', 'Right']) {
       const f = m.bone(s + 'Foot'), k = m.bone(s + 'Leg');
-      on(s + 'Leg', Props.makeShoeTop(0.049), Props.placeAt(new THREE.Vector3(f.x, f.y, f.z + 0.005), new THREE.Quaternion().setFromUnitVectors(UP, k.clone().sub(f).normalize())));
+      on(s + 'Leg', Props.makeShoeTop(0.056), Props.placeAt(new THREE.Vector3(f.x, f.y, f.z + 0.005), new THREE.Quaternion().setFromUnitVectors(UP, k.clone().sub(f).normalize())));
     }
     if (g.helmet) { const h = Props.makeHelmet(m, g.helmet === true ? 'spangen' : g.helmet); on('Head', h.obj, h.place); }
     // Felt in the colours of undyed and walnut-dyed wool.
@@ -376,7 +376,7 @@ export class Person {
     if (g.arms) {
       on('Hips', Props.makeBeltFittings(belt, r() * 10), new THREE.Matrix4());
       // Spatha at the left hip, point trailing back.
-      const aL = 1.42, rL = belt.r(aL) + 0.055;
+      const aL = g.shield === 'arm' ? 1.85 : 1.42, rL = belt.r(aL) + 0.055; // behind the shield arm's wrist
       // It slants back and, below the belt, out over the flare of the skirt.
       const nL = new THREE.Vector3(Math.sin(aL), 0, Math.cos(aL)), tL = new THREE.Vector3(-Math.cos(aL), 0, Math.sin(aL));
       const yL = new THREE.Vector3(0, Math.cos(0.6), 0).addScaledVector(tL, Math.sin(0.6)).addScaledVector(nL, -0.1).normalize();
@@ -384,7 +384,7 @@ export class Person {
       const spatha = Props.makeSpatha(), qS = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(yL.clone().cross(zL), yL, zL));
       // Walking or standing, his left hand rests on the hilt, palm down and in.
       const palm = new THREE.Vector3(-1, -1, 0).normalize().applyQuaternion(qS.clone().invert());
-      if (g.shield !== 'arm') this.leftGrip = { obj: spatha, at: new THREE.Vector3(0, 0.07, 0), axis: new THREE.Vector3(0, -1, 0), palm, depth: 0.02, always: false, pole: new THREE.Vector3(0.5, -0.2, -1) };
+      if (g.shield !== 'arm') this.leftGrip = { obj: spatha, at: new THREE.Vector3(0, 0.055, 0), axis: new THREE.Vector3(0, -1, 0), palm, depth: 0.028, always: false, pole: new THREE.Vector3(0.5, -0.2, -1) };
       on('Hips', spatha, Props.placeAt(new THREE.Vector3(belt.cx + Math.sin(aL) * rL, belt.y - 0.01, belt.cz + Math.cos(aL) * rL - 0.02), qS));
       // The scramasax hangs flat against his right hip, behind the spear
       // hand, its point slanting down and back (under a cloak, out of sight).

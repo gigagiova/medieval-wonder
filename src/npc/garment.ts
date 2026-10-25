@@ -244,8 +244,8 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
         v.fromBufferAttribute(n, i).normalize();
         p.setXYZ(i, p.getX(i) - v.x * k, p.getY(i) - v.y * k, p.getZ(i) - v.z * k);
       }
-      // ...and taper the flared trouser cuffs in round the ankle, down inside
-      // the shoes, so wraps run into the shoe tops without a ragged ring.
+      // ...and taper the flared trouser cuffs in round the ankle and end them
+      // level inside the leather shoe tops (props.ts makeShoeTop, on the shin).
       const shin = (['Left', 'Right'] as const).map((s) => ({ a: o.m.bone(s + 'Leg'), b: o.m.bone(s + 'Foot') }));
       const top = shin[0].b.y + 0.13, c = new THREE.Vector3(), d = new THREE.Vector3();
       for (let i = 0; i < p.count; i++) {
@@ -256,20 +256,20 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
         c.copy(a).addScaledVector(d, w.clone().sub(a).dot(d) / d.lengthSq());
         const f = THREE.MathUtils.smoothstep(top - w.y, 0, 0.1), r = w.distanceTo(c);
         if (r < 1e-4) continue;
-        const rr = THREE.MathUtils.lerp(r, Math.min(r, 0.048), f);
+        const rr = THREE.MathUtils.lerp(r, Math.min(r, 0.043), f);
         w.sub(c).multiplyScalar(rr / r).add(c);
-        w.y -= 0.04 * THREE.MathUtils.smoothstep(b.y - w.y, 0, 0.035); // the cut edge well down in the shoe
+        w.y = Math.max(w.y, b.y - 0.025);
         w.applyMatrix4(inv);
         p.setXYZ(i, w.x, w.y, w.z);
       }
-      // The bit inside the shoe moves with the foot, as the shoe does, so its
-      // edge never pops out when the ankle bends.
+      // The bit inside the shoe top rides on the shin, as the shoe top does,
+      // so its cut edge never swings out of it when the ankle bends.
       const si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
-      const footI = (['Left', 'Right'] as const).map((s) => m.skeleton.bones.findIndex((x) => canon(x.name) === s + 'Foot'));
+      const footI = (['Left', 'Right'] as const).map((s) => m.skeleton.bones.findIndex((x) => canon(x.name) === s + 'Leg'));
       for (let i = 0; i < p.count; i++) {
         m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld);
         const side = Math.abs(w.x - shin[0].b.x) < Math.abs(w.x - shin[1].b.x) ? 0 : 1;
-        const t = THREE.MathUtils.smoothstep(shin[side].b.y + 0.035 - w.y, 0, 0.06);
+        const t = THREE.MathUtils.smoothstep(shin[side].b.y + 0.07 - w.y, 0, 0.04);
         if (t <= 0 || footI[side] < 0) continue;
         const ws = [0, 1, 2, 3].map((k) => sw.getComponent(i, k) * (1 - t));
         const is = [0, 1, 2, 3].map((k) => si.getComponent(i, k));
@@ -809,7 +809,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
         ys[k] = vv.y;
       }
       // Smoothed round, so no single column stands up in a spike.
-      smooth(ys, NA, true, 2);
+      smooth(ys, NA, true, r === 0 && !spec.hood ? 10 : 2); // an open neckline: one easy rise over each shoulder
       for (let k = 0; k < NA; k++) tunic.pos[(r * NA + k) * 3 + 1] = ys[k];
     }
   }
