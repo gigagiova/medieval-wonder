@@ -133,7 +133,7 @@ vec3 applyAtmos(vec3 col, vec3 wpos){
 // (normal, OpenGL), tM (R ao, G roughness, B height). The ground also gets
 // tA2/tN2/tM2 (Roman basoli) and tA3/tN3/tM3 (mud).
 export const surfaceGLSL = /* glsl */ `
-struct Surf { vec3 alb; float rough; float ao; vec3 nrm; vec3 emi; float h; };
+struct Surf { vec3 alb; float rough; float ao; vec3 nrm; vec3 emi; float h; float wet; };
 
 uniform sampler2D uTown; // R Roman paving, G street, B gutter, A terrain height
 uniform vec4 uTownBox;   // x0, z0, 1/width, 1/depth (metres)
@@ -266,7 +266,8 @@ void weather(inout Surf s, vec3 p, vec3 n, float mossAmt){
   float damp = (1.0 - smoothstep(0.0, dampLine, y - hb * 0.8)) * (1.0 - under) * (1.0 - smoothstep(0.5, 0.9, n.y));
   s.alb *= mix(1.0, 0.6, damp);
   s.alb = mix(s.alb, s.alb*vec3(0.82, 0.92, 0.72), damp*0.5);
-  s.rough = mix(s.rough, 0.7, damp*0.5);
+  s.rough = mix(s.rough, 0.45, damp*0.6);
+  s.wet = max(s.wet, damp * smoothstep(0.55, 0.2, s.h) * 0.5);
   // Grime: soot and dust in every joint, more of it low on the wall.
   float grime = smoothstep(0.45, 0.1, s.h) * (0.5 + 0.5 * (1.0 - smoothstep(0.0, 3.0, y)));
   s.alb *= 1.0 - 0.35 * grime;
@@ -282,7 +283,7 @@ void weather(inout Surf s, vec3 p, vec3 n, float mossAmt){
 vec3 tintTex(vec3 c, vec3 tint, float k){ return c * mix(vec3(1.0), tint, k); }
 
 Surf surface(vec3 p, vec3 n){
-  Surf s; s.emi = vec3(0.); s.rough = 0.9; s.ao = 1.0; s.nrm = n; s.alb = vec3(0.2); s.h = 0.5;
+  Surf s; s.emi = vec3(0.); s.rough = 0.9; s.ao = 1.0; s.nrm = n; s.alb = vec3(0.2); s.h = 0.5; s.wet = 0.0;
 #if defined(TILE) && MAT != 1 && MAT != 4
   Smp t = biplanar(p, n);
   s.alb = t.a * ALB_K;
@@ -374,10 +375,15 @@ Surf surface(vec3 p, vec3 n){
   s.alb *= 1.0 - 0.4 * gap;
   s.rough = mix(s.rough, 0.8, gap * 0.5);
   // Standing water: in the gutters and the low spots of the mud. Dull, not mirrors.
-  float wet = clamp(tw.b * street + mud * smoothstep(0.62, 0.7, nz.g) * smoothstep(0.35, 0.15, m.b), 0.0, 1.0) * (1.0 - under);
-  s.alb *= 1.0 - 0.4*wet;
-  s.rough = mix(s.rough, 0.3, wet);
-  s.nrm = normalize(mix(s.nrm, n, wet*0.7));
+  // Standing water after the day's rain: the gutters, puddles in the low
+  // parts of the street and the mud, and a film in the gaps between stones.
+  // Only these are wet (glossy); the stones' crowns stay dull.
+  float pud = smoothstep(0.62, 0.7, nz.g + (0.35 - m.b) * 0.5);
+  float wet = clamp(tw.b * street + pud * (street * 0.8 + mud) + gap * street * 0.5, 0.0, 1.0) * (1.0 - under);
+  s.alb *= 1.0 - 0.45*wet;
+  s.rough = mix(s.rough, 0.22, wet);
+  s.nrm = normalize(mix(s.nrm, n, smoothstep(0.5, 1.0, wet) * 0.8));
+  s.wet = wet;
   s.alb *= 0.88 + 0.24*nz.b;
 #elif MAT == 6
   float g = vnoise(p*40.);

@@ -305,7 +305,7 @@ Object.assign(ao.configuration, { aoRadius: 1.6, distanceFalloff: 1.2, intensity
 (ao as { autoDetectTransparency: boolean }).autoDetectTransparency = false;
 ao.setQualityMode('Medium');
 composer.addPass(ao);
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.35, 0.5, 0.95);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.5, 0.7, 0.95);
 // Key light scattered in the mist (shafts), composited together with the
 // NaN guard: one bad pixel (NaN/inf) would be smeared over the whole screen
 // by the bloom, so non-finite or absurd values are cleared in the same pass.
@@ -314,10 +314,12 @@ composer.addPass(shafts);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 const grade = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) }, uUnder: shared.uUnder },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) }, uUnder: shared.uUnder,
+    // contrast (S-curve mix), saturation, saturation of warm light, vignette
+    uGrade: { value: new THREE.Vector4(0.4, 0.68, 1.0, 1.0) } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
   fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse; uniform float uTime; uniform vec2 uRes; uniform float uUnder;
+    uniform sampler2D tDiffuse; uniform float uTime; uniform vec2 uRes; uniform float uUnder; uniform vec4 uGrade;
     varying vec2 vUv;
     float h(vec2 p){ vec3 p3=fract(vec3(p.xyx)*.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
     float lu(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
@@ -346,15 +348,17 @@ const grade = new ShaderPass({
     void main(){
       vec2 c = vUv - 0.5; float r = dot(c,c);
       vec3 col = fxaa(vUv);
-      float l = dot(col, vec3(0.299,0.587,0.114));
-      // Cold, sick-green shadows; fire stays warm; blacks crushed.
-      // Grey overcast: cool neutral shadows, no warm push; firelight keeps its own colour.
-      vec3 shadowTint = mix(vec3(0.95,1.0,1.04), vec3(1.05,0.92,0.8), uUnder);
-      col = mix(col*shadowTint, col, smoothstep(0.0,0.3,l));
-      col = mix(col, col*col*(3.0-2.0*col), 0.22);
-      float sat = mix(0.6, 0.85, smoothstep(0.15, 0.6, l));
-      col = mix(vec3(dot(col, vec3(0.299,0.587,0.114))), col, sat);
-      col *= 1.0 - r*0.9;
+      // A film still, not a video game: an S-curve for contrast, split
+      // toning (cold blue-grey shadows, a faint warmth in the highlights),
+      // colour muted except the warm light of fire and lamps.
+      float l = lu(col);
+      col = mix(col, col*col*(3.0-2.0*col), uGrade.x);
+      vec3 shadowT = mix(vec3(0.9, 0.98, 1.07), vec3(1.05, 0.92, 0.8), uUnder);
+      col *= mix(vec3(1.0), shadowT, 1.0 - smoothstep(0.0, 0.35, l));
+      col *= mix(vec3(1.0), vec3(1.05, 1.0, 0.93), smoothstep(0.45, 0.9, l) * 0.6);
+      float warm = smoothstep(0.02, 0.15, col.r - col.b);
+      col = mix(vec3(lu(col)), col, mix(uGrade.y, uGrade.z, warm));
+      col *= 1.0 - r * uGrade.w;
       // Dither below one 8-bit step: breaks banding in the fog, invisible as grain.
       col += (h(vUv*uRes) - 0.5) / 255.0;
       gl_FragColor = vec4(max(col, 0.0), 1.0);

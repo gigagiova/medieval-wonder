@@ -134,7 +134,10 @@ export function field(x: number, y: number, z: number, m: MatName, out: THREE.Ve
 }
 function fieldW(x: number, y: number, z: number, m: MatName, out: THREE.Vector3) {
   const a = (AMP[m] ?? 1) * (1.6 - 0.6 * THREE.MathUtils.smoothstep(y, -4, -2));
-  const macro = 0.2, meso = 0.07;
+  // Masonry keeps its bulge and lean (macro) but not metre-scale dents: with
+  // smooth vertex normals those read as moulded clay, and the scanned relief
+  // in the shader does that job crisply. Ground and rock keep their lumps.
+  const macro = 0.2, meso = m === 'ground' || m === 'rock' ? 0.07 : 0.025;
   let dx = macro * noise(x / 4.7, y / 4.7, z / 4.7) + meso * noise(x / 1.3 + 31, y / 1.3, z / 1.3);
   let dy = macro * 0.6 * noise(x / 4.7 + 17, y / 4.7, z / 4.7) + meso * noise(x / 1.3, y / 1.3 + 19, z / 1.3);
   let dz = macro * noise(x / 4.7, y / 4.7, z / 4.7 + 53) + meso * noise(x / 1.3, y / 1.3, z / 1.3 + 41);
