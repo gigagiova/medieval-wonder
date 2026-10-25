@@ -1159,10 +1159,44 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   for (const g of sleeves) {
     const ax = (g as Grid & { axis: THREE.Vector3[] }).axis;
     fitRadial(g, (i, c) => c.copy(ax[Math.floor(i / g.cols)]), S.arms, bell ? 0.022 : 0.014, 0.16);
+    // The scans' arms are in modern sleeves (a jacket's, padded at the
+    // shoulder) and are never seen: no wider than a man's arm and the cloth on it.
+    if (!bell) for (let i = 0; i < g.pos.length / 3; i++) {
+      const r = Math.floor(i / g.cols), f = r / (g.rows - 1), C = ax[r];
+      const cap = THREE.MathUtils.lerp(0.068, 0.05, ss(0, 0.55, f)) - 0.006 * ss(0.6, 1, f);
+      vv.fromArray(g.pos, i * 3).sub(C);
+      const d = vv.length();
+      if (d > cap) vv.multiplyScalar(cap / d).add(C).toArray(g.pos, i * 3);
+    }
     // Its top tucks in under the yoke rather than standing open above the shoulder.
     for (const [r, k] of [[0, 0.55], [1, 0.85]]) for (let c = 0; c < g.cols; c++) {
       const o = (r * g.cols + c) * 3;
       vv.fromArray(g.pos, o).sub(ax[r]).multiplyScalar(k).add(ax[r]).toArray(g.pos, o);
+    }
+  }
+  // Where the yoke comes down over the top of the arm, its edge is laid onto
+  // the sleeve (5 mm off it) instead of standing off it as a shelf: the yoke
+  // and the sleeve meet in a seam, not a step.
+  {
+    const sv = new MeshBVH(mergeGeometries(sleeves.map((g) => posOnly(gridGeometry(g))))!);
+    const ix = sv.geometry.index!, SP = sv.geometry.attributes.position;
+    const hit = { point: new THREE.Vector3(), distance: 0, faceIndex: 0 }, n = new THREE.Vector3(), nk = bone('Neck');
+    let nY = 0;
+    while (nY < NR && tunic.region[nY * NA] === 4) nY++;
+    for (let r = Math.max(1, nY - 3); r < nY + 1 && r < NR; r++) {
+      const k = r >= nY - 1 ? 1 : r === nY - 2 ? 0.6 : 0.25;
+      for (let c = 0; c < NA; c++) {
+        const o = (r * NA + c) * 3;
+        vv.fromArray(tunic.pos, o);
+        if (Math.abs(vv.x - nk.x) < 0.12) continue;
+        sv.closestPointToPoint(vv, hit);
+        if (hit.distance > 0.06) continue;
+        tri.a.fromBufferAttribute(SP, ix.getX(hit.faceIndex * 3)); tri.b.fromBufferAttribute(SP, ix.getX(hit.faceIndex * 3 + 1)); tri.c.fromBufferAttribute(SP, ix.getX(hit.faceIndex * 3 + 2));
+        tri.getNormal(n);
+        if (n.dot(o2.subVectors(vv, hit.point)) < 0) n.negate();
+        const want = o2.copy(hit.point).addScaledVector(n, 0.005);
+        vv.lerp(want, k * ss(0.06, 0.02, hit.distance)).toArray(tunic.pos, o);
+      }
     }
   }
   // Keep the belt on the fitted cloth.
