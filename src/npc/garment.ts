@@ -64,6 +64,8 @@ export interface Garment {
    * out along q's normal (cn), so they keep to the edge however it moves.
    */
   bands?: { v: Uint32Array; q: Uint32Array; q2: Uint32Array; cb: Float32Array; cn: Float32Array };
+  /** Where a cloak's brooch sits (bind pose), if it has one. */
+  brooch?: THREE.Vector3;
   /** Where the belt sits, for fittings hung on it. */
   belt: { y: number; cx: number; cz: number; r: (a: number) => number };
 }
@@ -257,6 +259,8 @@ function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure) {
     // the face everything (lips, lids, beard), a man's head his hair; below
     // the jaw, and on the trunk, only skin.
     const face = w.z > hb.z + 0.03 && y > eyes.y - 0.14 && Math.abs(w.x - eyes.x) < 0.05;
+    // Under a veil, nothing of her head behind the ears but skin (hair gathered at the nape would come through it).
+    if (kit === 'woman' && cls[i] === 'head' && w.z < eyes.z - 0.07 && (s < 0.6 || (w.z < eyes.z - 0.1 && y > nk.y + 0.02))) { ok[i] = 0; continue; }
     // (Skin of the trunk only within the neckline: elsewhere the tunic is fitted close and it would show through.)
     const inNeck = Math.hypot(w.x - nk.x, w.z - nk.z) < 0.07 && y > nk.y - 0.07;
     ok[i] = c === 'hand' || (c === 'head' && (s > 0.35 || face || (kit === 'man' && y > head - 0.01))) || (c === 'head' && s > 0.5 && y > collar) || ((c === 'torso' || c === 'arm') && s > 0.5 && inNeck) ? 1 : 0;
@@ -264,6 +268,37 @@ function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure) {
   const keep: number[] = [];
   for (let t = 0; t < idx.count; t += 3) if (ok[idx.getX(t)] && ok[idx.getX(t + 1)] && ok[idx.getX(t + 2)]) keep.push(idx.getX(t), idx.getX(t + 1), idx.getX(t + 2));
   g.setIndex(keep);
+  // A wristwatch (painted out in the atlas, but still standing proud of the
+  // wrist): everything round the wrist pressed in to the wrist's own round.
+  {
+    const P = g.attributes.position, inv = m.matrixWorld.clone().invert(), c = new THREE.Vector3();
+    for (const side of ['Left', 'Right']) {
+      const A = M.bone(side + 'ForeArm'), B = M.bone(side + 'Hand'), T = B.clone().sub(A).normalize();
+      const radii: number[] = [];
+      for (let i = 0; i < cls.length; i++) {
+        if (cls[i] !== 'hand' && cls[i] !== 'arm') continue;
+        m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld);
+        const along = w.clone().sub(B).dot(T);
+        if (along < -0.08 || along > -0.01) continue;
+        c.copy(B).addScaledVector(T, along);
+        radii.push(w.distanceTo(c));
+      }
+      if (radii.length < 10) continue;
+      radii.sort((a, b) => a - b);
+      const rw = radii[Math.floor(radii.length * 0.4)] + 0.004;
+      for (let i = 0; i < cls.length; i++) {
+        if (cls[i] !== 'hand' && cls[i] !== 'arm') continue;
+        m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld);
+        const along = w.clone().sub(B).dot(T);
+        if (along < -0.09 || along > 0.0) continue;
+        c.copy(B).addScaledVector(T, along);
+        const r = w.distanceTo(c), lim = rw * (1 + 0.6 * ss(-0.015, 0.0, along));
+        if (r <= lim) continue;
+        w.sub(c).multiplyScalar(lim / r).add(c).applyMatrix4(inv);
+        P.setXYZ(i, w.x, w.y, w.z);
+      }
+    }
+  }
   // Where a beard grows (painted by the skin shader, per person): jaw, chin,
   // upper lip and cheeks below the cheekbones, not the lips.
   const beard = new Float32Array(cls.length), S = (x: number, a: number, b: number) => ss(a, b, x);
@@ -303,7 +338,7 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure) {
   const NRg = 12, NCg = 28, ray = new THREE.Ray(), o = new THREE.Vector3(), d = new THREE.Vector3();
   const R: number[][] = [], C: THREE.Vector3[] = [];
   for (let r = 0; r < NRg; r++) {
-    const t = -0.35 + 1.4 * (r / (NRg - 1));
+    const t = -0.35 + 1.2 * (r / (NRg - 1));
     const c = nk.clone().lerp(hb, t);
     c.z += 0.008;
     C.push(c);
@@ -1017,86 +1052,15 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       new MeshBVH(mergeGeometries([...under.map((g) => g.clone()), (spec.hood === 'veil' ? S.all : S.noBeard().all).geo.clone()].map(posOnly))), yBelt);
   }
 
-  // --- Cloak (sagum) hanging from the shoulders down the back, or a shawl.
-  let cape: Grid | null = null;
+  // --- A mantle: a cloak fastened on the right shoulder, or a woman's shawl (see layMantle).
+  let cape: Grid | null = null, brooch: THREE.Vector3 | null = null;
   if (spec.cape) {
-    const long = spec.cape === 'cloak';
-    // A close cloak is cut round the trunk, not round the arms held out in the bind pose.
-    const close = !!spec.cloakClose;
-    const under = mergeGeometries((close ? [tunicGeo, S.torso.geo.clone()] : [tunicGeo, ...sleeves.map(gridGeometry), ...(hood ? [gridGeometry(hood)] : []), S.all.geo.clone()]).map((g) => {
-      const n = g.index ? g.toNonIndexed() : g;
-      for (const k of Object.keys(n.attributes)) if (k !== 'position') n.deleteAttribute(k);
-      return n;
-    }));
-    const ubvh = new MeshBVH(under);
-    // A shawl stops clear above the sash: lower, the sash cut through it as she swayed.
-    const yT = neck.y - 0.045, yB = long ? knee + 0.06 : yBelt + 0.085;
-    const NR2 = long ? 28 : 16, NC2 = long ? 26 : 34, oL = spec.capeOpen ?? 0;
-    const g = new Grid(NR2, NC2, false);
-    g.group = G_OVER;
-    g.cap = long ? CAP_CLOAK : CAP_SHAWL;
-    const cx = hips.x, cz = hips.z - 0.01;
-    const radii: number[][] = [];
-    for (let r = 0; r < NR2; r++) {
-      const t = r / (NR2 - 1);
-      const y = yT + (yB - yT) * Math.pow(t, 0.9);
-      const a0 = long ? THREE.MathUtils.lerp(0.36, 0.62, Math.pow(t, 0.6)) * Math.PI : THREE.MathUtils.lerp(0.16, 0.3, t) * Math.PI;
-      const row: number[] = [];
-      for (let c = 0; c < NC2; c++) {
-        const a = a0 + oL + (Math.PI * 2 - 2 * a0 - oL) * (c / (NC2 - 1));
-        const dir = new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
-        ray.set(new THREE.Vector3(cx, y, cz).addScaledVector(dir, 1.2), dir.clone().negate());
-        const hit = ubvh.raycastFirst(ray, THREE.DoubleSide);
-        let R = hit ? Math.hypot(hit.point.x - cx, hit.point.z - cz) : 0.15;
-        // It hangs straight from the shoulder blades; it does not follow the small of the back.
-        if (r > 0) R = Math.max(R, radii[r - 1][c] - 0.004);
-        row.push(R);
-      }
-      radii.push(row);
-    }
-    for (let c = 0; c < NC2; c++) {
-      const col = Float32Array.from(radii.map((row) => row[c]));
-      smooth(col, NR2, false, 2);
-      radii.forEach((row, r) => { row[c] = Math.max(row[c], col[r]); });
-    }
-    for (let r = 0; r < NR2; r++) {
-      const t = r / (NR2 - 1);
-      const y = yT + (yB - yT) * Math.pow(t, 0.9);
-      const a0 = long ? THREE.MathUtils.lerp(0.36, 0.62, Math.pow(t, 0.6)) * Math.PI : THREE.MathUtils.lerp(0.16, 0.3, t) * Math.PI;
-      const row = Float32Array.from(radii[r]);
-      smooth(row, NC2, false, 5);
-      for (let c = 0; c < NC2; c++) {
-        const a = a0 + oL + (Math.PI * 2 - 2 * a0 - oL) * (c / (NC2 - 1));
-        const fold = (Math.sin(a * 9 + fp + Math.sin(a * 2.3) * 1.4) * 0.6 + Math.sin(a * 5 + fp * 1.3) * 0.4) * t * (long ? 0.03 : 0.012);
-        // Ease over the belt and round the swinging upper arms.
-        const side = Math.exp(-Math.pow(Math.cos(a), 2) / 0.12) * (1 - t);
-        let R = row[c] + 0.022 + t * (long ? 0.04 : 0.02) + fold + 0.02 * Math.exp(-Math.pow((y - yBelt) / 0.05, 2)) + 0.025 * side;
-        // Room for the arms hanging inside it.
-        if (close) R += 0.11 * Math.exp(-Math.pow(Math.cos(a) + 0.35, 2) / 0.5) * ss(yYoke + 0.08, yYoke - 0.04, y);
-        g.pos.push(cx + Math.sin(a) * R, y, cz + Math.cos(a) * R);
-        g.uv.push((c / NC2) * 3, t * (long ? 3 : 1.6));
-        g.maxD.push(r < 2 ? 0 : (long ? 0.3 : 0.035) * Math.pow(ss(0, 1, t), 0.8));
-        // A shawl is wrapped round the arms too: where it lies on them, it goes with them.
-        g.region.push(y > yYoke - 0.03 || !long ? 4 : 3);
-      }
-    }
-    // Over the shoulders it lies on the yoke, not in a level ring through it.
-    const down = new THREE.Vector3(0, -1, 0);
-    for (let r = 0; r < NR2 && g.pos[r * NC2 * 3 + 1] > yYoke - 0.08; r++) {
-      const ys = new Float32Array(NC2);
-      for (let c = 0; c < NC2; c++) {
-        vv.fromArray(g.pos, (r * NC2 + c) * 3);
-        ray.set(o2.set(vv.x, vv.y + 0.4, vv.z), down);
-        const hit = ubvh.raycastFirst(ray, THREE.DoubleSide);
-        ys[c] = hit ? Math.max(vv.y, hit.point.y + 0.02) : vv.y;
-      }
-      smooth(ys, NC2, false, 2);
-      for (let c = 0; c < NC2; c++) {
-        const o = (r * NC2 + c) * 3 + 1;
-        g.pos[o] = r === 0 ? ys[c] : Math.min(Math.max(ys[c], g.pos[o]), g.pos[o - NC2 * 3] - 0.012);
-      }
-    }
-    cape = g;
+    const under0 = [tunicGeo, ...sleeves.map(gridGeometry), ...scap.map(gridGeometry), ...(hood ? [gridGeometry(hood)] : [])];
+    const clothes = new MeshBVH(mergeGeometries(under0.map((g) => posOnly(g.clone()))));
+    const yH = spec.cape === 'cloak' ? knee + 0.03 : yBelt + 0.05;
+    ({ g: cape, brooch } = layMantle(M, spec.cape, spec.capeOpen ?? 0, clothes,
+      new MeshBVH(mergeGeometries([...under0.map((g) => g.clone()), S.shoulders.geo.clone()].map(posOnly))),
+      new MeshBVH(mergeGeometries([...under0.map((g) => g.clone()), S.all.geo.clone()].map(posOnly))), yH - 0.15, yH));
   }
 
   // --- Belt: a rope, a leather belt, or a wide sash.
@@ -1238,6 +1202,11 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
     for (const g of sleeves) {
       const b0 = baseOf.get(g)!, C = g.cols, R = g.rows;
       addBand(Array.from({ length: C }, (_, c) => b0 + (R - 1) * C + c), Array.from({ length: C }, (_, c) => b0 + (R - 2) * C + c), true, BAND.wool, G_TUNIC, 0.9);
+    }
+    // A mantle's hem, all round.
+    if (cape) {
+      const b0 = baseOf.get(cape)!, { path, inw } = gridBoundary(cape.rows, cape.cols);
+      addBand(path.map((i) => b0 + i), inw.map((i) => b0 + i), true, BAND.wool, G_OVER, 0.95);
     }
     // A veil's rolled linen hem round the face, down both front edges and
     // along the hem; a hood's wool, turned back round the face, and its cape's hem.
@@ -1428,25 +1397,6 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       m.set(s, (m.get(s) ?? 0) + w);
     }
   }
-  // A close cloak moves with the tunic beneath it, so neither the shoulders nor
-  // the skirt pushed back by a stride come through it; less so towards the hem.
-  if (cape && spec.cloakClose) {
-    const base = baseOf.get(cape)!;
-    const ix = tunicGeo.index!;
-    for (let i = base; i < base + cape.pos.length / 3; i++) {
-      vv.fromArray(bind, i * 3);
-      const t = 1 - 0.35 * ss(yBelt, yHem, vv.y);
-      if (t <= 0) continue;
-      tunicBVH.closestPointToPoint(vv, tmp);
-      const vs = [ix.getX(tmp.faceIndex * 3), ix.getX(tmp.faceIndex * 3 + 1), ix.getX(tmp.faceIndex * 3 + 2)];
-      tri.a.fromArray(bind, vs[0] * 3); tri.b.fromArray(bind, vs[1] * 3); tri.c.fromArray(bind, vs[2] * 3);
-      const bc = tri.getBarycoord(tmp.point, new THREE.Vector3()) ?? new THREE.Vector3(1 / 3, 1 / 3, 1 / 3);
-      const m = new Map<number, number>();
-      [bc.x, bc.y, bc.z].forEach((w, j) => { for (const [k, x] of wmap[vs[j]]) m.set(k, (m.get(k) ?? 0) + x * w * t); });
-      for (const [k, x] of wmap[i]) m.set(k, (m.get(k) ?? 0) + x * (1 - t));
-      wmap[i] = m;
-    }
-  }
   // Cloth worn over cloth (the scapular over the tunic) moves as the cloth
   // beneath it does, or the two cut through each other wherever their weights differ.
   let ride: Int32Array | undefined;
@@ -1498,7 +1448,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   // the tunic or sleeve at the nearest point beneath instead.
   // (So, too, a veil where it falls onto the shoulders: the tunic's yoke moves with the arms beneath it.)
   const onTunic: { g: Grid; f: (y: number) => number; ease: number }[] = [];
-  if (cape && spec.capeOnTunic) onTunic.push({ g: cape, f: () => 1, ease: 8 });
+  if (cape) onTunic.push({ g: cape, f: () => 1, ease: 4 });
   if (hood) onTunic.push({ g: hood, f: (y) => ss(jaw - 0.03, jaw - 0.12, y), ease: 3 });
   if (onTunic.length) {
     const tix: number[] = [];
@@ -1589,8 +1539,181 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   }
   const capMask = new Uint16Array(N), keepOut = new Uint8Array(N);
   for (let i = 0; i < N; i++) if (maxD[i] > 0) { capMask[i] = capOf[i]; keepOut[i] = capOf[i] === CAP_CLOAK || capOf[i] === CAP_SHAWL ? 1 : 0; }
-  return { geo, bind, skinI, skinW, capMask, keepOut, maxD: new Float32Array(maxD), edges: new Uint32Array(fe), rest: new Float32Array(fr), stiff: new Float32Array(fsf), rope, belt: beltInfo, ride, extraBones, skirt,
+  return { geo, bind, skinI, skinW, capMask, keepOut, maxD: new Float32Array(maxD), edges: new Uint32Array(fe), rest: new Float32Array(fr), stiff: new Float32Array(fsf), rope, belt: beltInfo, ride, extraBones, skirt, brooch: brooch ?? undefined,
     bands: bandV.length ? { v: Uint32Array.from(bandV), q: Uint32Array.from(bandQ), q2: Uint32Array.from(bandQ2), cb: Float32Array.from(bandB), cn: Float32Array.from(bandN) } : undefined };
+}
+
+/**
+ * Lay the falling part of a garment (rows `from` on of a grid of points round
+ * the neck's axis, columns 0..NC, NC repeating 0 unless the grid is `cut`)
+ * clear of the clothed body: out of it seen from the neck's axis and from
+ * above (from row `from0`), out from under overhangs, square to the clothes'
+ * surface, with nothing of them just outside it; then smoothed (only ever
+ * outwards) and hung (no point nearer the axis than the one above it).
+ */
+function clearFall(Pt: THREE.Vector3[][], nk: THREE.Vector3, from0: number, from: number, cut: boolean, clothes: MeshBVH, under: MeshBVH, all: MeshBVH) {
+  const NR = Pt.length, NC = Pt[0].length - 1;
+  // Then exactly clear of the clothed body (the field above is coarse), seen
+  // from the neck's axis and from above, as the field is: by the shorter way out.
+  {
+    const ray = new THREE.Ray(), o = new THREE.Vector3(), dn = new THREE.Vector3(0, -1, 0), m = 0.012;
+    for (let r = from0; r < NR; r++) for (const p of Pt[r]) {
+      const dx = p.x - nk.x, dz = p.z - nk.z, rr = Math.hypot(dx, dz) || 1e-6;
+      ray.set(o.set(nk.x + (dx / rr) * 0.7, p.y, nk.z + (dz / rr) * 0.7), new THREE.Vector3(-dx / rr, 0, -dz / rr));
+      const h1 = all.raycastFirst(ray, THREE.DoubleSide), R = h1 ? 0.7 - h1.distance : 0;
+      if (rr >= R + m) continue;
+      ray.set(o.set(p.x, p.y + 0.5, p.z), dn);
+      const h2 = all.raycastFirst(ray, THREE.DoubleSide), top = h2 ? h2.point.y : -Infinity;
+      if (p.y >= top + m) continue;
+      if (top + m - p.y < Math.min(0.03, R + m - rr)) p.y = top + m;
+      else p.set(nk.x + (dx / rr) * (R + m), p.y, nk.z + (dz / rr) * (R + m));
+    }
+  }
+  // Nor under an overhang (the yoke over the shoulder blades, a sleeve's
+  // head): out from the axis until nothing of the clothes is just above it.
+  {
+    const ray = new THREE.Ray(), up = new THREE.Vector3(0, 1, 0);
+    for (let r = from; r < NR; r++) for (const p of Pt[r]) for (let k = 0; k < 10; k++) {
+      ray.set(p, up);
+      if (!under.raycastFirst(ray, THREE.DoubleSide, 0, 0.12)) break;
+      const dx = p.x - nk.x, dz = p.z - nk.z, rr = Math.hypot(dx, dz) || 1;
+      p.x += (dx / rr) * 0.01; p.z += (dz / rr) * 0.01;
+    }
+  }
+  // And a clear 12 mm from the nearest of the clothes beneath, measured square
+  // to their surface (over the round of a shoulder, the views above along the
+  // axis and from above leave it a few millimetres off and its faces dip in).
+  {
+    const geo = clothes.geometry, ix = geo.index!, P = geo.attributes.position;
+    const hit = { point: new THREE.Vector3(), distance: 0, faceIndex: 0 }, tri = new THREE.Triangle(), n = new THREE.Vector3(), d = new THREE.Vector3();
+    for (let pass = 0; pass < 3; pass++) for (let r = from; r < NR; r++) for (const p of Pt[r]) {
+      clothes.closestPointToPoint(p, hit);
+      if (hit.distance > 0.05) continue;
+      tri.a.fromBufferAttribute(P, ix.getX(hit.faceIndex * 3)); tri.b.fromBufferAttribute(P, ix.getX(hit.faceIndex * 3 + 1)); tri.c.fromBufferAttribute(P, ix.getX(hit.faceIndex * 3 + 2));
+      tri.getNormal(n);
+      d.set(hit.point.x - nk.x, 0.4, hit.point.z - nk.z);
+      if (n.dot(d) < 0) n.negate();
+      const s2 = d.subVectors(p, hit.point).dot(n);
+      if (s2 < 0.016) p.addScaledVector(n, 0.016 - s2);
+    }
+    // Where clothes overlap (a sleeve's head under the yoke) the nearest
+    // surface may be the one beneath: look out from each point too, and if
+    // any of the clothes is just outside it, go out past that.
+    const ray = new THREE.Ray(), dir = new THREE.Vector3();
+    // (Only ever out from the axis, level: never climbing up what it meets.)
+    const flat = new THREE.Vector3();
+    for (let r = from; r < NR; r++) for (const p of Pt[r]) for (const up of [0, 0.6, 2]) for (let k = 0; k < 2; k++) {
+      flat.set(p.x - nk.x, 0, p.z - nk.z).normalize();
+      dir.copy(flat).setY(up).normalize();
+      ray.set(p, dir);
+      const h = clothes.raycastFirst(ray, THREE.DoubleSide, 0, 0.05);
+      if (!h) break;
+      p.addScaledVector(flat, Math.min(0.03, Math.hypot(h.point.x - p.x, h.point.z - p.z) + 0.014));
+    }
+  }
+  // Where single points were pushed out further than their neighbours, the
+  // neighbours rise to meet them (never the other way): soft bumps, no spikes.
+  for (let it = 0; it < 4; it++) {
+    const R = Pt.map((row) => row.map((p) => Math.hypot(p.x - nk.x, p.z - nk.z)));
+    for (let r = from; r < NR; r++) for (let c = 0; c <= NC; c++) {
+      let sum = 0, n = 0;
+      for (const [rr, cc] of [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]]) {
+        if (rr < from || rr >= NR) continue;
+        const c2 = cc < 0 ? (cut ? -1 : NC - 1) : cc > NC ? (cut ? -1 : 1) : cc;
+        if (c2 < 0) continue;
+        sum += R[rr][c2]; n++;
+      }
+      const want = 0.5 * R[r][c] + 0.5 * (sum / n);
+      if (want > R[r][c]) { const p = Pt[r][c], k = want / R[r][c]; p.set(nk.x + (p.x - nk.x) * k, p.y, nk.z + (p.z - nk.z) * k); }
+    }
+  }
+  // Each column hangs: no point of the fall tucked in nearer the axis than the one above it.
+  for (let c = 0; c <= NC; c++) for (let r = from; r < NR; r++) {
+    const a = Pt[r - 1][c], b = Pt[r][c];
+    const ra = Math.hypot(a.x - nk.x, a.z - nk.z), rb = Math.hypot(b.x - nk.x, b.z - nk.z);
+    if (rb < ra - 0.004) { const k = (ra - 0.004) / rb; b.set(nk.x + (b.x - nk.x) * k, b.y, nk.z + (b.z - nk.z) * k); }
+  }
+}
+
+/**
+ * A mantle laid round the shoulders. A cloak (the Lombards' and Byzantines'
+ * sagum or chlamys): a big piece of wool fastened with a brooch on the right
+ * shoulder, its upper edge round the back of the neck, over the left shoulder
+ * and across the breast, where it sags in a curve, back to the brooch; it
+ * covers the back and the left side and arm, and opens on the right, the
+ * sword arm free between its two edges falling from the brooch. A soldier's
+ * is thrown back off the left shoulder to free the shield arm: its front
+ * stops there. A shawl (a woman's palla): round the shoulders, over the veil,
+ * its two ends falling down in front.
+ *
+ * Built as the hood's cape is: the upper edge laid on the shoulders, then the
+ * fall like a tent, in upright folds, clear of the clothes beneath.
+ */
+function layMantle(M: Measure, kind: 'cloak' | 'shawl', open: number, clothes: MeshBVH, under: MeshBVH, all: MeshBVH, yLow: number, yHem: number): { g: Grid; brooch: THREE.Vector3 | null } {
+  const nk = M.bone('Neck'), cloak = kind === 'cloak';
+  // Bearings round the neck (0 in front, +pi/2 his left), from the cut edge one way round to the other.
+  const b0 = cloak ? -Math.PI / 2 - 0.12 : 0.3;
+  const sweep = cloak ? -(open ? Math.PI * 1.5 + 0.55 - open * 0.5 : Math.PI * 2 - 0.24) : Math.PI * 2 - 0.6;
+  const NC = cloak ? 52 : 44, NF = cloak ? 24 : 15, NR = NF + 1;
+  const ray = new THREE.Ray(), o = new THREE.Vector3(), dn = new THREE.Vector3(0, -1, 0);
+  const front = (ph: number) => Math.max(0, Math.cos(ph));
+  // The brooch: on the front of the right shoulder.
+  const brooch = cloak ? new THREE.Vector3() : null;
+  const top: THREE.Vector3[] = [];
+  for (let c = 0; c <= NC; c++) {
+    const ph = b0 + sweep * (c / NC), sp = Math.sin(ph), cp = Math.cos(ph);
+    // Off the neck onto the shoulders, wider by the brooch.
+    const TAU = Math.PI * 2, dd = ((((ph + Math.PI / 2 + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
+    const nearBrooch = cloak ? Math.exp(-(dd * dd) / 0.08) : 0;
+    const r0 = (cloak ? 0.1 : 0.14) + 0.035 * nearBrooch;
+    // (The clothed body without the head: from above, a beard or an ear would stand in the way.)
+    ray.set(o.set(nk.x + sp * r0, nk.y + 0.4, nk.z + cp * r0), dn);
+    const h = under.raycastFirst(ray, THREE.DoubleSide);
+    // (Never up the neck or the head, whatever stands there.)
+    let y = Math.min(h ? h.point.y : nk.y - 0.03, nk.y + (cloak ? 0.02 : 0.0)) + 0.014;
+    // Across the breast the cloak's edge sags (but a soldier's thrown-back one, and a shawl's ends, do not).
+    if (cloak && !open) y -= 0.15 * front(ph) ** 1.5 * (1 - nearBrooch);
+    // Laid on the body at that height.
+    ray.set(o.set(nk.x + sp * 0.7, y, nk.z + cp * 0.7), new THREE.Vector3(-sp, 0, -cp));
+    const h2 = under.raycastFirst(ray, THREE.DoubleSide), R = Math.max(r0, h2 ? 0.7 - h2.distance + 0.014 : r0);
+    top.push(new THREE.Vector3(nk.x + sp * R, y, nk.z + cp * R));
+  }
+  if (brooch) brooch.copy(top[0]).lerp(top[NC], 0.5);
+  // The fall.
+  const colliders = [starField(under, nk.x, nk.z, yLow, nk.y + 0.25)];
+  const tmp = new Float32Array(3);
+  const outOf = (q: THREE.Vector3) => { q.toArray(tmp); for (let it = 0; it < 2; it++) for (const cl of colliders) cl(tmp, 0, 0.012); return q.fromArray(tmp); };
+  const ph0 = Math.random() * 6;
+  const Pt: THREE.Vector3[][] = [top];
+  for (let f = 1; f <= NF; f++) {
+    const t = f / NF;
+    Pt.push(top.map((L, c) => {
+      const ph = b0 + sweep * (c / NC);
+      // Its hem: level behind, a little shorter in front; a shawl's ends lower than its back.
+      const hy = cloak ? yHem + 0.06 * front(ph) : yHem - 0.12 * front(ph);
+      const y = L.y + (hy - L.y) * t;
+      // Out like a tent, most where it hangs over the arms.
+      const flare = (cloak ? 0.05 + 0.06 * Math.sin(ph) ** 2 : 0.03 + 0.05 * Math.sin(ph) ** 2) * Math.pow(t, 0.7);
+      const dx = L.x - nk.x, dz = L.z - nk.z, dl = Math.hypot(dx, dz) || 1;
+      // Upright folds, deepest at the hem, and fuller behind, where the cloth gathers from the shoulders.
+      const fold = (Math.sin(c * 0.95 + ph0 + Math.sin(c * 0.37 + ph0) * 0.9) * 0.7 + Math.sin(c * 0.47 + ph0 * 1.7) * 0.3) * (cloak ? 0.028 : 0.014) * ss(0, 0.7, t);
+      const p = new THREE.Vector3(L.x + (dx / dl) * (flare + fold), y, L.z + (dz / dl) * (flare + fold));
+      return outOf(p);
+    }));
+  }
+  clearFall(Pt, nk, 1, 1, true, clothes, under, all);
+  const g = new Grid(NR, NC + 1, false);
+  g.group = G_OVER;
+  g.cap = cloak ? CAP_CLOAK : CAP_SHAWL;
+  for (let r = 0; r < NR; r++) for (let c = 0; c <= NC; c++) {
+    const p = Pt[r][c], t = r / NF;
+    g.pos.push(p.x, p.y, p.z);
+    g.uv.push(c / NC * 4, t * 3);
+    // It swings free below the shoulders (see cloth.ts), held along its upper edge.
+    g.maxD.push(r < 2 ? 0 : (cloak ? 0.28 : 0.05) * Math.pow(ss(0, 1, t), 0.8));
+    g.region.push(r < 3 ? 4 : 3);
+  }
+  return { g, brooch };
 }
 
 /** How each head covering is cut (metres; heights from the eyes). */
@@ -1689,83 +1812,7 @@ function layHood(M: Measure, kind: HoodKind, clothes: MeshBVH, under: MeshBVH, a
       return outOf(p, 0.007);
     }));
   }
-  // Then exactly clear of the clothed body (the field above is coarse), seen
-  // from the neck's axis and from above, as the field is: by the shorter way out.
-  {
-    const ray = new THREE.Ray(), o = new THREE.Vector3(), dn = new THREE.Vector3(0, -1, 0), m = 0.012;
-    for (let r = NH - 5; r < NR; r++) for (const p of Pt[r]) {
-      const dx = p.x - nk.x, dz = p.z - nk.z, rr = Math.hypot(dx, dz) || 1e-6;
-      ray.set(o.set(nk.x + (dx / rr) * 0.7, p.y, nk.z + (dz / rr) * 0.7), new THREE.Vector3(-dx / rr, 0, -dz / rr));
-      const h1 = all.raycastFirst(ray, THREE.DoubleSide), R = h1 ? 0.7 - h1.distance : 0;
-      if (rr >= R + m) continue;
-      ray.set(o.set(p.x, p.y + 0.5, p.z), dn);
-      const h2 = all.raycastFirst(ray, THREE.DoubleSide), top = h2 ? h2.point.y : -Infinity;
-      if (p.y >= top + m) continue;
-      if (top + m - p.y < Math.min(0.03, R + m - rr)) p.y = top + m;
-      else p.set(nk.x + (dx / rr) * (R + m), p.y, nk.z + (dz / rr) * (R + m));
-    }
-  }
-  // Nor under an overhang (the yoke over the shoulder blades, a sleeve's
-  // head): out from the axis until nothing of the clothes is just above it.
-  {
-    const ray = new THREE.Ray(), up = new THREE.Vector3(0, 1, 0);
-    for (let r = NH; r < NR; r++) for (const p of Pt[r]) for (let k = 0; k < 10; k++) {
-      ray.set(p, up);
-      if (!under.raycastFirst(ray, THREE.DoubleSide, 0, 0.12)) break;
-      const dx = p.x - nk.x, dz = p.z - nk.z, rr = Math.hypot(dx, dz) || 1;
-      p.x += (dx / rr) * 0.01; p.z += (dz / rr) * 0.01;
-    }
-  }
-  // And a clear 12 mm from the nearest of the clothes beneath, measured square
-  // to their surface (over the round of a shoulder, the views above along the
-  // axis and from above leave it a few millimetres off and its faces dip in).
-  {
-    const geo = clothes.geometry, ix = geo.index!, P = geo.attributes.position;
-    const hit = { point: new THREE.Vector3(), distance: 0, faceIndex: 0 }, tri = new THREE.Triangle(), n = new THREE.Vector3(), d = new THREE.Vector3();
-    for (let pass = 0; pass < 3; pass++) for (let r = NH; r < NR; r++) for (const p of Pt[r]) {
-      clothes.closestPointToPoint(p, hit);
-      if (hit.distance > 0.05) continue;
-      tri.a.fromBufferAttribute(P, ix.getX(hit.faceIndex * 3)); tri.b.fromBufferAttribute(P, ix.getX(hit.faceIndex * 3 + 1)); tri.c.fromBufferAttribute(P, ix.getX(hit.faceIndex * 3 + 2));
-      tri.getNormal(n);
-      d.set(hit.point.x - nk.x, 0.4, hit.point.z - nk.z);
-      if (n.dot(d) < 0) n.negate();
-      const s2 = d.subVectors(p, hit.point).dot(n);
-      if (s2 < 0.016) p.addScaledVector(n, 0.016 - s2);
-    }
-    // Where clothes overlap (a sleeve's head under the yoke) the nearest
-    // surface may be the one beneath: look out from each point too, and if
-    // any of the clothes is just outside it, go out past that.
-    const ray = new THREE.Ray(), dir = new THREE.Vector3();
-    for (let r = NH; r < NR; r++) for (const p of Pt[r]) for (const up of [0, 0.6, 2]) for (let k = 0; k < 2; k++) {
-      dir.set(p.x - nk.x, 0, p.z - nk.z).normalize().setY(up).normalize();
-      ray.set(p, dir);
-      const h = clothes.raycastFirst(ray, THREE.DoubleSide, 0, 0.05);
-      if (!h) break;
-      p.copy(h.point).addScaledVector(dir, 0.014);
-    }
-  }
-  // Where single points were pushed out further than their neighbours, the
-  // neighbours rise to meet them (never the other way): soft bumps, no spikes.
-  for (let it = 0; it < 4; it++) {
-    const R = Pt.map((row) => row.map((p) => Math.hypot(p.x - nk.x, p.z - nk.z)));
-    for (let r = NH; r < NR; r++) for (let c = 0; c <= NC; c++) {
-      let sum = 0, n = 0;
-      for (const [rr, cc] of [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]]) {
-        if (rr < NH || rr >= NR) continue;
-        const c2 = cc < 0 ? (o1 > 0 ? -1 : NC - 1) : cc > NC ? (o1 > 0 ? -1 : 1) : cc;
-        if (c2 < 0) continue;
-        sum += R[rr][c2]; n++;
-      }
-      const want = 0.5 * R[r][c] + 0.5 * (sum / n);
-      if (want > R[r][c]) { const p = Pt[r][c], k = want / R[r][c]; p.set(nk.x + (p.x - nk.x) * k, p.y, nk.z + (p.z - nk.z) * k); }
-    }
-  }
-  // Each column hangs: no point of the fall tucked in nearer the axis than the one above it.
-  for (let c = 0; c <= NC; c++) for (let r = NH; r < NR; r++) {
-    const a = Pt[r - 1][c], b = Pt[r][c];
-    const ra = Math.hypot(a.x - nk.x, a.z - nk.z), rb = Math.hypot(b.x - nk.x, b.z - nk.z);
-    if (rb < ra - 0.004) { const k = (ra - 0.004) / rb; b.set(nk.x + (b.x - nk.x) * k, b.y, nk.z + (b.z - nk.z) * k); }
-  }
+  clearFall(Pt, nk, NH - 5, NH, o1 > 0, clothes, under, all);
   for (let r = 0; r < NR; r++) for (let c = 0; c < NC; c++) {
     const p = Pt[r][c];
     g.pos.push(p.x, p.y, p.z);

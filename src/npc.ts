@@ -400,6 +400,12 @@ export class Person {
       const f = m.bone(s + 'Foot'), k = m.bone(s + 'Leg');
       on(s + 'Leg', Props.makeShoeTop(0.056), Props.placeAt(new THREE.Vector3(f.x, f.y, f.z + 0.005), new THREE.Quaternion().setFromUnitVectors(UP, k.clone().sub(f).normalize())));
     }
+    // A cloak's brooch, on the right shoulder, facing out.
+    const br = this.outfit.garment.brooch;
+    if (br) {
+      const sp = m.bone('Spine2'), out = new THREE.Vector3(br.x - sp.x, 0.25, br.z - sp.z + 0.08).normalize();
+      on('Spine2', Props.makeBrooch(), Props.placeAt(br.clone().addScaledVector(out, 0.004), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), out)));
+    }
     if (g.helmet) { const h = Props.makeHelmet(m, g.helmet === true ? 'spangen' : g.helmet); on('Head', h.obj, h.place); }
     // Felt in the colours of undyed and walnut-dyed wool.
     else if (g.cap) { const c = Props.makeCap(m, new THREE.Color(pick(r, [0x7e6a4e, 0x6e5a40, 0x8c7a5c, 0x5e4a34, 0x74603f]))); on('Head', c.obj, c.place); }

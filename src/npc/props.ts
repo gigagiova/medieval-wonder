@@ -366,6 +366,29 @@ export function makeShield(paint: THREE.Color) {
  * closing over the shoe's collar and the foot of the leg wraps. Origin on
  * the ankle's axis at the shoe's collar; up +Y.
  */
+/**
+ * A disc brooch (fibula) of the kind Lombard men pinned their cloaks with:
+ * gilt bronze, a beaded rim, a raised boss set with a garnet. Its face looks
+ * along +Z.
+ */
+export function makeBrooch() {
+  const m = propMats();
+  const g = new THREE.Group();
+  const disc = lathe([[0, 0], [0.021, 0], [0.023, 0.002], [0.022, 0.004], [0.016, 0.005], [0.01, 0.008], [0.006, 0.0095], [0, 0.01]], 20);
+  disc.rotateX(Math.PI / 2);
+  const gilt = withAtmos(new THREE.MeshStandardMaterial({ color: 0x8a6a2c, roughness: 0.38, metalness: 0.85 }));
+  g.add(new THREE.Mesh(disc, gilt));
+  const beads: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2;
+    beads.push(at(new THREE.SphereGeometry(0.0018, 5, 4), Math.cos(a) * 0.0195, Math.sin(a) * 0.0195, 0.0045));
+  }
+  g.add(new THREE.Mesh(merge(beads), gilt));
+  const garnet = withAtmos(new THREE.MeshStandardMaterial({ color: 0x5a0a0c, roughness: 0.15, metalness: 0.1, emissive: 0x1a0204 }));
+  g.add(new THREE.Mesh(at(new THREE.SphereGeometry(0.005, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), 0, 0, 0.0085, Math.PI / 2), garnet));
+  return g;
+}
+
 export function makeShoeTop(r = 0.05) {
   const m = propMats();
   const g = lathe([[r * 0.95, -0.035], [r * 1.02, 0], [r * 1.04, 0.035], [r * 1.07, 0.05], [r * 1.08, 0.056], [r * 1.02, 0.06], [r * 0.95, 0.054]], 18);

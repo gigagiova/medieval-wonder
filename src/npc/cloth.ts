@@ -193,7 +193,7 @@ export class Clothing {
     // A cloak hangs round the body: pulled taut it would cut straight through
     // the tunic to the spine. Keep it no nearer the spine's line than its skinned place.
     const sa = _sa.copy(caps[6].pa).lerp(caps[6].pb, 0.5), sd = _sd.copy(caps[7].pb).sub(sa).normalize();
-    const slack = 0.012 * this.scale;
+    const slack = 0.004 * this.scale;
     const radial = (arr: Float32Array, o: number, out: THREE.Vector3) => {
       out.set(arr[o] - sa.x, arr[o + 1] - sa.y, arr[o + 2] - sa.z);
       return out.addScaledVector(sd, -out.dot(sd));
