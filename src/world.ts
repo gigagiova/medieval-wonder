@@ -12,7 +12,7 @@ import { buildLibrary } from './library';
 import { setSite, worldTerrain, fastTerrain, terrain, toLocalXZ } from './displace';
 import { placeProp, commitProps, rand01, type PropId } from './props';
 import { BOUNDS, RIVERS, WALL700, CIVITAS_NOVA, MEDIEVAL_OUTLINE, insideWalls, insideness, riverAt, inPoly, type P2 } from './benevento/geo';
-import { SITES, GATES, ROADS, siteToWorld, DISTRICTS, type SiteDef } from './benevento/sites';
+import { SITES, GATES, ROADS, siteToWorld, DISTRICTS, onWall, type SiteDef } from './benevento/sites';
 import { layoutTown, density, FREE, STREET, RESERVED, HOUSE, PLOT, type Layout } from './benevento/layout';
 import { makeChunks, buildChunk, CHUNK, type Hole, type ChunkItems } from './benevento/fabric';
 import { FabricStream } from './benevento/stream';
@@ -99,7 +99,7 @@ export function getTeleports(): Teleport[] {
   at('Nux Sacra', S.nux, 0, 9, 0, 0);
   at('Molendinum', S.molendinum, 0.8, -7, 0.8, 0);
   at('Hortus Curtis', S.hortusSophiae, 0, 8, 0, 0);
-  at('Sancta Sophia', S.hortusSophiae, 14.5, 15.5, 9, 9);
+  at('Sancta Sophia', S.hortusSophiae, 5.5, 15, 9.5, 8.5);
   at('Castellum Aquae', S.castellumAquae, -3, 21, -12, 0);
   {
     const c = M.CISTERN;
@@ -112,7 +112,23 @@ export function getTeleports(): Teleport[] {
     out.push({ name: 'Catacumbae', ...lw(cs.stairBottom), yaw: s.rot });
     out.push({ name: 'Crypta', ...lw(cs.crypt), yaw: 0.9 + s.rot });
   }
-  for (const g of GATES) if (g.kind !== 'arch') out.push(tp(g.name, g.at[0], g.at[1], g.at[0] + 0.01, g.at[1] - 0.01));
+  // The gates: stand outside on the road that leaves each one (or straight out from the wall), a few
+  // metres off, looking back at the gateway (inside, the houses of the plan come right up to them).
+  for (const g of GATES) if (g.kind !== 'arch') {
+    let dx = 0, dz = 0;
+    for (const r of ROADS) {
+      const [p0, p1] = [r.pts[0], r.pts[r.pts.length - 1]];
+      const q = Math.hypot(p0[0] - g.at[0], p0[1] - g.at[1]) < 2 ? r.pts[1] : Math.hypot(p1[0] - g.at[0], p1[1] - g.at[1]) < 2 ? r.pts[r.pts.length - 2] : null;
+      if (q) { const L = Math.hypot(q[0] - g.at[0], q[1] - g.at[1]); dx = (q[0] - g.at[0]) / L; dz = (q[1] - g.at[1]) / L; break; }
+    }
+    if (!dx && !dz) {
+      const w = onWall(g.at[0], g.at[1]), a = WALL700[w.k], c = WALL700[(w.k + 1) % WALL700.length];
+      const L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
+      dx = -(c[1] - a[1]) / L; dz = (c[0] - a[0]) / L;
+      if (insideness(g.at[0] + dx * 10, g.at[1] + dz * 10) > insideness(g.at[0] - dx * 10, g.at[1] - dz * 10)) { dx = -dx; dz = -dz; }
+    }
+    out.push(tp(g.name, g.at[0] + dx * 9, g.at[1] + dz * 9, g.at[0], g.at[1]));
+  }
   return out;
 }
 
@@ -648,7 +664,7 @@ export function regionName(p: THREE.Vector3): string {
     return 'Catacumbae Sanctorum Quadraginta';
   }
   for (const g of GATES) if (Math.hypot(p.x - g.at[0], p.z - g.at[1]) < 8) return g.name;
-  const named: [SiteDef, number][] = [[S.iseum, 15], [S.curtis, 26], [S.episcopium, 30], [S.forum, 18], [S.theatrum, 50], [S.thermae, 28], [S.amphitheatrum, 55], [S.quadraginta, 48],
+  const named: [SiteDef, number][] = [[S.iseum, 12], [S.curtis, 26], [S.episcopium, 30], [S.forum, 18], [S.theatrum, 50], [S.thermae, 28], [S.amphitheatrum, 55], [S.quadraginta, 48],
     [S.turrisCatenae, 14], [S.sanctusHilarius, 16], [S.sanctusPetrus, 32], [S.necropolis, 28], [S.nux, 14], [S.molendinum, 14], [S.hortusSophiae, 16], [S.castellumAquae, 26], [S.pontesLeprosus, 50], [S.pontesOnuphrii, 45]];
   for (const [s, r] of named) if (near(s, r)) return s.name;
   for (const d of DISTRICTS) if (d.poly && inPoly(p.x, p.z, d.poly)) return d.name;

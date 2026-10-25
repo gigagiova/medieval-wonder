@@ -279,7 +279,10 @@ export function layoutTown(seed = 700): Layout {
     else {
       const v = rand();
       k = v < 0.42 ? 'orto' : v < 0.56 ? 'vinea' : v < 0.74 ? 'pratum' : v < 0.88 ? 'ruina' : 'stabulum';
-      if ((p.a > 2500 && k === 'stabulum') || cut) k = 'pratum';
+      // A road cut through it (a gate's way): no fences or rows of stakes across the road.
+      let lane = 0;
+      r.fill(p.pts, (kk) => { if (r.grid[kk] === STREET) lane++; });
+      if ((p.a > 2500 && k === 'stabulum') || cut || lane * r.res * r.res > 12) k = 'pratum';
     }
     use[n + 1] = k;
     if (k !== 'built') {
