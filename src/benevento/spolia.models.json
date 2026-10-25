@@ -1,0 +1,370 @@
+{
+ "torso_emperor": {
+  "id": "torso_emperor",
+  "size": [
+   0.983,
+   1.25,
+   0.449
+  ],
+  "tris": 8999,
+  "loTris": 1498,
+  "parts": 1,
+  "name": "Torso of an Emperor in Armor",
+  "author": "Abby Gancz",
+  "url": "https://sketchfab.com/3d-models/torso-of-an-emperor-in-armor-a86e2a3297664c3690531a046e75a705",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "torso_dionysus": {
+  "id": "torso_dionysus",
+  "size": [
+   0.763,
+   1,
+   0.412
+  ],
+  "tris": 7000,
+  "loTris": 1166,
+  "parts": 1,
+  "name": "Marble torso from a statue of Dionysos",
+  "author": "Thomas Flynn",
+  "url": "https://sketchfab.com/3d-models/marble-torso-from-a-statue-of-dionysos-de078950bd474c73bb6cd7e1cf31de9b",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "torso_apollo": {
+  "id": "torso_apollo",
+  "size": [
+   0.546,
+   0.95,
+   0.372
+  ],
+  "tris": 7000,
+  "loTris": 1164,
+  "parts": 1,
+  "name": "1924.1017 Torso of Apollo",
+  "author": "Cleveland Museum of Art",
+  "url": "https://sketchfab.com/3d-models/19241017-torso-of-apollo-368499d943d844e79e275fe0bc599078",
+  "license": "CC0 Public Domain",
+  "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/"
+ },
+ "torso_woman": {
+  "id": "torso_woman",
+  "size": [
+   0.4,
+   0.95,
+   0.271
+  ],
+  "tris": 6000,
+  "loTris": 1000,
+  "parts": 1,
+  "name": "1927.383 Torso of a Woman",
+  "author": "Cleveland Museum of Art",
+  "url": "https://sketchfab.com/3d-models/1927383-torso-of-a-woman-ef87b70aab6e42eca282f68933135830",
+  "license": "CC0 Public Domain",
+  "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/"
+ },
+ "bust_aurelius": {
+  "id": "bust_aurelius",
+  "size": [
+   0.582,
+   0.719,
+   0.63
+  ],
+  "tris": 6996,
+  "loTris": 1326,
+  "parts": 1,
+  "name": "Bust of Marcus Aurelius",
+  "author": "Fitzwilliam Museum",
+  "url": "https://sketchfab.com/3d-models/bust-of-marcus-aurelius-dba064e7f177442c9e20f755042bf662",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "bust_man": {
+  "id": "bust_man",
+  "size": [
+   0.409,
+   0.619,
+   0.399
+  ],
+  "tris": 6622,
+  "loTris": 1253,
+  "parts": 1,
+  "name": "1952.260 Bust",
+  "author": "Cleveland Museum of Art",
+  "url": "https://sketchfab.com/3d-models/1952260-bust-fc442ce1d47a49b0aea6ee03e86b5080",
+  "license": "CC0 Public Domain",
+  "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/"
+ },
+ "head_priestess": {
+  "id": "head_priestess",
+  "size": [
+   0.229,
+   0.4,
+   0.173
+  ],
+  "tris": 11553,
+  "loTris": 1880,
+  "parts": 1,
+  "name": "Head of a Priestess",
+  "author": "kemcclin",
+  "url": "https://sketchfab.com/3d-models/head-of-a-priestess-dc8675557181447dabd382816d5426e7",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "foot_colossal": {
+  "id": "foot_colossal",
+  "size": [
+   1.043,
+   0.581,
+   0.81
+  ],
+  "tris": 4998,
+  "loTris": 825,
+  "parts": 1,
+  "name": "Colossal Foot",
+  "author": "danielpett",
+  "url": "https://sketchfab.com/3d-models/colossal-foot-14d9f3705cb94f35a959903418bb14ed",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "relief_couple": {
+  "id": "relief_couple",
+  "size": [
+   1.249,
+   0.894,
+   0.554
+  ],
+  "tris": 8997,
+  "loTris": 2083,
+  "parts": 1,
+  "name": "Funerary Monument of a Husband and Wife",
+  "author": "Abby Gancz",
+  "url": "https://sketchfab.com/3d-models/funerary-monument-of-a-husband-and-wife-9f37bead9d4a41e095cf5ebe642f22df",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "relief_funerary": {
+  "id": "relief_funerary",
+  "size": [
+   0.544,
+   0.749,
+   0.299
+  ],
+  "tris": 4997,
+  "loTris": 1231,
+  "parts": 1,
+  "name": "Roman Funerary Relief, 2nd or 3rd C CE",
+  "author": "Minneapolis Institute of Art",
+  "url": "https://sketchfab.com/3d-models/roman-funerary-relief-2nd-or-3rd-c-ce-fe4730a35f8c478194e0897195ca9717",
+  "license": "CC0 Public Domain",
+  "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/"
+ },
+ "tondo": {
+  "id": "tondo",
+  "size": [
+   0.862,
+   0.85,
+   0.278
+  ],
+  "tris": 4996,
+  "loTris": 831,
+  "parts": 1,
+  "name": "Tondo: Portrait of a Young Noblewoman, 2nd C CE",
+  "author": "Minneapolis Institute of Art",
+  "url": "https://sketchfab.com/3d-models/tondo-portrait-of-a-young-noblewoman-2nd-c-ce-e69f29a1fb114428a7759ac3fc6d06e3",
+  "license": "CC0 Public Domain",
+  "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/"
+ },
+ "altar_grave": {
+  "id": "altar_grave",
+  "size": [
+   0.689,
+   0.998,
+   0.665
+  ],
+  "tris": 5996,
+  "loTris": 998,
+  "parts": 1,
+  "name": "Grave altar",
+  "author": "Fitzwilliam Museum",
+  "url": "https://sketchfab.com/3d-models/grave-altar-e62834dccb1f428f8a1ad16730463968",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "sarcophagus": {
+  "id": "sarcophagus",
+  "size": [
+   2.093,
+   0.76,
+   0.715
+  ],
+  "tris": 8998,
+  "loTris": 1806,
+  "parts": 1,
+  "name": "Sarcophagus",
+  "author": "Fitzwilliam Museum",
+  "url": "https://sketchfab.com/3d-models/sarcophagus-6ae90150f27240d09ce2c171569128d9",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "sarcophagus_seasons": {
+  "id": "sarcophagus_seasons",
+  "size": [
+   2.199,
+   0.85,
+   0.163
+  ],
+  "tris": 8999,
+  "loTris": 1445,
+  "parts": 1,
+  "name": "Four Seasons Sarcophagus (metmuseum.org)",
+  "author": "sfsheath",
+  "url": "https://sketchfab.com/3d-models/four-seasons-sarcophagus-metmuseumorg-41cb8185bcca4282bb9c99906b10ff42",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "sarcophagus_lid": {
+  "id": "sarcophagus_lid",
+  "size": [
+   1.205,
+   0.603,
+   2
+  ],
+  "tris": 6992,
+  "loTris": 1164,
+  "parts": 2,
+  "name": "Sarcophagus lid",
+  "author": "danielpett",
+  "url": "https://sketchfab.com/3d-models/sarcophagus-lid-d7fe1122c51941f59b81e96c2be341ed",
+  "license": "CC0 Public Domain",
+  "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/"
+ },
+ "capital": {
+  "id": "capital",
+  "size": [
+   0.957,
+   0.859,
+   0.963
+  ],
+  "tris": 7000,
+  "loTris": 1761,
+  "parts": 1,
+  "name": "Capitel romano (s. III d.C.) / Museo de Split",
+  "author": "PAR - Arqueología y Patrimonio Virtual",
+  "url": "https://sketchfab.com/3d-models/capitel-romano-s-iii-dc-museo-de-split-e005471f537f4f05a464f70882cae945",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "lion": {
+  "id": "lion",
+  "size": [
+   1.45,
+   1.078,
+   0.487
+  ],
+  "tris": 7000,
+  "loTris": 1104,
+  "parts": 1,
+  "name": "Lion- Roman Art",
+  "author": "Imergo.Marco.Rossetti",
+  "url": "https://sketchfab.com/3d-models/lion-roman-art-a9a37b152a08485a8abac3c7511b04c4",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "lion_corbridge": {
+  "id": "lion_corbridge",
+  "size": [
+   0.998,
+   0.938,
+   0.536
+  ],
+  "tris": 6000,
+  "loTris": 1053,
+  "parts": 1,
+  "name": "Corbridge Lion",
+  "author": "debmayers24",
+  "url": "https://sketchfab.com/3d-models/corbridge-lion-ab740d01dc7f49018d45369014bfacb8",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "apis": {
+  "id": "apis",
+  "size": [
+   0.964,
+   1.563,
+   1.9
+  ],
+  "tris": 7000,
+  "loTris": 1166,
+  "parts": 1,
+  "name": "Apis Bull, c. 664 BCE - 30 CE",
+  "author": "Minneapolis Institute of Art",
+  "url": "https://sketchfab.com/3d-models/apis-bull-c-664-bce-30-ce-8f3c2abe63754b1cbb0f4010c4215538",
+  "license": "CC0 Public Domain",
+  "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/"
+ },
+ "sphinx": {
+  "id": "sphinx",
+  "size": [
+   2.598,
+   1.142,
+   0.865
+  ],
+  "tris": 11997,
+  "loTris": 2736,
+  "parts": 4,
+  "name": "Old Kingdom Sphinx",
+  "author": "danderson4",
+  "url": "https://sketchfab.com/3d-models/old-kingdom-sphinx-ebd496a7e5364af1b32674389a38dffb",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "pharaoh": {
+  "id": "pharaoh",
+  "size": [
+   0.615,
+   1.299,
+   0.819
+  ],
+  "tris": 8997,
+  "loTris": 1495,
+  "parts": 2,
+  "name": "Egyptian Pharoah Khasekhemwy - Oxford Ashmoleon",
+  "author": "Nate Loper  🗺️ ⛏🏺",
+  "url": "https://sketchfab.com/3d-models/egyptian-pharoah-khasekhemwy-oxford-ashmoleon-6334eacc070a44f882eb2f8d0e0821d2",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "ram_amun": {
+  "id": "ram_amun",
+  "size": [
+   0.68,
+   0.998,
+   1.599
+  ],
+  "tris": 7000,
+  "loTris": 1165,
+  "parts": 1,
+  "name": "Ram of Amun (Polycam)",
+  "author": "Thomas Flynn",
+  "url": "https://sketchfab.com/3d-models/ram-of-amun-polycam-cdd9eb38c9a54cd5bf61abc112b97f11",
+  "license": "CC Attribution",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+ },
+ "isis": {
+  "id": "isis",
+  "size": [
+   0.416,
+   1.748,
+   0.665
+  ],
+  "tris": 8000,
+  "loTris": 1332,
+  "parts": 1,
+  "name": "Goddess Isis, c. 664 BCE - 30 CE",
+  "author": "Minneapolis Institute of Art",
+  "url": "https://sketchfab.com/3d-models/goddess-isis-c-664-bce-30-ce-8cd1f63c87a143c7b6c8cda8cf6b644f",
+  "license": "CC0 Public Domain",
+  "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/"
+ }
+}

@@ -21,6 +21,8 @@ import { buildRivers } from './benevento/rivers';
 import { interiorAnchors } from './benevento/interiors';
 import { PLACED, markReadable, markReadableWorld } from './benevento/readables';
 import { LORE, explorableLore } from './benevento/lore';
+import { buildPonteFratto, ponsTeleport, inPons, PONS, PONS_LANDMARK } from './benevento/pontefratto';
+import { buildSpolia } from './benevento/spolia';
 
 // Benevento in AD 700, under Duke Gisulf I: the town of the first Lombard
 // circuit on its ridge between the Calore and the Sabato, laid out on the
@@ -101,6 +103,7 @@ export function getTeleports(): Teleport[] {
     out.push({ name: 'Crypta', ...lw(cs.crypt), yaw: 0.9 + s.rot });
   }
   for (const g of GATES) if (g.kind !== 'arch') out.push(tp(g.name, g.at[0], g.at[1], g.at[0] + 0.01, g.at[1] - 0.01));
+  out.push(ponsTeleport());
   return out;
 }
 
@@ -354,6 +357,7 @@ export function getMapData() {
   ];
   for (const s of Object.values(S)) landmarks.push({ name: s.name, x: s.x, z: s.z, kind: 'site' });
   for (const g of GATES) landmarks.push({ name: g.name, x: g.at[0], z: g.at[1], kind: 'gate' });
+  landmarks.push(PONS_LANDMARK);
   return {
     bounds: BOUNDS,
     raster: lay.r,
@@ -467,6 +471,9 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
     bounds: BOUNDS,
     cover: (x, z) => Math.abs(x - 50) < 760 && Math.abs(z + 80) < 480,
   });
+  buildPonteFratto(scene, b);
+  await progress('Old stones in new walls', 0.79);
+  await buildSpolia(scene, b, [b, bc], lay);
   townProps(scene);
   await progress('The fog gathers', 0.8);
   const { collider: landCol, cells } = b.build(scene);
@@ -630,6 +637,7 @@ export function regionName(p: THREE.Vector3): string {
   const named: [SiteDef, number][] = [[S.curtis, 26], [S.episcopium, 30], [S.forum, 18], [S.theatrum, 50], [S.thermae, 28], [S.amphitheatrum, 55], [S.quadraginta, 48],
     [S.turrisCatenae, 14], [S.sanctusHilarius, 16], [S.sanctusPetrus, 32], [S.iseum, 22], [S.necropolis, 28], [S.nux, 14], [S.molendinum, 14], [S.hortusSophiae, 16], [S.pontesLeprosus, 50], [S.pontesOnuphrii, 45]];
   for (const [s, r] of named) if (near(s, r)) return s.name;
+  if (inPons(p.x, p.z)) return PONS.name;
   for (const d of DISTRICTS) if (d.poly && inPoly(p.x, p.z, d.poly)) return d.name;
   const rv = riverAt(p.x, p.z, 40);
   if (rv && rv.d < rv.w / 2 + 25) return rv.river.name === 'Calor' ? 'Ripa Caloris' : 'Ripa Sabbati';
