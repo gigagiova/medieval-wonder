@@ -103,7 +103,7 @@ export type PropKind = 'skull' | 'femur' | 'humerus' | 'tibia';
 export interface Prop { kind: PropKind; matrix: THREE.Matrix4; under: boolean }
 
 /** A spatial cell of merged geometry, used for frustum, zone and occlusion culling. */
-export interface Cell { key: string; under: boolean; box: THREE.Box3; meshes: THREE.Mesh[]; visible: boolean; occluded: number; /** Draw distance (default 120 m). */ range?: number; /** A far stand-in (never occlusion-tested). */ lod?: boolean }
+export interface Cell { key: string; under: boolean; box: THREE.Box3; meshes: THREE.Mesh[]; visible: boolean; occluded: number; /** Draw distance (default 120 m). */ range?: number; /** A far stand-in (never ray-tested). */ lod?: boolean; /** Behind the houses in the occlusion buffer this frame. */ behind?: boolean }
 export const CELL_SIZE = 36;
 export interface Lamp {
   pos: THREE.Vector3;
