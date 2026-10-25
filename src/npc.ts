@@ -6,9 +6,10 @@ import type { Lamp } from './builder';
 import { isReading } from './codex';
 import { retarget, relaxArms, legIK, wool, matte, makeWeave, withAtmos, canon, type ClipName, type Motion } from './npc/rig';
 import { prepScanBody } from './npc/scan';
-import { dressBody, faceOnly, buildGarment, bakeHeadShade, measure, addSkirtBones, addSwingBones, swingRig, type GarmentSpec, type Garment, type Measure } from './npc/garment';
+import { dressBody, faceSwap, faceOnly, buildGarment, bakeHeadShade, measure, addSkirtBones, addSwingBones, swingRig, type GarmentSpec, type Garment, type Measure } from './npc/garment';
 import { Clothing, clothStats } from './npc/cloth';
 import * as Props from './npc/props';
+import { makeStaff } from './npc/population-props';
 import { fabric, type FabricKind } from './npc/fabric';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
 
@@ -33,24 +34,30 @@ type Sex = 'man' | 'woman';
  * tools/fetch-people.ts, see public/models/npc/CREDITS.md), each re-dressed
  * in period clothes. Heights are the period's: men about 1.70 m, women 1.58.
  */
-type BodyId = 'eric' | 'nathan' | 'manuel' | 'claudia' | 'sophia';
+export type BodyId = 'eric' | 'nathan' | 'manuel' | 'claudia' | 'sophia';
 const BODIES: Record<BodyId, { sex: Sex; height: number }> = {
   eric: { sex: 'man', height: 1.72 }, nathan: { sex: 'man', height: 1.7 }, manuel: { sex: 'man', height: 1.69 },
   claudia: { sex: 'woman', height: 1.6 }, sophia: { sex: 'woman', height: 1.57 },
 };
 export type Role = Speaker;
 type OutfitId = 'monk' | 'peasantHood' | 'peasantCloak' | 'soldier' | 'soldierCloak' | 'woman' | 'womanShawl';
+export interface OutfitDef { sex: Sex; bodies: BodyId[]; spec: GarmentSpec; beard: boolean; wraps: boolean }
 
 // Which bodies wear an outfit: every pairing is tailored once at load.
-const OUTFITS: Record<OutfitId, { sex: Sex; bodies: BodyId[]; spec: GarmentSpec; beard: boolean; wraps: boolean }> = {
+const OUTFITS: Record<OutfitId, OutfitDef> = {
   monk: { sex: 'man', bodies: ['manuel', 'eric'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
   peasantHood: { sex: 'man', bodies: ['nathan'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather', thighs: 0.6, swing: true } },
-  peasantCloak: { sex: 'man', bodies: ['eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.6, swing: true, cloakClose: true } },
+  peasantCloak: { sex: 'man', bodies: ['eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.35, swing: true } },
   soldier: { sex: 'man', bodies: ['nathan', 'manuel'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 0.6 } },
-  soldierCloak: { sex: 'man', bodies: ['eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 0.6, capeOnTunic: true, capeOpen: 0.8 } },
+  soldierCloak: { sex: 'man', bodies: ['eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 0.3, capeOpen: 0.8 } },
   woman: { sex: 'woman', bodies: ['claudia', 'sophia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
   womanShawl: { sex: 'woman', bodies: ['sophia', 'claudia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
 };
+/** More outfits (src/npc/population.ts), tailored on first use like the others. */
+export function registerOutfit(id: string, def: OutfitDef) { (OUTFITS as Record<string, OutfitDef>)[id] = def; }
+export const outfitBodies = (id: string) => (OUTFITS as Record<string, OutfitDef>)[id]?.bodies ?? [];
+/** Whether an `outfit:body` pairing is already tailored (dressing someone in it then costs nothing extra). */
+export const outfitTailored = (key: string) => outfits.has(key);
 const ROLE_OUTFITS: Record<Role, OutfitId[]> = { monk: ['monk'], peasant: ['peasantHood', 'peasantCloak'], woman: ['woman', 'womanShawl'], soldier: ['soldier', 'soldierCloak'] };
 
 // Natural dyes on wool and linen, muted and a little faded.
@@ -89,6 +96,13 @@ export function loadNpcAssets(): Promise<void> {
     const scan = (id: string, top = false) => get(PROPS_DIR + id + '.json').then((g) => Props.prepScan(g.scene, top)).catch(() => null);
     const [basket, bucket, jar] = await Promise.all([scan('wicker_basket_02', true), scan('wooden_bucket_01', true), scan('planter_pot_clay')]);
     scans = { basket, bucket, jar };
+    // Older faces (see faceSwap).
+    await Promise.all(Object.keys(FACES).map((id) => get(DIR + id + '.json').then((g) => {
+      const m = g.scene.getObjectByProperty('isMesh', true) as THREE.Mesh;
+      const map = (m.material as THREE.MeshStandardMaterial).map!;
+      map.colorSpace = THREE.SRGBColorSpace;
+      faces.set(id, { geo: m.geometry, map });
+    }).catch((e) => console.warn('face', id, e))));
     const t0 = performance.now();
     kits = {} as Record<BodyId, KitData>;
     ids.forEach((id, i) => {
@@ -114,15 +128,42 @@ export function loadNpcAssets(): Promise<void> {
     npcDebug.buildMs.retarget = performance.now() - t0;
     (npcDebug as unknown as { heads: unknown }).heads = Object.fromEntries(Object.entries(kits).map(([k, v]) => [k, { ...v.m.head, c: v.m.head.c.toArray(), hb: v.m.bone('Head').toArray(), top: v.m.bone('HeadTop_End').toArray(), neck: v.m.bone('Neck').toArray(), hips: v.m.bone('Hips').toArray() }]));
     weave = makeWeave();
-    // Tailoring takes a while: one outfit per slice, so the page stays responsive.
-    for (const id of Object.keys(OUTFITS) as OutfitId[]) for (const body of OUTFITS[id].bodies) {
-      await new Promise((r) => setTimeout(r, 0));
-      const t1 = performance.now();
-      outfits.set(`${id}:${body}`, tailor(id, body));
-      npcDebug.buildMs[`${id}:${body}`] = performance.now() - t1;
-    }
+    // Outfits are tailored when first needed (see outfitFor): the town dresses
+    // the people nearest the camera first, one outfit a frame.
   })();
   return loading;
+}
+
+/**
+ * Older faces, scanned (tools/fetch-faces.ts; see public/models/npc/CREDITS.md),
+ * worn by some of those whose head is covered (`share` of them): the hood or
+ * cowl hides where face and head meet.
+ */
+const FACES: Record<string, { outfits: OutfitId[]; share: number }> = {
+  face_grandpa: { outfits: ['monk', 'peasantHood'], share: 0.4 },
+};
+const faces = new Map<string, { geo: THREE.BufferGeometry; map: THREE.Texture }>();
+
+/** An outfit on a body, tailored on first use (0.2-0.7 s each); `outfit:body#face` with another face. */
+function outfitFor(key: string): Outfit {
+  let o = outfits.get(key);
+  if (!o && key.includes('#')) {
+    const [base, fid] = key.split('#'), b = outfitFor(base), f = faces.get(fid)!;
+    const t = SkeletonUtils.clone(b.template);
+    t.updateMatrixWorld(true);
+    faceSwap(t, f.geo, f.map, b.m);
+    if (OUTFITS[b.id].spec.hood) bakeHeadShade(t, b.garment.geo, OUTFITS[b.id].spec.hood === 'cowl' ? 0.1 : 0.32);
+    o = { ...b, template: t };
+    outfits.set(key, o);
+  }
+  if (!o) {
+    const [id, body] = key.split(':') as [OutfitId, BodyId];
+    const t1 = performance.now();
+    o = tailor(id, body);
+    npcDebug.buildMs[key] = Math.round(performance.now() - t1);
+    outfits.set(key, o);
+  }
+  return o;
 }
 
 function tailor(id: OutfitId, body: BodyId): Outfit {
@@ -153,7 +194,28 @@ function tailor(id: OutfitId, body: BodyId): Outfit {
 
 // ------------------------------------------------------------------ a person
 
-interface Gear { lantern?: boolean; cap?: boolean; helmet?: boolean | 'spangen' | 'lamellar'; shield?: 'back' | 'arm'; spear?: boolean; arms?: boolean; sticks?: boolean; bucket?: boolean; basket?: boolean; jar?: boolean }
+/**
+ * Who a person is, beyond the four base roles (see src/npc/population.ts):
+ * name, title and lines; skin, hair and dress; size (children); and extra
+ * things to wear or carry, hung on the body by `equip`.
+ */
+export interface Look {
+  name?: string; title?: string; lines?: Line[];
+  /** Skin: 0-1 along the existing tan and olive axes, and a lightness factor. */
+  skin?: { tan: number; olive: number; light?: number };
+  hair?: number; grey?: number; beard?: number;
+  /** Clothes: tunic, overgarment, headcloth, belt colours and the fabric kinds of the first three. */
+  colors?: { tunic: number; over: number; head: number; belt?: number; beltKind?: FabricKind; kinds?: [FabricKind, FabricKind, FabricKind] };
+  /** Body scale against the body's own (children), and the head's scale on it. */
+  scale?: number; headScale?: number;
+  equip?: (h: EquipHooks) => void;
+}
+export interface EquipHooks {
+  person: Person; m: Measure; belt: Garment['belt']; rnd: () => number;
+  /** Hang an object on a bone, given where it sits in the bind pose. */
+  on: (bone: string, obj: THREE.Object3D, place: THREE.Matrix4) => void;
+}
+export interface Gear { staff?: boolean; lantern?: boolean; cap?: boolean; helmet?: boolean | 'spangen' | 'lamellar'; shield?: 'back' | 'arm'; spear?: boolean; arms?: boolean; sticks?: boolean; bucket?: boolean; basket?: boolean; jar?: boolean }
 interface Held { obj: THREE.Object3D; kind: 'hang' | 'spear' | 'arm'; drop: number; swing: { a: number; v: number; b: number; w: number }; last: THREE.Vector3 }
 
 const ANIMS: ClipName[] = ['walk', 'idle', 'talk', 'bless', 'kneel'];
@@ -197,9 +259,10 @@ export class Person {
   /** A woman's load: a jar balanced on the head, or a basket over the right forearm. */
   private load: { jar: THREE.Object3D | null; jarQ: THREE.Quaternion; basket: boolean } = { jar: null, jarQ: new THREE.Quaternion(), basket: false };
 
-  constructor(private scene: THREE.Scene, public outfit: Outfit, public role: Role, public rnd: () => number, gear: Gear) {
+  title: string;
+  constructor(private scene: THREE.Scene, public outfit: Outfit, public role: Role, public rnd: () => number, gear: Gear, public persona: Look = {}) {
     const k = (this.kit = kits![outfit.body]);
-    this.scale = k.scale * (0.94 + rnd() * 0.12);
+    this.scale = k.scale * (persona.scale ?? 0.94 + rnd() * 0.12);
     this.body = SkeletonUtils.clone(outfit.template);
     this.group.add(this.body);
     this.group.scale.setScalar(this.scale);
@@ -210,19 +273,21 @@ export class Person {
       if (m.isSkinnedMesh && !this.skeleton) this.skeleton = m.skeleton;
     });
     this.swing = swingRig(this.body, (n) => this.bones.get(n)!);
-    this.name = pick(rnd, NAMES[role]);
-    this.lines = LINES[role];
+    this.name = persona.name ?? pick(rnd, NAMES[role]);
+    this.lines = persona.lines ?? LINES[role];
+    this.title = persona.title ?? TITLE[role];
+    if (persona.headScale) this.bones.get('Head')?.scale.setScalar(persona.headScale);
     this.line = Math.floor(rnd() * this.lines.length);
 
     // Skin, within what a Lombard town held: from fair (Lombards, some
     // Latins) through olive to a light Mediterranean tan (Greeks, Levantines,
     // North Africans), more or less weathered: a shift along the warm/olive
     // axis and a little lightness, applied over each scan's own tone.
-    const tan = rnd(), olive = rnd() * 0.6, light = 0.96 + rnd() * 0.1;
+    const tan = persona.skin?.tan ?? rnd(), olive = persona.skin?.olive ?? rnd() * 0.6, light = persona.skin?.light ?? 0.96 + rnd() * 0.1;
     // Lombards wore their beards long; most townsmen here have one, short or
     // full, brown to black, greying with age. (Monks are shaven.)
-    const hairCol = new THREE.Color(pick(rnd, [0x2a1d15, 0x1c1510, 0x3a2a1e, 0x4a3524, 0x2e2420])).lerp(new THREE.Color(0x8a8580), rnd() < 0.25 ? 0.35 + rnd() * 0.3 : 0);
-    const beardAmt = outfit.sex === 'man' && role !== 'monk' && rnd() < 0.75 ? 0.75 + rnd() * 0.5 : 0;
+    const hairCol = new THREE.Color(persona.hair ?? pick(rnd, [0x2a1d15, 0x1c1510, 0x3a2a1e, 0x4a3524, 0x2e2420])).lerp(new THREE.Color(0x8a8580), persona.grey ?? (rnd() < 0.25 ? 0.35 + rnd() * 0.3 : 0));
+    const beardAmt = persona.beard ?? (outfit.sex === 'man' && role !== 'monk' && rnd() < 0.75 ? 0.75 + rnd() * 0.5 : 0);
     const beard = new THREE.Vector4(outfit.sex === 'man' ? npcDebug.beard ?? beardAmt : 0, hairCol.r, hairCol.g, hairCol.b);
     const tone = new THREE.Color().setRGB(1.04 - 0.08 * tan, 1.0 - 0.1 * tan + 0.02 * olive, 0.98 - 0.16 * tan - 0.03 * olive).multiplyScalar(light);
     this.body.traverse((o) => {
@@ -263,8 +328,13 @@ export class Person {
       head = dye(pick(rnd, [...DYES.undyed, ...DYES.weld]), 0.3);
       belt = fabric('leather', 0x3a2618);
     }
+    const lc = persona.colors;
+    if (lc) {
+      tunic = dye(lc.tunic); over = dye(lc.over); head = dye(lc.head, 0.1);
+      if (lc.belt !== undefined) belt = fabric(lc.beltKind ?? 'leather', dye(lc.belt));
+    }
     // Coarse tabby homespun; twill for gowns and soldiers' tunics; fulled wool (felt) for cloaks; linen veils.
-    const kinds: FabricKind[] = role === 'monk' ? ['tabby', 'tabby', 'tabby'] : role === 'woman' ? ['twill', 'twill', 'linen'] : role === 'soldier' ? ['twill', 'felt', 'tabby'] : ['tabby', 'felt', 'tabby'];
+    const kinds: FabricKind[] = lc?.kinds ?? (role === 'monk' ? ['tabby', 'tabby', 'tabby'] : role === 'woman' ? ['twill', 'twill', 'linen'] : role === 'soldier' ? ['twill', 'felt', 'tabby'] : ['tabby', 'felt', 'tabby']);
     const mats = [fabric(kinds[0], tunic), fabric(kinds[1], over), belt, fabric(kinds[2], head)];
     // A long skirt is also skinned to helper bones that swing with the thighs.
     let skel = this.skeleton;
@@ -393,12 +463,13 @@ export class Person {
   private equip(g: Gear) {
     const m = this.outfit.m, r = this.rnd;
     const on = (bone: string, obj: THREE.Object3D, place: THREE.Matrix4) => Props.hangOn(this.bones.get(bone)!, this.bindOf(bone), obj, place);
-    // Laymen's leg wraps run down into ankle shoes: a leather top laced round
-    // each ankle hides where wrap and shoe meet. It rides on the shin, the
-    // shoe's collar turning inside it about the ankle.
-    if (OUTFITS[this.outfit.id].wraps) for (const s of ['Left', 'Right']) {
-      const f = m.bone(s + 'Foot'), k = m.bone(s + 'Leg');
-      on(s + 'Leg', Props.makeShoeTop(0.056), Props.placeAt(new THREE.Vector3(f.x, f.y, f.z + 0.005), new THREE.Quaternion().setFromUnitVectors(UP, k.clone().sub(f).normalize())));
+    // (Laymen's leg wraps run down into their ankle boots: see garment.ts makeBoots.)
+
+    // A cloak's brooch, on the right shoulder, facing out.
+    const br = this.outfit.garment.brooch;
+    if (br) {
+      const sp = m.bone('Spine2'), out = new THREE.Vector3(br.x - sp.x, 0.25, br.z - sp.z + 0.08).normalize();
+      on('Spine2', Props.makeBrooch(), Props.placeAt(br.clone().addScaledVector(out, 0.004), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), out)));
     }
     if (g.helmet) { const h = Props.makeHelmet(m, g.helmet === true ? 'spangen' : g.helmet); on('Head', h.obj, h.place); }
     // Felt in the colours of undyed and walnut-dyed wool.
@@ -450,7 +521,8 @@ export class Person {
     if (g.jar) {
       const h = m.head;
       const jar = Props.makeHeadJar(scans.jar);
-      on('Head', jar, Props.placeAt(new THREE.Vector3(h.c.x, h.top + 0.022, h.c.z - 0.01)));
+      // On its pad, sitting down over the veiled crown.
+      on('Head', jar, Props.placeAt(new THREE.Vector3(h.c.x, h.top + 0.006, h.c.z - 0.01)));
       this.load.jar = jar;
       this.load.jarQ.copy(jar.quaternion);
     }
@@ -477,12 +549,13 @@ export class Person {
       hang(b, 'arm', 0);
       this.load.basket = true;
     } else if (g.basket && scans.basket) { const b = scans.basket.clone(); b.scale.setScalar(pz ? 1.0 : 1.25); if (pz) b.rotation.y = Math.PI / 2; const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.0); this.carryHalf = 0.14; }
-    if (g.spear) {
+    if (g.spear || g.staff) {
       // Held in the right fist (see gripSpear): it rides on the hand bone.
-      const s = (this.spear = Props.makeSpear());
+      const s = (this.spear = g.staff ? makeStaff(r) : Props.makeSpear());
       s.traverse((o) => { o.frustumCulled = false; });
       this.bones.get('RightHand')!.add(s);
     }
+    this.persona.equip?.({ person: this, m, belt, rnd: r, on });
   }
 
   bone(n: string) { return this.bones.get(n)!; }
@@ -868,14 +941,27 @@ export class Person {
   }
 }
 
-/** Make one person (also used by the test page). */
-export function makePerson(scene: THREE.Scene, role: Role, o: { outfit?: number; body?: number; seed?: number; gear?: Gear } = {}) {
+/** Who a person will be: their outfit (by key), dice and gear, decided before they are dressed. */
+interface Casting { role: Role; key: string; id: OutfitId; rnd: () => number; gear?: Gear; look?: Look }
+function cast(role: Role, o: { outfit?: number; body?: number; seed?: number; gear?: Gear; face?: boolean; outfitId?: string; look?: Look } = {}): Casting {
   const rnd = mulberry(o.seed ?? rngSeed++ * 7919);
   const ids = ROLE_OUTFITS[role];
-  const id = ids[(o.outfit ?? Math.floor(rnd() * ids.length)) % ids.length];
+  const id = (o.outfitId as OutfitId | undefined) ?? ids[(o.outfit ?? Math.floor(rnd() * ids.length)) % ids.length];
   const bs = OUTFITS[id].bodies;
-  const outfit = outfits.get(`${id}:${bs[(o.body ?? Math.floor(rnd() * bs.length)) % bs.length]}`)!;
-  let gear = o.gear;
+  let key = `${id}:${bs[(o.body ?? Math.floor(rnd() * bs.length)) % bs.length]}`;
+  for (const [fid, f] of Object.entries(FACES)) if (f.outfits.includes(id) && faces.has(fid) && (o.face ?? rnd() < f.share)) { key += '#' + fid; break; }
+  return { role, id, key, rnd, gear: o.gear, look: o.look };
+}
+
+/** Make one person (also used by the test page and src/npc/population.ts). */
+export function makePerson(scene: THREE.Scene, role: Role, o: { outfit?: number; body?: number; seed?: number; gear?: Gear; face?: boolean; outfitId?: string; look?: Look } = {}) {
+  return dress(scene, cast(role, o));
+}
+
+function dress(scene: THREE.Scene, c: Casting) {
+  const { role, id, rnd } = c;
+  const outfit = outfitFor(c.key);
+  let gear = c.gear;
   if (!gear) {
     const x = rnd();
     gear = role === 'monk' ? { lantern: x < 0.6 }
@@ -883,7 +969,7 @@ export function makePerson(scene: THREE.Scene, role: Role, o: { outfit?: number;
       : role === 'woman' ? { jar: x < 0.3, basket: x >= 0.3 && x < 0.65 }
       : { cap: id === 'peasantCloak', sticks: id === 'peasantHood' && x < 0.4, bucket: x >= 0.4 && x < 0.65, basket: x >= 0.65 && x < 0.8 };
   }
-  const p = new Person(scene, outfit, role, rnd, gear);
+  const p = new Person(scene, outfit, role, rnd, gear, c.look);
   npcDebug.people.push(p);
   return p;
 }
@@ -907,6 +993,8 @@ interface Agent {
   lastJ: number;
   maxSpeed: number;
   vel: THREE.Vector2;
+  /** Standing still, the clip held instead of idling (e.g. kneeling at prayer or at the washing stones). */
+  pose?: ClipName;
 }
 
 function prepStreets(raw: { pts: THREE.Vector2[]; w: number }[]): Street[] {
@@ -961,6 +1049,33 @@ export interface TownOpts {
   places?: { name: string; x: number; z: number }[];
   /** How many people (default 18). */
   count?: number;
+  /** Beyond this distance people are not drawn (default 60 m). */
+  showDist?: number;
+  /** Someone else decides who is about and where (src/npc/population.ts): the default plan is skipped. */
+  director?: TownDirector;
+}
+
+/** A person handed to the town by a director: walking a street (from `start`, within `zone`), or standing at a post or in a group. */
+export interface AgentSpec {
+  person: Person; kind: 'walk' | 'post' | 'group';
+  at?: THREE.Vector3; yaw?: number;
+  start?: { st: number; s: number; dir?: number };
+  zone?: Set<number> | null; pose?: ClipName; speed?: number; groupIndex?: number;
+}
+export interface TownApi {
+  streets: readonly { pts: THREE.Vector2[]; w: number; L: number }[];
+  add(spec: AgentSpec): void;
+  remove(p: Person): void;
+  /** The nearest street to a point: which, how far along, how far away, and the point on it with its direction. */
+  spot(x: number, z: number, filter?: (st: number) => boolean): { st: number; s: number; d: number; x: number; z: number; tx: number; tz: number };
+  pointAt(st: number, s: number): { x: number; z: number; tx: number; tz: number };
+  ground: (x: number, z: number) => number;
+  lamps: Lamp[];
+}
+export interface TownDirector {
+  attach(town: TownApi): void;
+  update(dt: number, player: THREE.Vector3, camera: THREE.Camera): void;
+  dispose?(): void;
 }
 
 let town: Town | null = null;
@@ -995,10 +1110,17 @@ class Town {
   talking: Agent | null = null;
   candidate: Agent | null = null;
   private frame = 0;
+  /** People placed but not yet dressed (see admit). */
+  private pending: { a: Agent; c: Casting; pos: THREE.Vector3; yaw: number }[] = [];
 
   constructor(private scene: THREE.Scene, private o: TownOpts) {
     this.streets = prepStreets(o.streets);
     const S = this.streets;
+    if (o.director) {
+      this.ui.onActivate = () => this.activate();
+      o.director.attach(this.api());
+      return;
+    }
     const place = (n: string) => o.places?.find((p) => p.name === n);
     const rnd = mulberry(727);
     const near = (x: number, z: number, R: number) => new Set(S.map((st, i) => (st.pts.some((p) => Math.hypot(p.x - x, p.y - z) < R) ? i : -1)).filter((i) => i >= 0));
@@ -1061,9 +1183,10 @@ class Town {
     for (const pl of plan) if (pl.kind === 'group') { const k = `${pl.at!.x},${pl.at!.z}`; groups.set(k, (groups.get(k) ?? 0) + 1); }
     const placed = new Map<string, number>();
     for (const pl of plan) {
-      const p = makePerson(this.scene, pl.role);
+      // Placed now, dressed later (nearest first, see admit).
+      const p = { pos: new THREE.Vector3(), yaw: 0 };
       const a: Agent = {
-        p, mode: 'walk', resume: 'walk', timer: 0, nextPause: 8 + rnd() * 25,
+        p: null as unknown as Person, mode: 'walk', resume: 'walk', timer: 0, nextPause: 8 + rnd() * 25,
         st: 0, s: 0, dir: 1, off: 0, allowed: pl.zone ?? null,
         home: new THREE.Vector3(), homeYaw: 0, chatCool: 10, partner: null, talkCycle: rnd() * 5, lastJ: -1,
         maxSpeed: (pl.role === 'monk' ? 1.0 : pl.role === 'soldier' ? 1.3 : 1.15) * (0.9 + rnd() * 0.2), vel: new THREE.Vector2(),
@@ -1097,13 +1220,99 @@ class Town {
         a.chatCool = -1; // marks a group member
       }
       p.pos.y = o.ground(p.pos.x, p.pos.z);
-      if (p.lamp) o.lamps.push(p.lamp);
-      this.agents.push(a);
+      this.pending.push({ a, c: cast(pl.role), pos: p.pos, yaw: p.yaw });
     }
     this.ui.onActivate = () => this.activate();
+    // The first two at once (the gate's guards, as the plan begins), so the town is not empty.
+    this.admit(null, 2);
+  }
+
+  /**
+   * Dress the waiting person nearest the camera: tailor their outfit if no
+   * one wears it yet (one outfit a frame: tailoring takes a few tenths of a
+   * second), then bring them in (up to `n` a frame when their outfits are ready).
+   */
+  private admit(cam: THREE.Vector3 | null, n = 1) {
+    for (let k = 0; k < n && this.pending.length; k++) {
+      let bi = 0;
+      if (cam) {
+        let bd = Infinity;
+        this.pending.forEach((q, i) => { const d = q.pos.distanceToSquared(cam); if (d < bd) { bd = d; bi = i; } });
+      }
+      const q = this.pending[bi], ready = outfits.has(q.c.key);
+      if (!ready && k > 0) return;
+      this.pending.splice(bi, 1);
+      const p = (q.a.p = dress(this.scene, q.c));
+      p.pos.copy(q.pos);
+      p.yaw = q.yaw;
+      if (p.lamp) this.o.lamps.push(p.lamp);
+      this.agents.push(q.a);
+      if (!ready) return;
+    }
+  }
+
+  private api(): TownApi {
+    const S = this.streets;
+    return {
+      streets: S, ground: this.o.ground, lamps: this.o.lamps,
+      add: (sp) => this.addAgent(sp),
+      remove: (p) => this.removeAgent(p),
+      spot: (x, z, filter) => {
+        let best = { st: 0, s: 0, d: Infinity };
+        S.forEach((st, i) => { if (filter && !filter(i)) return; const n = nearestOn(st, x, z); if (n.d < best.d) best = { st: i, s: n.s, d: n.d }; });
+        const c = pointAt(S[best.st], best.s);
+        return { ...best, x: c.x, z: c.z, tx: c.tx, tz: c.tz };
+      },
+      pointAt: (st, s) => ({ ...pointAt(S[st], s) }),
+    };
+  }
+
+  /** One person from a director (see AgentSpec). */
+  private addAgent(sp: AgentSpec) {
+    const S = this.streets, p = sp.person, rnd = p.rnd;
+    const a: Agent = {
+      p, mode: 'walk', resume: 'walk', timer: 0, nextPause: 8 + rnd() * 25,
+      st: 0, s: 0, dir: 1, off: 0, allowed: sp.zone ?? null,
+      home: new THREE.Vector3(), homeYaw: 0, chatCool: 10, partner: null, talkCycle: rnd() * 5, lastJ: -1,
+      maxSpeed: (sp.speed ?? 1.15) * (0.9 + rnd() * 0.2), vel: new THREE.Vector2(), pose: sp.pose,
+    };
+    if (sp.kind === 'walk') {
+      a.st = sp.start?.st ?? 0;
+      a.s = THREE.MathUtils.clamp(sp.start?.s ?? 0, 0, S[a.st].L);
+      a.dir = sp.start?.dir ?? (rnd() < 0.5 ? 1 : -1);
+      a.off = (rnd() - 0.5) * Math.max(0, S[a.st].w - 1.2) * 0.6;
+      const c = pointAt(S[a.st], a.s);
+      p.pos.set(c.x - c.tz * a.off, 0, c.z + c.tx * a.off);
+      p.yaw = Math.atan2(c.tx * a.dir, c.tz * a.dir);
+    } else {
+      a.mode = a.resume = 'post';
+      a.home.copy(sp.at!);
+      a.homeYaw = sp.yaw ?? 0;
+      p.pos.copy(sp.at!);
+      p.yaw = a.homeYaw;
+      if (sp.kind === 'group') { a.talkCycle = (sp.groupIndex ?? 0) * 3.1; a.chatCool = -1; }
+    }
+    p.pos.y = this.o.ground(p.pos.x, p.pos.z);
+    if (p.lamp) this.o.lamps.push(p.lamp);
+    this.agents.push(a);
+  }
+
+  private removeAgent(p: Person) {
+    const i = this.agents.findIndex((a) => a.p === p);
+    if (i < 0) return;
+    const a = this.agents[i];
+    if (this.talking === a) this.endTalk();
+    if (this.candidate === a) this.candidate = null;
+    for (const b of this.agents) if (b.partner === a) { b.partner = null; if (b.mode === 'chat') b.mode = 'walk'; }
+    p.dispose();
+    if (p.lamp) { const j = this.o.lamps.indexOf(p.lamp); if (j >= 0) this.o.lamps.splice(j, 1); }
+    this.agents.splice(i, 1);
+    const k = npcDebug.people.indexOf(p);
+    if (k >= 0) npcDebug.people.splice(k, 1);
   }
 
   dispose() {
+    this.o.director?.dispose?.();
     for (const a of this.agents) {
       a.p.dispose();
       if (a.p.lamp) { const i = this.o.lamps.indexOf(a.p.lamp); if (i >= 0) this.o.lamps.splice(i, 1); }
@@ -1191,7 +1400,7 @@ class Town {
       // In a group, people take turns to speak.
       const k = Math.sin(a.talkCycle * 0.45) + Math.sin(a.talkCycle * 0.27 + 1);
       W[k > 0.6 ? 'talk' : 'idle'] = 1;
-    } else W.idle = 1;
+    } else W[a.mode === 'post' && a.pose ? a.pose : 'idle'] = 1;
     // Walking, starting and stopping, the walk's share follows the speed;
     // turning on the spot, it shuffles the feet round.
     const mv = Math.max(THREE.MathUtils.smoothstep(p.speed, 0.06, 0.45), 0.5 * THREE.MathUtils.smoothstep(p.yawRate, 0.4, 1.4));
@@ -1201,7 +1410,9 @@ class Town {
   update(dt: number, camera: THREE.Camera, player: THREE.Vector3) {
     const t0 = performance.now();
     this.frame++;
+    this.o.director?.update(dt, player, camera);
     const cam = camera.position;
+    if (this.pending.length) this.admit(cam, 2);
     const frustum = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     const sphere = new THREE.Sphere();
     // --- behaviour
@@ -1258,7 +1469,7 @@ class Town {
       const p = a.p;
       sphere.center.copy(p.pos).y += 0.9;
       sphere.radius = 1.4;
-      const show = p.dist < 60 && frustum.intersectsSphere(sphere);
+      const show = p.dist < (this.o.showDist ?? 60) && frustum.intersectsSphere(sphere);
       p.setVisible(show);
       if (show && p.dist < npcDebug.simDist) sim.push(a);
     }
@@ -1317,7 +1528,7 @@ class Town {
     const p = a.p;
     const line = p.lines[p.line % p.lines.length];
     p.line++;
-    this.ui.say(`${p.name} · ${TITLE[p.role]}`, line);
+    this.ui.say(`${p.name} · ${p.title}`, line);
   }
 
   private endTalk() {

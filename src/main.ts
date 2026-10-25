@@ -22,6 +22,7 @@ import { loadProps } from './props';
 import { updateLibrary, pushOutOfSecretDoor } from './library';
 import { isReading } from './codex';
 import { loadNpcAssets, spawnTownsfolk, updateTownsfolk, pushOutOfTownsfolk, npcDebug } from './npc';
+import { registerPopulationOutfits, populationDirector, popDebug } from './npc/population';
 Object.assign(window, { __npc: npcDebug });
 import type { Lamp, Cell, PropKind } from './builder';
 
@@ -208,14 +209,20 @@ const summonTownsfolk = () => setTimeout(async () => {
   say('The townsfolk are coming…', true);
   const t0 = performance.now();
   try {
+    // The people of AD 700 by group and quarter (src/npc/population.ts): their extra cuts are tailored with the rest.
+    registerPopulationOutfits();
     await loadNpcAssets();
     say('The townsfolk are dressing…', true);
     // Townsfolk stand on the ground as drawn (the hill, its bumps and the
-    // gutters), not on the bare hill or the coarse collision grid.
+    // gutters), not on the bare hill or the coarse collision grid: the
+    // hill's height plus the ground's displacement field.
     const gv = new THREE.Vector3();
-    spawnTownsfolk(scene, { streets: getMapData().streets.filter((st) => st.kind === 'lane'), ground: (x, z) => field(x, 0, z, 'ground', gv).y, lamps, places: getMapData().landmarks });
-    const n = npcDebug.people.length;
-    say(n ? `${n} townsfolk are about (${((performance.now() - t0) / 1000).toFixed(0)} s)` : 'No townsfolk could be placed', !n);
+    // Lanes in the town and roads outside it; who is about is decided near the player as they go.
+    const md = getMapData();
+    const phoneLike = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 500;
+    spawnTownsfolk(scene, { streets: md.streets, ground: (x, z) => terrain(x, z) + field(x, 0, z, 'ground', gv).y, lamps, places: md.landmarks, director: populationDirector(scene, md), showDist: phoneLike ? 45 : 60 });
+    say(`The townsfolk are about (${((performance.now() - t0) / 1000).toFixed(0)} s)`);
+    Object.assign(window, { __pop: popDebug, __npcDebug: npcDebug, __player: player });
   } catch (e) {
     const err = e as Error;
     console.warn('townsfolk unavailable', e);

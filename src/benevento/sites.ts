@@ -44,7 +44,7 @@ export const SITES: Record<string, SiteDef> = {
   quadraginta: { id: 'quadraginta', name: 'Sancti Quadraginta', x: -548, z: -392, rot: 0.32, lx: -37, lz: -70, flat: [44, 70] },
   // Baths between the later Porta S. Lorenzo and Port'Arsa, outside the circuit of 700.
   thermae: { id: 'thermae', name: 'Thermae', x: -419, z: -140, rot: 0.38, lx: -33, lz: 24, flat: [24, 42] },
-  // Nunnery of St Peter outside the walls, founded by Theodorada (wife of Romuald I) beyond the Sabato on the Appia.
+  // Nunnery of St Peter outside the walls, founded by Theuderada (wife of Romuald I) beyond the Sabato on the Appia.
   sanctusPetrus: { id: 'sanctusPetrus', name: 'Sanctus Petrus extra muros', x: -858, z: -6, rot: -0.9, lx: -16, lz: -50, flat: [30, 50] },
   theatrum: { id: 'theatrum', name: 'Theatrum', x: -229, z: -8, rot: 0, flat: [52, 74] },
   amphitheatrum: { id: 'amphitheatrum', name: 'Amphitheatrum', x: -593, z: -214, rot: 0.5, flat: [56, 80] },

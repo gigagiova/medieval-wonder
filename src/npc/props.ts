@@ -362,6 +362,29 @@ export function makeShield(paint: THREE.Color) {
 }
 
 /**
+ * A disc brooch (fibula) of the kind Lombard men pinned their cloaks with:
+ * gilt bronze, a beaded rim, a raised boss set with a garnet. Its face looks
+ * along +Z.
+ */
+export function makeBrooch() {
+  const m = propMats();
+  const g = new THREE.Group();
+  const disc = lathe([[0, 0], [0.021, 0], [0.023, 0.002], [0.022, 0.004], [0.016, 0.005], [0.01, 0.008], [0.006, 0.0095], [0, 0.01]], 20);
+  disc.rotateX(Math.PI / 2);
+  const gilt = withAtmos(new THREE.MeshStandardMaterial({ color: 0x8a6a2c, roughness: 0.38, metalness: 0.85 }));
+  g.add(new THREE.Mesh(disc, gilt));
+  const beads: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2;
+    beads.push(at(new THREE.SphereGeometry(0.0018, 5, 4), Math.cos(a) * 0.0195, Math.sin(a) * 0.0195, 0.0045));
+  }
+  g.add(new THREE.Mesh(merge(beads), gilt));
+  const garnet = withAtmos(new THREE.MeshStandardMaterial({ color: 0x5a0a0c, roughness: 0.15, metalness: 0.1, emissive: 0x1a0204 }));
+  g.add(new THREE.Mesh(at(new THREE.SphereGeometry(0.005, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), 0, 0, 0.0085, Math.PI / 2), garnet));
+  return g;
+}
+
+/**
  * The soft leather top of an ankle shoe (a turnshoe laced round the ankle),
  * closing over the shoe's collar and the foot of the leg wraps. Origin on
  * the ankle's axis at the shoe's collar; up +Y.
@@ -484,13 +507,21 @@ export function makeSticks(seed: number) {
 export function makeHeadJar(jar: THREE.Object3D | null) {
   const m = propMats();
   const o = new THREE.Group();
-  const pad = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.02, 6, 16).rotateX(Math.PI / 2), m.linen);
-  pad.position.y = 0.012;
+  // The pad (a cercine): a twisted ring of cloth, soft and squashed under the weight.
+  const tg = new THREE.TorusGeometry(0.052, 0.018, 8, 24).rotateX(Math.PI / 2);
+  const tp = tg.attributes.position;
+  for (let i = 0; i < tp.count; i++) {
+    const x = tp.getX(i), z = tp.getZ(i), a = Math.atan2(z, x);
+    // Flattened, with the twist of its wound cloth running round it.
+    tp.setY(i, tp.getY(i) * 0.6 + Math.sin(a * 7 + Math.atan2(tp.getY(i), Math.hypot(x, z) - 0.052) * 1) * 0.0015);
+  }
+  tg.computeVertexNormals();
+  const pad = new THREE.Mesh(tg, m.linen);
   o.add(pad);
   if (jar) {
     const j = jar.clone();
     j.scale.setScalar(0.95);
-    j.position.y = 0.02;
+    j.position.y = 0.006;
     o.add(j);
   }
   return o;
