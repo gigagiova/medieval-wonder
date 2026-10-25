@@ -305,7 +305,8 @@ function ruins(occ: Occupancy, b: Builder) {
     if (p) {
       const g = groundY(p[0], p[1]);
       b.box('marble', 1.15, 1.25, 0.95, p[0], g - fastTerrain(p[0], p[1]) - 0.2, p[1], R(0, 6.28));
-      onGround('torso_emperor', p[0], p[1], R(0, 6.28), { y: g + 1.05, sink: 0, range: 80 });
+      const face = Math.atan2(fo.x - p[0], fo.z - p[1]);
+      onGround('torso_emperor', p[0], p[1], face, { y: g + 1.05, sink: 0, range: 80 });
       markReadableWorld('spoliaImperator', p[0], 1.6, p[1]);
       count('forum');
     }
@@ -450,7 +451,8 @@ async function loadModel(name: string, loader: GLTFLoader): Promise<Model> {
     if (!g.attributes.normal) g.computeVertexNormals();
     // Some scans come unlit (KHR_materials_unlit): always shade them as stone.
     const src = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial;
-    const mat = new THREE.MeshStandardMaterial({ map: src.map ?? null, normalMap: src.normalMap ?? null, name: src.name });
+    // Double-sided: many scans are open shells (a statue's back never scanned).
+    const mat = new THREE.MeshStandardMaterial({ map: src.map ?? null, normalMap: src.normalMap ?? null, name: src.name, side: THREE.DoubleSide });
     if (src.normalMap) mat.normalScale.set(0.8, 0.8);
     parts.push({ geometry: g, material: weather(mat) });
   });

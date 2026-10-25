@@ -81,3 +81,11 @@ Underground and high places:
   in the brambles. Rothari's law on the *masca* lies in the judge's house. Together they are the seed of
   the later witch legend; in 700 it does not yet exist.
 - **Isis**: the Iseum ruins, east of the walls. Its obelisk and Apis survive today in the town.
+- **Ponte Fratto** (teleport "Pons Maior (Ponte Fratto)", ~(-1350, -962), north of the old map edge on
+  the Calore): a block of the building inscription lies in the shallows under the fallen arch (`pontisTitulus`,
+  "...vetustate conlapsum restituit": restored once, fallen again), and someone has cut "Pons Maior
+  fractus est" into the timber trestle (`pontisNomen`): the name the ruin still has. Both invented (style).
+- **Spolia**: Roman sculpture in the walls and ruins (HISTORY.md section 10). Readables: an epitaph set
+  upside down in the wall by Porta Rufina (`spoliaTitulus`, style), the headless cuirassed "iron man" on
+  his base at the forum (`spoliaImperator`, style), and the sphinx built into the wall by Porta Summa
+  (`spoliaSphinx`, paraphrase: Iseum pieces did come out of Benevento's walls).
