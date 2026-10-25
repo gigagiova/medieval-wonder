@@ -54,12 +54,18 @@ export const SITES: Record<string, SiteDef> = {
   pontesOnuphrii: { id: 'pontesOnuphrii', name: 'Pons Sancti Onuphrii', x: -86, z: -372, rot: 0 },
   turrisCatenae: { id: 'turrisCatenae', name: 'Turris Catenae', x: -517, z: -27, rot: 0, flat: [14, 26] },
   sanctusHilarius: { id: 'sanctusHilarius', name: 'Sanctus Hilarius ad Portam Auream', x: 429, z: -285, rot: 0, flat: [14, 26] },
-  iseum: { id: 'iseum', name: 'Iseum', x: 660, z: 168, rot: 0.2, flat: [20, 36] },
+  // Domitian's temple of Isis: its remains in the square before the bishop's church (authored in the
+  // Episcopium's frame; HISTORY.md §5 for the evidence).
+  iseum: { id: 'iseum', name: 'Iseum', x: -32.8, z: -73.3, rot: -0.618, lx: -15, lz: -17,
+    reserve: [[-28, -28.6], [-2.5, -28.6], [-2.5, -6.5], [-28, -6.5]] },
   necropolis: { id: 'necropolis', name: 'Coemeterium Langobardorum', x: 238, z: 286, rot: 0 },
   nux: { id: 'nux', name: 'Nux Sacra', x: -330, z: 478, rot: 0, flat: [12, 24] },
   molendinum: { id: 'molendinum', name: 'Molendinum', x: -692, z: 2, rot: 0 },
   forum: { id: 'forum', name: 'Forum', x: -40, z: -168, rot: GRID_ROT, flat: [16, 30], clear: 18 },
-  hortusSophiae: { id: 'hortusSophiae', name: 'Hortus Curtis', x: 566, z: -16, rot: GRID_ROT, clear: 16 },
+  // The Roman castellum aquae on the height outside Porta Summa, where the Rocca dei Rettori will stand
+  // (OSM: the Rocca at 41.1290 N, 14.7820 E); the aqueduct comes in from the east-south-east.
+  castellumAquae: { id: 'castellumAquae', name: 'Castellum Aquae', x: 622, z: 160, rot: 2.64, flat: [14, 24] },
+  hortusSophiae: { id: 'hortusSophiae', name: 'Hortus Curtis', x: 566, z: -16, rot: GRID_ROT, clear: 20 },
 };
 
 // Terraces for the sites that need level footing.
@@ -129,16 +135,18 @@ export interface Road { name: string; pts: P2[]; w: number }
 const g = (id: string) => GATES.find((x) => x.id === id)!.at;
 export const ROADS: Road[] = [
   // The Appia: Ponte Leproso, north past the amphitheatre and the Santi Quaranta, to Porta S. Lorenzo.
-  { name: 'Via Appia', w: 3.4, pts: [[-1120, 40], [-990, 18], [-900, -10], [-845, -36], [-800, -56], [-793, -54], [-734, -145], [-700, -184], [-664, -246], [-630, -294], [-590, -326], [-520, -347], [-460, -345], g('laurentii')] },
-  // From the Arcus Sacramenti down past the theatre and Torre della Catena to the Sabato and the bridge.
-  { name: 'Via ad Pontem Leprosum', w: 2.8, pts: [[-82, -52], [-120, -38], [-168, -30], [-205, -52], [-262, -70], [-330, -60], [-400, -48], [-470, -40], [-517, -14], [-570, -30], [-640, -70], [-700, -120], [-734, -145]] },
+  // Over the bridge it runs from ramp foot to ramp foot (pons.ts: the bridge's axis is OSM's).
+  { name: 'Via Appia', w: 3.4, pts: [[-1120, 40], [-990, 18], [-900, -10], [-845, -30], [-811.5, -25.0], [-720.3, -169.6], [-700, -184], [-664, -246], [-630, -294], [-590, -326], [-520, -347], [-460, -345], g('laurentii')] },
+  // From the Arcus Sacramenti down past the theatre and Torre della Catena to the Sabato, along its
+  // bank upstream of the bridge, and up to the bridge's town-side ramp.
+  { name: 'Via ad Pontem Leprosum', w: 2.8, pts: [[-82, -52], [-120, -38], [-168, -30], [-205, -52], [-262, -70], [-330, -60], [-400, -48], [-470, -40], [-517, -14], [-570, -30], [-640, -70], [-690, -98], [-736.9, -115.1], [-720.3, -169.6]] },
   // The Traiana: through the Arch of Trajan, past S. Ilario, down to the Calore and on to Apulia.
   { name: 'Via Traiana', w: 3.2, pts: [[392, -228], [416, -246], [452, -268], [500, -300], [560, -342], [622, -390], [690, -444], [770, -500], [900, -530]] },
   // Porta Gloriosa down to the bridge of S. Onofrio and the road north (the old Latina).
   { name: 'Via Latina', w: 3.0, pts: [g('gloriosa'), [-80, -330], [-84, -350], [-90, -398], [-98, -428], [-118, -480], [-150, -560], [-200, -680], [-240, -800]] },
   // South from Porta Rufina past the Lombard cemetery to the Sabato ford.
   { name: 'Via Rufina', w: 2.6, pts: [g('rufina'), [172, 140], [184, 200], [214, 252], [236, 320], [222, 420], [200, 520], [178, 610]] },
-  // East from Porta Summa past the ruins of the Iseum.
+  // East from Porta Summa.
   { name: 'Via Summa', w: 2.8, pts: [g('summa'), [618, 108], [646, 140], [700, 172], [790, 200], [900, 236]] },
   // Down the riverside from Torre della Catena along the Sabato to the old walnut.
   { name: 'Semita Nucis', w: 1.8, pts: [[-517, -14], [-492, 40], [-470, 110], [-450, 200], [-418, 300], [-380, 400], [-345, 462]] },

@@ -17,6 +17,8 @@ import { layoutTown, density, FREE, STREET, RESERVED, HOUSE, PLOT, type Layout }
 import { makeChunks, buildChunk, CHUNK, type Hole, type ChunkItems } from './benevento/fabric';
 import { FabricStream } from './benevento/stream';
 import * as M from './benevento/monuments';
+import { theatreView } from './benevento/theatrum';
+import { ponsLeprosus, PONS } from './benevento/pons';
 import { buildRivers } from './benevento/rivers';
 import { interiorAnchors } from './benevento/interiors';
 import { PLACED, markReadable, markReadableWorld } from './benevento/readables';
@@ -75,20 +77,30 @@ export function getTeleports(): Teleport[] {
   at('Episcopium', S.episcopium, -15.5, -31, -17, -45);
   at('Sancta Maria', S.episcopium, -17.6, -45, -17, -62);
   at('Bibliotheca', S.episcopium, -12.6, -50, -7, -50);
-  at('Forum', S.forum, 21, 18, 21, 6);
-  at('Theatrum', S.theatrum, 6, 0, 30, 0);
+  at('Forum', S.forum, 12, 10, -6, -5);
+  {
+    // On the lower walkway of the cavea, looking across the seats to the stage.
+    const v = theatreView(), [x, z] = sw(S.theatrum, v.x, v.z), [lx, lz] = sw(S.theatrum, v.lx, v.lz);
+    out.push({ ...tp('Theatrum', x, z, lx, lz), y: fastTerrain(x, z) + v.y + 2.0 });
+  }
   at('Thermae', S.thermae, -20.6, 29.5, -30, 29.5);
-  at('Amphitheatrum', S.amphitheatrum, 0, -60, 0, 0);
+  at('Amphitheatrum', S.amphitheatrum, -14, -8, 28, 22);
   at('Sancti Quadraginta', S.quadraginta, -36, -46, -36, -56);
   at('Turris Catenae', S.turrisCatenae, -10, 0, 0, 0);
-  at('Pons Leprosus', S.pontesLeprosus, 0, 0, 30, 0);
+  {
+    // On the lane along the town bank, upstream: the cutwaters, the five arches, the Sabato under the last two.
+    const [x, z] = PONS.at(24, 15), [lx, lz] = PONS.at(PONS.arch(2), 0);
+    out.push(tp('Pons Leprosus', x, z, lx, lz));
+  }
   at('Sanctus Petrus', S.sanctusPetrus, -15.5, -31, -17, -45);
   at('Sanctus Hilarius', S.sanctusHilarius, -13, 0, 0, 0);
-  at('Iseum', S.iseum, 0, 16, 0, 0);
-  at('Coemeterium Langobardorum', S.necropolis, 0, 26, 0, 0);
+  at('Iseum', S.iseum, -5.5, -7.5, -15.5, -26);
+  at('Coemeterium Langobardorum', S.necropolis, 0, 11, 0, 0);
   at('Nux Sacra', S.nux, 0, 9, 0, 0);
   at('Molendinum', S.molendinum, 0.8, -7, 0.8, 0);
   at('Hortus Curtis', S.hortusSophiae, 0, 8, 0, 0);
+  at('Sancta Sophia', S.hortusSophiae, 14.5, 15.5, 9, 9);
+  at('Castellum Aquae', S.castellumAquae, -3, 21, -12, 0);
   {
     const c = M.CISTERN;
     const [x, z] = sw(S.hortusSophiae, 0, c.bottom - 3);
@@ -449,8 +461,9 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
   await at('By the old walnut', 0.7, S.nux, () => M.nux(b));
   await at('At the mill', 0.71, S.molendinum, () => M.molendinum(b));
   await at("In the dukes' orchard", 0.72, S.hortusSophiae, () => M.cisterna(b));
+  await at('At the water-castle', 0.73, S.castellumAquae, () => M.castellumAquae(b));
   await progress('Over the rivers', 0.74);
-  M.bridge(b, [-793, -54], [-734, -145], 6.4, 5.5, 'block', 11);
+  ponsLeprosus(b);
   M.bridge(b, [-73, -326], [-100, -424], 6.0, 4.5, 'block', 12);
   // Readables in the houses one can enter.
   for (const l of lay.lots) if (l.explore) {
@@ -541,9 +554,15 @@ function keepOut(x: number, z: number) {
     const r = s.flat ? s.flat[1] + 4 : s.clear ? s.clear + 6 : 14;
     if (Math.hypot(x - s.x, z - s.z) < r) return true;
   }
-  // The bridges' approaches.
-  if (distToPolyline(x, z, [[-793, -54], [-734, -145]]) < 9) return true;
+  // The Ponte Leproso, its ramps and the meadow on the town bank upstream of it (the view from the road).
+  {
+    const [s, w] = PONS.axis(x, z);
+    if (s > PONS.rampNE - 8 && s < PONS.rampSW + 8 && Math.abs(w) < 13) return true;
+    if (s > -20 && s < PONS.s1 + 10 && w > 0 && w < 40) return true;
+  }
   if (distToPolyline(x, z, [[-73, -326], [-100, -424]]) < 9) return true;
+  // The aqueduct's last arches outside Porta Summa.
+  if (distToPolyline(x, z, [[630.3, 164.6], [662, 182]]) < 7) return true;
   return false;
 }
 
@@ -599,6 +618,8 @@ function townTexture(L: Layout): THREE.DataTexture {
       const a = rd.pts[k], c = rd.pts[k + 1], L2 = Math.hypot(c[0] - a[0], c[1] - a[1]);
       for (let s = 0; s <= L2; s += 0.5) {
         const px = a[0] + ((c[0] - a[0]) * s) / L2, pz = a[1] + ((c[1] - a[1]) * s) / L2;
+        // Not on the ground under the Ponte Leproso: the road is up on the bridge there.
+        { const [ps, pw] = PONS.axis(px, pz); if (ps > PONS.rampNE + 1 && ps < PONS.rampSW - 1 && Math.abs(pw) < 4) continue; }
         for (let dz = -rd.w / 2; dz <= rd.w / 2; dz += 0.7) for (let dx = -rd.w / 2; dx <= rd.w / 2; dx += 0.7) {
           if (dx * dx + dz * dz > (rd.w / 2) ** 2) continue;
           const i = Math.floor(px + dx - T.x0), j = Math.floor(pz + dz - T.z0);
@@ -627,8 +648,8 @@ export function regionName(p: THREE.Vector3): string {
     return 'Catacumbae Sanctorum Quadraginta';
   }
   for (const g of GATES) if (Math.hypot(p.x - g.at[0], p.z - g.at[1]) < 8) return g.name;
-  const named: [SiteDef, number][] = [[S.curtis, 26], [S.episcopium, 30], [S.forum, 18], [S.theatrum, 50], [S.thermae, 28], [S.amphitheatrum, 55], [S.quadraginta, 48],
-    [S.turrisCatenae, 14], [S.sanctusHilarius, 16], [S.sanctusPetrus, 32], [S.iseum, 22], [S.necropolis, 28], [S.nux, 14], [S.molendinum, 14], [S.hortusSophiae, 16], [S.pontesLeprosus, 50], [S.pontesOnuphrii, 45]];
+  const named: [SiteDef, number][] = [[S.iseum, 15], [S.curtis, 26], [S.episcopium, 30], [S.forum, 18], [S.theatrum, 50], [S.thermae, 28], [S.amphitheatrum, 55], [S.quadraginta, 48],
+    [S.turrisCatenae, 14], [S.sanctusHilarius, 16], [S.sanctusPetrus, 32], [S.necropolis, 28], [S.nux, 14], [S.molendinum, 14], [S.hortusSophiae, 16], [S.castellumAquae, 26], [S.pontesLeprosus, 50], [S.pontesOnuphrii, 45]];
   for (const [s, r] of named) if (near(s, r)) return s.name;
   for (const d of DISTRICTS) if (d.poly && inPoly(p.x, p.z, d.poly)) return d.name;
   const rv = riverAt(p.x, p.z, 40);

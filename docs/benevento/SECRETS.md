@@ -18,7 +18,7 @@ game turns this legend into a trail of five clues. Each clue points to the next 
 |---|----------|-------|----------|
 | 1 | `nux` (The stump by the Sabato) | Nux Sacra, by the Sabato (-330, 478) | The holy tree is cut down. "Ask an old man of the duke's people." |
 | 2 | `domusAudoini` (An old soldier's keepsake) | Domus Audoini, an enterable house in the curtis quarter (444, -80) | The viper "sleeps where the Lady of the Egyptians lies in the mud" |
-| 3 | `isisVipera` (The serpent-crowned Lady) | Iseum, the ruined temple of Isis, outside the east wall (660, 168) | Real dedication formula. A newer scratch says "under the dukes' apples" |
+| 3 | `isisVipera` (The serpent-crowned Lady) | Iseum, the remains of the temple of Isis in the square before S. Maria (-33, -73): the relief propped against the podium | Real dedication formula. A newer scratch says "under the dukes' apples" |
 | 4 | `cisterna` (The serpent hollow) | Cisterna, below the duke's garden (Hortus Curtis, 566, -16); reached by a stair | An empty niche with the print of a snake. "Look at his altar." |
 | 5 | `calix` (The chalice of Barbatus) | Altar of S. Maria, the bishop's church (Episcopium) | The idol became the chalice. The trail ends here. |
 
@@ -64,12 +64,16 @@ Underground and high places:
 | calcaria | Amphitheatre | The lime-burner's tally: the monument is going into the kiln | style |
 | catena | Turris Catenae | The watch roll | style |
 | hilarius | S. Ilario ad Portam Auream | The altar | style |
-| obeliscus, apis, isisVipera | Iseum | Obelisks, the Apis bull, the serpent-crowned Isis | paraphrase / attested |
+| obeliscus, apis, isisVipera | Iseum, before the bishop's church | The fallen obelisk, the Apis bull, the serpent-crowned Isis; granite sphinxes guard the atrium gate | paraphrase / attested |
 | perticae | Lombard cemetery | Paul the Deacon HL V 34: poles topped with wooden doves | attested |
 | nux | The sacred walnut stump | Vita Barbati (viper trail 1) | legend |
 | molendinum | The mill on the Sabato | The miller's breve | style |
 | genius | The forum market | A base dedicated to the Genius of the colony | style |
 | cisterna, calix | Viper trail 4 and 5 | See above | legend |
+| pontisTitulus | Ponte Leproso, the parapet over the middle arch (upstream) | The names of Valentinian, Valens and Gratian, who restored the bridge (367-375) | paraphrase |
+| castellum | Castellum Aquae, by the open arch | The Roman water-castle of the Serino aqueduct | paraphrase |
+| rocca | Castellum Aquae, on the Lombard watch platform | Easter egg: the Torrione, the castrum and the Rocca dei Rettori that will stand here | paraphrase |
+| sophia | Hortus Curtis, by the ring of Roman columns | Foreshadowing S. Sofia (c. 760) and its six Roman columns | paraphrase |
 
 ## Easter eggs
 
@@ -80,4 +84,9 @@ Underground and high places:
 - **The witches' walnut** (*la noce di Benevento*): its stump is by the Sabato, with the hide strips still
   in the brambles. Rothari's law on the *masca* lies in the judge's house. Together they are the seed of
   the later witch legend; in 700 it does not yet exist.
-- **Isis**: the Iseum ruins, east of the walls. Its obelisk and Apis survive today in the town.
+- **Isis**: the Iseum's remains in the town's heart, before the bishop's church, where a red-granite sphinx was dug up in 2009 and where the obelisk stood by 1597 (today in Piazza Papiniano). The Apis survives on Viale San Lorenzo. The sphinxes at the atrium gate are a Christian church guarded by Egyptian beasts, as the trail's last step turns the idol into a chalice.
+- **The Rocca dei Rettori**: climb the water-castle outside Porta Summa to the Lombard lookout; the
+  readable there tells of the Torrione (871/875), the castrum and the papal Rocca (1321) to come.
+- **S. Sofia**: six Roman columns stacked in the dukes' orchard, two holding up a vine: sixty years on,
+  Arechis II will raise his star-shaped church here round six such columns.
+- **The marble bridge**: the three emperors' names on the Ponte Leproso's parapet.
