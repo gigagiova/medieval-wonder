@@ -185,9 +185,12 @@ def make(gid, g, garments, basemesh, rig):
     # carried by the shoulders and back instead, following the upper arm only
     # a little (`arm_follow`), so a swinging arm pushes it rather than lifting it.
     import re
-    kf = d.get('arm_follow', 0.3)
+    kf0 = d.get('arm_follow', 0.3)
+    shz = bone_world(rig, 'LeftArm').z
     for v in o.data.vertices:
         ws = {o.vertex_groups[gr.group].name: gr.weight for gr in v.groups}
+        # Over the shoulder the cloth goes with the arm's top (or the sleeve under it comes through).
+        kf = kf0 + (0.85 - kf0) * max(0.0, min(1.0, 1 - (shz - v.co.z) / 0.15))
         for S in ('Left', 'Right'):
             arm = [n for n in ws if re.match(r'mixamorig:%s(Arm|ForeArm|Hand)' % S, n)]
             tot = sum(ws[n] for n in arm)

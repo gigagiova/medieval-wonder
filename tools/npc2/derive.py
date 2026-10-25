@@ -200,3 +200,37 @@ def relax(o, basemesh, iters, gap=0.006):
     bm.free()
     o.data.update()
     return moved
+
+
+def lift_hood(o, basemesh, above=0.045):
+    """A hood fitted over a scanned head (fuller than MakeHuman's, with its
+    hair) falls over the eyes: its front is raised (and drawn back a little)
+    until the opening's top edge clears the brows by `above`."""
+    import headfit
+    co = headfit.mix_coords(basemesh)
+    eye = (headfit.group_centroid(basemesh, co, 'helper-l-eye') + headfit.group_centroid(basemesh, co, 'helper-r-eye')) / 2
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    ow, owi = o.matrix_world, o.matrix_world.inverted()
+    # The opening's top edge: the lowest of the hood in front of the face's middle, above the eyes' line.
+    front = [ow @ v.co for v in bm.verts if abs((ow @ v.co).x - eye.x) < 0.035 and (ow @ v.co).y < eye.y + 0.02 and (ow @ v.co).z > eye.z - 0.03]
+    if not front:
+        bm.free()
+        return 0.0
+    top = min(p.z for p in front)
+    d = eye.z + above - top
+    if d <= 0:
+        bm.free()
+        return 0.0
+    def ss(a, b, x):
+        t = min(1.0, max(0.0, (x - a) / (b - a)))
+        return t * t * (3 - 2 * t)
+    for v in bm.verts:
+        p = ow @ v.co
+        w = ss(eye.y + 0.14, eye.y - 0.01, p.y) * ss(eye.z - 0.09, eye.z - 0.02, p.z)
+        if w > 0:
+            v.co = owi @ (p + Vector((0, 0, d * w)))
+    bm.to_mesh(o.data)
+    bm.free()
+    o.data.update()
+    return d

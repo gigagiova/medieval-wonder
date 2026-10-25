@@ -422,23 +422,14 @@ def bake(basemesh, spec, out_dir, size=1024):
     bpy.context.view_layer.objects.active = basemesh
     bpy.ops.object.bake(type='DIFFUSE', pass_filter={'COLOR'}, use_selected_to_active=True,
                         cage_extrusion=0.02, max_ray_distance=0.05, margin=8)
-    # Where the scan isn't skin (a shirt collar at the neck): its `_SKIN`
-    # likeness baked as a mask, and those parts filled in from the skin
-    # round them.
+    # Where the scan is to be used: a mask baked like the colour.
     mask = bpy.data.images.new('head_mask', size, size, alpha=False)
     mm = bpy.data.materials.new('skinmask')
     mm.use_nodes = True
-    at = mm.node_tree.nodes.new('ShaderNodeAttribute')
-    at.attribute_name = '_SKIN' if '_SKIN' in scan.mesh.data.attributes else 'none'
-    ah = mm.node_tree.nodes.new('ShaderNodeAttribute')
-    ah.attribute_name = '_HAIR'
-    mx = mm.node_tree.nodes.new('ShaderNodeMath')
-    mx.operation = 'MAXIMUM'
-    mm.node_tree.links.new(at.outputs['Fac'], mx.inputs[0])
-    if '_SKIN' in scan.mesh.data.attributes:
-        mm.node_tree.links.new(ah.outputs['Fac'], mx.inputs[1])
-    else:
-        mx.inputs[1].default_value = 1.0  # a face-only scan is all skin
+    # (The scans' per-vertex skin likeness is too coarse on some faces to
+    # judge by: the whole head is taken, but for the collar below.)
+    mx = mm.node_tree.nodes.new('ShaderNodeValue')
+    mx.outputs[0].default_value = 1.0
     # ...and nothing of the scan below the jaw's shadow on the neck (a collar
     # sits there on most): the neck is continued from the skin above it.
     geo = mm.node_tree.nodes.new('ShaderNodeNewGeometry')
@@ -452,7 +443,7 @@ def bake(basemesh, spec, out_dir, size=1024):
     L.new(geo.outputs['Position'], sep.inputs[0])
     L.new(sep.outputs['Z'], rng.inputs['Value'])
     L.new(rng.outputs['Result'], mul.inputs[0])
-    L.new(mx.outputs['Value'], mul.inputs[1])
+    L.new(mx.outputs[0], mul.inputs[1])
     L.new(mul.outputs['Value'], mm.node_tree.nodes['Principled BSDF'].inputs['Base Color'])
     old_mats = list(scan.mesh.data.materials)
     for i in range(len(scan.mesh.data.materials)):
