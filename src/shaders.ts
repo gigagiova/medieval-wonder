@@ -40,40 +40,75 @@ uniform float uUnder;
 uniform float uFogBase;
 uniform vec3 uMoonDir;
 uniform sampler2D uNoise; // tiling low-frequency noise: R 4 cycles, G 8, B 16, A 6 (per tile)
+uniform sampler2D uLF;    // light field: R sun shadow height, GBA mean town height at ~1.5/5/14 m
+uniform vec4 uLFBox;      // x0, z0, 1/size, valid
+uniform vec4 uFogK;       // haze density, ground-mist density, mist falloff (1/m), sky fog distance
+
+// x: key light (1 lit, 0 in the shadow of the town), y: sky visibility.
+// p, n in world space. Two fetches of a small texture.
+#define WORLDLIGHT
+vec2 worldLight(vec3 p, vec3 n){
+  if (uLFBox.w < 0.5) return vec2(1.0);
+  vec2 uv = (p.xz - uLFBox.xy) * uLFBox.z;
+  vec2 e = min(uv, 1.0 - uv);
+  float inside = smoothstep(0.0, 0.1, min(e.x, e.y));
+  uv.y = 1.0 - uv.y;
+  vec2 nd = vec2(n.x, -n.z) * uLFBox.z;
+  float S = texture2D(uLF, uv + nd * 0.6).r;
+  float sun = smoothstep(S - 0.15, S + 0.9, p.y + 0.2);
+  vec3 hb = texture2D(uLF, uv + nd * 2.5).gba;
+  vec3 occ = max(hb - p.y, 0.0);
+  vec3 v = vec3(1.5, 5.0, 14.0);
+  v = v / (v + occ * 1.6);
+  float sky = dot(v, vec3(0.3, 0.35, 0.35));
+  return mix(vec2(1.0), vec2(sun, sky), inside);
+}
 
 vec3 applyAtmos(vec3 col, vec3 wpos){
   vec3 ro = cameraPosition;
   vec3 rd = wpos - ro; float L = max(length(rd), 1e-3); rd /= L;
-  float dens = mix(0.045, 0.075, uUnder);
-  float b = mix(0.06, 0.0, uUnder);
-  // Height fog anchored a little below the ground under the eye: looking out
-  // from the ridge the valleys lie in thicker mist.
-  float ground = uFogBase - 7.0 * uUnder;
-  float od;
+  // Two media, both integrated in closed form along the ray (no steps, no
+  // screen-space noise): a thin even haze, and a dense mist that pools at the
+  // ground and thins upward (scale height ~7 m). Its base trails the ground
+  // under the eye, so from the ridge the valleys lie drowned in it.
+  float haze = mix(uFogK.x, 0.05, uUnder);
+  float dG = mix(uFogK.y, 0.03, uUnder);
+  float b = mix(uFogK.z, 0.05, uUnder);
+  float ground = uFogBase - 4.0 * uUnder;
   float k = b * rd.y * L;
-  if (abs(k) > 1e-3) od = dens * exp(-b*(ro.y-ground)) * (1.0 - exp(-k)) / (b*rd.y);
-  else od = dens * exp(-b*(ro.y-ground)) * L;
-  // Drifting density: two lookups of the noise texture instead of 3D fbm.
-  vec3 mp = ro + rd * min(L, 25.0) * 0.6;
-  float n = texture2D(uNoise, mp.xz*0.0045 + vec2(uTime*0.0016, uTime*0.0009) + mp.y*0.003).r * 0.65
-          + texture2D(uNoise, mp.zx*0.011 - vec2(uTime*0.0021, -uTime*0.0013)).g * 0.35;
-  n = smoothstep(0.15, 0.85, n);
-  od *= mix(0.45, 1.6, n);
+  float g0 = dG * exp(-b * (ro.y - ground));
+  float odG = abs(k) > 1e-3 ? g0 * (1.0 - exp(-k)) / (b * rd.y) : g0 * L;
+  // Slow drifting banks of mist, anchored in the world: the density is read
+  // where the ray meets the surface (or 70 m out), at 15-60 m scales.
+  vec3 mp = ro + rd * min(L, 70.0);
+  vec2 drift = vec2(uTime * 0.0011, uTime * 0.0006);
+  float n = texture2D(uNoise, mp.xz * 0.0042 + drift).r * 0.6
+          + texture2D(uNoise, mp.zx * 0.0115 - drift * 1.7 + mp.y * 0.004).g * 0.4;
+  n = smoothstep(0.2, 0.8, n);
+  float od = haze * L + odG * mix(0.35, 1.65, n);
   float fogAmt = 1.0 - exp(-od);
-  vec3 fogC = mix(uFogCol, vec3(0.012,0.009,0.007), uUnder);
-  float md = max(dot(rd, uMoonDir), 0.0);
-  fogC *= 1.0 + 0.12 * pow(md, 3.0) * (1.0 - uUnder);
+  // Colour of the mist: lit by the overcast from above, brighter towards the
+  // bright west (forward scattering), cooler and darker away from it and
+  // towards the ground.
+  float md = dot(rd, uMoonDir);
+  // (the key light's own glow in the mist is added by the shaft pass, where it reaches)
+  float fwd = 0.85 + 0.15 * pow(max(md, 0.0), 4.0);
+  vec3 fogC = uFogCol * fwd * mix(vec3(0.93, 0.97, 1.05), vec3(1.04, 1.01, 0.97), max(md, 0.0));
+  fogC *= 0.86 + 0.14 * smoothstep(-0.25, 0.3, rd.y);
+  fogC = mix(fogC, vec3(0.010, 0.008, 0.007), uUnder);
   // Closed-form integral of 1/(h^2+t^2) along the view ray for every lamp:
   // cheap volumetric halos that wrap around geometry edges.
   vec3 scat = vec3(0.0);
+  float dens = haze + g0;
   for (int i=0;i<${NLAMP};i++){
+    if (uLampCol[i].r + uLampCol[i].g < 1e-4) continue;
     vec3 lp = uLampPos[i] - ro;
     float t0 = dot(lp, rd);
-    float h = max(length(lp - rd*t0), 0.35);
+    float h = max(length(lp - rd*t0), 0.3);
     float a = (atan((L - t0)/h) - atan(-t0/h)) / h;
     scat += uLampCol[i] * a * exp(-dens*0.8*clamp(t0, 0.0, L));
   }
-  scat *= mix(0.011, 0.022, uUnder) * mix(0.5, 1.5, n);
+  scat *= mix(0.012, 0.02, uUnder) * mix(0.7, 1.3, n);
   return mix(col, fogC, fogAmt) + scat;
 }
 `;
@@ -220,6 +255,10 @@ Surf surface(vec3 p, vec3 n){
   s.ao = t.m.r;
   s.rough = POROUS(t.m.g * ROUGH_K);
   s.nrm = normalize(n + t.n * NRM_K);
+  // Cavities: dirt and shadow settle in the joints and pores (height map),
+  // so the relief reads even where the light is flat.
+  float cav = smoothstep(0.5, 0.08, t.m.b);
+  s.alb *= 1.0 - 0.35 * cav;
   #ifdef TINT
   s.alb = tintTex(s.alb, TINT, 1.0);
   #endif
