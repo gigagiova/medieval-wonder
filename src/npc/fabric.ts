@@ -21,12 +21,13 @@ import { withAtmos } from './rig';
 export type FabricKind = 'tabby' | 'twill' | 'felt' | 'linen' | 'leather';
 
 /** Per kind: metres per texture repeat, detail contrast, normal strength, roughness, fuzz, and how much specular survives. */
-const KINDS: Record<FabricKind, { tile: number; contrast: number; nrm: number; rough: number; fuzz: number; spec: number }> = {
-  tabby: { tile: 0.34, contrast: 1.25, nrm: 1.3, rough: 1.0, fuzz: 0.3, spec: 0.05 },
-  twill: { tile: 0.4, contrast: 1.1, nrm: 1.1, rough: 1.0, fuzz: 0.3, spec: 0.05 },
-  felt: { tile: 0.3, contrast: 1.3, nrm: 0.8, rough: 1.0, fuzz: 0.4, spec: 0.04 },
-  linen: { tile: 0.36, contrast: 1.0, nrm: 0.9, rough: 0.95, fuzz: 0.15, spec: 0.08 },
-  leather: { tile: 0.4, contrast: 0.8, nrm: 0.7, rough: 0.78, fuzz: 0.0, spec: 0.35 },
+const KINDS: Record<FabricKind, { tile: number; contrast: number; nrm: number; rough: number; fuzz: number; spec: number; hand: [number, number, number, number] }> = {
+  // hand: how hand-made and worn it shows: slubs in the yarn, mottling of the dye, pilling, fading and grime.
+  tabby: { tile: 0.34, contrast: 1.25, nrm: 1.3, rough: 1.0, fuzz: 0.3, spec: 0.05, hand: [1, 1, 0.6, 1] },
+  twill: { tile: 0.4, contrast: 1.1, nrm: 1.1, rough: 1.0, fuzz: 0.3, spec: 0.05, hand: [0.8, 1, 0.7, 1] },
+  felt: { tile: 0.3, contrast: 1.3, nrm: 0.8, rough: 1.0, fuzz: 0.4, spec: 0.04, hand: [0.3, 1.2, 1, 1] },
+  linen: { tile: 0.36, contrast: 1.0, nrm: 0.9, rough: 0.95, fuzz: 0.15, spec: 0.08, hand: [1.3, 0.6, 0, 0.8] },
+  leather: { tile: 0.4, contrast: 0.8, nrm: 0.7, rough: 0.78, fuzz: 0.0, spec: 0.35, hand: [0, 0.6, 0, 0.6] },
 };
 
 const inBrowser = typeof document !== 'undefined';
@@ -51,6 +52,7 @@ function kindUniforms(kind: FabricKind): Record<string, { value: unknown }> {
       tFabN: { value: load(`textures/fabric/${kind}_n.webp`, THREE.RGFormat) },
       uFab: { value: new THREE.Vector4(1 / k.tile, k.contrast, k.nrm, k.fuzz) },
       uFabSpec: { value: k.spec },
+      uFabHand: { value: new THREE.Vector4(...k.hand) },
     };
     sets.set(kind, u);
   }
@@ -67,6 +69,7 @@ const FABRIC_GLSL = /* glsl */ `
 uniform sampler2D tFabD; uniform sampler2D tFabN;
 uniform vec4 uFab; // 1/tile, contrast, normal strength, fuzz
 uniform float uFabSpec;
+uniform vec4 uFabHand; // slubs, dye mottling, pilling, fading and grime
 varying vec3 vFab; varying vec3 vFabN;
 // A projection's (u, v) of a bind-pose point or offset: 0 looks along X, 1 along Y, 2 along Z.
 vec2 fabProj(vec3 p, int ax){ return ax == 0 ? p.zy : ax == 1 ? p.xz : p.xy; }
@@ -153,6 +156,33 @@ export function fabric(kind: FabricKind, color: THREE.ColorRepresentation, o: Fa
         fD *= 0.9 + 0.2 * fNz.r;
         diffuseColor.rgb *= max(mix(1.0, fD, uFab.y), 0.0);
         diffuseColor.rgb *= mix(vec3(1.0), vec3(1.04, 1.0, 0.94), fNz.g * 0.6);
+        {
+          // Hand-spun, hand-woven, hand-dyed and worn. (Fine detail fades out
+          // with distance, where it would only shimmer.)
+          vec2 fq = fabProj(vFab, fMa.x);
+          float fNear = 1.0 - smoothstep(0.0012, 0.005, length(fwidth(vFab)));
+          // Slubs: thick and thin runs of single yarns across the cloth.
+          float sl1 = texture2D(uNoise, vec2(fq.x * 0.6, fq.y * 24.0)).b, sl2 = texture2D(uNoise, vec2(fq.x * 21.0 + 0.3, fq.y * 0.55)).a;
+          float slub = (smoothstep(0.6, 0.85, sl1) - 0.6 * smoothstep(0.62, 0.88, 1.0 - sl1)) * 0.16 + smoothstep(0.66, 0.9, sl2) * 0.08;
+          diffuseColor.rgb *= 1.0 + slub * uFabHand.x * fNear;
+          // Pilling and felted fluff: pale specks of loose fibre.
+          float pill = smoothstep(0.8, 0.93, texture2D(uNoise, fq * 7.3 + 0.17).b) * smoothstep(0.5, 0.8, texture2D(uNoise, fq * 0.9).g);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.3 + 0.008, pill * uFabHand.z * fNear * 0.7);
+          // Uneven dye: the colour clouds and drifts towards the undyed fibre in patches.
+          vec4 fM = texture2D(uNoise, vFab.xy * 0.33 + vFab.zy * 0.21), fM2 = texture2D(uNoise, vFab.zx * 1.2 + vFab.y * 0.43);
+          diffuseColor.rgb *= 1.0 + ((fM.r - 0.5) * 0.26 + (fM2.g - 0.5) * 0.16) * uFabHand.y;
+          float fL = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+          diffuseColor.rgb = mix(diffuseColor.rgb, fL * vec3(1.1, 1.0, 0.82), smoothstep(0.45, 0.85, fM2.b) * 0.22 * uFabHand.y);
+          ${rest ? `
+          // Faded by the sun where it faces up and out; grey with dust.
+          fL = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+          float fade = clamp(normalize(vFabN).y * 0.6 + 0.25, 0.0, 1.0) * 0.2 * uFabHand.w;
+          diffuseColor.rgb = mix(diffuseColor.rgb, fL * vec3(1.12, 1.08, 1.0) + 0.012, fade);
+          // Mud splashed up the lowest hand's breadth, in drops and smears.
+          float lo = 1.0 - smoothstep(0.06, 0.42, vFab.y);
+          float spl = smoothstep(0.7, 0.84, texture2D(uNoise, vFab.xz * 2.7 + vFab.y * 4.1).b) * smoothstep(0.3, 0.7, texture2D(uNoise, vFab.xz * 0.8 + vFab.y * 0.9).r);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.13, 0.1, 0.07), spl * lo * 0.6 * uFabHand.w);` : ''}
+        }
         // Hollows between threads are rougher still than their crowns.
         roughnessFactor = clamp(roughnessFactor * (1.06 - 0.12 * fD), 0.0, 1.0);`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
