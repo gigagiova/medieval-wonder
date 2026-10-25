@@ -43,11 +43,11 @@ type OutfitId = 'monk' | 'peasantHood' | 'peasantCloak' | 'soldier' | 'soldierCl
 
 // Which bodies wear an outfit: every pairing is tailored once at load.
 const OUTFITS: Record<OutfitId, { sex: Sex; bodies: BodyId[]; spec: GarmentSpec; beard: boolean; wraps: boolean }> = {
-  monk: { sex: 'man', bodies: ['eric', 'manuel'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
-  peasantHood: { sex: 'man', bodies: ['nathan', 'eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather', thighs: 0.6, swing: true } },
-  peasantCloak: { sex: 'man', bodies: ['nathan', 'manuel'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.6, swing: true, cloakClose: true } },
-  soldier: { sex: 'man', bodies: ['manuel', 'nathan'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 0.6 } },
-  soldierCloak: { sex: 'man', bodies: ['eric', 'nathan'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 0.6, capeOnTunic: true, capeOpen: 0.8 } },
+  monk: { sex: 'man', bodies: ['manuel', 'eric'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
+  peasantHood: { sex: 'man', bodies: ['nathan'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather', thighs: 0.6, swing: true } },
+  peasantCloak: { sex: 'man', bodies: ['eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.6, swing: true, cloakClose: true } },
+  soldier: { sex: 'man', bodies: ['nathan', 'manuel'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 0.6 } },
+  soldierCloak: { sex: 'man', bodies: ['eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 0.6, capeOnTunic: true, capeOpen: 0.8 } },
   woman: { sex: 'woman', bodies: ['claudia', 'sophia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
   womanShawl: { sex: 'woman', bodies: ['sophia', 'claudia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
 };
@@ -75,7 +75,7 @@ let weave: THREE.Texture | null = null;
 let loading: Promise<void> | null = null;
 
 /** Dev switches and numbers (test page). */
-export const npcDebug = { prof: { anim: 0, logic: 0, frames: 0 }, cloth: clothStats, maxSim: 3, simDist: 15, people: [] as Person[], buildMs: {} as Record<string, number> };
+export const npcDebug = { beard: null as number | null, prof: { anim: 0, logic: 0, frames: 0 }, cloth: clothStats, maxSim: 3, simDist: 15, people: [] as Person[], buildMs: {} as Record<string, number> };
 
 // ------------------------------------------------------------------ loading
 
@@ -219,6 +219,11 @@ export class Person {
     // North Africans), more or less weathered: a shift along the warm/olive
     // axis and a little lightness, applied over each scan's own tone.
     const tan = rnd(), olive = rnd() * 0.6, light = 0.96 + rnd() * 0.1;
+    // Lombards wore their beards long; most townsmen here have one, short or
+    // full, brown to black, greying with age. (Monks are shaven.)
+    const hairCol = new THREE.Color(pick(rnd, [0x2a1d15, 0x1c1510, 0x3a2a1e, 0x4a3524, 0x2e2420])).lerp(new THREE.Color(0x8a8580), rnd() < 0.25 ? 0.35 + rnd() * 0.3 : 0);
+    const beardAmt = outfit.sex === 'man' && role !== 'monk' && rnd() < 0.75 ? 0.75 + rnd() * 0.5 : 0;
+    const beard = new THREE.Vector4(outfit.sex === 'man' ? npcDebug.beard ?? beardAmt : 0, hairCol.r, hairCol.g, hairCol.b);
     const tone = new THREE.Color().setRGB(1.04 - 0.08 * tan, 1.0 - 0.1 * tan + 0.02 * olive, 0.98 - 0.16 * tan - 0.03 * olive).multiplyScalar(light);
     this.body.traverse((o) => {
       const m = o as THREE.SkinnedMesh;
@@ -227,7 +232,7 @@ export class Person {
         if (!mat.userData.skin) return mat;
         const c = (mat as THREE.MeshStandardMaterial).clone();
         c.color.multiply(tone);
-        c.userData = { ...mat.userData };
+        c.userData = { ...mat.userData, uBeard: { value: beard } };
         return withAtmos(c, { skin: true, scan: !!mat.userData.scan });
       };
       m.material = Array.isArray(m.material) ? m.material.map(re) : re(m.material);

@@ -511,6 +511,8 @@ export const SCAN_SKIN = {
       vec2 u = f * f * (3.0 - 2.0 * f);
       return mix(mix(skinHash(i), skinHash(i + vec2(1, 0)), u.x), mix(skinHash(i + vec2(0, 1)), skinHash(i + vec2(1, 1)), u.x), u.y);
     }
+    uniform vec4 uBeard; // amount, colour
+    varying float vBeard;
     vec3 sssWrap(float d) {
       // Wrapped diffuse per channel: red light reaches furthest round into the shadow.
       vec3 w = vec3(0.42, 0.18, 0.12);
@@ -525,7 +527,20 @@ export const SCAN_SKIN = {
       vec2 pu2 = vNormalMapUv * 1500.0;
       float m0 = skinNoise(pu2), mx = skinNoise(pu2 + vec2(e, 0.0)), my = skinNoise(pu2 + vec2(0.0, e));
       vec2 g = vec2(n0 - nx, n0 - ny) * 0.22 + vec2(m0 - mx, m0 - my) * 0.12;
-      normal = normalize(normal + tbn * vec3(g, 0.0));
+      normal = normalize(normal + tbn * vec3(g * (1.0 + 2.5 * beardCover), 0.0));
+    }`,
+  // Beard hair over the skin: fine strands (elongated noise, roughly downward
+  // in the atlas, which keeps the face upright), thinning out at the mask's edges.
+  beard: /* glsl */ `
+    float beardCover = 0.0;
+    {
+      float b = vBeard * uBeard.x;
+      vec2 bu = vMapUv * vec2(2600.0, 700.0);
+      float s1 = skinNoise(bu), s2 = skinNoise(bu * 1.9 + 7.3);
+      float strand = s1 * 0.65 + s2 * 0.35;
+      beardCover = smoothstep(0.25, 0.75, b + (strand - 0.5) * 0.7) * smoothstep(0.02, 0.2, b);
+      vec3 hairCol = uBeard.yzw * (0.55 + 0.9 * strand);
+      diffuseColor.rgb = mix(diffuseColor.rgb, hairCol, beardCover * 0.92);
     }`,
   // Replaces the Lambert term of direct lights.
   direct: /* glsl */ `
@@ -555,8 +570,16 @@ export function withAtmos<M extends THREE.Material>(m: M, o: { skin?: boolean; s
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = applyAtmos(gl_FragColor.rgb, vWPos);');
     if (o.skin) fs = fs.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.06, 0.025, 0.018);');
     if (o.scan) {
+      // A short beard, painted strand by strand over the scan's own face (see scan.ts beardMask).
+      const uBeard = ((m.userData as { uBeard?: { value: THREE.Vector4 } }).uBeard ??= { value: new THREE.Vector4(0, 0.1, 0.07, 0.05) });
+      sh.uniforms.uBeard = uBeard;
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float beard;\nvarying float vBeard;')
+        .replace('#include <project_vertex>', '#include <project_vertex>\nvBeard = beard;');
       fs = fs
         .replace('#include <common>', '#include <common>\n' + SCAN_SKIN.pars)
+        .replace('#include <color_fragment>', '#include <color_fragment>\n' + SCAN_SKIN.beard)
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.8, beardCover);')
         .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SCAN_SKIN.normal)
         .replace('#include <lights_physical_pars_fragment>', THREE.ShaderChunk.lights_physical_pars_fragment
           .replace(/float dotNL = saturate\( dot\( geometryNormal, directLight\.direction \) \);\s*vec3 irradiance = dotNL \* directLight\.color;/, SCAN_SKIN.direct)

@@ -255,6 +255,21 @@ function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure) {
   const keep: number[] = [];
   for (let t = 0; t < idx.count; t += 3) if (ok[idx.getX(t)] && ok[idx.getX(t + 1)] && ok[idx.getX(t + 2)]) keep.push(idx.getX(t), idx.getX(t + 1), idx.getX(t + 2));
   g.setIndex(keep);
+  // Where a beard grows (painted by the skin shader, per person): jaw, chin,
+  // upper lip and cheeks below the cheekbones, not the lips.
+  const beard = new Float32Array(cls.length), S = (x: number, a: number, b: number) => ss(a, b, x);
+  if (kit === 'man') for (let i = 0; i < cls.length; i++) {
+    if (cls[i] !== 'head') continue;
+    m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld);
+    const dx = Math.abs(w.x - hb.x), dy = w.y - eyes.y, dz = w.z - eyes.z;
+    // Under the nose, down past the mouth's corners, then up the line of the cheekbone to the sideburns.
+    const top = -0.05 - 0.02 * S(dx, 0.02, 0.04) + 0.045 * S(dx, 0.045, 0.08);
+    let b = S(dy, top + 0.02, top - 0.014) * S(dy, -0.175, -0.145) * S(dz, -0.13, -0.095) * (1 - S(dx, 0.085, 0.1));
+    // The lips themselves are bare.
+    b *= 1 - (1 - S(dx, 0.022, 0.03)) * S(dy, -0.066, -0.072) * (1 - S(dy, -0.094, -0.1)) * S(dz, -0.03, -0.02);
+    beard[i] = b;
+  }
+  g.setAttribute('beard', new THREE.BufferAttribute(beard, 1));
   m.material = skinMaterial(m.material as THREE.MeshStandardMaterial);
 }
 

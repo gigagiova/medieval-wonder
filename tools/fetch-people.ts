@@ -23,7 +23,8 @@
 //  are trimmed or re-dressed at runtime (src/npc/garment.ts).
 import { NodeIO, Document, Node, Primitive } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { prune } from '@gltf-transform/functions';
+import { prune, simplify, weld } from '@gltf-transform/functions';
+import { MeshoptSimplifier } from 'meshoptimizer';
 import * as THREE from 'three';
 import sharp from 'sharp';
 import fs from 'node:fs';
@@ -33,6 +34,7 @@ import zlib from 'node:zlib';
 const OUT = 'public/models/npc';
 const CACHE = 'tools/.cache/people';
 const AT = 1024; // skin atlas size
+const SIMPLIFY = 0.5; // share of the scan's triangles kept
 
 export const PEOPLE = [
   { id: 'eric', uid: 'a46bc9f67aaa415bb4f3241eef900e7f', sex: 'man', title: 'Eric Rigged 001' },
@@ -429,9 +431,14 @@ async function pack(p: (typeof PEOPLE)[number], io: NodeIO) {
   mat.setNormalTexture(await tex(Nm, 92, 'normal'));
   mat.setMetallicRoughnessTexture(await tex(MR, 90, 'rough'));
   mat.setRoughnessFactor(1).setMetallicFactor(0).setDoubleSided(false).setName('skin');
+  // The dropped clip's keyframes.
+  for (const a of doc.getRoot().listAccessors()) if (a.listParents().every((x) => x === doc.getRoot() || x.propertyType === "AnimationSampler")) a.dispose();
+  // Half the triangles (the scans are dense on fingers, ears and folds of cloth), keeping UV seams and silhouettes.
+  await MeshoptSimplifier.ready;
+  await doc.transform(weld(), simplify({ simplifier: MeshoptSimplifier, ratio: SIMPLIFY, error: 0.0008, lockBorder: true }));
   await doc.transform(prune({ keepAttributes: true, keepLeaves: true }));
   await write(doc, io, p.id);
-  console.log(`${p.id}: ${nt} tris, ${keep.length} skin islands at ${(f * alb.w).toFixed(0)}px per UV unit (from ${alb.w}), forehead ref ${ref.map((x) => x.toFixed(0))}`);
+  console.log(`${p.id}: ${nt} tris (${prim.getIndices()!.getCount() / 3} kept), ${keep.length} skin islands at ${(f * alb.w).toFixed(0)}px per UV unit (from ${alb.w}), forehead ref ${ref.map((x) => x.toFixed(0))}`);
 }
 
 async function write(doc: Document, io: NodeIO, id: string) {

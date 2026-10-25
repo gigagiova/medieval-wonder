@@ -33,6 +33,7 @@ const ground = (x: number, z: number) => (view === 'lineup' ? 0 : Math.sin(x * 0
   g.computeVertexNormals();
   scene.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x3a3630, roughness: 1 })));
 }
+if (params.has('beard')) npcDebug.beard = Number(params.get('beard'));
 const T = Number(params.get('t') ?? 0);
 const t0 = performance.now();
 await loadNpcAssets();
