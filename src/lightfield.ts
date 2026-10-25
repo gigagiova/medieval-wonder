@@ -11,14 +11,14 @@ import type { Cell } from './builder';
 //   R  the sun's shadow height: a point is in the key light's shadow when it
 //      lies below it (exact for a height field: ray-marched once per bake,
 //      not per pixel and not per frame);
-//   G, B, A  the mean height of the town within ~1.5, 5 and 14 m, from which
+//   G, B, A  the mean height of the town within ~0.5, 5 and 12 m, from which
 //      the shader estimates how much sky a point sees (sky occlusion: alleys
 //      dark at the bottom, light up top; interiors and archways dark).
 // Nothing is drawn per frame: the per-frame cost is the two fetches.
 
 const SIZE = 176;       // metres covered
 const HRES = 1024;      // height map texels (17 cm)
-const LRES = 512;       // light field texels (34 cm)
+const LRES = 1024;      // light field texels (17 cm)
 const MOVE = 30;        // re-bake when the eye is this far from the centre
 const OFS = 20;         // heights are stored + OFS so the clear value (0) means "far below"
 
@@ -122,7 +122,7 @@ export class LightField {
             t += dt; dt *= 1.09;
           }
           // Mean town height around the point at three scales (mips).
-          float h1 = H(vUv, log2(3.0 / TEXEL));
+          float h1 = H(vUv, log2(1.0 / TEXEL));
           float h2 = H(vUv, log2(9.0 / TEXEL));
           float h3 = H(vUv, log2(24.0 / TEXEL));
           gl_FragColor = vec4(S, h1, h2, h3);
@@ -164,7 +164,7 @@ export class LightField {
       const skin = (o as THREE.SkinnedMesh).isSkinnedMesh;
       const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
       const odd = (o as THREE.Points).isPoints || (o as THREE.Sprite).isSprite || (o as THREE.Line).isLine
-        || skin || (mat && (mat.transparent || (mat as THREE.ShaderMaterial).isShaderMaterial));
+        || skin || (mat && (mat.transparent || mat.userData.foliage || (mat as THREE.ShaderMaterial).isShaderMaterial));
       if ((odd || this.skip.includes(o)) && o.visible) { restore.push([o, true]); o.visible = false; }
     });
     this.cam.position.set(cx, 300, cz);

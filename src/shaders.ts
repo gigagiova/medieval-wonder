@@ -40,7 +40,7 @@ uniform float uUnder;
 uniform float uFogBase;
 uniform vec3 uMoonDir;
 uniform sampler2D uNoise; // tiling low-frequency noise: R 4 cycles, G 8, B 16, A 6 (per tile)
-uniform sampler2D uLF;    // light field: R sun shadow height, GBA mean town height at ~1.5/5/14 m
+uniform sampler2D uLF;    // light field: R sun shadow height, GBA mean town height within ~0.5/5/12 m
 uniform vec4 uLFBox;      // x0, z0, 1/size, valid
 uniform vec4 uFogK;       // haze density, ground-mist density, mist falloff (1/m), sky fog distance
 
@@ -54,13 +54,16 @@ vec2 worldLight(vec3 p, vec3 n){
   float inside = smoothstep(0.0, 0.1, min(e.x, e.y));
   uv.y = 1.0 - uv.y;
   vec2 nd = vec2(n.x, -n.z) * uLFBox.z;
-  float S = texture2D(uLF, uv + nd * 0.6).r;
-  float sun = smoothstep(S - 0.15, S + 0.9, p.y + 0.2);
+  vec4 a = texture2D(uLF, uv + nd * 0.6);
+  float sun = smoothstep(a.r - 0.15, a.r + 0.9, p.y + 0.2);
+  // Under a roof, a vault or an arch (the town within ~1 m is well above):
+  // the sky only gets in sideways, through doors and windows.
+  float cover = smoothstep(0.8, 3.0, a.g - p.y);
   vec3 hb = texture2D(uLF, uv + nd * 2.5).gba;
   vec3 occ = max(hb - p.y, 0.0);
-  vec3 v = vec3(1.5, 5.0, 14.0);
+  vec3 v = vec3(1.0, 5.0, 14.0);
   v = v / (v + occ * 1.6);
-  float sky = dot(v, vec3(0.3, 0.35, 0.35));
+  float sky = dot(v, vec3(0.25, 0.35, 0.4)) * (1.0 - 0.75 * cover);
   return mix(vec2(1.0), vec2(sun, sky), inside);
 }
 
@@ -95,6 +98,18 @@ vec3 applyAtmos(vec3 col, vec3 wpos){
   float fwd = 0.85 + 0.15 * pow(max(md, 0.0), 4.0);
   vec3 fogC = uFogCol * fwd * mix(vec3(0.93, 0.97, 1.05), vec3(1.04, 1.01, 0.97), max(md, 0.0));
   fogC *= 0.86 + 0.14 * smoothstep(-0.25, 0.3, rd.y);
+  // The mist in a nave or a deep lane is not lit by the open sky: dim it by
+  // what the sky can reach a few metres along the ray (one fetch).
+#ifndef SKY_DOME
+  if (uLFBox.w > 0.5) {
+    vec3 q = ro + rd * min(L * 0.5, 6.0);
+    vec2 quv = (q.xz - uLFBox.xy) * uLFBox.z; quv.y = 1.0 - quv.y;
+    vec2 hq = texture2D(uLF, quv).gb;
+    float cq = smoothstep(0.8, 3.0, hq.x - q.y);
+    float oq = 5.0 / (5.0 + max(hq.y - q.y, 0.0) * 1.6);
+    fogC *= (0.35 + 0.65 * oq) * (1.0 - 0.7 * cq);
+  }
+#endif
   fogC = mix(fogC, vec3(0.010, 0.008, 0.007), uUnder);
   // Closed-form integral of 1/(h^2+t^2) along the view ray for every lamp:
   // cheap volumetric halos that wrap around geometry edges.

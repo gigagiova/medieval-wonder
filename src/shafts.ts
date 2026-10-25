@@ -89,7 +89,7 @@ export class ShaftPass extends Pass {
   private mq: FullScreenQuad;
   private cq: FullScreenQuad;
   /** Strength of the scattered key light (multiplies the light's colour × intensity). */
-  strength = 0.15;
+  strength = 0.07;
   constructor(private camera: THREE.PerspectiveCamera, private depth: () => THREE.Texture, private key: THREE.DirectionalLight) {
     super();
     const vs = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';

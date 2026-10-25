@@ -31,8 +31,8 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMapping = THREE.AgXToneMapping;
+renderer.toneMappingExposure = 1.0;
 renderer.info.autoReset = false;
 document.body.appendChild(renderer.domElement);
 
@@ -493,7 +493,7 @@ function adaptResolution(frameDt: number) {
 }
 
 // Light levels (also tweakable from the console / screenshot tools via __look).
-const look = { key: 3.0, env: 0.4 };
+const look = { key: 3.5, env: 0.3 };
 const clock = new THREE.Clock();
 let fps = 60;
 let frames = 0;

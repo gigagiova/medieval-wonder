@@ -51,6 +51,7 @@ export const shared = {
   uLF: { value: new THREE.DataTexture(new Uint8Array(4), 1, 1) as THREE.Texture },
   uLFBox: { value: new THREE.Vector4(0, 0, 1, 0) },
   uFogK: { value: new THREE.Vector4(0.009, 0.055, 0.12, 60) },
+  uSkyGlow: { value: 0.35 },
 };
 
 
@@ -169,6 +170,8 @@ export function makeSky(): THREE.Mesh {
       void main(){ vec4 w = modelMatrix*vec4(position,1.); vWPos = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
     fragmentShader: /* glsl */ `
       varying vec3 vWPos;
+      uniform float uSkyGlow;
+      #define SKY_DOME
       ${noiseGLSL}
       ${atmosGLSL}
       void main(){
@@ -182,7 +185,7 @@ export function makeSky(): THREE.Mesh {
         vec3 hor = vec3(0.19, 0.195, 0.205), zen = vec3(0.055, 0.06, 0.07);
         vec3 col = mix(hor, zen, smoothstep(-0.02, 0.55, y));
         vec3 glowC = vec3(0.92, 0.93, 0.95);
-        float glow = 0.28 * pow(md, 3.0) + 0.55 * pow(md, 14.0) + 0.6 * pow(md, 60.0);
+        float glow = uSkyGlow * (0.28 * pow(md, 3.0) + 0.55 * pow(md, 14.0) + 0.6 * pow(md, 60.0));
         // Cloud deck: a plane ~1.5 km up, warped so the masses billow.
         vec2 cuv = rd.xz / (max(y, 0.0) + 0.07);
         float t = uTime;
