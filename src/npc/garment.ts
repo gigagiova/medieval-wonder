@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { canon, withAtmos, matte } from './rig';
+import { fabric } from './fabric';
 
 // Clothes, made the way game characters are dressed: each garment is
 // generated around the body in its bind pose, pushed out of the body with
@@ -204,7 +205,7 @@ export function faceOnly(root: THREE.Object3D) {
  * the clothes cover goes.
  */
 export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard: boolean; wraps: boolean; m: Measure }) {
-  const leather = matte(0x2a1d14, 0.86);
+  const leather = fabric('leather', 0x2a1d14, { attr: 'position' });
   root.traverse((x) => {
     const m = x as THREE.SkinnedMesh;
     if (!m.isSkinnedMesh) return;
@@ -252,7 +253,7 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
     else if (m.name === 'Wolf3D_Outfit_Bottom') {
       // Wool hose, with linen fasciae wound from ankle to knee on laymen.
       const ankle = o.m.bone('LeftFoot').y + 0.03, knee = o.m.bone('LeftLeg').y + 0.02;
-      nm = withAtmos(new THREE.MeshStandardMaterial({ color: 0x2b241d, roughness: 0.97 }), o.wraps ? { wraps: { knee, ankle, color: new THREE.Color(0x6e6656) } } : {});
+      nm = fabric('tabby', 0x2b241d, { attr: 'position', wraps: o.wraps ? { knee, ankle, color: new THREE.Color(0x6e6656) } : undefined });
     } else if (/Body|Head|^Mesh$/.test(m.name) || kit === 'woman') {
       // Weathered skin: matte, slight wrap-around softness.
       const s = old.clone();
