@@ -22,6 +22,7 @@ export interface GarmentSpec {
   belt: 'rope' | 'leather' | 'sash';
   tail?: boolean; // the rope's hanging end
   thighs?: number; // share of a skirt's skinning carried by the thighs (default: hung from the pelvis)
+  cloakClose?: boolean; // a cloak cut round the trunk (and the hanging arms), skinned like the tunic under it
   swing?: boolean; // skin to twist-free stand-ins for the limb bones (needs addSwingBones on the body first)
 }
 
@@ -800,7 +801,9 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
   let cape: Grid | null = null;
   if (spec.cape) {
     const long = spec.cape === 'cloak';
-    const under = mergeGeometries([tunicGeo, ...sleeves.map(gridGeometry), ...(hood ? [gridGeometry(hood)] : []), S.all.geo.clone()].map((g) => {
+    // A close cloak is cut round the trunk, not round the arms held out in the bind pose.
+    const close = !!spec.cloakClose;
+    const under = mergeGeometries((close ? [tunicGeo, S.torso.geo.clone()] : [tunicGeo, ...sleeves.map(gridGeometry), ...(hood ? [gridGeometry(hood)] : []), S.all.geo.clone()]).map((g) => {
       const n = g.index ? g.toNonIndexed() : g;
       for (const k of Object.keys(n.attributes)) if (k !== 'position') n.deleteAttribute(k);
       return n;
@@ -846,7 +849,9 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
         const fold = (Math.sin(a * 9 + fp + Math.sin(a * 2.3) * 1.4) * 0.6 + Math.sin(a * 5 + fp * 1.3) * 0.4) * t * (long ? 0.03 : 0.012);
         // Ease over the belt and round the swinging upper arms.
         const side = Math.exp(-Math.pow(Math.cos(a), 2) / 0.12) * (1 - t);
-        const R = row[c] + 0.022 + t * (long ? 0.04 : 0.02) + fold + 0.02 * Math.exp(-Math.pow((y - yBelt) / 0.05, 2)) + 0.025 * side;
+        let R = row[c] + 0.022 + t * (long ? 0.04 : 0.02) + fold + 0.02 * Math.exp(-Math.pow((y - yBelt) / 0.05, 2)) + 0.025 * side;
+        // Room for the arms hanging inside it.
+        if (close) R += 0.11 * Math.exp(-Math.pow(Math.cos(a) + 0.35, 2) / 0.5) * ss(yYoke + 0.08, yYoke - 0.04, y);
         g.pos.push(cx + Math.sin(a) * R, y, cz + Math.cos(a) * R);
         g.uv.push((c / NC2) * 3, t * (long ? 3 : 1.6));
         g.maxD.push(r < 2 ? 0 : (long ? 0.3 : 0.1) * Math.pow(ss(0, 1, t), 0.8));
@@ -1089,6 +1094,25 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       wmap[i] = m;
     }
   }
+  // A close cloak moves with the tunic beneath it down to the belt, so the
+  // shoulders never rise through it; below, it hangs as before.
+  if (cape && spec.cloakClose) {
+    const base = hoodBase + (hood ? hood.pos.length / 3 : 0) + scap.reduce((a, g) => a + g.pos.length / 3, 0);
+    const ix = tunicGeo.index!;
+    for (let i = base; i < base + cape.pos.length / 3; i++) {
+      vv.fromArray(bind, i * 3);
+      const t = ss(yBelt - 0.08, yBelt + 0.04, vv.y);
+      if (t <= 0) continue;
+      tunicBVH.closestPointToPoint(vv, tmp);
+      const vs = [ix.getX(tmp.faceIndex * 3), ix.getX(tmp.faceIndex * 3 + 1), ix.getX(tmp.faceIndex * 3 + 2)];
+      tri.a.fromArray(bind, vs[0] * 3); tri.b.fromArray(bind, vs[1] * 3); tri.c.fromArray(bind, vs[2] * 3);
+      const bc = tri.getBarycoord(tmp.point, new THREE.Vector3()) ?? new THREE.Vector3(1 / 3, 1 / 3, 1 / 3);
+      const m = new Map<number, number>();
+      [bc.x, bc.y, bc.z].forEach((w, j) => { for (const [k, x] of wmap[vs[j]]) m.set(k, (m.get(k) ?? 0) + x * w * t); });
+      for (const [k, x] of wmap[i]) m.set(k, (m.get(k) ?? 0) + x * (1 - t));
+      wmap[i] = m;
+    }
+  }
   const skinI = new Uint16Array(N * 4), skinW = new Float32Array(N * 4);
   for (let i = 0; i < N; i++) {
     const top = [...wmap[i]].sort((a, b) => b[1] - a[1]).slice(0, 4);
@@ -1201,19 +1225,30 @@ function gridGeometry(g: Grid) {
  * skeleton (the one garments bind to) and posed by swingRig every frame.
  */
 const SWING = ['LeftUpLeg', 'RightUpLeg', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm'];
+// Measured against the trunk, not the collarbone: the clips roll that too.
+const ANCHOR: Record<string, string> = { UpLeg: 'Hips', Arm: 'Spine2', ForeArm: '' };
+
+/** A bone's place and turn in the frame of one of its ancestors. */
+function frameIn(anc: THREE.Object3D, b: THREE.Object3D, P: THREE.Vector3, Q: THREE.Quaternion) {
+  P.copy(b.position); Q.copy(b.quaternion);
+  for (let o = b.parent!; o !== anc; o = o.parent!) { P.applyQuaternion(o.quaternion).add(o.position); Q.premultiply(o.quaternion); }
+}
+
 export function addSwingBones(root: THREE.Object3D) {
   const mesh = root.getObjectByProperty('isSkinnedMesh', true) as THREE.SkinnedMesh;
   const sk = mesh.skeleton, bones = [...sk.bones], inv = [...sk.boneInverses];
   const made = new Map<string, THREE.Bone>();
   root.updateMatrixWorld(true);
   for (const n of SWING) {
-    const src = bones.find((b) => canon(b.name) === n)!, child = src.children.find((c) => (c as THREE.Bone).isBone)!;
+    const src = bones.find((b) => canon(b.name) === n)!;
+    const a = ANCHOR[n.replace(/^(Left|Right)/, '')];
+    const parent = a ? bones.find((b) => canon(b.name) === a)! : made.get(canon(src.parent!.name))!;
     const h = new THREE.Bone();
     h.name = src.name + '_swing';
-    h.position.copy(src.position);
-    h.quaternion.copy(src.quaternion);
-    h.userData.swing = { src: n, q0: src.quaternion.toArray(), c: child.position.toArray() };
-    (made.get(canon(src.parent!.name)) ?? src.parent!).add(h);
+    if (a) frameIn(parent, src, h.position, h.quaternion);
+    else { h.position.copy(src.position); h.quaternion.copy(src.quaternion); }
+    h.userData.swing = n;
+    parent.add(h);
     made.set(n, h);
     h.updateMatrixWorld(true);
     bones.push(h);
@@ -1222,27 +1257,38 @@ export function addSwingBones(root: THREE.Object3D) {
   mesh.bind(new THREE.Skeleton(bones, inv), mesh.bindMatrix);
 }
 
-/** Poses a body's swing stand-ins from its limbs; call after the animation. */
+/** Poses a body's swing stand-ins from its limbs; call after the animation (build it while the body is in its bind pose). */
 export function swingRig(body: THREE.Object3D, bone: (n: string) => THREE.Bone) {
-  const hs: { h: THREE.Bone; b: THREE.Bone; q0: THREE.Quaternion; a0: THREE.Vector3; c: THREE.Vector3; k: number }[] = [];
+  type E = { h: THREE.Bone; b: THREE.Bone; R: THREE.Object3D; up: THREE.Bone | null; Q0h: THREE.Quaternion; a0: THREE.Vector3; c: THREE.Vector3; k: number };
+  const hs: E[] = [];
+  const P = new THREE.Vector3(), Q = new THREE.Quaternion(), qi = new THREE.Quaternion(), a1 = new THREE.Vector3();
   body.traverse((o) => {
-    const d = o.userData.swing as { src: string; q0: number[]; c: number[] } | undefined;
-    if (!d) return;
-    const q0 = new THREE.Quaternion().fromArray(d.q0), c = new THREE.Vector3().fromArray(d.c);
-    hs.push({ h: o as THREE.Bone, b: bone(d.src), q0, c, a0: c.clone().applyQuaternion(q0).normalize(), k: SWING.indexOf(d.src) });
+    const n = o.userData.swing as string | undefined;
+    if (!n) return;
+    const h = o as THREE.Bone, b = bone(n), up = (h.parent as THREE.Bone).userData.swing ? (h.parent as THREE.Bone) : null;
+    const R = up ? up.parent! : h.parent!;
+    const c = b.children.find((x) => (x as THREE.Bone).isBone)!.position.clone();
+    const Q0h = new THREE.Quaternion();
+    frameIn(R, b, P, Q0h);
+    // A forearm's, in the frame of the upper arm's stand-in, as at bind.
+    if (up) { frameIn(R, bone(up.userData.swing), P, qi); Q0h.premultiply(qi.invert()); }
+    hs.push({ h, b, R, up, Q0h, c, a0: c.clone().applyQuaternion(Q0h).normalize(), k: SWING.indexOf(n) });
   });
   if (!hs.length) return null;
-  hs.sort((x, y) => x.k - y.k); // upper arms before forearms
-  const q = new THREE.Quaternion(), qi = new THREE.Quaternion(), a1 = new THREE.Vector3();
+  hs.sort((x, y) => x.k - y.k); // upper limbs before forearms
   return () => {
-    for (const { h, b, q0, a0, c } of hs) {
-      // The limb's rotation in its stand-in parent's frame...
-      q.copy(b.quaternion);
-      if (h.parent !== b.parent) q.premultiply(b.parent!.quaternion).premultiply(qi.copy(h.parent!.quaternion).invert());
-      // ...keeping only what turns the bone's line away from where it lay at bind.
-      a1.copy(c).applyQuaternion(q).normalize();
-      h.quaternion.setFromUnitVectors(a0, a1).multiply(q0);
-      h.position.copy(b.position);
+    for (const { h, b, R, up, Q0h, a0, c } of hs) {
+      frameIn(R, b, P, Q);
+      if (up) {
+        // Into the frame of the upper arm's stand-in.
+        qi.copy(up.quaternion).invert();
+        Q.premultiply(qi);
+        P.sub(up.position).applyQuaternion(qi);
+      }
+      // Keep only what turns the bone's line away from where it lay at bind.
+      a1.copy(c).applyQuaternion(Q).normalize();
+      h.quaternion.setFromUnitVectors(a0, a1).multiply(Q0h);
+      h.position.copy(P);
     }
   };
 }

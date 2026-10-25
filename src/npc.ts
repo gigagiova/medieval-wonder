@@ -32,7 +32,7 @@ type OutfitId = 'monk' | 'peasantHood' | 'peasantCloak' | 'soldier' | 'soldierCl
 const OUTFITS: Record<OutfitId, { kit: Kit; spec: GarmentSpec; beard: boolean; wraps: boolean }> = {
   monk: { kit: 'man', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true } },
   peasantHood: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather', thighs: 0.6, swing: true } },
-  peasantCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.6, swing: true } },
+  peasantCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.6, swing: true, cloakClose: true } },
   soldier: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather' } },
   soldierCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather' } },
   woman: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.12, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
