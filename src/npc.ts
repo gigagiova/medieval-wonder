@@ -343,6 +343,13 @@ export class Person {
   private equip(g: Gear) {
     const m = this.outfit.m, r = this.rnd;
     const on = (bone: string, obj: THREE.Object3D, place: THREE.Matrix4) => Props.hangOn(this.bones.get(bone)!, this.bindOf(bone), obj, place);
+    // Laymen's leg wraps run down into ankle shoes: a leather top laced round
+    // each ankle hides where wrap and shoe meet. It rides on the shin, the
+    // shoe's collar turning inside it about the ankle.
+    if (OUTFITS[this.outfit.id].wraps) for (const s of ['Left', 'Right']) {
+      const f = m.bone(s + 'Foot'), k = m.bone(s + 'Leg');
+      on(s + 'Leg', Props.makeShoeTop(0.049), Props.placeAt(new THREE.Vector3(f.x, f.y, f.z + 0.005), new THREE.Quaternion().setFromUnitVectors(UP, k.clone().sub(f).normalize())));
+    }
     if (g.helmet) { const h = Props.makeHelmet(m, g.helmet === true ? 'spangen' : g.helmet); on('Head', h.obj, h.place); }
     // Felt in the colours of undyed and walnut-dyed wool.
     else if (g.cap) { const c = Props.makeCap(m, new THREE.Color(pick(r, [0x7e6a4e, 0x6e5a40, 0x8c7a5c, 0x5e4a34, 0x74603f]))); on('Head', c.obj, c.place); }
