@@ -1,27 +1,22 @@
-// Fetch and pack the townsfolk's bodies and animations into web-friendly glTF
+// Fetch and pack the townsfolk's animations into web-friendly glTF
 // (one JSON with embedded geometry + external .webp textures; the game is also
 // published somewhere that serves .json and .webp but not .glb/.bin).
 //
 //   npx tsx tools/fetch-npc.ts
 //
-// Sources (all free to use, see public/models/npc/CREDITS.md):
-//  - man:   Ready Player Me sample avatar shipped in the three.js examples (MIT repo)
-//  - woman: "Michelle" (Mixamo character) shipped in the three.js examples
-//  - tpose: the Mixamo "Soldier" rig's T-pose (three.js examples), a reference
-//           pose for retargeting onto the man
+// The bodies are scanned people: see tools/fetch-people.ts.
+// Source (see public/models/npc/CREDITS.md):
 //  - ual:   Quaternius' Universal Animation Library (CC0), animations only,
 //           downloaded from itch.io (free, name-your-own-price)
 import { NodeIO, Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, prune, resample, textureCompress } from '@gltf-transform/functions';
-import sharp from 'sharp';
+import { prune, resample } from '@gltf-transform/functions';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const OUT = 'public/models/npc';
 const CACHE = 'node_modules/.cache/npc';
-const THREE_EX = 'https://raw.githubusercontent.com/mrdoob/three.js/r180/examples/models/gltf/';
 
 /** The animations we use from the Universal Animation Library. */
 export const UAL_CLIPS = [
@@ -30,11 +25,6 @@ export const UAL_CLIPS = [
 ];
 
 function curl(args: string[]) { return execFileSync('curl', ['-sSfL', '--retry', '3', ...args]); }
-function get(url: string, file: string) {
-  if (fs.existsSync(file)) return;
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  curl(['-o', file, url]);
-}
 
 /** itch.io's free-download flow for a name-your-own-price page (no login). */
 function itchFree(page: string, uploadName: RegExp, file: string) {
@@ -82,9 +72,6 @@ function animationsOnly(doc: Document, keep?: string[]) {
 }
 
 fs.mkdirSync(OUT, { recursive: true });
-get(THREE_EX + 'readyplayer.me.glb', path.join(CACHE, 'man.glb'));
-get(THREE_EX + 'Michelle.glb', path.join(CACHE, 'woman.glb'));
-get(THREE_EX + 'Soldier.glb', path.join(CACHE, 'soldier.glb'));
 itchFree('https://quaternius.itch.io/universal-animation-library', /Standard/, path.join(CACHE, 'ual.zip'));
 if (!fs.existsSync(path.join(CACHE, 'ual.glb'))) {
   execFileSync('unzip', ['-o', '-j', path.join(CACHE, 'ual.zip'), '*Unreal-Godot/UAL1_Standard.glb', '-d', CACHE]);
@@ -92,33 +79,10 @@ if (!fs.existsSync(path.join(CACHE, 'ual.glb'))) {
 }
 
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
-for (const id of ['man', 'woman']) {
-  const doc = await io.read(path.join(CACHE, `${id}.glb`));
-  if (id === 'woman') for (const a of doc.getRoot().listAnimations()) if (a.getName() !== 'TPose') a.dispose();
-  await doc.transform(dedup(), textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [1024, 1024], quality: 84 }), prune({ keepLeaves: true }));
-  await write(doc, io, id);
-}
-{
-  const doc = await io.read(path.join(CACHE, 'soldier.glb'));
-  animationsOnly(doc, ['TPose']);
-  await doc.transform(prune({ keepLeaves: true }));
-  await write(doc, io, 'tpose');
-}
 {
   const doc = await io.read(path.join(CACHE, 'ual.glb'));
   animationsOnly(doc, UAL_CLIPS);
   await doc.transform(resample({ tolerance: 1e-4 }), prune({ keepLeaves: true }));
   await write(doc, io, 'ual');
 }
-fs.writeFileSync(path.join(OUT, 'CREDITS.md'), `# Townsfolk
-
-- **man.json**: Ready Player Me sample avatar, as shipped with the three.js examples
-  (\`examples/models/gltf/readyplayer.me.glb\`, MIT-licensed repository). Ready Player Me's own terms apply.
-- **woman.json**: "Michelle", a Mixamo character shipped with the three.js examples
-  (\`examples/models/gltf/Michelle.glb\`). Mixamo terms: free to use in projects, not to be redistributed as standalone assets.
-- **tpose.json**: T-pose of the Mixamo "Soldier" rig (three.js examples), used only as a retargeting reference.
-- **ual.json**: animations from Quaternius' **Universal Animation Library** (Standard), CC0 1.0,
-  https://quaternius.itch.io/universal-animation-library — clips: ${UAL_CLIPS.join(', ')}.
-
-Garments, props and dyes are generated in code (src/npc.ts). Packed by \`tools/fetch-npc.ts\`.
-`);
+// Credits: public/models/npc/CREDITS.md (the bodies come from tools/fetch-people.ts).

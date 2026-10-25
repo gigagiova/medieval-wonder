@@ -94,6 +94,7 @@ export function loadNpcAssets(): Promise<void> {
     ids.forEach((id, i) => {
       const t = bodies[i].scene, { sex, height } = BODIES[id];
       prepScanBody(t);
+      t.userData.sex = sex;
       // Arms down to the Mixamo bodies' A-pose (60° below level) before tailoring: some scans are bound in a T-pose.
       {
         t.updateMatrixWorld(true);

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 (window as unknown as { __npc: unknown }).__npc = await import('./npc');
 import { loadNpcAssets, makePerson, spawnTownsfolk, updateTownsfolk, npcDebug, type Role, type Person } from './npc';
 import { shared } from './materials';
+import { fabricTextures } from './npc/fabric';
 import type { Lamp } from './builder';
 
 // Dev page for the townsfolk.
@@ -133,6 +134,24 @@ for (let i = 0; i < n; i++) {
   step(1 / 60);
 }
 const simMs = performance.now() - ts;
+// Garment and skin textures load asynchronously: wait for them before the picture.
+{
+  const pending = () => {
+    let n = 0;
+    scene.traverse((o) => {
+      const mm = (o as THREE.Mesh).material;
+      if (!mm) return;
+      for (const m of Array.isArray(mm) ? mm : [mm]) {
+        const u = (m as unknown as { userData: { uniforms?: Record<string, { value: unknown }> } }).userData.uniforms ?? {};
+        for (const v of [...Object.values(m), ...Object.values(u).map((x) => x?.value)]) if (v instanceof THREE.Texture && !(v as THREE.CanvasTexture).isCanvasTexture && !v.image) n++;
+      }
+    });
+    for (const k of ['tabby', 'twill', 'felt', 'linen', 'leather'] as const) { const f = fabricTextures(k); if (!f.detail.image || !f.normal.image) n++; }
+    return n;
+  };
+  const t1 = performance.now();
+  while (pending() && performance.now() - t1 < 10000) await new Promise((r) => setTimeout(r, 100));
+}
 place();
 lampsToLights();
 renderer.render(scene, camera);

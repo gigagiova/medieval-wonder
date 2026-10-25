@@ -137,11 +137,25 @@ export function stripHeadPieces(root: THREE.Object3D) {
 
 export function measure(root: THREE.Object3D, skull?: { rx: number; rz: number }): Measure {
   root.updateMatrixWorld(true);
-  const bone = (n: string) => {
+  const joint = (n: string) => {
     let o: THREE.Object3D | undefined;
     root.traverse((x) => { if (!o && (x as THREE.Bone).isBone && canon(x.name) === n) o = x; });
     return o!.getWorldPosition(new THREE.Vector3());
   };
+  // Clothes are cut round the base of the neck. A scan's neck joint can sit
+  // well up the neck (8 cm above the shoulder joints on some): its base is
+  // taken level with the shoulders instead, as Mixamo's is.
+  const neckY = Math.min(joint('Neck').y, joint('LeftArm').y + 0.025, joint('RightArm').y + 0.025);
+  const bone = (n: string) => { const p = joint(n); if (n === 'Neck') p.y = neckY; return p; };
+  let eyes: THREE.Vector3 | null = null;
+  root.traverse((x) => { if (!eyes && canon(x.name) === 'LeftEye') eyes = bone('LeftEye').add(bone('RightEye')).multiplyScalar(0.5); });
+  if (skull && eyes) {
+    // A scan's skull, from its eyes: a head's crown is ~11.5 cm above the
+    // eyes, the middle of the cranium ~8 cm behind them.
+    const E = eyes as THREE.Vector3;
+    const c = new THREE.Vector3(E.x, E.y + 0.01, E.z - 0.08);
+    return { bone, head: { c, rx: skull.rx, rz: skull.rz, top: E.y + 0.115, brow: E.y + 0.03, skull: false } };
+  }
   if (skull) {
     // A head without its skull (see faceOnly): measured from the bones.
     const hb = bone('Head'), top = Math.min(bone('HeadTop_End').y, hb.y + 0.165);
@@ -178,7 +192,16 @@ export function faceOnly(root: THREE.Object3D) {
     if (canon(x.name) === 'HeadTop_End') top = x.getWorldPosition(new THREE.Vector3()).y;
   });
   hb = hb.clone();
-  const cy = (hb.y + Math.min(top, hb.y + 0.165)) / 2;
+  let cy = (hb.y + Math.min(top, hb.y + 0.165)) / 2, cone = 1.0;
+  // A scan: the face is framed from the middle of the skull, behind the eyes (see measure).
+  const eyes: THREE.Vector3[] = [];
+  root.traverse((x) => { if (/^(Left|Right)Eye$/.test(canon(x.name))) eyes.push(x.getWorldPosition(new THREE.Vector3())); });
+  if (eyes.length === 2) {
+    const E = eyes[0].add(eyes[1]).multiplyScalar(0.5);
+    hb.set(E.x, hb.y, E.z - 0.08);
+    cy = E.y;
+    cone = 0.8;
+  }
   const v = new THREE.Vector3();
   root.traverse((o) => {
     const m = o as THREE.SkinnedMesh;
@@ -189,7 +212,7 @@ export function faceOnly(root: THREE.Object3D) {
       m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld);
       if (v.y < hb.y + 0.01) return true; // neck and under the jaw
       const a = Math.abs(Math.atan2(v.x - hb.x, v.z - hb.z));
-      return a < 1.0 && v.y < cy + 0.045;
+      return a < cone && v.y < cy + 0.045;
     };
     const keep: number[] = [];
     for (let t = 0; t < idx.count; t += 3) {
@@ -217,12 +240,17 @@ function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure) {
   m.frustumCulled = false;
   const cls = boneClassOf(m), g = (m.geometry = m.geometry.clone()), idx = g.index!;
   const skin = g.attributes._skin, w = new THREE.Vector3();
-  const head = M.bone('Head').y, collar = M.bone('Neck').y - 0.12;
+  const hb = M.bone('Head'), head = hb.y, collar = M.bone('Neck').y - 0.12;
+  const eyes = M.bone('LeftEye').add(M.bone('RightEye')).multiplyScalar(0.5);
   const ok = new Uint8Array(cls.length);
   for (let i = 0; i < cls.length; i++) {
     const s = skin ? skin.getX(i) : 1, y = m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld).y;
     const c = cls[i];
-    ok[i] = (c === 'hand' && s > 0.35) || (c === 'head' && (s > 0.35 || (kit === 'man' && y > head - 0.035))) || ((c === 'torso' || c === 'arm' || c === 'head') && s > 0.5 && y > collar) ? 1 : 0;
+    // Hands keep everything (watches and cuffs are painted over in the atlas);
+    // the face everything (lips, lids, beard), a man's head his hair; below
+    // the jaw, and on the trunk, only skin.
+    const face = w.z > hb.z + 0.03 && y > eyes.y - 0.14 && Math.abs(w.x - eyes.x) < 0.05;
+    ok[i] = c === 'hand' || (c === 'head' && (s > 0.35 || face || (kit === 'man' && y > head - 0.01))) || ((c === 'torso' || c === 'arm' || c === 'head') && s > 0.5 && y > collar) ? 1 : 0;
   }
   const keep: number[] = [];
   for (let t = 0; t < idx.count; t += 3) if (ok[idx.getX(t)] && ok[idx.getX(t + 1)] && ok[idx.getX(t + 2)]) keep.push(idx.getX(t), idx.getX(t + 1), idx.getX(t + 2));
@@ -420,6 +448,9 @@ function bodySets(root: THREE.Object3D, full: THREE.Object3D) {
     // A scan's shirt collar, tie and hanging hair: not part of the body's shape.
     const sk = g.attributes._skin;
     if (sk && neck) for (let i = 0; i < c.length; i++) if (c[i] === 'head' && sk.getX(i) < 0.4 && m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld).y < (neck as THREE.Vector3).y + 0.09) c[i] = 'none';
+    // A woman's hair goes under her veil: it is no part of the shape her clothes are fitted to.
+    const hr = g.attributes._hair;
+    if (hr && full.userData.sex === 'woman') for (let i = 0; i < c.length; i++) if (hr.getX(i) > 0.5) c[i] = 'none';
     for (let i = 0; i < g.attributes.position.count; i++) {
       m.getVertexPosition(i, v);
       v.applyMatrix4(m.matrixWorld);
@@ -671,7 +702,8 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       let open = th < -0.62 ? o0 : th < -0.42 ? THREE.MathUtils.lerp(o0, H.mid, (th + 0.62) / 0.2)
         : th < 0.45 ? H.mid : THREE.MathUtils.lerp(H.mid, H.top, Math.min(1, (th - 0.45) / 0.7));
       // A veil frames the face, straight across the brow, and its edges fall open down the front.
-      if (veil) open = th < VEIL_J ? H.mid + (VEIL_J - th) * 0.12 : THREE.MathUtils.lerp(H.mid, 0.02, ss(0.22, 0.5, th));
+      // Below the chin its ends cross over the throat (pinned at the shoulder), covering the neckline.
+      if (veil) open = th < VEIL_J ? Math.max(0.12, H.mid - (VEIL_J - th) * 1.1) : THREE.MathUtils.lerp(H.mid, 0.02, ss(0.22, 0.5, th));
       for (let c = 0; c < NC; c++) {
         const ph = open + (Math.PI * 2 - 2 * open) * (c / (NC - 1));
         if (veil && th < VEIL_J) {
@@ -683,7 +715,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
           const ell = 1 / Math.sqrt((dj.x / M.head.rx) ** 2 + (dj.y / ((M.head.top - Hc.y) * 1.02)) ** 2 + (dj.z / M.head.rz) ** 2);
           const J = Hc.clone().addScaledVector(dj, Math.max(ell, H.minD) + H.off);
           const R0 = Math.hypot(J.x - Hc.x, J.z - Hc.z) + s * 0.015;
-          hood.pos.push(Hc.x + Math.sin(ph) * R0, J.y - s * (0.1 + 0.1 * back), Hc.z + Math.cos(ph) * R0);
+          hood.pos.push(Hc.x + Math.sin(ph) * R0, J.y - s * (0.2 + 0.1 * back), Hc.z + Math.cos(ph) * R0);
           hood.uv.push((c / NC) * 4, (r / NH) * 3);
           // Pinned: it lies on the shoulders, and loose it sank through them.
           hood.maxD.push(0);

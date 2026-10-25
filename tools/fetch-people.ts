@@ -272,9 +272,13 @@ async function pack(p: (typeof PEOPLE)[number], io: NodeIO) {
     const dc = Math.hypot(q[0] - R[0], q[1] - R[1]), dl = q[2] / R[2];
     return (1 - THREE.MathUtils.smoothstep(dc, 0.025, 0.06)) * THREE.MathUtils.smoothstep(dl, 0.35, 0.55) * (1 - THREE.MathUtils.smoothstep(dl, 1.5, 1.9));
   };
-  const skin = new Float32Array(nv), oil = new Float32Array(nv);
+  const skin = new Float32Array(nv), oil = new Float32Array(nv), hair = new Float32Array(nv);
   for (let i = 0; i < nv; i++) {
-    skin[i] = skinOf(avg(alb, UV[i][0], UV[i][1]));
+    const col = avg(alb, UV[i][0], UV[i][1]);
+    skin[i] = skinOf(col);
+    // Hair: not skin, and darker than a white shirt (blonde or brown alike).
+    const Lr = (col[0] + col[1] + col[2]) / (ref[0] + ref[1] + ref[2]);
+    hair[i] = skin[i] < 0.45 && Lr < 1.3 && (cls[i] === 'head' || cls[i] === 'torso') && P[i].y > jw('Spine2').y - 0.05 ? 1 : 0;
     const v = P[i];
     if (cls[i] !== 'head' || v.z < H.z) continue;
     // The T-zone: a strip down the middle of the forehead and the nose, a little on the chin.
@@ -289,10 +293,10 @@ async function pack(p: (typeof PEOPLE)[number], io: NodeIO) {
   const parent = Int32Array.from({ length: nv }, (_, i) => i);
   const find = (x: number): number => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
   for (let t = 0; t < nt; t++) { const a = find(idx[t * 3]), b = find(idx[t * 3 + 1]), c = find(idx[t * 3 + 2]); parent[b] = a; parent[find(c)] = find(a); }
-  const isl = new Map<number, { verts: Set<number>; tris: number[]; show: number; n: number; box: number[] }>();
+  const isl = new Map<number, { verts: Set<number>; tris: number[]; show: number; n: number; sk: number; face: number; wt: number; eye: number; jaw: number; hand: number; box: number[] }>();
   for (let t = 0; t < nt; t++) {
     const r = find(idx[t * 3]);
-    if (!isl.has(r)) isl.set(r, { verts: new Set(), tris: [], show: 0, n: 0, box: [1, 1, 0, 0] });
+    if (!isl.has(r)) isl.set(r, { verts: new Set(), tris: [], show: 0, n: 0, sk: 0, face: 0, wt: 1, eye: 0, jaw: 0, hand: 0, box: [1, 1, 0, 0] });
     const I = isl.get(r)!;
     I.tris.push(t);
     for (let k = 0; k < 3; k++) {
@@ -301,15 +305,26 @@ async function pack(p: (typeof PEOPLE)[number], io: NodeIO) {
       I.verts.add(i);
       I.n++;
       if (cls[i] === 'head' || cls[i] === 'hand') I.show++;
+      I.sk += skin[i];
+      if (/Eye$/.test(topJ[i])) I.eye++;
+      else if (/Jaw/.test(topJ[i])) I.jaw++;
+      else if (cls[i] === 'head' && N[i].z > 0.5 && P[i].z > H.z && P[i].y > H.y - 0.06) I.face++;
+      if (cls[i] === 'hand') I.hand++;
       I.box[0] = Math.min(I.box[0], UV[i][0]); I.box[1] = Math.min(I.box[1], UV[i][1]);
       I.box[2] = Math.max(I.box[2], UV[i][0]); I.box[3] = Math.max(I.box[3], UV[i][1]);
     }
   }
   const keep = [...isl.values()].filter((I) => I.show / I.n > 0.5);
+  // Texels where they matter: the face most, then skin; hair less (a woman's
+  // goes under her veil), and the mouth's inside and teeth least.
+  for (const I of keep) {
+    const face = I.face / I.n > 0.3, skinny = I.sk / I.n > 0.5;
+    I.wt = I.eye / I.n > 0.5 ? 0.45 : I.jaw / I.n > 0.5 && I.sk / I.n < 0.5 ? 0.3 : face ? 1.5 : skinny ? 0.8 : p.sex === 'woman' ? 0.2 : 0.55;
+  }
   // Shelf-pack their boxes, as large as they fit.
   const pad = 3;
   const place = (f: number) => {
-    const rects = keep.map((I, k) => ({ k, w: Math.ceil((I.box[2] - I.box[0]) * alb.w * f) + 2 * pad, h: Math.ceil((I.box[3] - I.box[1]) * alb.h * f) + 2 * pad, x: 0, y: 0 }));
+    const rects = keep.map((I, k) => ({ k, w: Math.ceil((I.box[2] - I.box[0]) * alb.w * f * I.wt) + 2 * pad, h: Math.ceil((I.box[3] - I.box[1]) * alb.h * f * I.wt) + 2 * pad, x: 0, y: 0 }));
     rects.sort((a, b) => b.h - a.h);
     let x = 0, y = 0, sh = 0;
     for (const r of rects) {
@@ -327,21 +342,23 @@ async function pack(p: (typeof PEOPLE)[number], io: NodeIO) {
   for (const r of rects) {
     const I = keep[r.k];
     for (const i of I.verts) {
-      nuv[i * 2] = (r.x + pad + (UV[i][0] - I.box[0]) * alb.w * f) / AT;
-      nuv[i * 2 + 1] = (r.y + pad + (UV[i][1] - I.box[1]) * alb.h * f) / AT;
+      nuv[i * 2] = (r.x + pad + (UV[i][0] - I.box[0]) * alb.w * f * I.wt) / AT;
+      nuv[i * 2 + 1] = (r.y + pad + (UV[i][1] - I.box[1]) * alb.h * f * I.wt) / AT;
     }
   }
   // Rasterize: albedo and normal resampled from the 8K scan, oil interpolated.
   const eyePx = new Uint8Array(AT * AT), A = new Uint8Array(AT * AT * 3), Nm = new Uint8Array(AT * AT * 3), mask = new Uint8Array(AT * AT), O = new Float32Array(AT * AT);
   const t3 = [0, 0, 0];
   for (const r of rects) for (const t of keep[r.k].tris) {
+    const fk = f * keep[r.k].wt;
+    const hand = keep[r.k].hand / keep[r.k].n > 0.5;
     const eye = /Eye$/.test(topJ[idx[t * 3]]) ? 1 : 0;
     const ii = [idx[t * 3], idx[t * 3 + 1], idx[t * 3 + 2]];
     raster(ii.map((i) => [nuv[i * 2] * AT, nuv[i * 2 + 1] * AT]), (x, y, w) => {
       const u = w[0] * UV[ii[0]][0] + w[1] * UV[ii[1]][0] + w[2] * UV[ii[2]][0];
       const v = w[0] * UV[ii[0]][1] + w[1] * UV[ii[1]][1] + w[2] * UV[ii[2]][1];
       // Box-filter the 8K source over this texel's footprint.
-      const s = Math.max(1, Math.round(1 / f / 2)), acc = [0, 0, 0], accN = [0, 0, 0];
+      const s = Math.max(1, Math.round(1 / fk / 2)), acc = [0, 0, 0], accN = [0, 0, 0];
       let n = 0;
       for (let dy = -s; dy <= s; dy += Math.max(1, s >> 1)) for (let dx = -s; dx <= s; dx += Math.max(1, s >> 1)) {
         px(alb, u + dx / alb.w, v + dy / alb.h, t3); acc[0] += t3[0]; acc[1] += t3[1]; acc[2] += t3[2];
@@ -350,10 +367,24 @@ async function pack(p: (typeof PEOPLE)[number], io: NodeIO) {
       }
       const o = (y * AT + x) * 3;
       for (let k = 0; k < 3; k++) { A[o + k] = acc[k] / n; Nm[o + k] = nrmSrc ? accN[k] / n : 128; }
+      // Watches, rings and shirt cuffs on the hands are painted over with skin.
+      if (hand) {
+        const c = [A[o], A[o + 1], A[o + 2]], s = skinOf(c);
+        if (s < 0.6) { const L = (c[0] + c[1] + c[2]) / (ref[0] + ref[1] + ref[2]); for (let k = 0; k < 3; k++) A[o + k] = THREE.MathUtils.lerp(ref[k] * THREE.MathUtils.clamp(L, 0.8, 1.05), c[k], s / 0.6); if (s < 0.3) for (let k = 0; k < 3; k++) Nm[o + k] = k === 2 ? 255 : 128; }
+      }
       O[y * AT + x] = w[0] * oil[ii[0]] + w[1] * oil[ii[1]] + w[2] * oil[ii[2]];
       mask[y * AT + x] = 1;
       eyePx[y * AT + x] = eye;
     });
+  }
+  // Lipstick and blusher off: strongly red, saturated skin is pulled back towards the face's own tone.
+  for (let i = 0; i < AT * AT; i++) {
+    if (!mask[i] || eyePx[i]) continue;
+    const c = [A[i * 3], A[i * 3 + 1], A[i * 3 + 2]], q = chroma(c);
+    const red = THREE.MathUtils.smoothstep(q[0] - R[0], 0.03, 0.09) * THREE.MathUtils.smoothstep(R[1] - q[1], 0.0, 0.04);
+    if (red <= 0) continue;
+    const L = q[2] / R[2], k = 0.45 * red;
+    for (let j = 0; j < 3; j++) A[i * 3 + j] = THREE.MathUtils.lerp(c[j], ref[j] * L * (j === 0 ? 1.06 : 0.97), k);
   }
   // Fill the background with the reference skin tone before dilating.
   for (let i = 0; i < AT * AT; i++) if (!mask[i]) for (let k = 0; k < 3; k++) A[i * 3 + k] = ref[k];
@@ -391,7 +422,7 @@ async function pack(p: (typeof PEOPLE)[number], io: NodeIO) {
   uv.setArray(nuv);
   const attr = (name: string, a: Float32Array) => prim.setAttribute(name, doc.createAccessor().setType('SCALAR').setArray(a).setBuffer(doc.getRoot().listBuffers()[0]));
   attr('_SKIN', skin);
-  attr('_OIL', oil);
+  attr('_HAIR', hair);
   const webp = async (d: Uint8Array, q: number) => sharp(Buffer.from(d), { raw: { width: AT, height: AT, channels: 3 } }).webp({ quality: q }).toBuffer();
   const tex = async (d: Uint8Array, q: number, name: string) => doc.createTexture(name).setImage(await webp(d, q)).setMimeType('image/webp');
   mat.setBaseColorTexture(await tex(A, 90, 'albedo'));
