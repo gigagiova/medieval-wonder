@@ -718,7 +718,7 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
         : th < 0.45 ? H.mid : THREE.MathUtils.lerp(H.mid, H.top, Math.min(1, (th - 0.45) / 0.7));
       // A veil frames the face, straight across the brow, and its edges fall open down the front.
       // Below the chin its ends cross over the throat (pinned at the shoulder), covering the neckline.
-      if (veil) open = th < VEIL_J ? Math.max(0.12, H.mid - (VEIL_J - th) * 1.1) : THREE.MathUtils.lerp(H.mid, 0.02, ss(0.22, 0.5, th));
+      if (veil) open = th < VEIL_J ? Math.max(-0.3, H.mid - (VEIL_J - th) * 2.6) : THREE.MathUtils.lerp(H.mid, 0.02, ss(0.22, 0.5, th));
       for (let c = 0; c < NC; c++) {
         const ph = open + (Math.PI * 2 - 2 * open) * (c / (NC - 1));
         if (veil && th < VEIL_J) {
@@ -1017,7 +1017,8 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
             const hit = b.raycastFirst(ray, THREE.DoubleSide);
             if (hit) need = Math.max(need, 0.6 - hit.distance + gap);
           }
-          R = Math.max(R, need, prev - 0.002);
+          // Its ends overlap across the throat, the one wound last on top.
+          R = Math.max(R, need, prev - 0.002) + 0.007 * (c / (NCh - 1)) * ss(rJ, rJ - 3, r);
           vv.set(ax.x + d.x * R, vv.y, ax.z + d.z * R).toArray(hood.pos, o);
         }
         prev = R;

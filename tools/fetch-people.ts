@@ -425,11 +425,12 @@ async function pack(p: (typeof PEOPLE)[number], io: NodeIO) {
   const attr = (name: string, a: Float32Array) => prim.setAttribute(name, doc.createAccessor().setType('SCALAR').setArray(a).setBuffer(doc.getRoot().listBuffers()[0]));
   attr('_SKIN', skin);
   attr('_HAIR', hair);
-  const webp = async (d: Uint8Array, q: number) => sharp(Buffer.from(d), { raw: { width: AT, height: AT, channels: 3 } }).webp({ quality: q }).toBuffer();
-  const tex = async (d: Uint8Array, q: number, name: string) => doc.createTexture(name).setImage(await webp(d, q)).setMimeType('image/webp');
+  // Albedo at full size; normal and roughness at half (GPU memory on phones: five bodies' maps come to ~40 MB).
+  const webp = async (d: Uint8Array, q: number, s: number) => sharp(Buffer.from(d), { raw: { width: AT, height: AT, channels: 3 } }).resize(s, s).webp({ quality: q }).toBuffer();
+  const tex = async (d: Uint8Array, q: number, name: string, s = AT) => doc.createTexture(name).setImage(await webp(d, q, s)).setMimeType('image/webp');
   mat.setBaseColorTexture(await tex(A, 90, 'albedo'));
-  mat.setNormalTexture(await tex(Nm, 92, 'normal'));
-  mat.setMetallicRoughnessTexture(await tex(MR, 90, 'rough'));
+  mat.setNormalTexture(await tex(Nm, 92, 'normal', AT / 2));
+  mat.setMetallicRoughnessTexture(await tex(MR, 90, 'rough', AT / 2));
   mat.setRoughnessFactor(1).setMetallicFactor(0).setDoubleSided(false).setName('skin');
   // The dropped clip's keyframes.
   for (const a of doc.getRoot().listAccessors()) if (a.listParents().every((x) => x === doc.getRoot() || x.propertyType === "AnimationSampler")) a.dispose();

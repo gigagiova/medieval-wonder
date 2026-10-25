@@ -50,15 +50,15 @@ const lampsToLights = () => lamps.slice(0, 4).forEach((l, i) => { lights[i].posi
 if (view === 'lineup') {
   let anim = params.get('anim') ?? 'idle';
   (window as unknown as { __setAnim: (a: string) => void }).__setAnim = (a) => { anim = a; };
-  const cast: [Role, number, object][] = [
+  const cast: [Role, number, object, number?][] = [
     ['monk', 0, { lantern: true }], ['peasant', 0, { sticks: true }], ['peasant', 1, { cap: true, bucket: true }],
     ['woman', 0, { jar: true }], ['woman', 1, { basket: true }],
     ['soldier', 0, { arms: true, spear: true, helmet: true, shield: 'back' }], ['soldier', 1, { arms: true, spear: true, shield: 'arm' }],
   ];
   // &cast=woman:0:jar,woman:1:basket — just these people (gear flags joined by +).
-  if (params.get('cast')) cast.splice(0, cast.length, ...params.get('cast')!.split(',').map((c) => { const [r, o, g] = c.split(':'); return [r as Role, Number(o), Object.fromEntries((g ?? '').split('+').filter(Boolean).map((k) => [k, true]))] as [Role, number, object]; }));
-  const people: Person[] = cast.map(([r, o, g], i) => {
-    const p = makePerson(scene, r, { outfit: o, seed: 11 + i * 31, gear: g });
+  if (params.get('cast')) cast.splice(0, cast.length, ...params.get('cast')!.split(',').map((c) => { const [r, o, g, b] = c.split(':'); return [r as Role, Number(o), Object.fromEntries((g ?? '').split('+').filter(Boolean).map((k) => [k, true])), b ? Number(b) : undefined] as [Role, number, object, number?]; }));
+  const people: Person[] = cast.map(([r, o, g, bi], i) => {
+    const p = makePerson(scene, r, { outfit: o, body: bi, seed: 11 + i * 31, gear: g });
     p.pos.set((i - (cast.length - 1) / 2) * 1.15, 0, 0);
     if (p.lamp) lamps.push(p.lamp);
     return p;
