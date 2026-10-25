@@ -403,6 +403,22 @@ function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure) {
   const keep: number[] = [];
   for (let t = 0; t < idx.count; t += 3) if (ok[idx.getX(t)] && ok[idx.getX(t + 1)] && ok[idx.getX(t + 2)]) keep.push(idx.getX(t), idx.getX(t + 1), idx.getX(t + 2));
   g.setIndex(keep);
+  // A modern cut (a quiff, a high fade) brought down to a plain short crop:
+  // the hair above the crown of the skull pressed down towards it.
+  if (kit === 'man') {
+    const P = g.attributes.position, inv = m.matrixWorld.clone().invert(), top0 = eyes.y + 0.088;
+    for (let i = 0; i < cls.length; i++) {
+      if (cls[i] !== 'head') continue;
+      const s = skin ? skin.getX(i) : 1;
+      if (s > 0.6) continue;
+      m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld);
+      if (w.y <= top0) continue;
+      const k = 0.5 + 0.5 * ss(0.3, 0.6, s);
+      w.y = top0 + (w.y - top0) * k;
+      w.applyMatrix4(inv);
+      P.setXYZ(i, w.x, w.y, w.z);
+    }
+  }
   // A wristwatch (painted out in the atlas, but still standing proud of the
   // wrist): everything round the wrist pressed in to the wrist's own round.
   {
@@ -450,7 +466,31 @@ function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure) {
   }
   g.setAttribute('beard', new THREE.BufferAttribute(beard, 1));
   m.material = skinMaterial(m.material as THREE.MeshStandardMaterial);
-  fillNeck(m, M);
+  fillNeck(m, M, kit);
+}
+
+/** The average colour of a texture's pixels at the given uvs (sRGB), or null if its image is not to hand. */
+const texPixels = new WeakMap<object, ImageData>();
+function averageTexel(tex: THREE.Texture | null, uvs: [number, number][]) {
+  const img = tex?.image as (CanvasImageSource & { width: number; height: number }) | undefined;
+  if (!img || !img.width || typeof document === 'undefined') return null;
+  let data = texPixels.get(img);
+  if (!data) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const g = c.getContext('2d', { willReadFrequently: true })!;
+    g.drawImage(img, 0, 0, 256, 256);
+    data = g.getImageData(0, 0, 256, 256);
+    texPixels.set(img, data);
+  }
+  let r = 0, gg = 0, b = 0;
+  for (const [u, v] of uvs) {
+    const x = Math.min(255, Math.max(0, Math.floor(u * 256))), y = Math.min(255, Math.max(0, Math.floor((tex!.flipY ? 1 - v : v) * 256)));
+    const o = (y * 256 + x) * 4;
+    r += data.data[o]; gg += data.data[o + 1]; b += data.data[o + 2];
+  }
+  const n = uvs.length || 1;
+  return new THREE.Color().setRGB(r / n / 255, gg / n / 255, b / n / 255, THREE.SRGBColorSpace);
 }
 
 /**
@@ -461,7 +501,7 @@ function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure) {
  * one, an ellipse where not, from inside the tunic up into the head.
  * It is coloured from the scan's own skin at the front of the neck.
  */
-function fillNeck(m: THREE.SkinnedMesh, M: Measure) {
+function fillNeck(m: THREE.SkinnedMesh, M: Measure, kit: 'man' | 'woman') {
   const g = m.geometry, P = g.attributes.position, idx = g.index!, NV = P.count;
   const W = new Float32Array(NV * 3), v = new THREE.Vector3();
   for (let i = 0; i < NV; i++) m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld).toArray(W, i * 3);
@@ -473,7 +513,7 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure) {
   const NRg = 12, NCg = 28, ray = new THREE.Ray(), o = new THREE.Vector3(), d = new THREE.Vector3();
   const R: number[][] = [], C: THREE.Vector3[] = [];
   for (let r = 0; r < NRg; r++) {
-    const t = -0.35 + 1.2 * (r / (NRg - 1));
+    const t = -0.35 + (kit === 'man' ? 1.4 : 1.2) * (r / (NRg - 1));
     const c = nk.clone().lerp(hb, t);
     c.z += 0.008;
     C.push(c);
@@ -513,6 +553,13 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure) {
   const used = new Set<number>(idx.array as ArrayLike<number> as number[]);
   for (const i of used) { const dd = (W[i * 3] - ref.x) ** 2 + (W[i * 3 + 1] - ref.y) ** 2 + (W[i * 3 + 2] - ref.z) ** 2; if (dd < bd) { bd = dd; best = i; } }
   const uv0 = [g.attributes.uv.getX(best), g.attributes.uv.getY(best)];
+  // Its colour, the average of the cheeks' skin (a single texel of the atlas showed its weave).
+  const cheek: [number, number][] = [];
+  for (const i of used) {
+    const x = Math.abs(W[i * 3] - eyes.x), y = W[i * 3 + 1] - eyes.y, z = W[i * 3 + 2] - eyes.z;
+    if (x > 0.03 && x < 0.06 && y < -0.02 && y > -0.06 && z > -0.04) cheek.push([g.attributes.uv.getX(i), g.attributes.uv.getY(i)]);
+  }
+  const avg = averageTexel((m.material as THREE.MeshStandardMaterial).map, cheek);
   // Skin weights: the nearest vertex of the whole (untrimmed) body.
   const si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
   const pos: number[] = [], uv: number[] = [], SI: number[] = [], SW: number[] = [], ix: number[] = [];
@@ -545,7 +592,13 @@ function fillNeck(m: THREE.SkinnedMesh, M: Measure) {
   }
   ng.setIndex(ix);
   ng.computeVertexNormals();
-  const nm = new THREE.SkinnedMesh(ng, m.material);
+  let mat = m.material as THREE.Material;
+  if (avg) {
+    // A neck a little paler than the cheeks, matte.
+    mat = withAtmos(new THREE.MeshStandardMaterial({ color: avg.multiplyScalar(1.04), roughness: 0.62, metalness: 0 }), { skin: true });
+    mat.userData.skin = true;
+  }
+  const nm = new THREE.SkinnedMesh(ng, mat);
   nm.name = 'NeckFill';
   nm.frustumCulled = false;
   nm.bind(m.skeleton, m.bindMatrix);
@@ -1850,7 +1903,8 @@ function layMantle(M: Measure, kind: 'cloak' | 'shawl', open: number, clothes: M
     g.pos.push(p.x, p.y, p.z);
     g.uv.push(c / NC * 4, t * 3);
     // It swings free below the shoulders (see cloth.ts), held along its upper edge.
-    g.maxD.push(r < 2 ? 0 : (cloak ? 0.28 : 0.05) * Math.pow(ss(0, 1, t), 0.8));
+    // (Over the shoulders and back it lies on the tunic and goes as that does: only below the waist is it free to swing.)
+    g.maxD.push(r < 2 ? 0 : (cloak ? 0.28 : 0.04) * Math.pow(ss(0, 1, t), 0.8) * ss(nk.y - 0.3, nk.y - 0.6, p.y));
     g.region.push(r < 3 ? 4 : 3);
   }
   return { g, brooch };
