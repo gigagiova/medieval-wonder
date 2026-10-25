@@ -38,3 +38,10 @@ Fetched and packed by `tools/fetch-props.ts`.
 - [grass_medium_02](https://polyhaven.com/a/grass_medium_02)
 - [shrub_02](https://polyhaven.com/a/shrub_02)
 - [weed_plant_02](https://polyhaven.com/a/weed_plant_02)
+
+## Other sources
+
+- `medieval_cart`: "Medieval wooden cart" by rakutin,
+  https://sketchfab.com/3d-models/medieval-wooden-cart-c4ee19920e9b45aaa6ebe37839b1ad2a,
+  licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Simplified to ~5.6k
+  triangles, textures re-encoded as 1024 px webp (packed like the Poly Haven props).

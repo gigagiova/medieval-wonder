@@ -35,7 +35,7 @@ export interface LotData { c: P2[]; front?: { a: P2; b: P2; out: P2 }; h: number
  * that mattered built high (a tower house: an inference, see
  * docs/benevento/ARCHITECTURE.md). Pure function of the lot.
  */
-function lotForm(c: P2[], front: boolean, seed: number): { form?: 'tower' | 'ruin'; h?: number } {
+export function lotForm(c: P2[], front: boolean, seed: number): { form?: 'tower' | 'ruin'; h?: number } {
   const r = rng(seed * 3 + 17);
   const u = r(), v = r();
   let area = 0, cx = 0, cz = 0;

@@ -198,7 +198,7 @@ export function buildFront(acc: Acc, fr: FrontLine, p: FrontPlan, stoneM: MatNam
       // Storage jars and a basket: octagonal pots of clay.
       for (let u = u0 + 0.2; u < u1; u += R(0.3, 0.42)) jar(acc, f, u, D / 2 + R(-0.05, 0.05), R(0.42, 0.72), R(0.14, 0.2), r);
     } else if (it.kind === 'cart') {
-      cart(acc, f, (u0 + u1) / 2, D / 2 + 0.05, r);
+      // The scanned cart is placed with the town's props (world.ts townProps).
     } else if (it.kind === 'ladder') {
       // Two rails of rough poles, rungs lashed across, leaning at ~75 degrees.
       const foot = Math.min(D, it.h * 0.27);
@@ -242,7 +242,7 @@ export function jar(acc: Acc, f: Frame, u: number, w: number, h: number, rad: nu
 }
 
 /** A two-wheeled handcart with its shafts down, parked along the wall. */
-function cart(acc: Acc, f: Frame, u: number, w: number, r: () => number) {
+export function cart(acc: Acc, f: Frame, u: number, w: number, r: () => number) {
   const L = 1.25, W = 0.85, yB = 0.52;
   // Bed of boards and low sides.
   box(acc, 'wood', f, u, yB, w, L / 2, 0.03, W / 2, 0.01);
