@@ -321,13 +321,19 @@ export class Builder {
         }
       }
     }
+    this.parts.clear();
     const cells: Cell[] = [];
     for (const [key, b] of buckets) {
       const cell: Cell = { key, under: key[0] === 'u', box: new THREE.Box3(), meshes: [], visible: true, occluded: 0 };
       for (const [m, geos] of b) {
+        // Shading is all in world space: no texture coordinates are needed.
+        for (const g of geos) g.deleteAttribute('uv');
         const merged = mergeGeometries(geos, false)!;
+        geos.length = 0;
         merged.computeBoundingSphere();
         merged.computeBoundingBox();
+        // Keep no CPU copy once the GPU has it.
+        for (const a of Object.values(merged.attributes)) (a as THREE.BufferAttribute).onUpload(function (this: THREE.BufferAttribute) { (this as unknown as { array: unknown }).array = null; });
         cell.box.union(merged.boundingBox!);
         const mesh = new THREE.Mesh(merged, mat(m));
         mesh.castShadow = !['window', 'ember', 'horn'].includes(m) && !cell.under;
@@ -339,6 +345,7 @@ export class Builder {
       cells.push(cell);
     }
     const col = mergeGeometries(this.colliders, false)!;
+    this.colliders.length = 0;
     return { collider: new THREE.Mesh(col), cells };
   }
 }

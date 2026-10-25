@@ -133,9 +133,23 @@ World coordinates in metres (x, z).
 
 ## 6. The town in 700
 
-- Streets and blocks follow the plan (vectorised: 1533 lane segments, 711 blocks/open spaces). Lanes are
-  narrowed to 1.4–2.8 m where houses have crept forward; the decumanus (*platea publica maior*) keeps
-  3–3.6 m; the plan's wide open spaces stay as squares.
+- **Streets and blocks are the plan's, exactly** (see `layout-vs-plan.png`: A the plan as vectorised and
+  registered, B the generated town, C the plan's block outlines over it). The plan's white spaces were
+  split into blocks and lanes by shape (narrow and long = lane); where a block's outline has a gap in the
+  drawing and it leaked into the lane network, the parts wider than 9.2 m were cut back out as blocks
+  (morphological opening, `plan_classify.py`). Result: 679 blocks/open spaces inside the circuit, lanes
+  as drawn (median width ~5 m). The ink line between a block and a lane is shared half and half; a line
+  between two blocks is their party wall. **Houses stand only inside the plan's blocks**, their fronts on
+  the block edge where it meets a lane; nothing is built in the street space. Medieval narrowness shows
+  in jetties, pontili, stalls and the worn band along the fronts; the middle of the wider street spaces
+  is left as trodden grass.
+- **Why the outline differs from the plan's**: the plan draws the later medieval town. The circuit
+  standing in 700 (red on the maps) leaves out the Civitas nova of Arechis II (SW, after 758) and the
+  annex towards the later Porta Somma (SE, 10th c.). Those parts of the plan exist in the game as ground,
+  ruins and roads outside the wall, not as town.
+- The decumanus (*platea publica maior*) cannot be traced as one corridor in the plan; it is the cheapest
+  path through the plan's lane graph that stays near the line of the later Via Magistrale (Dijkstra in
+  `gen_geo.py`), paved at 3.3 m with the old Roman slabs.
 - Density: houses are dense along the decumanus, round the curtis, the bishop's church and inside Porta
   Aurea; elsewhere blocks are gardens (*orti*), vines, pens (*stabula*), meadows and ruins of Roman
   houses — "strong penetration of the countryside inside" (Bertelli). Houses of stone (*casae

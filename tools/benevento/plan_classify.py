@@ -38,10 +38,30 @@ for l in range(1, n):
     mw = 2 * (hw.mean() if hw.size else rmax)
     elong = s / max(mw, 1)
     wm = mw / K  # width in plan px (~ metres)
-    if wm < 10.5 and elong > 7: kind[l] = 1
+    if (wm < 10.5 and elong > 7) or (wm < 16 and elong > 10): kind[l] = 1
     elif a / (K * K) > 2500 and wm > 14: kind[l] = 3
     else: kind[l] = 2
     info.append((l, a / (K * K), wm, elong, kind[l]))
+# A block whose outline has a gap in the drawing leaks into the lane network and
+# would read as a vast 'street'. Split such street components: the parts wider
+# than 2*RW (morphological opening) are blocks; only small widenings (crossings,
+# little squares) stay street.
+RW = 4.6
+st = (kind[lab] == 1)
+core = (dist >= RW * K) & st
+disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int(2 * RW * K) + 1, int(2 * RW * K) + 1))
+wide = cv2.dilate(core.astype(np.uint8), disc) & st.astype(np.uint8)
+wn, wlab, wst, _ = cv2.connectedComponentsWithStats(wide, connectivity=4)
+split = 0
+for l in range(1, wn):
+    am = wst[l, 4] / (K * K)
+    if am < 220: continue
+    m = wlab == l
+    lab[m] = n + split
+    split += 1
+    kind = np.append(kind, np.uint8(3 if am > 2500 else 2))
+    info.append((n + split - 1, am, 0, 0, int(kind[-1])))
+print('leaked blocks split from the lanes', split)
 info = np.array(info)
 print('components', len(info), 'streets', (info[:, 4] == 1).sum(), 'parcels', (info[:, 4] == 2).sum(), 'open', (info[:, 4] == 3).sum())
 vis = np.full((H, W, 3), 255, np.uint8)

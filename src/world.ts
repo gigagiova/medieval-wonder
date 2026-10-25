@@ -583,7 +583,7 @@ function townTexture(L: Layout): THREE.DataTexture {
     const k = r.idx(x, z);
     if (k < 0) continue;
     data[o] = r.main[k];
-    data[o + 1] = r.grid[k] === STREET ? 255 : 0;
+    data[o + 1] = r.grid[k] === STREET ? (r.trod[k] ? 255 : 40) : 0;
   }
   // Roads outside the walls: beaten earth, the Appia and the Traiana still paved in places.
   for (const rd of ROADS) {

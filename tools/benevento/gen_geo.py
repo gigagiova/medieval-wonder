@@ -110,6 +110,70 @@ for q in pl['parcels']:
     c = Pq.representative_point()
     parcels.append({'k': q['k'], 'a': q['a'], 'in': bool(town.contains(c)), 'pts': q['pts']})
 areas = pl['streetAreas']
+# The decumanus (platea publica maior) as one continuous lane: the cheapest path
+# through the plan's lane graph between Porta S. Lorenzo and the east gate,
+# kept close to the line of the later Via Magistrale (Corso Dante/Garibaldi).
+import heapq
+ends = []
+for i, st in enumerate(streets):
+    ends.append((tuple(st['pts'][0]), i, 0)); ends.append((tuple(st['pts'][-1]), i, 1))
+pts_all = np.array([e[0] for e in ends])
+from scipy.spatial import cKDTree
+tree = cKDTree(pts_all)
+node_of = {}
+nid = 0
+for k, p in enumerate(pts_all):
+    if k in node_of: continue
+    for j in tree.query_ball_point(p, 6.0):
+        if j not in node_of: node_of[j] = nid
+    nid += 1
+adj = {}
+for i, st in enumerate(streets):
+    a, b = node_of[2 * i], node_of[2 * i + 1]
+    L = LineString(st['pts'])
+    dc = np.mean([corso.distance(Point(p)) for p in st['pts']])
+    w = L.length * (1 + (dc / 5.0) ** 2) + 1.0
+    adj.setdefault(a, []).append((b, w, i)); adj.setdefault(b, []).append((a, w, i))
+# Bridge small gaps between lane pieces (the plan's lines cut some lanes).
+npos = {}
+for k, p in enumerate(pts_all): npos.setdefault(node_of[k], p)
+nkeys = list(npos.keys()); narr = np.array([npos[k] for k in nkeys]); ntree = cKDTree(narr)
+for a_i, a in enumerate(nkeys):
+    for b_i in ntree.query_ball_point(narr[a_i], 30.0):
+        b = nkeys[b_i]
+        if b == a: continue
+        d = float(np.linalg.norm(narr[a_i] - narr[b_i]))
+        dc = corso.distance(Point(*(narr[a_i] + narr[b_i]) / 2))
+        w = d * 1.6 * (1 + (dc / 5.0) ** 2) + 3
+        adj.setdefault(a, []).append((b, w, -1))
+def nearest_node(x, z):
+    d, k = tree.query([x, z]); return node_of[k]
+src, dst = nearest_node(-392, -332), nearest_node(590, 80)
+dist = {src: 0}; prev = {}; pq = [(0, src)]
+while pq:
+    d, u = heapq.heappop(pq)
+    if u == dst: break
+    if d > dist.get(u, 1e18): continue
+    for v, w, i in adj.get(u, []):
+        nd = d + w
+        if nd < dist.get(v, 1e18): dist[v] = nd; prev[v] = (u, i); heapq.heappush(pq, (nd, v))
+path_edges = []
+u = dst
+while u in prev:
+    p, i = prev[u]; path_edges.append((p, u, i)); u = p
+path_edges.reverse()
+dec = []
+for p, u, i in path_edges:
+    if i < 0:
+        dec.append(list(npos[u])); continue
+    seg = streets[i]['pts']
+    if node_of[2 * i] != p: seg = seg[::-1]
+    dec.extend(seg if not dec else seg[1:])
+for s2 in streets: s2['main'] = False
+decL = LineString(dec).simplify(1.0)
+decumanus = [[round(x, 1), round(z, 1)] for x, z in decL.coords]
+print('decumanus', len(path_edges), 'segments', round(LineString(dec).length), 'm, reached', u == src)
+
 print('plan streets', len(streets), 'main', sum(s['main'] for s in streets), 'parcels', len(parcels), 'inside', sum(p['in'] for p in parcels))
 geo = {
     'frame': {'lat0': 41.1305, 'lon0': 14.7745, 'note': 'x east, z south, metres; equirectangular'},
@@ -121,6 +185,7 @@ geo = {
     'medievalOutline': [[round(x, 1), round(z, 1)] for x, z in list(outline.simplify(3).exterior.coords)[:-1]],
     'streets': streets,
     'parcels': parcels,
+    'decumanus': decumanus,
     'streetAreas': areas,
 }
 json.dump(geo, open(OUT, 'w'), separators=(',', ':'))

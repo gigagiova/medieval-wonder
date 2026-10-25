@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { rng } from '../builder';
-import { GEO_STREETS, GEO_PARCELS, WALL700, BOUNDS, insideness, inPoly, distPolyline, type P2 } from './geo';
+import { GEO_STREETS, GEO_PARCELS, GEO_STREET_AREAS, DECUMANUS, WALL700, BOUNDS, insideness, inPoly, distPolyline, type P2 } from './geo';
 import { SITES, GATES, ROADS, EXPLORE_TARGETS, siteToWorld, type ExploreKind } from './sites';
 import { fastTerrain } from '../displace';
 import type { Lot, BridgeSpec } from '../town';
 
-// The town of AD 700 laid out on the user's plan: its lanes (narrowed where
-// houses have crept into them) and its blocks, filled with houses where the
+// The town of AD 700 laid out on the user's plan: its blocks exactly as drawn
+// (houses stand only inside them, fronts on the block edge) and its street
+// spaces left open, with the lanes' centre lines for walkers; blocks are filled with houses where the
 // early-medieval town was dense, and with vegetable plots, ruins, meadows and
 // pens where it was not: the countryside had come inside the walls.
 
@@ -19,12 +20,15 @@ export class Raster {
   readonly res = 0.5;
   readonly x0: number; readonly z0: number; readonly nx: number; readonly nz: number;
   grid: Uint8Array; parcel: Uint16Array; main: Uint8Array;
+  /** Street cells worn bare by feet and carts (near the house fronts and along the lanes); the rest of a wide street space is grass. */
+  trod: Uint8Array;
   constructor(x0: number, z0: number, x1: number, z1: number) {
     this.x0 = x0; this.z0 = z0;
     this.nx = Math.ceil((x1 - x0) / this.res); this.nz = Math.ceil((z1 - z0) / this.res);
     this.grid = new Uint8Array(this.nx * this.nz).fill(OUTSIDE);
     this.parcel = new Uint16Array(this.nx * this.nz);
     this.main = new Uint8Array(this.nx * this.nz);
+    this.trod = new Uint8Array(this.nx * this.nz);
   }
   idx(x: number, z: number) {
     const i = Math.floor((x - this.x0) / this.res), j = Math.floor((z - this.z0) / this.res);
@@ -98,7 +102,7 @@ function buildDensity() {
   for (const [x, z] of WALL700) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
   DX0 = x0 - 16; DZ0 = z0 - 16; DNX = Math.ceil((x1 - x0 + 32) / DS); DNZ = Math.ceil((z1 - z0 + 32) / DS);
   DEN = new Float32Array(DNX * DNZ);
-  const mains = GEO_STREETS.filter((s) => s.main).map((s) => s.pts);
+  const mains = [DECUMANUS];
   const focus: [number, number, number, number][] = [
     [SITES.curtis.x, SITES.curtis.z, 0.5, 140], [SITES.episcopium.x, SITES.episcopium.z, 0.45, 130],
     [389, -224, 0.3, 90], [SITES.forum.x, SITES.forum.z, 0.25, 90],
@@ -154,6 +158,31 @@ export function layoutTown(seed = 700): Layout {
   // 2. The plan's blocks: each a parcel id.
   const parcels = GEO_PARCELS.filter((p) => p.in);
   parcels.forEach((p, n) => r.fill(p.pts, (k) => { if (r.grid[k] === FREE) r.parcel[k] = n + 1; }));
+  // The plan's street spaces; the ink between them and the blocks is shared out
+  // (half to each), and a line between two blocks is their party wall.
+  {
+    const SA = 0xffff;
+    for (const a of GEO_STREET_AREAS) if (!a.hole) r.fill(a.pts, (k) => { if (!r.parcel[k]) r.parcel[k] = SA; });
+    for (const a of GEO_STREET_AREAS) if (a.hole) r.fill(a.pts, (k) => { if (r.parcel[k] === SA) r.parcel[k] = 0; });
+    const nx = r.nx, nb = [1, -1, nx, -nx];
+    let front: number[] = [];
+    for (let k = 0; k < r.grid.length; k++) if (r.grid[k] !== OUTSIDE && r.parcel[k]) front.push(k);
+    for (let pass = 0; pass < 6 && front.length; pass++) {
+      const next: number[] = [], set: [number, number][] = [];
+      for (const k of front) for (const o of nb) {
+        const q = k + o;
+        if (q < 0 || q >= r.grid.length || r.grid[q] === OUTSIDE || r.parcel[q]) continue;
+        set.push([q, r.parcel[k]]);
+      }
+      for (const [q, v] of set) if (!r.parcel[q]) { r.parcel[q] = v; next.push(q); }
+      front = next;
+    }
+    // Whatever is not a block is street space.
+    for (let k = 0; k < r.grid.length; k++) {
+      if (r.parcel[k] === SA) { r.parcel[k] = 0; if (r.grid[k] === FREE) r.grid[k] = STREET; }
+      else if (!r.parcel[k] && r.grid[k] === FREE) r.grid[k] = STREET;
+    }
+  }
   // 3. Landmark precincts are kept clear (their modules build them); the forum is an open square.
   for (const s of Object.values(SITES)) {
     if (!s.clear && !s.reserve) continue;
@@ -166,7 +195,7 @@ export function layoutTown(seed = 700): Layout {
 
   // 4. Lanes of the plan, narrowed: houses crept forward into the old street
   //    spaces; only the decumanus and the open places keep their breadth.
-  const paint = (s: Street) => {
+  const paint = (s: Street, cut = false) => {
     for (let k = 0; k < s.pts.length - 1; k++) {
       const a = s.pts[k], b = s.pts[k + 1];
       const rad = s.w / 2 + 0.6;
@@ -176,7 +205,8 @@ export function layoutTown(seed = 700): Layout {
           if (kk < 0) continue;
           const d = distSeg(V(x, z), a, b);
           const wob = 0.22 * Math.sin(x * 1.7 + z * 0.9) * Math.cos(z * 1.3 - x * 0.4);
-          if (d < s.w / 2 + wob && r.grid[kk] !== OUTSIDE && (r.grid[kk] !== RESERVED || s.main)) {
+          if (d < s.w / 2 + wob && r.grid[kk] !== OUTSIDE && (r.grid[kk] !== RESERVED || s.main) && (cut || !r.parcel[kk])) {
+            if (cut) r.parcel[kk] = 0;
             r.grid[kk] = STREET;
             if (s.main) r.main[kk] = Math.max(r.main[kk], Math.round(255 * (1 - d / (s.w / 2 + 0.01))));
           }
@@ -184,15 +214,29 @@ export function layoutTown(seed = 700): Layout {
       }
     }
   };
+  {
+    const s: Street = { pts: DECUMANUS.map(([x, z]) => V(x, z)), w: 3.3, main: true, kind: 'lane' };
+    lay.streets.push(s);
+    paint(s, true);
+  }
   for (const g of GEO_STREETS) {
     if (!g.in) continue;
     const pts = g.pts.map(([x, z]) => V(x, z));
     if (lengthOf(pts) < 3) continue;
-    const w = g.main ? THREE.MathUtils.clamp(g.w * 0.8, 3.0, 3.6) : g.w >= 7.5 ? g.w * 0.85 : THREE.MathUtils.clamp(g.w * 0.62, 1.35, 2.8);
+    const w = Math.max(1.2, g.w);
     const s: Street = { pts, w, main: g.main, kind: 'lane' };
     lay.streets.push(s);
     paint(s);
     if (g.w >= 7.5 && lengthOf(pts) > 6) { const m = along(pts, lengthOf(pts) / 2)!; lay.squares.push({ x: m.p.x, z: m.p.y, r: g.w / 2 }); }
+  }
+  // The arch gates: a paved way straight through, 30 m into the town.
+  for (const [id, dx, dz] of [['aurea', 0.88, -0.48], ['sacramenti', 0.62, -0.79]] as const) {
+    const g = GATES.find((q) => q.id === id)!;
+    // Inward is the side that is inside the walls.
+    const sgn = insideness(g.at[0] - dx * 12, g.at[1] - dz * 12) > insideness(g.at[0] + dx * 12, g.at[1] + dz * 12) ? -1 : 1;
+    const s: Street = { pts: [V(g.at[0] - sgn * dx * 6, g.at[1] - sgn * dz * 6), V(g.at[0] + sgn * dx * 30, g.at[1] + sgn * dz * 30)], w: 5, main: false, kind: 'lane' };
+    lay.streets.push(s);
+    paint(s, true);
   }
   // Gates: a short paved approach inside each.
   for (const gt of GATES) {
@@ -206,7 +250,7 @@ export function layoutTown(seed = 700): Layout {
     }
     if (best && best.d < 60) {
       const s: Street = { pts: [V(gx, gz), best.p], w: gt.main ? 3.2 : 2.2, main: false, kind: 'lane' };
-      lay.streets.push(s); paint(s);
+      lay.streets.push(s); paint(s, true);
     }
   }
 
@@ -237,7 +281,7 @@ export function layoutTown(seed = 700): Layout {
   });
 
   // 6. Houses along the lanes, wall to wall, each within one block.
-  const quadClear = (c: V2[], allowHouse: number, needPid: (pid: number) => boolean) => {
+  const quadClear = (c: V2[], allowHouse: number, needPid: (pid: number) => boolean, inBlock = false) => {
     let total = 0, house = 0, pid0 = -1;
     const p = V(0, 0);
     for (let u = 0.08; u < 1; u += 0.14) for (let w = 0.08; w < 1; w += 0.14) {
@@ -248,6 +292,7 @@ export function layoutTown(seed = 700): Layout {
       const v = r.grid[k];
       if (v === STREET || v === RESERVED || v === OUTSIDE || v === PLOT) return false;
       const pid = r.parcel[k];
+      if (!pid && inBlock) return false;
       if (pid) { if (pid0 < 0) pid0 = pid; else if (pid !== pid0) return false; }
       total++;
       if (v === HOUSE) house++;
@@ -267,33 +312,51 @@ export function layoutTown(seed = 700): Layout {
   const pidOf = (c: V2[]) => { const m = c[0].clone().add(c[1]).add(c[2]).add(c[3]).multiplyScalar(0.25); return r.pid(m.x, m.y); };
   let lotId = 0;
   const frontOk = (pid: number) => use[pid] === 'built' || use[pid] === 'mixed';
-  for (const s of lay.streets) {
-    const L = lengthOf(s.pts);
-    for (const side of [-1, 1]) {
-      let u = R(0, 1.2);
-      while (u < L - 2) {
-        const f = R(3.2, s.main ? 7 : 5.8);
-        const a = along(s.pts, u), b = along(s.pts, Math.min(u + f, L));
-        u += f + (rand() < 0.08 ? R(0.5, 1.5) : 0);
-        if (!a || !b) break;
-        const n = V(-a.d.y, a.d.x).multiplyScalar(side), nb = V(-b.d.y, b.d.x).multiplyScalar(side);
-        const off = s.w / 2 + 0.25;
-        const F0 = a.p.clone().addScaledVector(n, off), F1 = b.p.clone().addScaledVector(nb, off);
-        // Inside the walls only, and on settled ground: density thins the frontage too.
-        if (density(F0.x, F0.y) < 0.1 && rand() < 0.6) continue;
-        let d0 = R(5, s.main ? 11 : 9), d1 = d0 + R(-1.4, 1.4);
-        let ok = false, c: V2[] = [];
-        while (d0 > 2.6 && d1 > 2.6) {
-          c = [F0, F1, F1.clone().addScaledVector(nb, d1), F0.clone().addScaledVector(n, d0)];
-          if (quadClear(c, 0.35, frontOk)) { ok = true; break; }
-          d0 -= 0.8; d1 -= 0.8;
-        }
-        if (!ok) continue;
-        markQuad(c);
-        lay.lots.push({ id: lotId++, c, front: { a: F0, b: F1, out: n.clone().negate() }, h: R(5, 10.5) * (0.75 + 0.35 * density(F0.x, F0.y)), street: s.w, parcel: pidOf(c) });
+  // Street width in front of a point, looking out along n.
+  const widthAt = (p: V2, n: V2) => {
+    let w = 0;
+    while (w < 16) { const k = r.idx(p.x + n.x * (w + 0.25), p.y + n.y * (w + 0.25)); if (k < 0 || r.grid[k] !== STREET) break; w += 0.5; }
+    return w;
+  };
+  const strict = (pid: number) => (q: number) => q === pid;
+  parcels.forEach((p, n) => {
+    const pid = n + 1;
+    if (!frontOk(pid)) return;
+    const ring = p.pts.map(([x, z]) => V(x, z));
+    ring.push(ring[0].clone());
+    const L = lengthOf(ring);
+    let u = R(0, 2);
+    while (u < L - 2.5) {
+      const f = Math.min(R(3.2, 6.5), L - u);
+      const a = along(ring, u), b = along(ring, u + f);
+      u += f + (rand() < 0.06 ? R(0.5, 1.5) : 0);
+      if (!a || !b) break;
+      const d = b.p.clone().sub(a.p);
+      if (d.length() < 2.4) continue;
+      d.normalize();
+      const perp = V(-d.y, d.x);
+      const mid = a.p.clone().add(b.p).multiplyScalar(0.5);
+      const pin = r.pid(mid.x + perp.x * 1.5, mid.y + perp.y * 1.5) === pid, pout = r.pid(mid.x - perp.x * 1.5, mid.y - perp.y * 1.5) === pid;
+      if (pin === pout) continue;
+      const nIn = pin ? perp : perp.clone().negate(), out = nIn.clone().negate();
+      // A front only where the block meets the street (not a party wall).
+      const ahead = r.at(mid.x + out.x * 1.2, mid.y + out.y * 1.2);
+      if (ahead !== STREET) continue;
+      if (density(mid.x, mid.y) < 0.1 && rand() < 0.6) continue;
+      const F0 = a.p.clone().addScaledVector(nIn, 0.1), F1 = b.p.clone().addScaledVector(nIn, 0.1);
+      const main = r.main[r.idx(mid.x + out.x * 1.5, mid.y + out.y * 1.5)] > 0;
+      let d0 = R(5, main ? 11 : 9), d1 = d0 + R(-1.4, 1.4);
+      let ok = false, c: V2[] = [];
+      while (d0 > 2.6 && d1 > 2.6) {
+        c = [F0, F1, F1.clone().addScaledVector(nIn, d1), F0.clone().addScaledVector(nIn, d0)];
+        if (quadClear(c, 0.35, strict(pid), true)) { ok = true; break; }
+        d0 -= 0.8; d1 -= 0.8;
       }
+      if (!ok) continue;
+      markQuad(c);
+      lay.lots.push({ id: lotId++, c, front: { a: F0, b: F1, out }, h: R(5, 10.5) * (0.75 + 0.35 * density(F0.x, F0.y)), street: Math.max(1.5, widthAt(mid, out)), parcel: pid });
     }
-  }
+  });
   // Back buildings inside built blocks; mixed blocks keep a garden behind.
   const free: number[] = [];
   for (let k = 0; k < r.grid.length; k++) if (r.grid[k] === FREE && use[r.parcel[k]] === 'built') free.push(k);
@@ -308,7 +371,7 @@ export function layoutTown(seed = 700): Layout {
       const w = R(2.6, 7) * (1 - s * 0.2), d = R(2.6, 7) * (1 - s * 0.2);
       const o = V(x, z).addScaledVector(ex, -w * R(0.2, 0.8)).addScaledVector(ez, -d * R(0.2, 0.8));
       const c = [o, o.clone().addScaledVector(ex, w), o.clone().addScaledVector(ex, w).addScaledVector(ez, d), o.clone().addScaledVector(ez, d)];
-      if (!quadClear(c, 0.6, (pid) => use[pid] === 'built')) continue;
+      if (!quadClear(c, 0.6, (pid) => use[pid] === 'built', true)) continue;
       markQuad(c);
       lay.lots.push({ id: lotId++, c, h: R(3.5, 8), parcel: pidOf(c) });
       break;
@@ -339,7 +402,7 @@ export function layoutTown(seed = 700): Layout {
 
   // 8. Pontili and flying arches where both sides of a lane are built.
   for (const s of lay.streets) {
-    if (s.w > 3.3) continue;
+    if (s.w > 4.6 || s.kind !== 'lane') continue;
     const L = lengthOf(s.pts);
     let u = R(6, 16);
     while (u < L - 4) {
@@ -347,17 +410,21 @@ export function layoutTown(seed = 700): Layout {
       u += R(9, 24);
       if (!a) break;
       const n = V(-a.d.y, a.d.x);
-      const probe = (side: number) => {
+      const wl = widthAt(a.p, n), wr = widthAt(a.p, n.clone().negate());
+      const W = wl + wr;
+      if (W < 1.2 || W > 4.6) continue;
+      const beyond = (side: number, w: number) => {
         let ok = 0;
         for (const k of [-1.2, 0, 1.2]) {
-          const q = a.p.clone().addScaledVector(n, side * (s.w / 2 + 1.3)).addScaledVector(a.d, k);
+          const q = a.p.clone().addScaledVector(n, side * (w + 1.0)).addScaledVector(a.d, k);
           if (r.at(q.x, q.y) === HOUSE) ok++;
         }
         return ok >= 2;
       };
-      if (!probe(1) || !probe(-1)) continue;
+      if (!beyond(1, wl) || !beyond(-1, wr)) continue;
+      const c = a.p.clone().addScaledVector(n, (wl - wr) / 2);
       if (density(a.p.x, a.p.y) < 0.35) continue;
-      lay.bridges.push({ x: a.p.x, z: a.p.y, dx: a.d.x, dz: a.d.y, w: s.w, pontile: rand() < 0.55 && !s.main, main: s.main });
+      lay.bridges.push({ x: c.x, z: c.y, dx: a.d.x, dz: a.d.y, w: W, pontile: rand() < 0.55 && !s.main, main: s.main });
     }
   }
 
@@ -365,6 +432,31 @@ export function layoutTown(seed = 700): Layout {
   for (const q of lay.squares) {
     if (q.r < 4 || density(q.x, q.z) < 0.3 || lay.wells.some((w) => Math.hypot(w.x - q.x, w.z - q.z) < 55)) continue;
     lay.wells.push({ x: q.x + R(-1.5, 1.5), z: q.z + R(-1.5, 1.5) });
+  }
+
+  // Worn ground: a band along every built front and every lane; the middle of
+  // the wider street spaces of the plan is grass, trodden only where people go.
+  {
+    const nx = r.nx, N = r.grid.length;
+    const dist = new Uint8Array(N).fill(255);
+    for (let k = 0; k < N; k++) if (r.grid[k] !== STREET) dist[k] = 0;
+    for (let k = 0; k < N; k++) { const i = k % nx; let d = dist[k]; if (i > 0) d = Math.min(d, dist[k - 1] + 1); if (k >= nx) d = Math.min(d, dist[k - nx] + 1); dist[k] = d; }
+    for (let k = N - 1; k >= 0; k--) { const i = k % nx; let d = dist[k]; if (i < nx - 1) d = Math.min(d, dist[k + 1] + 1); if (k + nx < N) d = Math.min(d, dist[k + nx] + 1); dist[k] = d; }
+    for (let k = 0; k < N; k++) if (r.grid[k] === STREET && (dist[k] <= 5 || r.main[k])) r.trod[k] = 255;
+    for (const s of lay.streets) {
+      const rad = Math.min(s.w / 2, 1.6);
+      for (let q = 0; q < s.pts.length - 1; q++) {
+        const a = s.pts[q], b = s.pts[q + 1], L = a.distanceTo(b);
+        for (let t = 0; t <= L; t += 0.5) {
+          const px = a.x + ((b.x - a.x) * t) / L, pz = a.y + ((b.y - a.y) * t) / L;
+          for (let dz = -rad; dz <= rad; dz += 0.5) for (let dx = -rad; dx <= rad; dx += 0.5) {
+            if (dx * dx + dz * dz > rad * rad) continue;
+            const k = r.idx(px + dx, pz + dz);
+            if (k >= 0 && r.grid[k] === STREET) r.trod[k] = 255;
+          }
+        }
+      }
+    }
   }
 
   // 10. Roads outside the walls.

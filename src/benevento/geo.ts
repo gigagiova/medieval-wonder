@@ -26,6 +26,7 @@ interface Raw {
   streets: GeoStreet[];
   parcels: GeoParcel[];
   streetAreas: GeoArea[];
+  decumanus: P2[];
 }
 const G = RAW as unknown as Raw;
 
@@ -39,6 +40,8 @@ export const MEDIEVAL_OUTLINE = G.medievalOutline;
 export const GEO_STREETS = G.streets;
 export const GEO_PARCELS = G.parcels;
 export const GEO_STREET_AREAS = G.streetAreas;
+/** The decumanus maximus (platea publica maior): one lane across the town, through the plan's corridors along the line of the later Via Magistrale. */
+export const DECUMANUS = G.decumanus;
 
 const TT = G.terrain;
 const H = (() => {

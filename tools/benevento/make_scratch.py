@@ -53,8 +53,7 @@ out.append(f'<path d="{path(geo["wall"], True)}" fill="none" stroke="#b01e1e" st
 # Roads outside, main streets inside
 for rd in sites['roads']:
     out.append(f'<path d="{path(rd["pts"])}" fill="none" stroke="#a0763c" stroke-width="{rd["w"] * 1.2:.1f}" opacity="0.7"/>')
-for s in geo['streets']:
-    if s['main']: out.append(f'<path d="{path(s["pts"])}" fill="none" stroke="#d48a1c" stroke-width="3.5" opacity="0.9"/>')
+out.append(f'<path d="{path(geo["decumanus"])}" fill="none" stroke="#d48a1c" stroke-width="3.5" opacity="0.9"/>')
 # Gates
 for g in sites['gates']:
     q = px([g['at']])[0]
