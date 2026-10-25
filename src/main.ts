@@ -17,6 +17,7 @@ import { Player } from './player';
 import { Soundscape } from './audio';
 import { initMap } from './map';
 import { loadProps } from './props';
+import { loadForest } from './forest';
 import { updateLibrary, pushOutOfSecretDoor } from './library';
 import { isReading } from './codex';
 import { loadNpcAssets, spawnTownsfolk, updateTownsfolk, pushOutOfTownsfolk, npcDebug } from './npc';
@@ -49,7 +50,7 @@ const progress = async (label: string, frac: number) => {
 addEventListener('error', (e) => { enterEl.textContent = 'Something went wrong: ' + (e.message || e.error); });
 addEventListener('unhandledrejection', (e) => { enterEl.textContent = 'Something went wrong: ' + (e.reason?.message ?? e.reason); });
 await progress('Gathering the furnishings', 0);
-await loadProps();
+await Promise.all([loadProps(), loadForest()]);
 await progress('Lighting the lamps', 0.01);
 const t0 = performance.now();
 const { collider, cells, lamps, flames, props, townTex, stream } = await buildWorld(scene, progress);
