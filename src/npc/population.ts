@@ -26,10 +26,10 @@ type Colors = NonNullable<Look['colors']>;
 
 // ------------------------------------------------------------------ outfits
 
-/** Two more cuts, tailored at load with the others: the long tunic of clergy, merchants and strangers, and the same under a mantle (paenula, pallium). */
+/** Two more cuts, tailored on first use like the others: the long tunic of clergy, merchants and strangers, and the same under a mantle (paenula, pallium). */
 export function registerPopulationOutfits() {
   registerOutfit('robe', { sex: 'man', bodies: ['nathan', 'manuel'], beard: true, wraps: false, spec: { hem: 'ankle', flare: 0.16, folds: 0.03, sleeve: 'fitted', hood: null, belt: 'sash', stride: 0.85 } });
-  registerOutfit('robeCloak', { sex: 'man', bodies: ['eric'], beard: true, wraps: false, spec: { hem: 'ankle', flare: 0.16, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'sash', stride: 0.85, capeOnTunic: true } });
+  registerOutfit('robeCloak', { sex: 'man', bodies: ['eric'], beard: true, wraps: false, spec: { hem: 'ankle', flare: 0.16, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'sash', stride: 0.85 } });
 }
 
 // ------------------------------------------------------------------ dyes
@@ -313,7 +313,9 @@ export function makeOfGroup(scene: THREE.Scene, id: GroupId, seed: number, o: { 
     equip: extras.length ? (h) => equipExtras(extras, h) : undefined,
   };
   const gear = g.gear?.(r, outfitId);
-  const p = makePerson(scene, role, { outfitId, seed: Math.floor(r() * 1e9), gear, look });
+  // Children never get the older scanned face; the old may.
+  const face = g.scale ? false : g.grey && g.grey[0] >= 0.4 ? true : undefined;
+  const p = makePerson(scene, role, { outfitId, seed: Math.floor(r() * 1e9), gear, look, face });
   return { person: p, speed: g.speed ?? (role === 'soldier' ? 1.3 : 1.15) };
 }
 const mulberry = (a: number) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };

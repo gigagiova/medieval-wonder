@@ -193,7 +193,7 @@ export class Clothing {
     // A cloak hangs round the body: pulled taut it would cut straight through
     // the tunic to the spine. Keep it no nearer the spine's line than its skinned place.
     const sa = _sa.copy(caps[6].pa).lerp(caps[6].pb, 0.5), sd = _sd.copy(caps[7].pb).sub(sa).normalize();
-    const slack = 0.012 * this.scale;
+    const slack = 0.004 * this.scale;
     const radial = (arr: Float32Array, o: number, out: THREE.Vector3) => {
       out.set(arr[o] - sa.x, arr[o + 1] - sa.y, arr[o + 2] - sa.z);
       return out.addScaledVector(sd, -out.dot(sd));
@@ -281,6 +281,20 @@ export class Clothing {
       for (let k = 0; k < S.riders.length; k++) {
         const o = S.riders[k] * 3, q = Rd[S.riders[k]] * 3;
         P[o] = P[q] + T[o] - T[q]; P[o + 1] = P[q + 1] + T[o + 1] - T[q + 1]; P[o + 2] = P[q + 2] + T[o + 2] - T[q + 2];
+      }
+    }
+    // Hems and bindings keep to their edges: along the cloth from the edge and
+    // out along its normal (last frame's: they hardly turn in one).
+    if (G.bands) {
+      const B = G.bands, NR0 = S.geo.attributes.normal.array as Float32Array;
+      for (let k = 0; k < B.v.length; k++) {
+        const o = B.v[k] * 3, q = B.q[k] * 3, q2 = B.q2[k] * 3;
+        const nx = NR0[q], ny = NR0[q + 1], nz = NR0[q + 2];
+        let bx = P[q2] - P[q], by = P[q2 + 1] - P[q + 1], bz = P[q2 + 2] - P[q + 2];
+        const d = bx * nx + by * ny + bz * nz;
+        bx -= nx * d; by -= ny * d; bz -= nz * d;
+        const l = Math.sqrt(bx * bx + by * by + bz * bz) || 1, cb = B.cb[k] * sc / l, cn = B.cn[k] * sc;
+        P[o] = P[q] + bx * cb + nx * cn; P[o + 1] = P[q + 1] + by * cb + ny * cn; P[o + 2] = P[q + 2] + bz * cb + nz * cn;
       }
     }
     const t2 = performance.now();
