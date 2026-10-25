@@ -20,7 +20,7 @@ const path = require('path');
   await b.close();
   const png = (u) => Buffer.from(u.split(',')[1], 'base64');
   const a = await sharp(png(r.albedo)).webp({ quality: 88, alphaQuality: 100 }).toFile(path.join(out, 'impostor.webp'));
-  const n = await sharp(png(r.normal)).resize(512, 832).webp({ quality: 90 }).toFile(path.join(out, 'impostorn.webp'));
+  const n = await sharp(png(r.normal)).resize(312, 507).webp({ quality: 90 }).toFile(path.join(out, 'impostorn.webp'));
   fs.writeFileSync(path.join(out, 'impostors.json'), JSON.stringify(r.json));
   console.log('impostor.webp', (a.size / 1024).toFixed(0), 'KB; impostorn.webp', (n.size / 1024).toFixed(0), 'KB;', JSON.stringify(r.json.trees));
 })();
