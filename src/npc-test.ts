@@ -46,12 +46,15 @@ const lights = Array.from({ length: 4 }, () => { const l = new THREE.PointLight(
 const lampsToLights = () => lamps.slice(0, 4).forEach((l, i) => { lights[i].position.copy(l.pos); lights[i].intensity = 2.5; });
 
 if (view === 'lineup') {
-  const anim = params.get('anim') ?? 'idle';
+  let anim = params.get('anim') ?? 'idle';
+  (window as unknown as { __setAnim: (a: string) => void }).__setAnim = (a) => { anim = a; };
   const cast: [Role, number, object][] = [
     ['monk', 0, { lantern: true }], ['peasant', 0, { sticks: true }], ['peasant', 1, { cap: true, bucket: true }],
     ['woman', 0, { jar: true }], ['woman', 1, { basket: true }],
     ['soldier', 0, { arms: true, spear: true, helmet: true, shield: 'back' }], ['soldier', 1, { arms: true, spear: true, shield: 'arm' }],
   ];
+  // &cast=woman:0:jar,woman:1:basket — just these people (gear flags joined by +).
+  if (params.get('cast')) cast.splice(0, cast.length, ...params.get('cast')!.split(',').map((c) => { const [r, o, g] = c.split(':'); return [r as Role, Number(o), Object.fromEntries((g ?? '').split('+').filter(Boolean).map((k) => [k, true]))] as [Role, number, object]; }));
   const people: Person[] = cast.map(([r, o, g], i) => {
     const p = makePerson(scene, r, { outfit: o, seed: 11 + i * 31, gear: g });
     p.pos.set((i - (cast.length - 1) / 2) * 1.15, 0, 0);
@@ -70,7 +73,7 @@ if (view === 'lineup') {
       if (cam === 'back') p.yaw = 0;
       p.animate(dt, 1, null);
       p.group.updateMatrixWorld(true);
-      p.cloth.setSimulating(true);
+      p.cloth.setSimulating(params.get('sim') !== '0');
       p.cloth.update(dt, p.pos);
       p.carry(dt);
     }
@@ -142,6 +145,8 @@ Object.assign(stats.__stats, {
   people: npcDebug.people.length, calls: renderer.info.render.calls, tris: renderer.info.render.triangles,
   speeds: npcDebug.people.slice(0, 1).map((p) => p.walkSpeed),
 });
+// Audit hooks: step the simulation and re-render from a script.
+(window as unknown as { __api: unknown }).__api = { THREE, scene, camera, renderer, people: npcDebug.people, step: (dt: number) => step(dt), render: () => { lampsToLights(); renderer.render(scene, camera); } };
 (window as unknown as { __done: boolean }).__done = true;
 if (!params.has('t')) {
   let last = performance.now();
