@@ -23,6 +23,7 @@ import { loadNpcAssets, spawnTownsfolk, updateTownsfolk, pushOutOfTownsfolk, npc
 Object.assign(window, { __npc: npcDebug });
 import type { Lamp, Cell, PropKind } from './builder';
 import { fogHides } from './fogcull';
+import { OcclusionBuffer, chunkPrisms, indexLotsFrom, OCC_RANGE } from './occlusion';
 import { perfT, perfAdd, perfFrame, perfStats, initHud, gpuBegin, gpuEnd } from './perf';
 
 const params = new URLSearchParams(location.search);
@@ -398,9 +399,14 @@ if (params.has('shot') && !params.has('at')) {
 // 1. Zones: the earth is the biggest occluder. Underground cells are hidden
 //    above ground and vice versa, except around the ossuary stair.
 // 2. Distance: past ~120 m the fog has swallowed everything.
-// 3. Occlusion: rays from the eye to the cell's bounds against the collision
-//    BVH; a cell whose every ray is blocked twice in a row is hidden.
+// 3. Occlusion above ground: the houses near the eye are drawn into a small
+//    software depth buffer every frame and a cell is hidden only when its
+//    whole box is behind them (conservative, see occlusion.ts). Underground:
+//    rays from the eye to the cell's bounds against the collision BVH; a cell
+//    whose every ray is blocked twice in a row is hidden.
 // Three.js frustum-culls each cell's meshes on top of this.
+const occBuf = new OcclusionBuffer();
+indexLotsFrom([...stream.chunks.values()].flatMap((c) => c.it.lots));
 const ray = new THREE.Ray();
 const pts: THREE.Vector3[] = Array.from({ length: 10 }, () => new THREE.Vector3());
 const cen = new THREE.Vector3(), hit = new THREE.Vector3(), eye = new THREE.Vector3();
@@ -437,11 +443,17 @@ function cull(isUnder: boolean, camLocal: number) {
     const zoneOk = c.under ? showUnder : showAbove;
     // Past its draw distance, or wholly inside the fog (see fogcull.ts).
     const near = c.box.distanceToPoint(eye) < (c.range ?? 120) && !(zoneOk && !c.under && fogHides(c.box, eye, shared.uFogBase.value, shared.uUnder.value));
-    if (zoneOk && near && !c.lod) live.push(c);
+    if (zoneOk && near && c.under && !c.lod) live.push(c);
     else c.occluded = 0;
     c.visible = zoneOk && near;
   }
-  // Re-test a slice of the live cells each frame.
+  if (!isUnder) {
+    const t = perfT();
+    if (occBuf.begin(camera)) for (const it of stream.itemsNear(eye.x, eye.z, OCC_RANGE)) occBuf.drawPrisms(chunkPrisms(it), eye);
+    perfAdd('occl', t);
+    for (const c of cells) if (c.visible && !c.under) c.occluded = occBuf.hidden(c.box) ? 2 : 0;
+  }
+  // Underground: re-test a slice of the live cells each frame.
   const per = Math.max(4, Math.ceil(live.length / 6));
   for (let i = 0; i < per && live.length; i++) {
     const c = live[(rr++) % live.length];
