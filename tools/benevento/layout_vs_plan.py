@@ -37,3 +37,13 @@ out.paste(a, (0, 0)); out.paste(b, (0, Hd)); out.paste(c, (0, 2 * Hd))
 out.save(os.path.join(ROOT, 'docs/benevento/layout-vs-plan.png'), optimize=True)
 c.crop((int(250 * S), int(150 * S), int(800 * S), int(500 * S))).save(D + 'cmp_zoom.png')
 print(out.size)
+# Zoomed overlays: the plan's drawn cell outlines (black) over the generated footprints.
+Z = 4
+for name, (x0, z0, x1, z1) in {'centre': (-80, -200, 60, -60), 'east': (360, -160, 500, -20), 'west': (-330, -250, -190, -110), 'north': (120, -260, 260, -120)}.items():
+    crop = lay.crop((int(x0 - m['x0']), int(z0 - m['z0']), int(x1 - m['x0']), int(z1 - m['z0']))).resize((int((x1 - x0) * Z), int((z1 - z0) * Z)), Image.NEAREST)
+    dz = ImageDraw.Draw(crop)
+    Pz = lambda q: ((q[0] - x0) * Z, (q[1] - z0) * Z)
+    for q in g['parcels']:
+        if q['in']: dz.polygon([Pz(v) for v in q['pts']], outline=(0, 0, 0))
+    crop.save(D + 'zoom_' + name + '.png')
+print('zooms written to', D)

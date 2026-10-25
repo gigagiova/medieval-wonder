@@ -160,7 +160,9 @@ export function layoutTown(seed = 700): Layout {
   }
   // 2. The plan's blocks: each a parcel id.
   const parcels = GEO_PARCELS.filter((p) => p.in);
-  parcels.forEach((p, n) => r.fill(p.pts, (k) => { if (r.grid[k] === FREE) r.parcel[k] = n + 1; }));
+  // Largest first, so a cell drawn inside another (a courtyard in a ring of
+  // buildings, a house standing in a yard) owns its own ground.
+  [...parcels.keys()].sort((a, b) => parcels[b].a - parcels[a].a).forEach((n) => r.fill(parcels[n].pts, (k) => { if (r.grid[k] === FREE) r.parcel[k] = n + 1; }));
   // The plan's street spaces; the ink between them and the blocks is shared out
   // (half to each), and a line between two blocks is their party wall.
   {
@@ -259,7 +261,7 @@ export function layoutTown(seed = 700): Layout {
 
   // 5. What each block was in 700: as the plan says, a block is built up and
   //    an open space is a garden, a vineyard, a pen, a meadow or a ruin.
-  type Use = 'built' | 'site' | PlotKind;
+  type Use = 'built' | 'site' | 'house' | 'court' | PlotKind;
   const use: Use[] = [];
   // Blocks a landmark precinct cuts into belong to the landmark.
   const tot = new Uint32Array(parcels.length + 1), res = new Uint32Array(parcels.length + 1);
@@ -326,6 +328,82 @@ export function layoutTown(seed = 700): Layout {
     return w;
   };
   const strict = (pid: number) => (q: number) => q === pid;
+  // The plan draws the houses themselves: every cell of a block between its
+  // lines is one building, as drawn (irregular footprints kept, simplified
+  // to at most ~10 corners); courtyards only where the plan draws a cell in
+  // a ring of others. Only cells too big for one house (blocks drawn without
+  // inner lines) are filled by the passes below.
+  const simplify = (pts: V2[], tol: number): V2[] => {
+    const ring = [...pts, pts[0]];
+    const dp = (a: number, b: number, out: number[]) => {
+      let best = -1, bd = tol;
+      for (let i = a + 1; i < b; i++) { const d = distSeg(ring[i], ring[a], ring[b]); if (d > bd) { bd = d; best = i; } }
+      if (best < 0) return;
+      dp(a, best, out); out.push(best); dp(best, b, out);
+    };
+    // Split the ring at its two farthest points so the recursion has ends.
+    let far = 0, fd = 0;
+    for (let i = 1; i < pts.length; i++) { const d = pts[i].distanceTo(pts[0]); if (d > fd) { fd = d; far = i; } }
+    const idx: number[] = [0];
+    dp(0, far, idx); idx.push(far); dp(far, ring.length - 1, idx);
+    return idx.map((i) => ring[i]);
+  };
+  const CELL_MAX = 420;
+  // Cells drawn inside other cells. A container whose leftover is a thin band
+  // round its children is a ring of buildings round a courtyard (a cloister, a
+  // courtyard house); a container with room to spare is a yard with buildings
+  // standing in it.
+  const centroid = (pts: P2[]) => { let x = 0, z = 0; for (const [a, b] of pts) { x += a / pts.length; z += b / pts.length; } return [x, z] as P2; };
+  const bbox = parcels.map((p) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of p.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return [x0, z0, x1, z1]; });
+  const children: number[][] = parcels.map(() => []);
+  const parentOf: number[] = parcels.map(() => -1);
+  parcels.forEach((q, j) => {
+    const [cx, cz] = centroid(q.pts);
+    let best = -1;
+    parcels.forEach((p, i) => {
+      if (i === j || p.a <= q.a * 1.3) return;
+      const b2 = bbox[i];
+      if (cx < b2[0] || cx > b2[2] || cz < b2[1] || cz > b2[3] || !inPoly(cx, cz, p.pts)) return;
+      if (best < 0 || p.a < parcels[best].a) best = i;
+    });
+    if (best >= 0) { children[best].push(j); parentOf[j] = best; }
+  });
+  parcels.forEach((p, i) => {
+    if (!children[i].length || use[i + 1] !== 'built') return;
+    let per = 0, ca = 0;
+    for (let k = 0; k < p.pts.length; k++) { const a = p.pts[k], b = p.pts[(k + 1) % p.pts.length]; per += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+    for (const j of children[i]) ca += parcels[j].a;
+    const band = (p.a - ca) / Math.max(1, per);
+    if (band < 9) { for (const j of children[i]) if (use[j + 1] === 'built') use[j + 1] = 'court'; }
+    else use[i + 1] = 'court';
+  });
+  parcels.forEach((p, n) => {
+    const pid = n + 1;
+    if (use[pid] !== 'built') return;
+    let pts = p.pts.map(([x, z]) => V(x, z));
+    if (children[n].length) return; // a ring round a courtyard: filled by the passes below
+    if (p.a > CELL_MAX) return;
+    for (const tol of [0.45, 0.7, 1.0, 1.4]) { pts = simplify(p.pts.map(([x, z]) => V(x, z)), tol); if (pts.length <= 10) break; }
+    if (pts.length < 3) return;
+    // The front: the longest side with a lane in front of it; it becomes edge 0→1.
+    let fk = -1, fl = 0, fout = V(0, 0);
+    for (let k = 0; k < pts.length; k++) {
+      const a = pts[k], b = pts[(k + 1) % pts.length], L = a.distanceTo(b);
+      if (L < 2.4 || L <= fl) continue;
+      const e = b.clone().sub(a).normalize(), m = a.clone().add(b).multiplyScalar(0.5);
+      for (const sd of [-1, 1]) {
+        const o = V(-e.y * sd, e.x * sd);
+        if (r.at(m.x + o.x * 1.3, m.y + o.y * 1.3) === STREET && r.pid(m.x - o.x * 1.3, m.y - o.y * 1.3) === pid) { fk = k; fl = L; fout = o; }
+      }
+    }
+    use[pid] = 'house';
+    r.fill(p.pts, (kk) => { if (r.grid[kk] === FREE) r.grid[kk] = HOUSE; });
+    const h0 = density(pts[0].x, pts[0].y);
+    if (fk < 0) { lay.lots.push({ id: lotId++, c: pts, h: R(4, 8) * (0.8 + 0.3 * h0), parcel: pid }); return; }
+    const c = [...pts.slice(fk), ...pts.slice(0, fk)];
+    const mid = c[0].clone().add(c[1]).multiplyScalar(0.5);
+    lay.lots.push({ id: lotId++, c, front: { a: c[0].clone(), b: c[1].clone(), out: fout }, h: R(5, 10.5) * (0.75 + 0.35 * h0), street: Math.max(1.5, widthAt(mid, fout)), parcel: pid });
+  });
   parcels.forEach((p, n) => {
     const pid = n + 1;
     if (!frontOk(pid)) return;
@@ -447,7 +525,7 @@ export function layoutTown(seed = 700): Layout {
   for (const t of EXPLORE_TARGETS) {
     let best: TownLot | null = null, bd = Infinity;
     for (const l of lay.lots) {
-      if (!l.front || taken.has(l.id)) continue;
+      if (!l.front || taken.has(l.id) || l.c.length !== 4) continue;
       const w = l.c[0].distanceTo(l.c[1]), d = l.c[1].distanceTo(l.c[2]);
       if (w < 3.6 || d < 4.2 || w > 8.5) continue;
       const m = l.c[0].clone().add(l.c[2]).multiplyScalar(0.5);
