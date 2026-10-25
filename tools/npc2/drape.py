@@ -44,6 +44,10 @@ def lower_arms(rig, angle):
 def make(gid, g, garments, basemesh, rig):
     d = g['drape']
     sc = bpy.context.scene
+    # The whole body collides: MPFB's masks hiding it under the fitted clothes are off meanwhile.
+    masks = [m for m in basemesh.modifiers if m.type == 'MASK' and m.name.startswith('Delete')]
+    for m in masks:
+        m.show_viewport = False
     lower_arms(rig, math.radians(d.get('arms', 38)))
     neck = bone_world(rig, 'Neck')
     sh = (bone_world(rig, 'LeftArm') + bone_world(rig, 'RightArm')) / 2
@@ -56,29 +60,58 @@ def make(gid, g, garments, basemesh, rig):
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new('UVMap')
     grid = []
-    top_len = (a1 - a0) * r0
+    # The cut starts out already hanging: each column of it follows the
+    # body's (and the garments under it) outline as seen from the neck's
+    # axis, a little clear of it, falling straight down from the widest point
+    # above (as cloth hangs from the shoulders), from the collar to the hem.
+    # The solver then only has to settle it into its folds.
+    from mathutils.bvhtree import BVHTree
+    dg = bpy.context.evaluated_depsgraph_get()
+    verts, polys = [], []
+    for c in [basemesh] + [garments[c] for c in d.get('over', []) if c in garments]:
+        ce = c.evaluated_get(dg)
+        cm = ce.to_mesh()
+        off = len(verts)
+        verts += [c.matrix_world @ v.co for v in cm.vertices]
+        polys += [tuple(off + i for i in p.vertices) for p in cm.polygons]
+        ce.to_mesh_clear()
+    hull = BVHTree.FromPolygons(verts, polys)
+    gap = d.get('gap', 0.02)
+    H = drop + 0.1
+    nz = 80
+    cols = []
+    for i in range(ncol + 1):
+        a = a0 + (a1 - a0) * i / ncol
+        dirn = Vector((-math.cos(a), -math.sin(a), 0))
+        prof = [Vector((neck.x, neck.y, z0)) + dirn * r0]
+        rmax = r0
+        for k in range(1, nz + 1):
+            z = z0 - H * k / nz
+            c = Vector((neck.x, neck.y, z))
+            hit = hull.ray_cast(c + dirn * 0.8, -dirn, 0.8)
+            r = (0.8 - hit[3]) if hit[0] is not None else 0.0
+            rmax = max(rmax, r + gap + 0.02 * k / nz)
+            prof.append(c + dirn * rmax)
+        # Resampled at equal steps along it, to the cloak's length.
+        L = [0.0]
+        for k in range(1, len(prof)):
+            L.append(L[-1] + (prof[k] - prof[k - 1]).length)
+        tot = min(L[-1], d['length'] + (rmax - r0))
+        col = []
+        for j in range(nrow + 1):
+            sj = tot * j / nrow
+            k = next((k for k in range(1, len(L)) if L[k] >= sj), len(L) - 1)
+            f = (sj - L[k - 1]) / max(1e-9, L[k] - L[k - 1])
+            col.append(prof[k - 1].lerp(prof[k], min(1.0, f)))
+        cols.append(col)
+    total = sum((cols[len(cols) // 2][j + 1] - cols[len(cols) // 2][j]).length for j in range(nrow))
     for j in range(nrow + 1):
-        t = j / nrow
-        row = []
-        # Profile: out from the collar to `reach` over the first fifth, then down.
-        s_out = (r1 - r0)
-        total = s_out + drop
-        s = t * total
-        for i in range(ncol + 1):
-            a = a0 + (a1 - a0) * i / ncol
-            dirn = Vector((-math.cos(a), -math.sin(a) * d.get('depth', 0.85), 0))
-            # Blender: the body's right is -X, its front -Y.
-            if s <= s_out:
-                p = Vector((neck.x, neck.y, z0)) + dirn * (r0 + s) + Vector((0, 0, -0.15 * s))
-            else:
-                p = Vector((neck.x, neck.y, z0)) + dirn * r1 + Vector((0, 0, -0.15 * s_out - (s - s_out)))
-            row.append(bm.verts.new(p))
-        grid.append(row)
+        grid.append([bm.verts.new(cols[i][j]) for i in range(ncol + 1)])
     for j in range(nrow):
         for i in range(ncol):
             f = bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
             for l, (ii, jj) in zip(f.loops, ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))):
-                l[uv].uv = (ii / ncol * (a1 - a0) * (r1 + r0) / 2 / 1.2, 1 - jj / nrow * total / 1.2)
+                l[uv].uv = (ii / ncol * (a1 - a0) * 0.25 / 1.2, 1 - jj / nrow * total / 1.2)
     me = bpy.data.meshes.new('G_' + gid)
     bm.to_mesh(me)
     bm.free()
@@ -204,6 +237,8 @@ def make(gid, g, garments, basemesh, rig):
     bpy.context.view_layer.update()
     # Where it is fastened (a brooch, src/npc/props.ts): the collar's end at the right shoulder.
     o['npc2_brooch'] = list(o.matrix_world @ o.data.vertices[0].co)
+    for m in masks:
+        m.show_viewport = True
     o.parent = rig
     am = o.modifiers.new('Armature', 'ARMATURE')
     am.object = rig

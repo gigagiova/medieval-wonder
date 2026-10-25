@@ -100,6 +100,8 @@ async function write(doc: Document, io: NodeIO, id: string) {
     buffers[i].dispose();
   }
   root.listTextures().forEach((t, i) => t.setURI(`${id}_${i}.webp`));
+  // (Old textures of this body go first: their count may have changed.)
+  for (const f of fs.readdirSync(OUT)) if (new RegExp(`^${id}_\\d+\\.webp$`).test(f)) fs.unlinkSync(path.join(OUT, f));
   const { json, resources } = await io.writeJSON(doc);
   for (const b of json.buffers ?? []) b.uri = 'data:application/octet-stream;base64,' + Buffer.from(resources[b.uri!]).toString('base64');
   let tex = 0;

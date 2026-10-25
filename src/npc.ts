@@ -61,9 +61,13 @@ const OUTFITS: Record<OutfitId, OutfitDef> = {
 };
 /** More outfits (src/npc/population.ts), tailored on first use like the others. */
 export function registerOutfit(id: string, def: OutfitDef) { (OUTFITS as Record<string, OutfitDef>)[id] = def; }
-export const outfitBodies = (id: string) => (OUTFITS as Record<string, OutfitDef>)[id]?.bodies ?? [];
+export const outfitBodies = (id: string): string[] => {
+  const d = (OUTFITS as Record<string, OutfitDef>)[id];
+  const v2 = NPC_V2 && d ? bodiesV2(id, d.sex) : [];
+  return v2.length ? v2 : d?.bodies ?? [];
+};
 /** Whether an `outfit:body` pairing is already tailored (dressing someone in it then costs nothing extra). */
-export const outfitTailored = (key: string) => outfits.has(key);
+export const outfitTailored = (key: string) => outfits.has(key) || (NPC_V2 && kitsV2.has(key.split(':')[1]));
 const ROLE_OUTFITS: Record<Role, OutfitId[]> = { monk: ['monk', 'monkBare'], peasant: ['peasantHood', 'peasantCloak'], woman: ['woman', 'womanShawl'], soldier: ['soldier', 'soldierCloak'] };
 
 // Natural dyes on wool and linen, muted and a little faded.
@@ -385,7 +389,7 @@ export class Person {
       skel = new THREE.Skeleton([...skel.bones, ...this.skirt], [...skel.boneInverses, inv, inv.clone()]);
     }
     this.cloth = v2
-      ? dressV2(this.body, outfit as unknown as OutfitV2, { tunic, over, head, belt, leg: dye(pick(rnd, [...DYES.undyed, ...DYES.woad]), 0.3), shoe: new THREE.Color(0x8a7a6a).multiplyScalar(0.8 + rnd() * 0.3), kinds: lc?.kinds }) as unknown as Clothing
+      ? dressV2(this.body, outfit as unknown as OutfitV2, { tunic, over, head, belt, leg: dye(pick(rnd, [...DYES.undyed, ...DYES.woad]), 0.3), shoe: new THREE.Color(0x8a7a6a).multiplyScalar(0.8 + rnd() * 0.3), kinds: lc?.kinds, role }) as unknown as Clothing
       : new Clothing(scene, outfit.garment, skel, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
 
     // Motion.
