@@ -112,7 +112,7 @@ const L: Lore[] = [
   {
     id: 'cisterna', title: 'The serpent hollow', kind: 'note', status: 'legend', trail: 4,
     latin: 'Hic latuit.',
-    english: '"Here it was hidden." In the plaster of the niche there is the print of a coiled snake, a hand long, and nothing in it. Romuald\'s wife Theodorada was a Christian; while the duke was away she gave the golden viper to the bishop. What did Barbatus make of it? Look at his altar.',
+    english: '"Here it was hidden." In the plaster of the niche there is the print of a coiled snake, a hand long, and nothing in it. Romuald\'s wife Theuderada was a Christian; while the duke was away she gave the golden viper to the bishop. What did Barbatus make of it? Look at his altar.',
     source: 'Legend after the Vita Barbati. The cistern under the future S. Sofia is invented.',
   },
   {
