@@ -188,11 +188,14 @@ export class LightField {
     this.scene.background = null;
     r.setClearColor(0x000000, 0);
     r.setRenderTarget(this.hRT);
-    r.clear();
-    r.render(this.scene, this.cam);
-    this.scene.overrideMaterial = prevOverride;
-    this.scene.background = prevBg;
-    for (const [o, v] of restore) o.visible = v;
+    try {
+      r.clear();
+      r.render(this.scene, this.cam);
+    } finally {
+      this.scene.overrideMaterial = prevOverride;
+      this.scene.background = prevBg;
+      for (const [o, v] of restore) o.visible = v;
+    }
     // Mips come from the render target's automatic generation on unbind.
     const q = this.quad.material as THREE.ShaderMaterial;
     q.uniforms.uSun.value.copy(shared.uMoonDir.value);
