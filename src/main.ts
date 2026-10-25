@@ -182,6 +182,8 @@ function updateBones(showAbove: boolean, showUnder: boolean) {
       else g.lo.setMatrixAt(nl++, p.matrix);
     });
     g.hi.count = nh; g.lo.count = nl;
+    // An instanced mesh with no instances still costs a draw call.
+    g.hi.visible = nh > 0; g.lo.visible = nl > 0;
     g.hi.instanceMatrix.needsUpdate = true;
     g.lo.instanceMatrix.needsUpdate = true;
   }
