@@ -169,13 +169,15 @@ export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
           #endif
           float ms = clamp(abs(nlK) + 2.0 * sAO * sAO - 1.0, 0.0, 1.0);
           reflectedLight.directDiffuse *= ms;
-          reflectedLight.directSpecular *= ms * SPEC_K;
+          // Wet stone and puddles keep their gloss; dry porous stone does not.
+          float specK = mix(SPEC_K, 1.0, S.wet);
+          reflectedLight.directSpecular *= ms * specK;
           vec3 alb = diffuseColor.rgb;
           vec3 ga = 2.0404 * alb - 0.3324, gb = -4.7951 * alb + 0.6417, gc = 2.7552 * alb + 0.6903;
           reflectedLight.indirectDiffuse *= max(vec3(sAO), ((sAO * ga + gb) * sAO + gc) * sAO);
           float nv = clamp(dot(normal, geometryViewDir), 0.0, 1.0);
           float so = clamp(pow(nv + sAO, exp2(-16.0 * roughnessFactor - 1.0)) - 1.0 + sAO, 0.0, 1.0);
-          reflectedLight.indirectSpecular *= SPEC_K * so;
+          reflectedLight.indirectSpecular *= specK * so;
         }`)
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = applyAtmos(gl_FragColor.rgb, vWPos);');
   };

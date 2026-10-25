@@ -208,8 +208,25 @@ export function fabric(kind: FabricKind, color: THREE.ColorRepresentation, o: Fa
           // No glossy lobe on wool and linen; a soft fibre fuzz on the silhouette instead.
           reflectedLight.directSpecular *= uFabSpec;
           reflectedLight.indirectSpecular *= uFabSpec;
-          float fz = pow(1.0 - saturate(dot(geometryNormal, normalize(vViewPosition))), 3.0) * uFab.w;
-          reflectedLight.indirectDiffuse *= 1.0 + fz;
+          float fNv = saturate(dot(geometryNormal, normalize(vViewPosition)));
+          float fz = pow(1.0 - fNv, 3.0) * uFab.w;
+          // Hollows between the threads: occluded (multi-bounce AO, Jimenez
+          // et al.) rather than painted dark, so the weave reads in shade too.
+          float fAO = clamp(0.55 + 0.45 * fD, 0.0, 1.0);
+          vec3 fAlb = diffuseColor.rgb;
+          vec3 fA = 2.0404 * fAlb - 0.3324, fB = -4.7951 * fAlb + 0.6417, fC = 2.7552 * fAlb + 0.6903;
+          reflectedLight.indirectDiffuse *= max(vec3(fAO), ((fAO * fA + fB) * fAO + fC) * fAO);
+          // Sheen: loose fibres scatter the sky back at grazing angles
+          // (the look of the Charlie / Estevez-Kulla cloth lobe, cheaply):
+          // added light, tinted towards the fibre, strongest on silhouettes,
+          // so dark wool keeps its form against a dark street.
+          #if defined( RE_IndirectDiffuse )
+          vec3 fSky = (irradiance + iblIrradiance) * RECIPROCAL_PI;
+          #else
+          vec3 fSky = vec3(0.0);
+          #endif
+          reflectedLight.indirectDiffuse += fSky * mix(fAlb, vec3(0.5), 0.7) * fz * 3.0;
+          reflectedLight.indirectDiffuse *= 1.0 + fz * 0.5;
           reflectedLight.directDiffuse *= 1.0 + fz * 0.6;
         }`);
   };
