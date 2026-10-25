@@ -43,6 +43,8 @@ def plain(name, imgs, alpha=False):
 
 def prepare(basemesh, garments, rig, spec):
     for o in [o for o in bpy.data.objects if o.type == 'MESH']:
+        # Cloth and skin are smooth: no faceting (the draped cloaks are made flat-shaded).
+        o.data.polygons.foreach_set('use_smooth', [True] * len(o.data.polygons))
         alpha = any(s in o.name.lower() for s in ('eyebrow', 'eyelash', 'hair', 'beard'))
         for i, old in enumerate(o.data.materials):
             imgs = images_of(old)

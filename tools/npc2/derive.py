@@ -166,3 +166,34 @@ def lengthen(bm, o, rig, by, step=0.045, flare=0.22):
             v.co = owi @ p
         cur = [g for g in res['geom'] if isinstance(g, bmesh.types.BMEdge) and g.is_boundary]
     bm.normal_update()
+
+
+def relax(o, basemesh, iters, gap=0.006):
+    """Smooth away an asset's crumpled, sculpted folds (a veil's), then push
+    it back out of the body (it shrinks as it smooths) to `gap` over it."""
+    from mathutils.bvhtree import BVHTree
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    for _ in range(iters):
+        bmesh.ops.smooth_vert(bm, verts=[v for v in bm.verts if not v.is_boundary], factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    dg = bpy.context.evaluated_depsgraph_get()
+    be = basemesh.evaluated_get(dg)
+    me = be.to_mesh()
+    mw = basemesh.matrix_world
+    tree = BVHTree.FromPolygons([mw @ v.co for v in me.vertices], [tuple(p.vertices) for p in me.polygons])
+    be.to_mesh_clear()
+    ow, owi = o.matrix_world, o.matrix_world.inverted()
+    moved = 0
+    for v in bm.verts:
+        p = ow @ v.co
+        loc, nrm, _, d = tree.find_nearest(p, 0.1)
+        if loc is None:
+            continue
+        side = (p - loc).dot(nrm)
+        if side < gap:
+            v.co = owi @ (loc + nrm * gap)
+            moved += 1
+    bm.to_mesh(o.data)
+    bm.free()
+    o.data.update()
+    return moved

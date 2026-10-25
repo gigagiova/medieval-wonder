@@ -31,6 +31,8 @@ export interface OutfitV2 {
 }
 
 const DIR = 'models/npc2/';
+const flatNormal = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1);
+flatNormal.needsUpdate = true;
 /** The bodies, and which v1 outfits each can wear (by sex). */
 export const BODIES_V2: { id: string; sex: Sex }[] = [
   { id: 'm_young', sex: 'man' }, { id: 'm_mid', sex: 'man' }, { id: 'm_old', sex: 'man' },
@@ -73,6 +75,8 @@ function prep(t: THREE.Object3D) {
       const src = m.material as THREE.MeshStandardMaterial;
       if (src.map) src.map.colorSpace = THREE.SRGBColorSpace;
       if (!m.geometry.getAttribute('beard')) m.geometry.setAttribute('beard', new THREE.BufferAttribute(new Float32Array(m.geometry.attributes.position.count), 1));
+      // (The shared skin shader lays its pores on the normal map's UVs: a flat one where the body has none.)
+      if (!src.normalMap) src.normalMap = flatNormal;
       m.material = skinMaterial(src);
     }
   });
