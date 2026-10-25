@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { textureSet } from '../materials';
 import { matte, withAtmos } from './rig';
+import { fabric } from './fabric';
 import type { Measure, Garment } from './garment';
 
 // What people carry. Built in code, in the bind pose's frame (metres, facing
@@ -17,12 +18,12 @@ function makeMats() {
     iron: matte(0x3a3836, 0.55, 0.65, D),
     darkIron: matte(0x2a2826, 0.62, 0.55, D),
     bronze: matte(0x5a4426, 0.5, 0.7, D),
-    leather: matte(0x3a2618, 0.8, 0, D),
-    darkLeather: matte(0x22160e, 0.82, 0, D),
+    leather: fabric('leather', 0x3a2618, { attr: 'position' }),
+    darkLeather: fabric('leather', 0x22160e, { attr: 'position' }),
     ash: tex(0x7e6a52, 0.8),
     board: tex(0xffffff, 0.9),
-    felt: matte(0x4a3e30, 1, 0, D),
-    linen: matte(0x9a917e, 0.95, 0, D),
+    felt: fabric('felt', 0x4a3e30, { attr: 'position' }),
+    linen: fabric('linen', 0x9a917e, { attr: 'position' }),
   };
 }
 export const propMats = () => (M ??= makeMats());
@@ -134,19 +135,13 @@ function makeHeadMats() {
     const d = Math.hypot(x - cx, (y - cy) * 1.2) * R;
     return Math.exp(-Math.pow((d - 0.36) / 0.13, 2));
   }, 3);
-  // Felt: matted, fibrous, no weave at all.
-  const fluff = tileNoise(40, 7), fuzz = tileNoise(110, 8);
-  const felt = normalTex(256, (x, y) => fluff(x, y) * 0.6 + fuzz(x, y) * 0.4, 1.6);
   const D = { side: THREE.DoubleSide };
   return {
     iron: withAtmos(new THREE.MeshStandardMaterial({ color: 0x8a8580, map: rust, roughness: 0.5, metalness: 0.45, normalMap: hammer, normalScale: new THREE.Vector2(0.35, 0.35), ...D })),
     bronze: withAtmos(new THREE.MeshStandardMaterial({ color: 0x86683c, roughness: 0.45, metalness: 0.5, normalMap: hammer, normalScale: new THREE.Vector2(0.15, 0.15), ...D })),
     mail: withAtmos(new THREE.MeshStandardMaterial({ color: 0x4e4b47, roughness: 0.55, metalness: 0.5, normalMap: mail, normalScale: new THREE.Vector2(1.2, 1.2), ...D })),
-    lace: matte(0x2e1e12, 0.85, 0, D),
-    felt: (color: THREE.Color) => withAtmos(new THREE.MeshPhysicalMaterial({
-      color, roughness: 1, metalness: 0, sheen: 1, sheenRoughness: 0.9, sheenColor: color.clone().lerp(new THREE.Color(0xc8b89a), 0.2),
-      normalMap: felt, normalScale: new THREE.Vector2(0.55, 0.55), ...D,
-    })),
+    lace: fabric('leather', 0x2e1e12, { attr: 'position' }),
+    felt: (color: THREE.Color) => fabric('felt', color, { attr: 'position' }),
   };
 }
 const headMats = () => (HM ??= makeHeadMats());

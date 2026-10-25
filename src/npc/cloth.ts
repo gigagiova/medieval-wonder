@@ -26,6 +26,8 @@ export class Clothing {
     // Bound with an identity bind matrix: the garment's bind positions are in
     // the same world-at-load space as the body's, and the skeleton's bone
     // matrices already carry the person's position, heading and size.
+    // The bind pose, unskinned: fabric.ts lays the weave on it (also on the simulated mesh, below).
+    G.geo.setAttribute('rest', G.geo.attributes.position); G.geo.setAttribute('restN', G.geo.attributes.normal);
     const far = new THREE.SkinnedMesh(G.geo, mats);
     far.bindMode = THREE.DetachedBindMode;
     far.bind(skeleton, new THREE.Matrix4());
@@ -73,6 +75,7 @@ export class Clothing {
     geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(G.bind.length), 3).setUsage(THREE.DynamicDrawUsage));
     geo.setAttribute('uv', G.geo.attributes.uv);
     geo.setAttribute('color', G.geo.attributes.color);
+    geo.setAttribute('rest', G.geo.attributes.rest); geo.setAttribute('restN', G.geo.attributes.restN);
     geo.setIndex(G.geo.index);
     for (const g of G.geo.groups) geo.addGroup(g.start, g.count, g.materialIndex);
     const near = new THREE.Mesh(geo, this.mats);

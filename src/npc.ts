@@ -9,6 +9,7 @@ import { prepScanBody } from './npc/scan';
 import { dressBody, faceOnly, buildGarment, bakeHeadShade, measure, addSkirtBones, addSwingBones, swingRig, type GarmentSpec, type Garment, type Measure } from './npc/garment';
 import { Clothing, clothStats } from './npc/cloth';
 import * as Props from './npc/props';
+import { fabric, type FabricKind } from './npc/fabric';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
 
 // Townsfolk: monks, peasant men and women, and Lombard soldiers (arimanni)
@@ -244,19 +245,21 @@ export class Person {
       tunic = dye(pick(rnd, [...DYES.madder, ...DYES.woad, ...DYES.undyed, ...DYES.weld]));
       over = dye(pick(rnd, [...DYES.undyed, ...DYES.woad]));
       head = dye(pick(rnd, DYES.linen), 0.1);
-      belt = wool(dye(pick(rnd, [...DYES.madder, ...DYES.weld, ...DYES.undyed])), W);
+      belt = fabric('tabby', dye(pick(rnd, [...DYES.madder, ...DYES.weld, ...DYES.undyed])));
     } else if (role === 'soldier') {
       tunic = dye(pick(rnd, [...DYES.madder, ...DYES.woad, DYES.undyed[0], DYES.undyed[2]]));
       over = dye(pick(rnd, [...DYES.undyed, ...DYES.woad]));
       head = over;
-      belt = matte(0x2e1e12, 0.75);
+      belt = fabric('leather', 0x2e1e12);
     } else {
       tunic = dye(pick(rnd, [...DYES.undyed, ...DYES.undyed, ...DYES.madder, ...DYES.weld, ...DYES.woad]), 0.3);
       over = dye(pick(rnd, DYES.undyed), 0.3);
       head = dye(pick(rnd, [...DYES.undyed, ...DYES.weld]), 0.3);
-      belt = matte(0x3a2618, 0.82);
+      belt = fabric('leather', 0x3a2618);
     }
-    const mats = [wool(tunic, W), wool(over, W), belt, role === 'woman' ? wool(head, W, { linen: true }) : wool(head, W)];
+    // Coarse tabby homespun; twill for gowns and soldiers' tunics; fulled wool (felt) for cloaks; linen veils.
+    const kinds: FabricKind[] = role === 'monk' ? ['tabby', 'tabby', 'tabby'] : role === 'woman' ? ['twill', 'twill', 'linen'] : role === 'soldier' ? ['twill', 'felt', 'tabby'] : ['tabby', 'felt', 'tabby'];
+    const mats = [fabric(kinds[0], tunic), fabric(kinds[1], over), belt, fabric(kinds[2], head)];
     // A long skirt is also skinned to helper bones that swing with the thighs.
     let skel = this.skeleton;
     const extra = outfit.garment.extraBones;
