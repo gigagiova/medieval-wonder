@@ -243,7 +243,7 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
     const dip = short.map((_, f) => Math.max(...[-3, -2, -1, 0, 1, 2, 3].map((j) => short[(f + j + N) % N])));
     const sm = dip.map((_, f) => [-4, -3, -2, -1, 0, 1, 2, 3, 4].reduce((acc, j) => acc + dip[(f + j + N) % N] * (5 - Math.abs(j)), 0) / 25);
     for (let f = 0; f < frames; f++) {
-      hp[f * 3 + 1] -= Math.min(0.06, sm[f % N] * 1.2);
+      hp[f * 3 + 1] -= Math.min(0.025, sm[f % N] * 1.2);
       ik(f);
       for (const b of legs.flat()) b.quaternion.toArray(rot.get(b)!, f * 4);
     }
@@ -302,9 +302,39 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
       hips.position.copy(v1.fromArray(hp, f * 3).add(hipsRest).applyMatrix4(hipsParentInv));
       tgt.updateMatrixWorld(true);
     };
-    for (let f = 0; f < frames; f++) {
-      pose(f);
-      hp[f * 3 + 1] += clear[f] - lowest(tSole);
+    const ground = () => {
+      for (let f = 0; f < frames; f++) {
+        pose(f);
+        hp[f * 3 + 1] += clear[f] - lowest(tSole);
+      }
+    };
+    // The source carries itself low: standing, it lunges on bent knees, one
+    // foot well ahead; walking, it steps high on deeply bent knees. On these
+    // bodies that reads as a crouch, so the legs are eased towards straight
+    // (thighs and knees part of the way back to the bind pose).
+    const stand = name === 'idle' || name === 'talk' || name === 'bless';
+    const ease = stand ? 0.45 : 0;
+    const footQ: THREE.Quaternion[][] = [];
+    if (stand) for (let f = 0; f < frames; f++) { pose(f); footQ.push(legs.map((L) => L[2].getWorldQuaternion(new THREE.Quaternion()))); }
+    if (ease) for (let f = 0; f < frames; f++) for (const L of legs) for (const b of [L[0], L[1]]) {
+      q.fromArray(rot.get(b)!, f * 4).slerp(restLocal.get(b)!, ease).toArray(rot.get(b)!, f * 4);
+    }
+    ground();
+    if (stand) {
+      // Standing feet stay put, flat as the source's, where they stand on average.
+      const mean = [0, 1].map(() => new THREE.Vector3());
+      for (let f = 0; f < frames; f++) { pose(f); legs.forEach((L, k) => mean[k].add(L[2].getWorldPosition(v1).divideScalar(frames))); }
+      for (let f = 0; f < frames; f++) {
+        pose(f);
+        legs.forEach((L, k) => {
+          legIK(L, mean[k], fT);
+          L[2].parent!.getWorldQuaternion(qi).invert();
+          L[2].quaternion.copy(qi.multiply(footQ[f][k]));
+          L[2].updateMatrixWorld(true);
+          for (const b of L) b.quaternion.toArray(rot.get(b)!, f * 4);
+        });
+      }
+      ground();
     }
     let speed = 0, start = 0;
     if (name === 'walk' || name === 'walkFormal') ({ v: speed, start } = plantFeet(frames, clip.duration / (frames - 1), rot, hp, sLow, pose));
