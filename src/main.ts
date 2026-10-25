@@ -22,6 +22,7 @@ import { isReading } from './codex';
 import { loadNpcAssets, spawnTownsfolk, updateTownsfolk, pushOutOfTownsfolk, npcDebug } from './npc';
 Object.assign(window, { __npc: npcDebug });
 import type { Lamp, Cell, PropKind } from './builder';
+import { perfT, perfAdd, perfFrame, perfStats, initHud, gpuBegin, gpuEnd } from './perf';
 
 const params = new URLSearchParams(location.search);
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -495,12 +496,15 @@ function frame() {
   fps += (1 / Math.max(dt, 1e-3) - fps) * 0.05;
   renderer.info.reset();
 
+  let pt = perfT();
   if (!isReading() && !isReadingSecret()) player.update(dt);
   guardFall(dt);
   pushOutOfSecretDoor(player.pos);
   updateLibrary(libCam());
   pushOutOfTownsfolk(player.pos);
+  perfAdd('player', pt); pt = perfT();
   updateTownsfolk(dt, camera, player);
+  perfAdd('npc', pt); pt = perfT();
 
   const camY = camera.position.y;
   sky.position.copy(camera.position);
@@ -561,16 +565,30 @@ function frame() {
   if (regionTimer < 0) regionEl.classList.remove('show');
   hintEl.classList.toggle('show', isUnder && !lanternOn);
 
+  perfAdd('misc', pt); pt = perfT();
   stream.update(camera.position, camera.getWorldDirection(tmpDir));
+  perfAdd('stream', pt); pt = perfT();
   cull(isUnder, camLocal);
+  perfAdd('cull', pt); pt = perfT();
   updateSecrets(camera);
   audio?.update(dt, under, Math.hypot(player.pos.x - SITES.episcopium.x, player.pos.z - SITES.episcopium.z));
   if (!params.has('shot')) adaptResolution(rawDt);
+  perfAdd('misc', pt); pt = perfT();
+  gpuBegin();
   composer.render(dt);
+  gpuEnd();
+  perfAdd('render', pt);
+  if (captureNext && frames > 12) { captureNext = false; (window as unknown as { __shot: string }).__shot = renderer.domElement.toDataURL('image/png'); }
+  const mi = renderer.info;
+  perfFrame({ calls: mi.render.calls, tris: mi.render.triangles, textures: mi.memory.textures, geometries: mi.memory.geometries, ratio, chunks: stream.stats.ready });
   if (params.has('debug')) document.title = `${fps.toFixed(0)} fps · cells ${cullStats.visible}/${cells.length} · occluded ${cullStats.occluded} · ${renderer.info.render.calls} calls · ${(renderer.info.render.triangles / 1000).toFixed(0)}k tris · chunks ${stream.stats.ready}`;
-  if (params.has('shot') && !held && frames > 12) { (window as unknown as { __done: boolean }).__done = true; return; }
+  if (params.has('shot') && !held && frames > 12) { (window as unknown as { __done: boolean }).__done = true; running = false; return; }
   requestAnimationFrame(frame);
 }
+// Benchmarks: restart the frame loop after a ?shot run has finished.
+let running = true, captureNext = false;
+Object.assign(window, { __renderer: renderer, __perf: perfStats, __resume: (n = 12, capture = false) => { captureNext = capture; (window as unknown as { __done: boolean }).__done = false; frames = 12 - n; if (!running) { running = true; requestAnimationFrame(frame); } } });
+if (params.has('debug')) initHud(renderer, scene);
 // ?at=<teleport name>[&yaw=..&pitch=..]: start at a named place (also for screenshots).
 if (params.has('at')) {
   const want = params.get('at')!.toLowerCase();
