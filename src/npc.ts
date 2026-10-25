@@ -25,7 +25,6 @@ import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
 // Walk up to someone and press E (or the Loquere button) to speak with them.
 
 const DIR = 'models/npc/';
-const PROPS_DIR = 'models/props/';
 
 type Sex = 'man' | 'woman';
 /**
@@ -88,7 +87,8 @@ export function loadNpcAssets(): Promise<void> {
     const get = (u: string) => loadGltf(u, loader);
     const ids = Object.keys(BODIES) as BodyId[];
     const [ual, ...bodies] = await Promise.all([get(DIR + 'ual.json'), ...ids.map((id) => get(DIR + id + '.json'))]);
-    const scan = (id: string, top = false) => get(PROPS_DIR + id + '.json').then((g) => Props.prepScan(g.scene, top)).catch(() => null);
+    // (Lighter copies of the town's scanned props: see tools/npc-props.ts.)
+    const scan = (id: string, top = false) => get(DIR + id + '_lo.json').then((g) => Props.prepScan(g.scene, top)).catch(() => null);
     const [basket, bucket, jar] = await Promise.all([scan('wicker_basket_02', true), scan('wooden_bucket_01', true), scan('planter_pot_clay')]);
     scans = { basket, bucket, jar };
     // Older faces (see faceSwap).

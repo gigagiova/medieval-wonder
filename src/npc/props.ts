@@ -221,7 +221,8 @@ export function makeCap(Ms: Measure, color: THREE.Color) {
 /** Rivets: small domes at the given points, facing out from the axis. */
 function rivets(pts: THREE.Vector3[], r: number) {
   return pts.map((p) => {
-    const g = new THREE.SphereGeometry(r, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2);
+    // (A rivet head is a few millimetres across: five sides and two rings read as round.)
+    const g = new THREE.SphereGeometry(r, 5, 2, 0, Math.PI * 2, 0, Math.PI / 2);
     const n = new THREE.Vector3(p.x, 0, p.z).normalize();
     g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n));
     return g.translate(p.x, p.y, p.z);
@@ -279,23 +280,23 @@ export function makeHelmet(Ms: Measure, kind: 'spangen' | 'lamellar' = 'spangen'
   const iron: THREE.BufferGeometry[] = [], bronze: THREE.BufferGeometry[] = [], lace: THREE.BufferGeometry[] = [];
   const studs: THREE.Vector3[] = [];
   if (kind === 'spangen') {
-    iron.push(surface(24, 48, (t, s) => sh.at(t, s * Math.PI * 2), [4, 2]));
+    iron.push(surface(14, 36, (t, s) => sh.at(t, s * Math.PI * 2), [4, 2]));
     // Six bands over the seams, each with rivets down both edges.
     for (let k = 0; k < 6; k++) {
       const ak = (k / 6) * Math.PI * 2 + Math.PI / 6;
-      bronze.push(surface(16, 2, (t, s) => {
+      bronze.push(surface(10, 2, (t, s) => {
         const tt = t * 0.93, w = (0.016 * (1 - 0.55 * tt)) / Math.max(0.05, sh.ax(tt));
         return sh.at(tt, ak + (s - 0.5) * 2 * w, 0.003 + (1 - Math.abs(s - 0.5) * 2) * 0.0015);
       }));
-      for (let i = 1; i < 9; i++) {
-        const t = i * 0.095, w = (0.011 * (1 - 0.55 * t)) / Math.max(0.05, sh.ax(t));
+      for (let i = 1; i < 7; i++) {
+        const t = i * 0.125, w = (0.011 * (1 - 0.55 * t)) / Math.max(0.05, sh.ax(t));
         studs.push(sh.at(t, ak - w, 0.005), sh.at(t, ak + w, 0.005));
       }
     }
     // The brow band, with a beaded lower edge.
-    bronze.push(surface(3, 64, (t, s) => sh.at(t * 0.16 - 0.01, s * Math.PI * 2, 0.003 + Math.sin(t * Math.PI) * 0.0012)));
-    bronze.push(at(new THREE.TorusGeometry(1, 0.003 / sh.ax(0), 4, 64), 0, -0.002, 0, Math.PI / 2).scale(sh.ax(0) + 0.004, 1, sh.az(0) + 0.004));
-    for (let k = 0; k < 24; k++) studs.push(sh.at(0.07, (k / 24) * Math.PI * 2, 0.007));
+    bronze.push(surface(3, 40, (t, s) => sh.at(t * 0.16 - 0.01, s * Math.PI * 2, 0.003 + Math.sin(t * Math.PI) * 0.0012)));
+    bronze.push(at(new THREE.TorusGeometry(1, 0.003 / sh.ax(0), 3, 40), 0, -0.002, 0, Math.PI / 2).scale(sh.ax(0) + 0.004, 1, sh.az(0) + 0.004));
+    for (let k = 0; k < 16; k++) studs.push(sh.at(0.07, (k / 16) * Math.PI * 2, 0.007));
     // The finial: a cap over the apex and a short plume tube.
     const top = sh.at(0.93, 0);
     bronze.push(lathe([[0.001, 0], [0.026, 0], [0.022, 0.008], [0.01, 0.016], [0.008, 0.02]], 14).translate(0, top.y - 0.004, 0));
