@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { skinMaterial } from './scan';
 import { canon, withAtmos, matte } from './rig';
 
 // Clothes, made the way game characters are dressed: each garment is
@@ -68,7 +69,7 @@ export interface Measure {
 // ------------------------------------------------------------------ body
 
 const HANDS = /Hand|Thumb|Index|Middle|Ring|Pinky/;
-const HEAD = /^(Head|HeadTop_End|LeftEye|RightEye|Neck)$/;
+const HEAD = /^(Head.*|LeftEye|RightEye|Neck)$/; // Head.*: a scan's jaw, lids, brows
 const ARMS = /Shoulder|Arm/;
 const FEET = /Foot|Toe/;
 const LEGS = /UpLeg|Leg/;
@@ -203,6 +204,31 @@ export function faceOnly(root: THREE.Object3D) {
  * hose and his shoes; the woman keeps head, hands and feet. Everything else
  * the clothes cover goes.
  */
+const BOTTOM = /^(Wolf3D_Outfit_Bottom|Scan_Bottom)$/, FOOTWEAR = /^(Wolf3D_Outfit_Footwear|Scan_Footwear)$/;
+
+/**
+ * A scan's upper body down to what shows of a dressed townsman: face, neck
+ * and hands, his hair (a woman's goes under her veil, see faceOnly), and the
+ * skin at the base of the neck. Shirt collars, ties, cuffs, watches, rings
+ * and earrings go: they don't look like skin (the packed `_skin` likeness).
+ */
+function trimScan(m: THREE.SkinnedMesh, kit: 'man' | 'woman', M: Measure) {
+  m.frustumCulled = false;
+  const cls = boneClassOf(m), g = (m.geometry = m.geometry.clone()), idx = g.index!;
+  const skin = g.attributes._skin, w = new THREE.Vector3();
+  const head = M.bone('Head').y, collar = M.bone('Neck').y - 0.12;
+  const ok = new Uint8Array(cls.length);
+  for (let i = 0; i < cls.length; i++) {
+    const s = skin ? skin.getX(i) : 1, y = m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld).y;
+    const c = cls[i];
+    ok[i] = (c === 'hand' && s > 0.35) || (c === 'head' && (s > 0.35 || (kit === 'man' && y > head - 0.035))) || ((c === 'torso' || c === 'arm' || c === 'head') && s > 0.5 && y > collar) ? 1 : 0;
+  }
+  const keep: number[] = [];
+  for (let t = 0; t < idx.count; t += 3) if (ok[idx.getX(t)] && ok[idx.getX(t + 1)] && ok[idx.getX(t + 2)]) keep.push(idx.getX(t), idx.getX(t + 1), idx.getX(t + 2));
+  g.setIndex(keep);
+  m.material = skinMaterial(m.material as THREE.MeshStandardMaterial);
+}
+
 export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard: boolean; wraps: boolean; m: Measure }) {
   const leather = matte(0x2a1d14, 0.86);
   root.traverse((x) => {
@@ -210,6 +236,9 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
     if (!m.isSkinnedMesh) return;
     m.frustumCulled = false;
     if (/Outfit_Top|Headwear/.test(m.name) || (!o.beard && /Beard/.test(m.name))) { m.visible = false; return; }
+    // A scanned body (scan.ts): its legs go under a woman's gown.
+    if (kit === 'woman' && m.name === 'Scan_Bottom') { m.visible = false; return; }
+    if (m.name === 'Scan_Top') { trimScan(m, kit, o.m); return; }
     const trim = kit === 'woman' || m.name === 'Wolf3D_Body';
     if (trim) {
       const cls = boneClassOf(m);
@@ -231,7 +260,7 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
       m.geometry.addGroup(0, skin.length, 0);
       if (feet.length) m.geometry.addGroup(skin.length, feet.length, 1);
     }
-    if (m.name === 'Wolf3D_Outfit_Bottom') {
+    if (BOTTOM.test(m.name)) {
       // Trousers become close-fitting hose: pull them in above the knee so they
       // stay inside a short tunic's skirt.
       const knee = o.m.bone('LeftLeg').y, g = (m.geometry = m.geometry.clone());
@@ -282,7 +311,7 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
     }
     const old = m.material as THREE.MeshStandardMaterial;
     let nm: THREE.Material;
-    if (m.name === 'Wolf3D_Outfit_Footwear') {
+    if (FOOTWEAR.test(m.name)) {
       nm = leather;
       // Stiff leather: the shoe moves with the foot alone. Shin weights on its
       // collar tore it into spikes whenever the ankle bent.
@@ -312,7 +341,7 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
         p.setXYZ(i, w.x, w.y, w.z);
       }
     }
-    else if (m.name === 'Wolf3D_Outfit_Bottom') {
+    else if (BOTTOM.test(m.name)) {
       // Wool hose, with linen fasciae wound from ankle to knee on laymen.
       const ankle = o.m.bone('LeftFoot').y + 0.01, knee = o.m.bone('LeftLeg').y + 0.02;
       nm = withAtmos(new THREE.MeshStandardMaterial({ color: 0x2b241d, roughness: 0.97 }), o.wraps ? { wraps: { knee, ankle, color: new THREE.Color(0x6e6656) } } : {});
@@ -327,7 +356,7 @@ export function dressBody(root: THREE.Object3D, kit: 'man' | 'woman', o: { beard
       nm = withAtmos(s, { skin: true });
       nm.userData.skin = true;
     } else nm = withAtmos(old.clone());
-    m.material = kit === 'woman' ? [nm, leather] : nm;
+    m.material = kit === 'woman' && m.geometry.groups.length ? [nm, leather] : nm;
   });
 }
 
@@ -387,6 +416,9 @@ function bodySets(root: THREE.Object3D, full: THREE.Object3D) {
     const base = pos.length / 3;
     const c = boneClassOf(m);
     if (/Outfit_Top/.test(m.name) && neck) dropTrimmings(m, c, neck);
+    // A scan's shirt collar, tie and hanging hair: not part of the body's shape.
+    const sk = g.attributes._skin;
+    if (sk && neck) for (let i = 0; i < c.length; i++) if (c[i] === 'head' && sk.getX(i) < 0.4 && m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld).y < (neck as THREE.Vector3).y + 0.09) c[i] = 'none';
     for (let i = 0; i < g.attributes.position.count; i++) {
       m.getVertexPosition(i, v);
       v.applyMatrix4(m.matrixWorld);

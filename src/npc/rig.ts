@@ -128,13 +128,15 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
     });
     const side = new THREE.Vector3().crossVectors(up, fT);
     for (const [foot, list] of cand) {
-      const low = list.filter((c) => c.w.y < minY + 0.012);
+      // Each foot's own lowest points (a scan may stand with one heel a little raised).
+      const fMin = list.reduce((m, c) => Math.min(m, c.w.y), Infinity);
+      const low = list.filter((c) => c.w.y < Math.max(minY, fMin) + 0.012);
       const by = (k: (c: { w: THREE.Vector3 }) => number) => low.reduce((a, c) => (k(c) > k(a) ? c : a));
       const toe = by((c) => c.w.dot(fT)), heel = by((c) => -c.w.dot(fT));
       const mid = (toe.w.dot(fT) * 0.6 + heel.w.dot(fT) * 0.4);
       const ball = low.filter((c) => Math.abs(c.w.dot(fT) - mid) < 0.03);
       // The rounded toe cap and heel counter touch first when the foot tips.
-      const shoe = list.filter((c) => c.w.y < minY + 0.05);
+      const shoe = list.filter((c) => c.w.y < Math.max(minY, fMin) + 0.05);
       const cap = shoe.reduce((a, c) => (c.w.dot(fT) > a.w.dot(fT) ? c : a)), back = shoe.reduce((a, c) => (c.w.dot(fT) < a.w.dot(fT) ? c : a));
       const pts = [toe, heel, cap, back];
       if (ball.length) pts.push(ball.reduce((a, c) => (c.w.dot(side) > a.w.dot(side) ? c : a)), ball.reduce((a, c) => (c.w.dot(side) < a.w.dot(side) ? c : a)));
@@ -426,14 +428,120 @@ export function relaxArms(root: THREE.Object3D, angle: number) {
   for (const s of skeletons) s.calculateInverses();
 }
 
+/**
+ * Re-orient a body's bones to Mixamo's local axes, keeping where each joint
+ * is and how the skin is bound (the bind matrices are recomputed): Y along
+ * the bone to its child; X to the body's left on the trunk and head, to its
+ * right down the legs, backwards along the left arm and forwards along the
+ * right. Hand and finger poses in npc.ts turn bones about those axes, so a
+ * scanned body rigged with other conventions (Renderpeople's 3ds Max biped
+ * frames) holds a lantern or a spear the way the Mixamo bodies do. The body
+ * must face +Z.
+ */
+export function mixamoFrames(root: THREE.Object3D) {
+  root.updateMatrixWorld(true);
+  const bones: THREE.Bone[] = [];
+  root.traverse((o) => { if ((o as THREE.Bone).isBone) bones.push(o as THREE.Bone); });
+  const by = new Map(bones.map((b) => [canon(b.name), b]));
+  const oldW = new Map(bones.map((b) => [b, b.matrixWorld.clone()]));
+  const newW = new Map<THREE.Bone, THREE.Matrix4>();
+  const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3(), c = new THREE.Vector3();
+  const X = new THREE.Vector3(), Y = new THREE.Vector3(), Z = new THREE.Vector3(), ref = new THREE.Vector3();
+  const childOf = (n: string, b: THREE.Bone) => {
+    const aim = n === 'Head' ? 'HeadTop_End' : n === 'Hips' ? 'Spine' : AIM[n];
+    if (aim && by.get(aim)) return by.get(aim)!;
+    const kids = b.children.filter((k) => (k as THREE.Bone).isBone && /^(Left|Right)?(Hand|Spine|Neck|Head|Toe|Leg|Fore|Arm)/.test(canon(k.name)) && !/Twist|Eye|Jaw|Brow|Mouth|Lid/.test(k.name));
+    return (kids[0] as THREE.Bone) ?? null;
+  };
+  for (const b of bones) {
+    const n = canon(b.name);
+    oldW.get(b)!.decompose(p, q, s);
+    const known = /^(Hips|Spine\d?|Neck|Head|HeadTop_End|(Left|Right)(Shoulder|Arm|ForeArm|Hand.*|UpLeg|Leg|Foot|ToeBase|Toe_End))$/.test(n);
+    if (!known) { newW.set(b, oldW.get(b)!.clone()); continue; }
+    const k = childOf(n, b);
+    if (k) Y.copy(c.setFromMatrixPosition(oldW.get(k)!)).sub(p).normalize();
+    else {
+      // An end bone keeps its parent's new frame.
+      const pw = newW.get(b.parent as THREE.Bone);
+      newW.set(b, pw ? new THREE.Matrix4().compose(p, new THREE.Quaternion().setFromRotationMatrix(pw), s) : oldW.get(b)!.clone());
+      continue;
+    }
+    if (/^Left(Shoulder|Arm|ForeArm|Hand)/.test(n)) ref.set(0, 0, -1);
+    else if (/^Right(Shoulder|Arm|ForeArm|Hand)/.test(n)) ref.set(0, 0, 1);
+    else if (/UpLeg|Leg|Foot|Toe/.test(n)) ref.set(-1, 0, 0);
+    else ref.set(1, 0, 0);
+    X.copy(ref).addScaledVector(Y, -ref.dot(Y));
+    if (X.lengthSq() < 1e-6) X.set(0, 1, 0).addScaledVector(Y, -Y.y);
+    X.normalize();
+    Z.crossVectors(X, Y);
+    q.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, Z));
+    newW.set(b, new THREE.Matrix4().compose(p, q, s));
+  }
+  // Locals from the new world frames, parents first (traverse order).
+  const inv = new THREE.Matrix4();
+  for (const b of bones) {
+    const pw = newW.get(b.parent as THREE.Bone) ?? b.parent!.matrixWorld;
+    inv.copy(pw).invert().multiply(newW.get(b)!).decompose(b.position, b.quaternion, b.scale);
+  }
+  root.updateMatrixWorld(true);
+  // Bake the skin's bind transform (bone world · inverse, the same for every
+  // bone: Sketchfab's unit scale) into the geometry, then bind afresh: each
+  // bone's inverse is the inverse of its world matrix, as on the Mixamo bodies.
+  const done = new Set<THREE.Skeleton>();
+  root.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh) return;
+    const S = oldW.get(m.skeleton.bones[0])!.clone().multiply(m.skeleton.boneInverses[0]);
+    m.geometry.applyMatrix4(m.bindMatrix.clone().invert().multiply(S).multiply(m.bindMatrix));
+    if (done.has(m.skeleton)) return;
+    done.add(m.skeleton);
+    m.skeleton.calculateInverses();
+    m.skeleton.update();
+  });
+}
+
 // ------------------------------------------------------------------ materials
+
+/** GLSL injected by withAtmos for scanned skin (see scan.ts skinMaterial). */
+export const SCAN_SKIN = {
+  pars: /* glsl */ `
+    float skinHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float skinNoise(vec2 p) {
+      vec2 i = floor(p), f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(mix(skinHash(i), skinHash(i + vec2(1, 0)), u.x), mix(skinHash(i + vec2(0, 1)), skinHash(i + vec2(1, 1)), u.x), u.y);
+    }
+    vec3 sssWrap(float d) {
+      // Wrapped diffuse per channel: red light reaches furthest round into the shadow.
+      vec3 w = vec3(0.42, 0.18, 0.12);
+      return clamp((vec3(d) + w) / (1.0 + w), 0.0, 1.0) * (1.0 / (1.0 + w * 0.5));
+    }`,
+  // After the normal map: pores, ~0.6 mm, in the atlas's UV space.
+  normal: /* glsl */ `
+    {
+      vec2 pu = vNormalMapUv * 520.0;
+      float e = 0.5;
+      float n0 = skinNoise(pu), nx = skinNoise(pu + vec2(e, 0.0)), ny = skinNoise(pu + vec2(0.0, e));
+      vec2 pu2 = vNormalMapUv * 1500.0;
+      float m0 = skinNoise(pu2), mx = skinNoise(pu2 + vec2(e, 0.0)), my = skinNoise(pu2 + vec2(0.0, e));
+      vec2 g = vec2(n0 - nx, n0 - ny) * 0.22 + vec2(m0 - mx, m0 - my) * 0.12;
+      normal = normalize(normal + tbn * vec3(g, 0.0));
+    }`,
+  // Replaces the Lambert term of direct lights.
+  direct: /* glsl */ `
+    float dotNLraw = dot( geometryNormal, directLight.direction );
+    float dotNL = saturate( dotNLraw );
+    vec3 irradiance = dotNL * directLight.color;
+    vec3 irradianceD = sssWrap( dotNLraw ) * directLight.color;`,
+};
+
 
 /**
  * Run a material through the game's fog and lamp in-scattering. Skin gets a
  * soft wrap-around diffuse term so faces don't look like plastic; hose can
  * get fasciae, linen bands wound from ankle to knee.
  */
-export function withAtmos<M extends THREE.Material>(m: M, o: { skin?: boolean; wraps?: { knee: number; ankle: number; color: THREE.Color } } = {}): M {
+export function withAtmos<M extends THREE.Material>(m: M, o: { skin?: boolean; scan?: boolean; wraps?: { knee: number; ankle: number; color: THREE.Color } } = {}): M {
   const w = o.wraps;
   const uWrap = w ? { value: w.color } : null;
   m.onBeforeCompile = (sh) => {
@@ -446,6 +554,14 @@ export function withAtmos<M extends THREE.Material>(m: M, o: { skin?: boolean; w
       .replace('#include <common>', `#include <common>\nvarying vec3 vWPos;\n${w ? 'varying vec3 vBind;\nuniform vec3 uWrap;' : ''}\n${noiseGLSL}\n${atmosGLSL}`)
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = applyAtmos(gl_FragColor.rgb, vWPos);');
     if (o.skin) fs = fs.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.06, 0.025, 0.018);');
+    if (o.scan) {
+      fs = fs
+        .replace('#include <common>', '#include <common>\n' + SCAN_SKIN.pars)
+        .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SCAN_SKIN.normal)
+        .replace('#include <lights_physical_pars_fragment>', THREE.ShaderChunk.lights_physical_pars_fragment
+          .replace(/float dotNL = saturate\( dot\( geometryNormal, directLight\.direction \) \);\s*vec3 irradiance = dotNL \* directLight\.color;/, SCAN_SKIN.direct)
+          .replace('reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );\n}', 'reflectedLight.directDiffuse += irradianceD * BRDF_Lambert( material.diffuseColor );\n}'));
+    }
     if (w) {
       // Strips about 6 cm wide wound in a spiral; each turn overlaps the last.
       fs = fs.replace('#include <color_fragment>', `#include <color_fragment>
@@ -460,7 +576,7 @@ export function withAtmos<M extends THREE.Material>(m: M, o: { skin?: boolean; w
     }
     sh.fragmentShader = fs;
   };
-  m.customProgramCacheKey = () => (o.skin ? 'npc-skin' : w ? `npc-wrap${w.knee.toFixed(2)}` : 'npc-atmos');
+  m.customProgramCacheKey = () => (o.scan ? 'npc-scan' : o.skin ? 'npc-skin' : w ? `npc-wrap${w.knee.toFixed(2)}` : 'npc-atmos');
   return m;
 }
 

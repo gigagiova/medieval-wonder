@@ -105,7 +105,7 @@ function subject(name: string, bare: boolean): Subject {
   root.traverse((o) => { if ((o as THREE.Bone).isBone) bones.set(canon(o.name), o as THREE.Bone); });
   let st: ReturnType<typeof sticks> | undefined;
   if (params.get('sticks') === '1') { st = sticks(root); scene.add(st.g); root.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).visible = false; }); }
-  return { st, name, kit: person.outfit.kit, group, root, bones, mixer: new THREE.AnimationMixer(root), motion: k.motion, person, walkClip: role === 'monk' ? 'walkFormal' : 'walk' };
+  return { st, name, kit: person.outfit.sex, group, root, bones, mixer: new THREE.AnimationMixer(root), motion: k.motion, person, walkClip: role === 'monk' ? 'walkFormal' : 'walk' };
 }
 function pose(s: Subject, clip: ClipName, t: number) {
   s.mixer.stopAllAction();
@@ -386,7 +386,7 @@ if (view === 'street') {
   }
   stats.people = people.map((p, i) => {
     const s = rec[i].stances.slice().sort((a, b) => a - b);
-    return { role: p.role, kit: p.outfit.kit, walkSpeed: +p.walkSpeed.toFixed(3), scale: +p.scale.toFixed(3), nStance: s.length, slideMed: +(s[s.length >> 1] ?? 0).toFixed(1), slideP90: +(s[Math.floor(s.length * 0.9)] ?? 0).toFixed(1), slideMax: +(s[s.length - 1] ?? 0).toFixed(1), penCm: +(rec[i].pen * 100).toFixed(1), vmax: +rec[i].vmax.toFixed(2), pops: rec[i].pops.slice(0, 6), nPops: rec[i].pops.length, bad: rec[i].bad.slice(0, 8), penAt: rec[i].penAt };
+    return { role: p.role, kit: p.outfit.sex + ":" + p.outfit.body, walkSpeed: +p.walkSpeed.toFixed(3), scale: +p.scale.toFixed(3), nStance: s.length, slideMed: +(s[s.length >> 1] ?? 0).toFixed(1), slideP90: +(s[Math.floor(s.length * 0.9)] ?? 0).toFixed(1), slideMax: +(s[s.length - 1] ?? 0).toFixed(1), penCm: +(rec[i].pen * 100).toFixed(1), vmax: +rec[i].vmax.toFixed(2), pops: rec[i].pops.slice(0, 6), nPops: rec[i].pops.length, bad: rec[i].bad.slice(0, 8), penAt: rec[i].penAt };
   });
   if (trace.length) stats.trace = trace.filter((_, i) => i % Number(params.get('every') ?? 10) === 0 && i < Number(params.get('upto') ?? 1e9));
   renderer.setScissorTest(false);

@@ -5,7 +5,8 @@ import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { Lamp } from './builder';
 import { isReading } from './codex';
 import { retarget, relaxArms, legIK, wool, matte, makeWeave, withAtmos, canon, type ClipName, type Motion } from './npc/rig';
-import { dressBody, stripHeadPieces, faceOnly, buildGarment, bakeHeadShade, measure, addSkirtBones, addSwingBones, swingRig, type GarmentSpec, type Garment, type Measure } from './npc/garment';
+import { prepScanBody } from './npc/scan';
+import { dressBody, faceOnly, buildGarment, bakeHeadShade, measure, addSkirtBones, addSwingBones, swingRig, type GarmentSpec, type Garment, type Measure } from './npc/garment';
 import { Clothing, clothStats } from './npc/cloth';
 import * as Props from './npc/props';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
@@ -25,18 +26,29 @@ import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
 const DIR = 'models/npc/';
 const PROPS_DIR = 'models/props/';
 
-type Kit = 'man' | 'woman';
+type Sex = 'man' | 'woman';
+/**
+ * The bodies: photogrammetry scans of real people (Renderpeople, packed by
+ * tools/fetch-people.ts, see public/models/npc/CREDITS.md), each re-dressed
+ * in period clothes. Heights are the period's: men about 1.70 m, women 1.58.
+ */
+type BodyId = 'eric' | 'nathan' | 'manuel' | 'claudia' | 'sophia';
+const BODIES: Record<BodyId, { sex: Sex; height: number }> = {
+  eric: { sex: 'man', height: 1.72 }, nathan: { sex: 'man', height: 1.7 }, manuel: { sex: 'man', height: 1.69 },
+  claudia: { sex: 'woman', height: 1.6 }, sophia: { sex: 'woman', height: 1.57 },
+};
 export type Role = Speaker;
 type OutfitId = 'monk' | 'peasantHood' | 'peasantCloak' | 'soldier' | 'soldierCloak' | 'woman' | 'womanShawl';
 
-const OUTFITS: Record<OutfitId, { kit: Kit; spec: GarmentSpec; beard: boolean; wraps: boolean }> = {
-  monk: { kit: 'man', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
-  peasantHood: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather', thighs: 0.6, swing: true } },
-  peasantCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.6, swing: true, cloakClose: true } },
-  soldier: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 0.6 } },
-  soldierCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 0.6, capeOnTunic: true, capeOpen: 0.8 } },
-  woman: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
-  womanShawl: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
+// Which bodies wear an outfit: every pairing is tailored once at load.
+const OUTFITS: Record<OutfitId, { sex: Sex; bodies: BodyId[]; spec: GarmentSpec; beard: boolean; wraps: boolean }> = {
+  monk: { sex: 'man', bodies: ['eric', 'manuel'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.15, folds: 0.032, sleeve: 'bell', hood: 'cowl', scapular: true, belt: 'rope', tail: true, stride: 0.85 } },
+  peasantHood: { sex: 'man', bodies: ['nathan', 'eric'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: 'hood', belt: 'leather', thighs: 0.6, swing: true } },
+  peasantCloak: { sex: 'man', bodies: ['nathan', 'manuel'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', thighs: 0.6, swing: true, cloakClose: true } },
+  soldier: { sex: 'man', bodies: ['manuel', 'nathan'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather', legFollow: 0.6 } },
+  soldierCloak: { sex: 'man', bodies: ['eric', 'nathan'], beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather', legFollow: 0.6, capeOnTunic: true, capeOpen: 0.8 } },
+  woman: { sex: 'woman', bodies: ['claudia', 'sophia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
+  womanShawl: { sex: 'woman', bodies: ['sophia', 'claudia'], beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
 };
 const ROLE_OUTFITS: Record<Role, OutfitId[]> = { monk: ['monk'], peasant: ['peasantHood', 'peasantCloak'], woman: ['woman', 'womanShawl'], soldier: ['soldier', 'soldierCloak'] };
 
@@ -51,11 +63,12 @@ const DYES = {
 };
 const pick = <T>(r: () => number, a: T[]) => a[Math.floor(r() * a.length) % a.length];
 
-interface KitData { template: THREE.Object3D; motion: Motion; m: Measure; scale: number }
-interface Outfit { id: OutfitId; kit: Kit; template: THREE.Object3D; garment: Garment; m: Measure }
+interface KitData { id: BodyId; sex: Sex; template: THREE.Object3D; motion: Motion; m: Measure; scale: number }
+interface Outfit { id: OutfitId; body: BodyId; sex: Sex; template: THREE.Object3D; garment: Garment; m: Measure }
 
-let kits: Record<Kit, KitData> | null = null;
-const outfits = new Map<OutfitId, Outfit>();
+let kits: Record<BodyId, KitData> | null = null;
+/** Tailored outfits, by `${outfit}:${body}`. */
+const outfits = new Map<string, Outfit>();
 let scans: { basket: THREE.Object3D | null; bucket: THREE.Object3D | null; jar: THREE.Object3D | null } = { basket: null, bucket: null, jar: null };
 let weave: THREE.Texture | null = null;
 let loading: Promise<void> | null = null;
@@ -70,46 +83,51 @@ export function loadNpcAssets(): Promise<void> {
   loading ??= (async () => {
     const loader = new GLTFLoader();
     const get = (u: string) => loadGltf(u, loader);
-    const [man, woman, ual] = await Promise.all([get(DIR + 'man.json'), get(DIR + 'woman.json'), get(DIR + 'ual.json')]);
-    // Michelle is bound in a T-pose; lower her arms first, as the man's are.
-    relaxArms(woman.scene, 0.92);
-    (npcDebug as unknown as { stripped: number[] }).stripped = stripHeadPieces(woman.scene);
-    faceOnly(woman.scene);
+    const ids = Object.keys(BODIES) as BodyId[];
+    const [ual, ...bodies] = await Promise.all([get(DIR + 'ual.json'), ...ids.map((id) => get(DIR + id + '.json'))]);
     const scan = (id: string, top = false) => get(PROPS_DIR + id + '.json').then((g) => Props.prepScan(g.scene, top)).catch(() => null);
     const [basket, bucket, jar] = await Promise.all([scan('wicker_basket_02', true), scan('wooden_bucket_01', true), scan('planter_pot_clay')]);
     scans = { basket, bucket, jar };
-    const kit = (g: GLTF, height: number, skull?: { rx: number; rz: number }): KitData => {
-      const t = g.scene;
+    const t0 = performance.now();
+    kits = {} as Record<BodyId, KitData>;
+    ids.forEach((id, i) => {
+      const t = bodies[i].scene, { sex, height } = BODIES[id];
+      prepScanBody(t);
+      // Arms down to the Mixamo bodies' A-pose (60° below level) before tailoring: some scans are bound in a T-pose.
+      {
+        t.updateMatrixWorld(true);
+        const w = (n: string) => t.getObjectByName(n)!.getWorldPosition(new THREE.Vector3());
+        const d = w('LeftForeArm').sub(w('LeftArm'));
+        const drop = Math.atan2(-d.y, Math.abs(d.x));
+        if (drop < 0.95) relaxArms(t, 1.05 - drop);
+      }
+      // Under a veil only the face shows; the veil is fitted to the skull's ellipsoid.
+      if (sex === 'woman') faceOnly(t);
       t.updateMatrixWorld(true);
-      const m = measure(t, skull);
+      const m = measure(t, sex === 'woman' ? { rx: 0.074, rz: 0.094 } : undefined);
       let top = 0;
       t.traverse((o) => { if (canon(o.name) === 'HeadTop_End') top = o.getWorldPosition(new THREE.Vector3()).y; });
-      return { template: t, motion: retarget(t, ual), m, scale: height / (top || 1.8) };
-    };
-    const t0 = performance.now();
-    kits = {
-      man: kit(man, 1.74),
-      woman: kit(woman, 1.6, { rx: 0.074, rz: 0.094 }),
-    };
+      kits![id] = { id, sex, template: t, motion: retarget(t, ual), m, scale: height / (top || 1.8) };
+    });
     npcDebug.buildMs.retarget = performance.now() - t0;
     (npcDebug as unknown as { heads: unknown }).heads = Object.fromEntries(Object.entries(kits).map(([k, v]) => [k, { ...v.m.head, c: v.m.head.c.toArray(), hb: v.m.bone('Head').toArray(), top: v.m.bone('HeadTop_End').toArray(), neck: v.m.bone('Neck').toArray(), hips: v.m.bone('Hips').toArray() }]));
     weave = makeWeave();
     // Tailoring takes a while: one outfit per slice, so the page stays responsive.
-    for (const id of Object.keys(OUTFITS) as OutfitId[]) {
+    for (const id of Object.keys(OUTFITS) as OutfitId[]) for (const body of OUTFITS[id].bodies) {
       await new Promise((r) => setTimeout(r, 0));
       const t1 = performance.now();
-      outfits.set(id, tailor(id));
-      npcDebug.buildMs[id] = performance.now() - t1;
+      outfits.set(`${id}:${body}`, tailor(id, body));
+      npcDebug.buildMs[`${id}:${body}`] = performance.now() - t1;
     }
   })();
   return loading;
 }
 
-function tailor(id: OutfitId): Outfit {
-  const o = OUTFITS[id], k = kits![o.kit];
+function tailor(id: OutfitId, body: BodyId): Outfit {
+  const o = OUTFITS[id], k = kits![body];
   const t = SkeletonUtils.clone(k.template);
   t.updateMatrixWorld(true);
-  dressBody(t, o.kit, { beard: o.beard, wraps: o.wraps, m: k.m });
+  dressBody(t, o.sex, { beard: o.beard, wraps: o.wraps, m: k.m });
   t.traverse((x) => { if (/Teeth/.test(x.name)) x.visible = false; });
   if (o.spec.swing) addSwingBones(t);
   if (o.spec.stride) {
@@ -119,7 +137,7 @@ function tailor(id: OutfitId): Outfit {
     const knee = k.m.bone('LeftLeg').y + 0.06, v = new THREE.Vector3();
     t.traverse((x) => {
       const m = x as THREE.SkinnedMesh;
-      if (!m.isSkinnedMesh || m.name !== 'Wolf3D_Outfit_Bottom') return;
+      if (!m.isSkinnedMesh || !/^(Wolf3D_Outfit_Bottom|Scan_Bottom)$/.test(m.name)) return;
       const ix = m.geometry.index!, keep: number[] = [];
       const low = (i: number) => m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld).y < knee;
       for (let i = 0; i < ix.count; i += 3) if (low(ix.getX(i)) || low(ix.getX(i + 1)) || low(ix.getX(i + 2))) keep.push(ix.getX(i), ix.getX(i + 1), ix.getX(i + 2));
@@ -128,7 +146,7 @@ function tailor(id: OutfitId): Outfit {
   }
   const garment = buildGarment(t, k.template, k.m, o.spec);
   if (o.spec.hood) bakeHeadShade(t, garment.geo, o.spec.hood === 'cowl' ? 0.1 : 0.32);
-  return { id, kit: o.kit, template: t, garment, m: k.m };
+  return { id, body, sex: o.sex, template: t, garment, m: k.m };
 }
 
 // ------------------------------------------------------------------ a person
@@ -178,7 +196,7 @@ export class Person {
   private load: { jar: THREE.Object3D | null; jarQ: THREE.Quaternion; basket: boolean } = { jar: null, jarQ: new THREE.Quaternion(), basket: false };
 
   constructor(private scene: THREE.Scene, public outfit: Outfit, public role: Role, public rnd: () => number, gear: Gear) {
-    const k = (this.kit = kits![outfit.kit]);
+    const k = (this.kit = kits![outfit.body]);
     this.scale = k.scale * (0.94 + rnd() * 0.12);
     this.body = SkeletonUtils.clone(outfit.template);
     this.group.add(this.body);
@@ -194,8 +212,12 @@ export class Person {
     this.lines = LINES[role];
     this.line = Math.floor(rnd() * this.lines.length);
 
-    // Skin: a little ruddier or paler, more or less weathered.
-    const tone = new THREE.Color().setRGB(0.88 + rnd() * 0.16, 0.86 + rnd() * 0.12, 0.84 + rnd() * 0.12).multiplyScalar(0.86 + rnd() * 0.16);
+    // Skin, within what a Lombard town held: from fair (Lombards, some
+    // Latins) through olive to a light Mediterranean tan (Greeks, Levantines,
+    // North Africans), more or less weathered: a shift along the warm/olive
+    // axis and a little lightness, applied over each scan's own tone.
+    const tan = rnd(), olive = rnd() * 0.6, light = 0.96 + rnd() * 0.1;
+    const tone = new THREE.Color().setRGB(1.04 - 0.08 * tan, 1.0 - 0.1 * tan + 0.02 * olive, 0.98 - 0.16 * tan - 0.03 * olive).multiplyScalar(light);
     this.body.traverse((o) => {
       const m = o as THREE.SkinnedMesh;
       if (!m.isSkinnedMesh) return;
@@ -203,8 +225,8 @@ export class Person {
         if (!mat.userData.skin) return mat;
         const c = (mat as THREE.MeshStandardMaterial).clone();
         c.color.multiply(tone);
-        c.userData.skin = true;
-        return withAtmos(c, { skin: true });
+        c.userData = { ...mat.userData };
+        return withAtmos(c, { skin: true, scan: !!mat.userData.scan });
       };
       m.material = Array.isArray(m.material) ? m.material.map(re) : re(m.material);
     });
@@ -838,11 +860,12 @@ export class Person {
 }
 
 /** Make one person (also used by the test page). */
-export function makePerson(scene: THREE.Scene, role: Role, o: { outfit?: number; seed?: number; gear?: Gear } = {}) {
+export function makePerson(scene: THREE.Scene, role: Role, o: { outfit?: number; body?: number; seed?: number; gear?: Gear } = {}) {
   const rnd = mulberry(o.seed ?? rngSeed++ * 7919);
   const ids = ROLE_OUTFITS[role];
   const id = ids[(o.outfit ?? Math.floor(rnd() * ids.length)) % ids.length];
-  const outfit = outfits.get(id)!;
+  const bs = OUTFITS[id].bodies;
+  const outfit = outfits.get(`${id}:${bs[(o.body ?? Math.floor(rnd() * bs.length)) % bs.length]}`)!;
   let gear = o.gear;
   if (!gear) {
     const x = rnd();
