@@ -159,8 +159,11 @@ export class TreeField {
       this.imp.name = 'trees-impostors';
       this.group.add(this.imp);
     }
-    // An invisible, never-culled helper that triggers the update each render.
-    const ticker = new THREE.Mesh(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0, 0, 0, 0], 3)), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+    // An invisible helper that triggers the update each render; its draw range is negative, so
+    // three calls onBeforeRender but issues no draw call.
+    const tg = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0, 0, 0, 0], 3));
+    tg.setDrawRange(0, -1); // a negative count: WebGLRenderer returns before binding or drawing anything
+    const ticker = new THREE.Mesh(tg, new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
     ticker.frustumCulled = false;
     ticker.onBeforeRender = (_r, _s, camera) => this.update(camera);
     this.group.add(ticker);
@@ -268,6 +271,7 @@ export class TreeField {
     for (let j = nb; j < this.barkIds.length; j++) if (this.bark.getVisibleAt(this.barkIds[j])) this.bark.setVisibleAt(this.barkIds[j], false);
     if (this.imp) {
       this.imp.count = ni;
+      this.imp.visible = ni > 0; // no empty instanced draws
       this.imp.instanceMatrix.needsUpdate = true;
       this.impA!.needsUpdate = true;
       this.impT!.needsUpdate = true;
@@ -277,6 +281,8 @@ export class TreeField {
         this.imp.instanceMatrix.addUpdateRange(0, ni * 16);
       }
     }
+    this.bark.visible = nb > 0;
+    this.leaf.visible = nl > 0;
     this.stats.meshes = Math.max(nb, nl);
     this.stats.impostors = ni;
     this.stats.tris = tris;

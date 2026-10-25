@@ -46,14 +46,14 @@ interface Sp {
 }
 const SPECIES: Record<string, Sp> = {
   // Big old oaks: crowns 25-30 m across at full size, so scaled down a little.
-  large: { ids: ['oakL1', 'oakL2', 'oakL3'], ends: [10, 20, 32], far: 125, scale: [0.6, 0.78], room: 6.5, leafy: true },
-  big: { ids: ['oakB1', 'oakB3', 'oakB4'], ends: [8, 16, 24, 34], far: 120, scale: [0.72, 0.95], room: 5, leafy: true },
-  medium: { ids: ['oakM1', 'oakM2', 'oakM3'], ends: [8, 18, 30], far: 95, scale: [0.8, 1.15], room: 2.6, leafy: true },
-  small: { ids: ['oakS1', 'oakS2'], ends: [8, 20], far: 60, scale: [0.75, 1.3], room: 1.6, leafy: true },
-  ancient: { ids: ['ancient'], ends: [12, 24, 36], far: 100, scale: [0.95, 1.25], room: 6, leafy: false },
-  twisted: { ids: ['twisted'], ends: [10, 20, 32], far: 95, scale: [0.85, 1.2], room: 3.2, leafy: false },
-  snag: { ids: ['snag'], ends: [10, 20, 32], far: 95, scale: [0.75, 1.1], room: 2.4, leafy: false },
-  poplar: { ids: ['poplar'], ends: [9, 18, 26, 34], far: 120, scale: [0.8, 1.15], room: 4.5, leafy: true },
+  large: { ids: ['oakL1', 'oakL2', 'oakL3'], ends: [10, 20, 42], far: 125, scale: [0.6, 0.78], room: 6.5, leafy: true },
+  big: { ids: ['oakB1', 'oakB3', 'oakB4'], ends: [8, 16, 24, 40], far: 120, scale: [0.72, 0.95], room: 5, leafy: true },
+  medium: { ids: ['oakM1', 'oakM2', 'oakM3'], ends: [8, 18, 38], far: 95, scale: [0.9, 1.3], room: 2.6, leafy: true },
+  small: { ids: ['oakS1', 'oakS2'], ends: [8, 30], far: 0, scale: [0.75, 1.3], room: 1.6, leafy: true },
+  ancient: { ids: ['ancient'], ends: [12, 24, 40], far: 100, scale: [0.95, 1.25], room: 6, leafy: false },
+  twisted: { ids: ['twisted'], ends: [10, 20, 38], far: 95, scale: [0.85, 1.2], room: 3.2, leafy: false },
+  snag: { ids: ['snag'], ends: [10, 20, 38], far: 95, scale: [0.75, 1.1], room: 2.4, leafy: false },
+  poplar: { ids: ['poplar'], ends: [5, 16, 26, 40], far: 120, scale: [0.8, 1.15], room: 4.5, leafy: true },
 };
 
 export function buildForest(scene: THREE.Scene, b: Builder, o: ForestOpts): THREE.Object3D {
@@ -205,12 +205,12 @@ export function buildForest(scene: THREE.Scene, b: Builder, o: ForestOpts): THRE
     const u = rand();
     let order: string[];
     if (bank < 22 && u < 0.55) order = ['poplar', 'medium', 'small'];
-    else if (u < 0.06) order = ['large', 'big', 'medium', 'small'];
-    else if (u < 0.2) order = ['big', 'medium', 'small'];
-    else if (u < 0.23) order = ['ancient', 'medium', 'small'];
-    else if (u < 0.29) order = ['twisted', 'small'];
-    else if (u < 0.39) order = ['snag', 'small'];
-    else if (u < 0.68) order = ['medium', 'small'];
+    else if (u < 0.1) order = ['large', 'big', 'medium', 'small'];
+    else if (u < 0.27) order = ['big', 'medium', 'small'];
+    else if (u < 0.31) order = ['ancient', 'big', 'medium', 'small'];
+    else if (u < 0.37) order = ['twisted', 'small'];
+    else if (u < 0.46) order = ['snag', 'small'];
+    else if (u < 0.72) order = ['medium', 'small'];
     else order = ['small'];
     for (const name of order) if (plant(name, x, z, wallNear)) break;
   }

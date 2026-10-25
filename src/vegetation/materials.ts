@@ -254,7 +254,7 @@ export function impostorMaterial(p: TreePack): THREE.MeshStandardMaterial {
         float col = vFrame.x;
         vec2 iuv = cell(col, vFrame.w, vIUv);
         vec4 ia = texture(tImp, iuv);
-        if (ia.a < 0.5) discard;
+        if (ia.a < 0.4) discard;
         vec3 hc = ia.rgb;
         float hh = vTintI.y;
         hc = (hh < 0.5 ? mix(hc * vec3(0.92, 0.98, 1.04), hc, hh * 2.0) : mix(hc, hc * vec3(1.08, 1.0, 0.86), hh * 2.0 - 1.0)) * vTintI.x;

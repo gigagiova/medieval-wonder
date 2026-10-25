@@ -6,8 +6,8 @@ import * as THREE from 'three';
 import { loadTreePack } from '../../src/vegetation/pack';
 import { barkMaterial, leafMaterial, vegUniforms } from '../../src/vegetation/materials';
 
-const IMPOSTORS = ['oakL1', 'oakL2', 'oakL3', 'oakB1', 'oakB3', 'oakB4', 'oakM1', 'oakM2', 'oakM3', 'oakS1', 'oakS2', 'ancient', 'twisted', 'snag', 'poplar'];
-const COLS = 8, ROWS = 16, CELL = 96, W = COLS * CELL, H = ROWS * CELL;
+const IMPOSTORS = ['oakL1', 'oakL2', 'oakL3', 'oakB1', 'oakB3', 'oakB4', 'oakM1', 'oakM2', 'oakM3', 'ancient', 'twisted', 'snag', 'poplar'];
+const COLS = 8, ROWS = 13, CELL = 128, W = COLS * CELL, H = ROWS * CELL;
 
 const pack = await loadTreePack();
 vegUniforms.uWind.value = 0;
