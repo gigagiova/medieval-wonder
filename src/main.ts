@@ -320,9 +320,32 @@ const grade = new ShaderPass({
     uniform sampler2D tDiffuse; uniform float uTime; uniform vec2 uRes; uniform float uUnder;
     varying vec2 vUv;
     float h(vec2 p){ vec3 p3=fract(vec3(p.xyx)*.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+    float lu(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+    // FXAA (the compact 'console' form) on the tone-mapped image: the scene
+    // target is not multisampled, and at phone pixel ratios edges would crawl.
+    // Flat areas leave after five fetches.
+    vec3 fxaa(vec2 uv){
+      vec2 px = 1.0 / vec2(textureSize(tDiffuse, 0));
+      vec3 m = texture2D(tDiffuse, uv).rgb;
+      float nw = lu(texture2D(tDiffuse, uv + vec2(-0.5, -0.5) * px).rgb);
+      float ne = lu(texture2D(tDiffuse, uv + vec2(0.5, -0.5) * px).rgb);
+      float sw = lu(texture2D(tDiffuse, uv + vec2(-0.5, 0.5) * px).rgb);
+      float se = lu(texture2D(tDiffuse, uv + vec2(0.5, 0.5) * px).rgb);
+      float lm = lu(m);
+      float lMin = min(lm, min(min(nw, ne), min(sw, se)));
+      float lMax = max(lm, max(max(nw, ne), max(sw, se)));
+      if (lMax - lMin < max(0.03, lMax * 0.125)) return m;
+      vec2 dir = vec2(-((nw + ne) - (sw + se)), (nw + sw) - (ne + se));
+      float red = max((nw + ne + sw + se) * 0.03125, 1.0 / 128.0);
+      dir = clamp(dir / (min(abs(dir.x), abs(dir.y)) + red), -8.0, 8.0) * px;
+      vec3 a = 0.5 * (texture2D(tDiffuse, uv - dir * 0.1667).rgb + texture2D(tDiffuse, uv + dir * 0.1667).rgb);
+      vec3 b = a * 0.5 + 0.25 * (texture2D(tDiffuse, uv - dir * 0.5).rgb + texture2D(tDiffuse, uv + dir * 0.5).rgb);
+      float lb = lu(b);
+      return (lb < lMin || lb > lMax) ? a : b;
+    }
     void main(){
       vec2 c = vUv - 0.5; float r = dot(c,c);
-      vec3 col = texture2D(tDiffuse, vUv).rgb;
+      vec3 col = fxaa(vUv);
       float l = dot(col, vec3(0.299,0.587,0.114));
       // Cold, sick-green shadows; fire stays warm; blacks crushed.
       // Grey overcast: cool neutral shadows, no warm push; firelight keeps its own colour.
