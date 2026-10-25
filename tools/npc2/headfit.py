@@ -537,10 +537,9 @@ def fill_non_skin(img, mask, bg=None):
 
 
 def match_body_tone(basemesh, skin, head_img, hidx, zc, alpha):
-    """Scale the painted body skin's colour to the scanned skin's: compared
-    texel for texel wherever the head has scanned skin (alpha), through the
-    head's UVs and MakeHuman's own. Mostly a change of lightness; the hue
-    moves at most 8%."""
+    """Scale the painted body skin's colour so that its neck and shoulders
+    average what the scanned skin of the face does. Mostly a change of
+    lightness; the hue moves at most 18%."""
     import numpy as np
     me = basemesh.data
     body_img = next(n.image for n in skin.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image and n.image.name != 'dummy' and 'normal' not in n.image.name.lower())
@@ -550,22 +549,34 @@ def match_body_tone(basemesh, skin, head_img, hidx, zc, alpha):
     W, H = body_img.size
     bp = np.array(body_img.pixels[:], dtype=np.float32).reshape(H, W, 4)
     hs, bs = np.zeros(3), np.zeros(3)
-    k = 0
+    samples = []
+    k = kb = 0
+    mw = basemesh.matrix_world
     for p in me.polygons:
         if p.index not in hidx:
+            # The painted skin of the neck and shoulders, just below the head's material.
+            if zc - 0.2 < (mw @ p.center).z < zc:
+                for li in p.loop_indices:
+                    mu, mv = muv[li].uv
+                    bs += bp[min(H - 1, max(0, int(mv * H))), min(W - 1, max(0, int(mu * W))), :3]
+                    kb += 1
             continue
         for li in p.loop_indices:
             u, v = huv[li].uv
             x, y = min(n - 1, max(0, int(u * n))), min(n - 1, max(0, int(v * n)))
             if alpha[y, x] < 0.9:
                 continue
-            mu, mv = muv[li].uv
-            hs += hp[y, x, :3]
-            bs += bp[min(H - 1, max(0, int(mv * H))), min(W - 1, max(0, int(mu * W))), :3]
+            samples.append(hp[y, x, :3])
             k += 1
+    # The face's skin: not its hair, brows or shadows (the brighter middle of its texels).
+    S = np.array(samples) if samples else np.ones((1, 3)) * 0.6
+    lum = S.mean(1)
+    lo, hi = np.percentile(lum, 40), np.percentile(lum, 92)
+    hs = S[(lum >= lo) & (lum <= hi)].mean(0)
+    bs /= max(1, kb)
     kc = hs / np.maximum(bs, 1e-3)
     kl = hs.mean() / max(bs.mean(), 1e-3)
-    kc = np.clip(kl * np.clip(kc / kl, 0.92, 1.08), 0.4, 1.8)
+    kc = np.clip(kl * np.clip(kc / kl, 0.82, 1.18), 0.4, 1.8)
     px = bp.reshape(-1, 4).copy()
     px[:, :3] = np.clip(px[:, :3] * kc, 0, 1)
     new = bpy.data.images.new('body_skin', W, H, alpha=False)

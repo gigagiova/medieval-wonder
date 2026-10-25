@@ -68,8 +68,8 @@ GARMENTS = {
     'shoes': {'sex': ['man', 'woman'], 'mhclo': 'punkduck_medieval_boots/punkduck_medieval_boots.mhclo', 'fabric': 'leather', 'layer': 'shoe', 'map': 'color'},
     # Modelled here (drape.py): a Lombard cloak of fulled wool fastened at
     # the right shoulder, to the calf; a woman's shawl round the shoulders.
-    'cloak': {'sex': ['man'], 'drape': {'from': 165, 'to': 375, 'length': 1.05, 'over': ['shirt'], 'bend': 2.0, 'frames': 25}, 'fabric': 'felt', 'layer': 'over', 'depth': 80},
-    'shawl': {'sex': ['woman'], 'drape': {'from': 140, 'to': 400, 'length': 0.5, 'over': ['gown', 'veil'], 'collar': 0.11, 'bend': 2.0, 'frames': 25}, 'fabric': 'twill', 'layer': 'over', 'depth': 80},
+    'cloak': {'sex': ['man'], 'drape': {'from': 165, 'to': 375, 'length': 1.05, 'over': ['shirt'], 'frames': 1}, 'fabric': 'felt', 'layer': 'over', 'depth': 80},
+    'shawl': {'sex': ['woman'], 'drape': {'from': 140, 'to': 400, 'length': 0.5, 'over': ['gown', 'veil'], 'collar': 0.11, 'frames': 1, 'folds': 0.015}, 'fabric': 'twill', 'layer': 'over', 'depth': 80},
     'gown': {'sex': ['woman'], 'mhclo': 'punkduck_medieval_dress/punkduck_medieval_dress.mhclo', 'fabric': 'twill', 'layer': 'tunic'},
     'veil': {'sex': ['woman'], 'mhclo': 'elvs_charity_veil1/elvs_charity_veil1.mhclo', 'fabric': 'linen', 'layer': 'head', 'relax': 12},
 }

@@ -103,6 +103,13 @@ def make(gid, g, garments, basemesh, rig):
             k = next((k for k in range(1, len(L)) if L[k] >= sj), len(L) - 1)
             f = (sj - L[k - 1]) / max(1e-9, L[k] - L[k - 1])
             col.append(prof[k - 1].lerp(prof[k], min(1.0, f)))
+        # Folds: the cloth gathered at the collar falls in soft tubes,
+        # deeper towards the hem (irregularly spaced, as wool hangs).
+        A, nf = d.get('folds', 0.03), d.get('nfolds', 15)
+        ph = nf * a + 0.9 * math.sin(3.1 * a + 0.5) + 0.5 * math.sin(7.3 * a)
+        for j in range(1, len(col)):
+            t = j / nrow
+            col[j] = col[j] + dirn * (A * t ** 1.4 * (0.5 + 0.5 * math.sin(ph)))
         cols.append(col)
     total = sum((cols[len(cols) // 2][j + 1] - cols[len(cols) // 2][j]).length for j in range(nrow))
     for j in range(nrow + 1):
@@ -141,7 +148,7 @@ def make(gid, g, garments, basemesh, rig):
     cs.distance_min = 0.008
     cs.use_self_collision = d.get('self', False)
     cs.collision_quality = 4
-    cl.point_cache.frame_start, cl.point_cache.frame_end = 1, d.get('frames', 70)
+    cl.point_cache.frame_start, cl.point_cache.frame_end = 1, max(2, d.get('frames', 70))
     import os
     if os.environ.get('NPC2_DRAPE_DEBUG'):
         bpy.ops.wm.save_as_mainfile(filepath=os.environ['NPC2_DRAPE_DEBUG'] + '_' + gid + '_init.blend', copy=True)
@@ -235,8 +242,8 @@ def make(gid, g, garments, basemesh, rig):
     for side in ('Left', 'Right'):
         rig.pose.bones['mixamorig:%sArm' % side].rotation_quaternion = (1, 0, 0, 0)
     bpy.context.view_layer.update()
-    # Where it is fastened (a brooch, src/npc/props.ts): the collar's end at the right shoulder.
-    o['npc2_brooch'] = list(o.matrix_world @ o.data.vertices[0].co)
+    # Where it is fastened (a fibula, src/npc/props.ts): the collar's end at the right shoulder.
+    o['npc2_brooch'] = list(o.matrix_world @ o.data.vertices[ncol].co)
     for m in masks:
         m.show_viewport = True
     o.parent = rig
