@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { NLAMP, noiseGLSL, atmosGLSL, surfaceGLSL } from './shaders';
+import { fillTexture } from './ktx2';
 
 // ---------------------------------------------------------------- textures
 // Photo-scanned CC0 PBR sets from Poly Haven (see public/textures/CREDITS.md
@@ -14,7 +15,12 @@ function load(path: string, srgb: boolean): THREE.Texture {
   let done: () => void = () => {};
   pending.push(new Promise<void>((res) => { done = res; }));
   // A missing texture must not hold up the world: resolve on error too.
-  const t = loader.load(path, () => done(), undefined, () => { console.warn('texture failed', path); done(); });
+  // World sets come as KTX2 (GPU-compressed) with the WebP as fallback; see ktx2.ts.
+  let t: THREE.Texture;
+  if (path.endsWith('.webp')) {
+    t = new THREE.Texture();
+    fillTexture(t, path.slice(0, -5), srgb).then(done, (e) => { console.warn('texture failed', path, e); done(); });
+  } else t = loader.load(path, () => done(), undefined, () => { console.warn('texture failed', path); done(); });
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.anisotropy = 4;

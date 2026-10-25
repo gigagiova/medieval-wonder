@@ -24,6 +24,7 @@ Object.assign(window, { __npc: npcDebug });
 import type { Lamp, Cell, PropKind } from './builder';
 import { fogHides } from './fogcull';
 import { OcclusionBuffer, chunkPrisms, indexLotsFrom, OCC_RANGE } from './occlusion';
+import { setKtx2Renderer } from './ktx2';
 import { perfT, perfAdd, perfFrame, perfStats, initHud, gpuBegin, gpuEnd } from './perf';
 
 const params = new URLSearchParams(location.search);
@@ -36,6 +37,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
 renderer.info.autoReset = false;
 document.body.appendChild(renderer.domElement);
+setKtx2Renderer(renderer);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 900);
