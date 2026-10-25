@@ -153,7 +153,8 @@ export class LightField {
     if (!(far || fresh || force)) return;
     this.lastReady = readyChunks;
     this.wait = 1.5;
-    this.bake(eye.x, eye.z);
+    // A failed bake must never stop the frame loop: keep the last field.
+    try { this.bake(eye.x, eye.z); } catch (e) { console.warn('light field bake failed', e); this.scene.overrideMaterial = null; this.renderer.setRenderTarget(null); }
   }
 
   bake(cx: number, cz: number) {
