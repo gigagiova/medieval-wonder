@@ -73,7 +73,8 @@ if (view === 'lineup') {
       p.speed = anim === 'walk' ? 1.15 : 0;
       p.yaw = cam === 'side' ? Math.PI / 2 : cam === 'back' ? Math.PI : 0;
       if (cam === 'back') p.yaw = 0;
-      p.animate(dt, 1, null);
+      // &bind=1: the bind pose, as the clothes were tailored (positioned, unanimated).
+      if (params.has('bind')) { p.group.position.copy(p.pos); p.group.rotation.y = p.yaw; } else p.animate(dt, 1, null);
       p.group.updateMatrixWorld(true);
       p.cloth.setSimulating(params.get('sim') !== '0');
       p.cloth.update(dt, p.pos);

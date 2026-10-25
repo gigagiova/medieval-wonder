@@ -450,7 +450,8 @@ export class Person {
     if (g.jar) {
       const h = m.head;
       const jar = Props.makeHeadJar(scans.jar);
-      on('Head', jar, Props.placeAt(new THREE.Vector3(h.c.x, h.top + 0.022, h.c.z - 0.01)));
+      // On its pad, sitting down over the veiled crown.
+      on('Head', jar, Props.placeAt(new THREE.Vector3(h.c.x, h.top + 0.006, h.c.z - 0.01)));
       this.load.jar = jar;
       this.load.jarQ.copy(jar.quaternion);
     }

@@ -484,13 +484,21 @@ export function makeSticks(seed: number) {
 export function makeHeadJar(jar: THREE.Object3D | null) {
   const m = propMats();
   const o = new THREE.Group();
-  const pad = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.02, 6, 16).rotateX(Math.PI / 2), m.linen);
-  pad.position.y = 0.012;
+  // The pad (a cercine): a twisted ring of cloth, soft and squashed under the weight.
+  const tg = new THREE.TorusGeometry(0.052, 0.018, 8, 24).rotateX(Math.PI / 2);
+  const tp = tg.attributes.position;
+  for (let i = 0; i < tp.count; i++) {
+    const x = tp.getX(i), z = tp.getZ(i), a = Math.atan2(z, x);
+    // Flattened, with the twist of its wound cloth running round it.
+    tp.setY(i, tp.getY(i) * 0.6 + Math.sin(a * 7 + Math.atan2(tp.getY(i), Math.hypot(x, z) - 0.052) * 1) * 0.0015);
+  }
+  tg.computeVertexNormals();
+  const pad = new THREE.Mesh(tg, m.linen);
   o.add(pad);
   if (jar) {
     const j = jar.clone();
     j.scale.setScalar(0.95);
-    j.position.y = 0.02;
+    j.position.y = 0.006;
     o.add(j);
   }
   return o;
