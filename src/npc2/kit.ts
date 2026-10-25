@@ -96,8 +96,10 @@ function measureBody(t: THREE.Object3D): Measure {
 const outfitsV2 = new Map<string, OutfitV2>();
 
 /** Bodies that can wear a v1 outfit id in v2 (none: v2 doesn't make it). */
+/** Outfits worn only by some bodies: a bare-headed monk is the old man (close-cropped, as if tonsured). */
+const ONLY: Record<string, string[]> = { monkBare: ['m_elder'] };
 export function bodiesV2(outfit: string, sex: Sex) {
-  return [...kitsV2.values()].filter((k) => k.sex === sex && k.meta.outfits[outfit]).map((k) => k.id);
+  return [...kitsV2.values()].filter((k) => k.sex === sex && k.meta.outfits[outfit] && (!ONLY[outfit] || ONLY[outfit].includes(k.id))).map((k) => k.id);
 }
 
 /** An outfit on a body: the body's template with that outfit's garments, hidden parts dropped. */

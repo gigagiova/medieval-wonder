@@ -77,6 +77,8 @@ GARMENTS = {
 # Outfits: what each kind of person wears (the game picks dyes and props).
 OUTFITS = {
     'monk': {'sex': 'man', 'garments': ['robe', 'rope', 'cowl', 'shoes']},
+    # Bare-headed: the game wears it only on the elderly body (close-cropped grey: no tonsure is painted in v2).
+    'monkBare': {'sex': 'man', 'garments': ['robe', 'rope', 'shoes']},
     'peasantHood': {'sex': 'man', 'garments': ['tunic', 'hood', 'hose', 'boots']},
     'peasantCloak': {'sex': 'man', 'garments': ['shirt', 'belt', 'cloak', 'hose', 'boots']},
     'soldier': {'sex': 'man', 'garments': ['shirt', 'belt', 'hose', 'boots']},
