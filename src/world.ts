@@ -10,11 +10,11 @@ import { buildBaths, BATHS_SPOT } from './baths';
 import { buildPalace, PALACE_SPOT } from './palace';
 import { buildLibrary } from './library';
 import { setSite, worldTerrain, fastTerrain, terrain, toLocalXZ } from './displace';
-import { placeProp, commitProps, rand01, type PropId } from './props';
+import { placeProp, commitProps, rand01, propSize, propsLoaded, type PropId } from './props';
 import { BOUNDS, RIVERS, WALL700, CIVITAS_NOVA, MEDIEVAL_OUTLINE, insideWalls, insideness, riverAt, inPoly, type P2 } from './benevento/geo';
 import { SITES, GATES, ROADS, siteToWorld, DISTRICTS, onWall, type SiteDef } from './benevento/sites';
 import { layoutTown, density, FREE, STREET, RESERVED, HOUSE, PLOT, type Layout } from './benevento/layout';
-import { makeChunks, buildChunk, CHUNK, type Hole, type ChunkItems } from './benevento/fabric';
+import { makeChunks, buildChunk, CHUNK, lotForm, type Hole, type ChunkItems } from './benevento/fabric';
 import { FabricStream } from './benevento/stream';
 import * as M from './benevento/monuments';
 import { theatreView } from './benevento/theatrum';
@@ -25,6 +25,7 @@ import { PLACED, markReadable, markReadableWorld } from './benevento/readables';
 import { LORE, explorableLore } from './benevento/lore';
 import { buildPonteFratto, ponsTeleport, inPons, PONS as PONS_FRATTO, PONS_LANDMARK } from './benevento/pontefratto';
 import { buildSpolia } from './benevento/spolia';
+import { planFront } from './arch/dress';
 
 // Benevento in AD 700, under Duke Gisulf I: the town of the first Lombard
 // circuit on its ridge between the Calore and the Sabato, laid out on the
@@ -595,9 +596,29 @@ function keepOut(x: number, z: number) {
 function townProps(scene: THREE.Scene) {
   const P = (id: PropId, x: number, z: number, ry: number, s: number) => placeProp(scene, id, x, 0, z, ry, s);
   let k = 0;
+  // Carts parked along the house fronts (planned with the rest of the street
+  // things in arch/dress.ts, which also gives them collision): the scanned cart.
+  const cartLen = propsLoaded('medieval_cart') ? Math.max(propSize('medieval_cart').x, propSize('medieval_cart').z) : 0;
+  const plans = new Map<number, ReturnType<typeof planFront>>();
+  for (const l of lay.lots) {
+    if (!l.front || l.explore) continue;
+    const seed = 1000 + l.id * 7919;
+    const h = lotForm(l.c.map((p) => [p.x, p.y] as P2), true, seed).h ?? l.h;
+    const fp = planFront(l.front, l.street ?? 2, h, seed);
+    plans.set(l.id, fp);
+    if (!cartLen) continue;
+    const f = l.front, e = f.b.clone().sub(f.a).normalize();
+    for (const it of fp.items) if (it.kind === 'cart') {
+      const c = f.a.clone().addScaledVector(e, it.u + it.len / 2).addScaledVector(f.out, it.depth / 2 + 0.05);
+      const flip = rand01(l.id * 2.3) < 0.5 ? 0 : Math.PI;
+      P('medieval_cart', c.x, c.y, Math.atan2(-e.y, e.x) + flip, 2.1 / cartLen);
+    }
+  }
   for (const l of lay.lots) {
     if (!l.front || (k++ % 4) !== 0) continue;
     const f = l.front, t = rand01(l.id * 1.7);
+    // Not where the house already has its stair, woodpile, bench or cart (arch/dress.ts).
+    { const fp = plans.get(l.id); if (fp && (fp.stair || fp.items.length)) continue; }
     const x = f.a.x + (f.b.x - f.a.x) * t + f.out.x * 0.45, z = f.a.y + (f.b.y - f.a.y) * t + f.out.y * 0.45;
     const u = rand01(l.id * 3.1);
     if (u < 0.22) P('wine_barrel_01', x, z, u * 20, 0.85);

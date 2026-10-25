@@ -5,11 +5,12 @@ import type { MatName } from '../materials';
 import type { FireSource } from '../fire';
 import { buildHouse, buildBridge, reseedTown, type BridgeSpec, type Lot } from '../town';
 import { reseedKit } from '../arch/kit';
+import { planFront, frontColliders } from '../arch/dress';
 import { reseedShapes, ruin, arcadeGeo, archRings, quoinBox, pyramidRoof, wellHead, fallenDrum } from '../shapes';
 import { fastTerrain } from '../displace';
 import { torch, brazier } from '../lights';
 import { WALL700, BOUNDS, insideness, type P2 } from './geo';
-import { GATES } from './sites';
+import { GATES, SITES } from './sites';
 import type { Layout, Plot, PlotKind } from './layout';
 import { buildInterior, interiorCollider } from './interiors';
 
@@ -23,7 +24,28 @@ import { buildInterior, interiorCollider } from './interiors';
 export const CHUNK = 32;
 const V = (x: number, z: number) => new THREE.Vector2(x, z);
 
-export interface LotData { c: P2[]; front?: { a: P2; b: P2; out: P2 }; h: number; street: number; seed: number; explore?: { id: string; kind: string } }
+export interface LotData { c: P2[]; front?: { a: P2; b: P2; out: P2 }; h: number; street: number; seed: number; explore?: { id: string; kind: string };
+  /** A tower house (taller, few openings, low hipped roof) or a roofless ruin; see lotForm(). */
+  form?: 'tower' | 'ruin' }
+
+/**
+ * Some houses are not like the rest: here and there a back building has
+ * fallen in (roofless walls, weeds; a town of 700 was full of them), and
+ * near the duke's curtis and along the main street a few of the households
+ * that mattered built high (a tower house: an inference, see
+ * docs/benevento/ARCHITECTURE.md). Pure function of the lot.
+ */
+export function lotForm(c: P2[], front: boolean, seed: number): { form?: 'tower' | 'ruin'; h?: number } {
+  const r = rng(seed * 3 + 17);
+  const u = r(), v = r();
+  let area = 0, cx = 0, cz = 0;
+  for (let k = 0; k < c.length; k++) { const a = c[k], q = c[(k + 1) % c.length]; area += a[0] * q[1] - q[0] * a[1]; cx += a[0] / c.length; cz += a[1] / c.length; }
+  area = Math.abs(area) / 2;
+  const nearCurtis = Math.hypot(cx - SITES.curtis.x, cz - SITES.curtis.z) < 170;
+  if (area > 14 && area < 60 && c.length === 4 && u < (nearCurtis ? 0.07 : 0.012)) return { form: 'tower', h: 12.5 + v * 4.5 };
+  if (!front && area > 12 && u > 0.965) return { form: 'ruin', h: 1.8 + v * 2.6 };
+  return {};
+}
 export interface WallPiece { a: P2; b: P2; out: P2; h: number; seed: number }
 export interface TowerSpec { x: number; z: number; ox: number; oz: number; kind: 0 | 1 | 2; h: number; seed: number; roof: boolean; torch: boolean }
 export interface GateSpec { id: string; x: number; z: number; dx: number; dz: number; main: boolean; seed: number }
@@ -198,6 +220,7 @@ function plot(b: Builder, p: PlotData) {
       if (gap > 0 && L > 3) { const gw = 1.4 / L; seg(0, gap - gw / 2); seg(gap + gw / 2, 1); } else seg(0, 1);
     }
   }
+  if (p.kind === 'orto' || p.kind === 'stabulum') yardThings(b, p);
   if (b.mode === 'collide' && p.kind !== 'ruina') return;
   // Interior: rows of beds in the gardens, vine stakes, a shed in the pens,
   // Roman walls and fallen drums among weeds in the ruins.
@@ -255,6 +278,49 @@ function plot(b: Builder, p: PlotData) {
       const x = R(x0 + 2, x1 - 2), z = R(z0 + 2, z1 - 2);
       if (inside(x, z)) fallenDrum(b, x, z, R(0.3, 0.45), R(0.8, 2), R(0, 3));
     }
+  }
+}
+
+/**
+ * In a garden or a pen, now and then a bread oven (a dome of rubble on a
+ * square base, its mouth black with soot) and a woodpile beside it: the
+ * household ovens of the excavated early-medieval yards. Own random stream.
+ */
+function yardThings(b: Builder, p: PlotData) {
+  const r = rng(p.seed * 5 + 31);
+  if (r() > 0.4) return;
+  const P = p.pts;
+  let cx = 0, cz = 0;
+  for (const [x, z] of P) { cx += x / P.length; cz += z / P.length; }
+  const inPoly = (x: number, z: number) => {
+    let c = false;
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++) if ((P[i][1] > z) !== (P[j][1] > z) && x < ((P[j][0] - P[i][0]) * (z - P[i][1])) / (P[j][1] - P[i][1]) + P[i][0]) c = !c;
+    return c;
+  };
+  // Towards an edge (ovens stood against a yard wall), but well inside.
+  const k = Math.floor(r() * P.length), a = P[k], c = P[(k + 1) % P.length];
+  const t = 0.3 + r() * 0.4;
+  const ex = a[0] + (c[0] - a[0]) * t, ez = a[1] + (c[1] - a[1]) * t;
+  const dx = cx - ex, dz = cz - ez, dl = Math.hypot(dx, dz) || 1;
+  const x = ex + (dx / dl) * 2.2, z = ez + (dz / dl) * 2.2;
+  const ok = [[0, 0], [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]].every(([ox, oz]) => inPoly(x + ox, z + oz));
+  if (!ok) return;
+  const ry = Math.atan2(dx, dz); // mouth towards the middle of the yard
+  const w = 1.5 + r() * 0.4;
+  b.box('rubble', w, 0.75, w, x, -0.2, z, ry);
+  if (b.mode === 'collide') return;
+  const dome = new THREE.SphereGeometry(w * 0.48, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+  dome.scale(1, 0.8, 1);
+  b.geo(r() < 0.6 ? 'rubble' : 'clay', dome, x, 0.5, z, ry, false);
+  // The mouth: a soot-black arch on the front, a slab before it.
+  const fx = Math.sin(ry), fz = Math.cos(ry);
+  b.box('iron', 0.42, 0.42, 0.06, x + fx * (w * 0.47), 0.48, z + fz * (w * 0.47), ry, false);
+  b.box('slab', 0.7, 0.06, 0.4, x + fx * (w * 0.5 + 0.15), 0.5, z + fz * (w * 0.5 + 0.15), ry, false);
+  // Woodpile beside it.
+  const sx = Math.cos(ry), sz = -Math.sin(ry);
+  for (let i = 0; i < 9; i++) {
+    const row = Math.floor(i / 3), col = i % 3;
+    b.box('wood', 0.9 + r() * 0.2, 0.13, 0.13, x + sx * (w * 0.5 + 0.7) + fx * (col * 0.15 - 0.15), -0.15 + row * 0.13, z + sz * (w * 0.5 + 0.7) + fz * (col * 0.15 - 0.15), ry + Math.PI / 2 + (r() - 0.5) * 0.1, false);
   }
 }
 
@@ -318,7 +384,7 @@ export function prismSoup(c: P2[], y0: number, y1: number) {
 
 // ---------------------------------------------------------------- one chunk
 const toLot = (l: LotData): Lot => ({
-  c: l.c.map(([x, z]) => V(x, z)), h: l.h, street: l.street,
+  c: l.c.map(([x, z]) => V(x, z)), h: l.h, street: l.street, seed: l.seed, form: l.form,
   front: l.front ? { a: V(...l.front.a), b: V(...l.front.b), out: V(...l.front.out) } : undefined,
 });
 /** Build a chunk's content. In 'collide' mode only the cheap collision proxies are made. */
@@ -327,7 +393,16 @@ export function buildChunk(b: Builder, it: ChunkItems) {
   for (const l of it.lots) {
     reseedTown(l.seed); reseedKit(l.seed + 1); reseedShapes(l.seed + 2);
     if (l.explore) { if (coll) interiorCollider(b, l); else buildInterior(b, l); continue; }
-    if (coll) { b.collideShape(prismSoup(l.c, -0.3, l.h), 'rubble'); continue; }
+    if (coll) {
+      b.collideShape(prismSoup(l.c, -0.3, l.h), 'rubble');
+      // Outside stairs (walkable), woodpiles and benches in the street.
+      if (l.front) {
+        const fr = { a: V(...l.front.a), b: V(...l.front.b), out: V(...l.front.out) };
+        const g = frontColliders(fr, planFront(fr, l.street, l.h, l.seed));
+        if (g) b.collideShape(g, 'rubble');
+      }
+      continue;
+    }
     buildHouse(b, toLot(l));
   }
   if (!coll) for (const br of it.bridges) { reseedTown(br.seed); reseedKit(br.seed + 1); reseedShapes(br.seed + 2); buildBridge(b, br); }
@@ -383,6 +458,7 @@ export function makeChunks(lay: Layout, holes: Hole[]): Map<number, ChunkItems> 
       c: l.c.map((p) => [p.x, p.y] as P2), h: l.h, street: l.street ?? 2, seed: 1000 + l.id * 7919,
       front: l.front ? { a: [l.front.a.x, l.front.a.y], b: [l.front.b.x, l.front.b.y], out: [l.front.out.x, l.front.out.y] } : undefined,
       explore: l.explore,
+      ...(l.explore ? {} : lotForm(l.c.map((p) => [p.x, p.y] as P2), !!l.front, 1000 + l.id * 7919)),
     });
   }
   for (const br of lay.bridges) get(br.x, br.z).bridges.push({ ...br, seed: 50000 + seed++ * 104729 });
@@ -408,7 +484,7 @@ export function makeChunks(lay: Layout, holes: Hole[]): Map<number, ChunkItems> 
       if (r.at(x, z) === 3) m[j * MR + i] = 1;
     }
     // Explorable houses keep their floors.
-    for (const l of c.lots) if (l.explore) {
+    for (const l of c.lots) if (l.explore || l.form === 'ruin') {
       const P = l.c;
       for (let j = 0; j < MR; j++) for (let i = 0; i < MR; i++) {
         const x = c.i * CHUNK + (i + 0.5) * 0.5, z = c.j * CHUNK + (j + 0.5) * 0.5;
@@ -446,6 +522,7 @@ export function lodChunk(it: ChunkItems): { walls: number[]; roofs: number[] } {
       const A0 = Y(ax, az, -0.6), B0 = Y(bx, bz, -0.6), A1 = Y(ax, az, h), B1 = Y(bx, bz, h);
       tri(walls, A0, B0, B1); tri(walls, A0, B1, A1);
     }
+    if (l.form === 'ruin') continue;
     // Footprints drawn on the plan that are no quads: a flat cap at the eaves (it is far away).
     if (n !== 4) {
       for (let k = 1; k < n - 1; k++) tri(roofs, Y(c[0][0], c[0][1], h), Y(c[k][0], c[k][1], h), Y(c[k + 1][0], c[k + 1][1], h));

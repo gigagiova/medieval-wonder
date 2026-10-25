@@ -135,5 +135,12 @@ Photo-scanned models from [Poly Haven](https://polyhaven.com), CC0 (public domai
 Fetched and packed by \`tools/fetch-props.ts\`.
 
 ${Object.keys(PROPS).map((id) => `- [${id}](https://polyhaven.com/a/${id})`).join('\n')}
+
+## Other sources
+
+- \`medieval_cart\`: "Medieval wooden cart" by rakutin,
+  https://sketchfab.com/3d-models/medieval-wooden-cart-c4ee19920e9b45aaa6ebe37839b1ad2a,
+  licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Simplified to ~5.6k
+  triangles, textures re-encoded as 1024 px webp (packed like the Poly Haven props).
 `);
 void flatten; void join;
