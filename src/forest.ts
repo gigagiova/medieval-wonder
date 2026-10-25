@@ -46,14 +46,14 @@ interface Sp {
 }
 const SPECIES: Record<string, Sp> = {
   // Big old oaks: crowns 25-30 m across at full size, so scaled down a little.
-  large: { ids: ['oakL1', 'oakL2', 'oakL3'], ends: [10, 20, 42], far: 125, scale: [0.6, 0.78], room: 6.5, leafy: true },
-  big: { ids: ['oakB1', 'oakB3', 'oakB4'], ends: [8, 16, 24, 40], far: 120, scale: [0.72, 0.95], room: 5, leafy: true },
-  medium: { ids: ['oakM1', 'oakM2', 'oakM3'], ends: [8, 18, 38], far: 95, scale: [0.9, 1.3], room: 2.6, leafy: true },
+  large: { ids: ['oakL1', 'oakL2', 'oakL3'], ends: [8, 18, 42], far: 125, scale: [0.6, 0.78], room: 6.5, leafy: true },
+  big: { ids: ['oakB1', 'oakB3', 'oakB4'], ends: [6, 14, 22, 40], far: 120, scale: [0.72, 0.95], room: 5, leafy: true },
+  medium: { ids: ['oakM1', 'oakM2', 'oakM3'], ends: [6, 16, 38], far: 95, scale: [0.9, 1.3], room: 2.6, leafy: true },
   small: { ids: ['oakS1', 'oakS2'], ends: [8, 30], far: 0, scale: [0.75, 1.3], room: 1.6, leafy: true },
-  ancient: { ids: ['ancient'], ends: [12, 24, 40], far: 100, scale: [0.95, 1.25], room: 6, leafy: false },
-  twisted: { ids: ['twisted'], ends: [10, 20, 38], far: 95, scale: [0.85, 1.2], room: 3.2, leafy: false },
-  snag: { ids: ['snag'], ends: [10, 20, 38], far: 95, scale: [0.75, 1.1], room: 2.4, leafy: false },
-  poplar: { ids: ['poplar'], ends: [5, 16, 26, 40], far: 120, scale: [0.8, 1.15], room: 4.5, leafy: true },
+  ancient: { ids: ['ancient'], ends: [9, 22, 40], far: 100, scale: [0.95, 1.25], room: 6, leafy: false },
+  twisted: { ids: ['twisted'], ends: [8, 18, 38], far: 95, scale: [0.85, 1.2], room: 3.2, leafy: false },
+  snag: { ids: ['snag'], ends: [8, 18, 38], far: 95, scale: [0.75, 1.1], room: 2.4, leafy: false },
+  poplar: { ids: ['poplar'], ends: [5, 10, 22, 40], far: 120, scale: [0.8, 1.15], room: 4.5, leafy: true },
 };
 
 export function buildForest(scene: THREE.Scene, b: Builder, o: ForestOpts): THREE.Object3D {

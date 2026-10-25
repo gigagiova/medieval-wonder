@@ -7,7 +7,9 @@ import { loadTreePack } from '../../src/vegetation/pack';
 import { barkMaterial, leafMaterial, vegUniforms } from '../../src/vegetation/materials';
 
 const IMPOSTORS = ['oakL1', 'oakL2', 'oakL3', 'oakB1', 'oakB3', 'oakB4', 'oakM1', 'oakM2', 'oakM3', 'ancient', 'twisted', 'snag', 'poplar'];
-const COLS = 8, ROWS = 13, CELL = 78, W = COLS * CELL, H = ROWS * CELL;
+// Rendered at SS times the final size and averaged down (tools/trees/bake-impostors.cjs), so a
+// sparse crown keeps its true coverage in alpha instead of turning into a solid blob.
+const COLS = 8, ROWS = 13, OUT = 78, SS = 3, CELL = OUT * SS, W = COLS * CELL, H = ROWS * CELL;
 
 const pack = await loadTreePack();
 vegUniforms.uWind.value = 0;
@@ -59,7 +61,7 @@ function pass(bake: 1 | 2): string {
   const img = g.getImageData(0, 0, W, H), d = img.data;
   const filled = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) filled[i] = d[i * 4 + 3] > 0 ? 1 : 0;
-  for (let it = 0; it < 12; it++) {
+  for (let it = 0; it < 8; it++) {
     const next = filled.slice();
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const i = y * W + x;
@@ -83,4 +85,4 @@ function pass(bake: 1 | 2): string {
 
 const albedo = pass(1);
 const normal = pass(2);
-(window as unknown as { __bake: unknown }).__bake = { albedo, normal, json: { cols: COLS, rows: ROWS, size: [W, H], trees: out } };
+(window as unknown as { __bake: unknown }).__bake = { albedo, normal, json: { cols: COLS, rows: ROWS, size: [W / SS, H / SS], trees: out } };
