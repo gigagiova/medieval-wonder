@@ -9,8 +9,10 @@ import { shared, mat, MAT, makeSurfaceMaterial, makeSky, makeMotes, texturesRead
 import { makeFire } from './fire';
 import { makeBones } from './bones';
 import { NLAMP } from './shaders';
-import { buildWorld, SPAWN, regionName, getTeleports, getMapData, type Teleport } from './world';
-import { field } from './displace';
+import { buildWorld, SPAWN, SPAWN_YAW, STAIR_ZONES, TOWN_TEX, siteGroups, regionName, getTeleports, getMapData, type Teleport } from './world';
+import { terrain, fastTerrain, field } from './displace';
+import { SITES } from './benevento/sites';
+import { updateSecrets, isReadingSecret } from './benevento/secrets';
 import { Player } from './player';
 import { Soundscape } from './audio';
 import { initMap } from './map';
@@ -34,7 +36,8 @@ document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 900);
-scene.add(makeSky());
+const sky = makeSky();
+scene.add(sky);
 
 // Title card shows progress while the world is built in stages; any failure
 // is written on the card instead of leaving it hanging.
@@ -49,12 +52,30 @@ await progress('Gathering the furnishings', 0);
 await loadProps();
 await progress('Lighting the lamps', 0.01);
 const t0 = performance.now();
-const { collider, cells, lamps, flames, props, townTex } = await buildWorld(scene, progress);
+const { collider, cells, lamps, flames, props, townTex, stream } = await buildWorld(scene, progress);
 shared.uTown.value = townTex;
+shared.uTownBox.value.set(TOWN_TEX.x0, TOWN_TEX.z0, 1 / TOWN_TEX.w, 1 / TOWN_TEX.h);
+shared.uTownH.value.set(TOWN_TEX.hMin, TOWN_TEX.hMax);
+Object.assign(window, { __stream: stream, __scene: scene, __collider: collider });
 (window as unknown as { __camera: THREE.Camera }).__camera = camera;
 const bvh = new MeshBVH(collider.geometry);
 (collider.geometry as unknown as { boundsTree: MeshBVH }).boundsTree = bvh;
 const buildMs = performance.now() - t0;
+// Hand meshes to the GPU at once, so their CPU copies can go (the builder and
+// the stream free each array on upload): a cheap pass into a 1x1 target.
+const upRT = new THREE.WebGLRenderTarget(1, 1), upScene = new THREE.Scene();
+upScene.overrideMaterial = new THREE.MeshBasicMaterial();
+function gpuUpload(meshes: THREE.Mesh[]) {
+  if (!meshes.length) return;
+  const st = meshes.map((m) => ({ p: m.parent, v: m.visible, f: m.frustumCulled }));
+  for (const m of meshes) { m.visible = true; m.frustumCulled = false; upScene.add(m); }
+  renderer.setRenderTarget(upRT);
+  renderer.render(upScene, camera);
+  renderer.setRenderTarget(null);
+  meshes.forEach((m, i) => { upScene.remove(m); st[i].p?.add(m); m.visible = st[i].v; m.frustumCulled = st[i].f; });
+}
+gpuUpload(cells.flatMap((c) => c.meshes as THREE.Mesh[]));
+stream.uploader = gpuUpload;
 
 // Moonlight and a faint sky fill.
 // Overcast dusk: the sun is just down; light comes from the whole sky,
@@ -119,8 +140,8 @@ scene.add(lantern);
 let lanternOn = false;
 
 // Fire, split by zone so the whole underground can be switched off at once.
-const fireAbove = makeFire(flames.filter((f) => f.pos.y > -2.5));
-const fireUnder = makeFire(flames.filter((f) => f.pos.y <= -2.5));
+const fireAbove = makeFire(flames.filter((f) => !f.under));
+const fireUnder = makeFire(flames.filter((f) => f.under));
 scene.add(fireAbove, fireUnder);
 
 // Bones: sculpted geometry, one instanced draw per kind and zone.
@@ -187,7 +208,7 @@ const summonTownsfolk = () => setTimeout(async () => {
     // Townsfolk stand on the ground as drawn (the hill, its bumps and the
     // gutters), not on the bare hill or the coarse collision grid.
     const gv = new THREE.Vector3();
-    spawnTownsfolk(scene, { streets: getMapData().streets, ground: (x, z) => field(x, 0, z, 'ground', gv).y, lamps, places: getMapData().landmarks });
+    spawnTownsfolk(scene, { streets: getMapData().streets.filter((st) => st.kind === 'lane'), ground: (x, z) => field(x, 0, z, 'ground', gv).y, lamps, places: getMapData().landmarks });
     const n = npcDebug.people.length;
     say(n ? `${n} townsfolk are about (${((performance.now() - t0) / 1000).toFixed(0)} s)` : 'No townsfolk could be placed', !n);
   } catch (e) {
@@ -198,6 +219,7 @@ const summonTownsfolk = () => setTimeout(async () => {
 }, 500);
 
 const player = new Player(collider, SPAWN, camera, renderer.domElement);
+player.yaw = SPAWN_YAW;
 // Screenshot hooks: ?shot=…&hold waits for a teleport before counting frames.
 let held = params.has('hold');
 Object.assign(window, {
@@ -236,7 +258,7 @@ let safeTimer = 0;
 function guardFall(dt: number) {
   safeTimer += dt;
   if (player.onGround && safeTimer > 0.5) { lastSafe.copy(player.pos); safeTimer = 0; }
-  if (player.pos.y < -25) { player.pos.copy(lastSafe); player.vel.set(0, 0, 0); }
+  if (player.pos.y - fastTerrain(player.pos.x, player.pos.z) < -25) { player.pos.copy(lastSafe); player.vel.set(0, 0, 0); }
 }
 Object.assign(window, { __probe: (x: number, y: number, z: number) => floorBelow(x, y, z, 50) });
 initMap();
@@ -310,6 +332,15 @@ const hintEl = document.getElementById('hint')!;
 await progress('Grinding the pigments', 0.9);
 await texturesReady;
 await envLoaded;
+await progress('Building the lanes about you', 0.9);
+{
+  const named = params.has('at') ? getTeleports().find((q) => q.name.toLowerCase().includes(params.get('at')!.toLowerCase())) : undefined;
+  const at = named ? [named.x, 0, named.z] : params.has('shot') ? params.get('shot')!.split(',').map(Number) : [SPAWN.x, 0, SPAWN.z];
+  stream.update(new THREE.Vector3(at[0], 0, at[2]));
+  const pump = setInterval(() => stream.update(new THREE.Vector3(at[0], 0, at[2])), 100);
+  await stream.ready(at[0], at[2], params.has('shot') ? 44 : 36, (f) => { enterEl.textContent = `Building the lanes about you… ${Math.round(f * 100)}%`; });
+  clearInterval(pump);
+}
 await progress('Mixing the pigments', 0.94);
 try { await renderer.compileAsync(scene, camera); } catch { /* compiled on first frame instead */ }
 enterEl.textContent = 'Enter';
@@ -337,11 +368,24 @@ if (matchMedia('(pointer: coarse)').matches) hintEl.textContent = 'It is dark. T
 let region = '';
 let regionTimer = 0;
 
+const tmpDir = new THREE.Vector3();
+// The library lives in the Episcopium's frame: give it the camera in that frame.
+const libProxy = new THREE.PerspectiveCamera();
+libProxy.matrixAutoUpdate = false;
+const libInv = new THREE.Matrix4();
+function libCam() {
+  const g = siteGroups.episcopium;
+  if (!g) return camera;
+  libInv.copy(g.matrixWorld).invert();
+  libProxy.matrix.multiplyMatrices(libInv, camera.matrixWorld);
+  libProxy.matrixWorld.copy(libProxy.matrix);
+  return libProxy;
+}
 const noise1 = (t: number) => Math.sin(t * 7.3) * 0.5 + Math.sin(t * 13.1 + 1.3) * 0.3 + Math.sin(t * 23.7 + 2.1) * 0.2;
 const tmp = new THREE.Vector3();
 
 // ?shot=x,y,z,yaw,pitch places the camera for screenshots.
-if (params.has('shot')) {
+if (params.has('shot') && !params.has('at')) {
   const [x, y, z, yaw, pitch] = params.get('shot')!.split(',').map(Number);
   player.pos.set(x, y, z); player.yaw = yaw; player.pitch = pitch ?? 0;
   overlay.classList.add('hidden');
@@ -378,19 +422,19 @@ function occluded(c: Cell): boolean {
   }
   return true;
 }
-function cull(isUnder: boolean) {
+function cull(isUnder: boolean, camLocal: number) {
   eye.copy(camera.position);
-  const nearStair = Math.abs(eye.x + 36) < 7 && eye.z < -46 && eye.z > -66;
-  const showUnder = isUnder || nearStair || eye.y < -0.5;
-  const showAbove = !isUnder || nearStair || eye.y > -3.5;
+  const nearStair = STAIR_ZONES.some((s) => Math.hypot(eye.x - s.x, eye.z - s.z) < s.r);
+  const showUnder = isUnder || nearStair || camLocal < -0.5;
+  const showAbove = !isUnder || nearStair || camLocal > -3.5;
   fireAbove.visible = showAbove;
   fireUnder.visible = showUnder;
   if ((rr & 3) === 0) updateBones(showAbove, showUnder);
   const live: Cell[] = [];
   for (const c of cells) {
     const zoneOk = c.under ? showUnder : showAbove;
-    const near = c.box.distanceToPoint(eye) < 120;
-    if (zoneOk && near) live.push(c);
+    const near = c.box.distanceToPoint(eye) < (c.range ?? 120);
+    if (zoneOk && near && !c.lod) live.push(c);
     else c.occluded = 0;
     c.visible = zoneOk && near;
   }
@@ -451,15 +495,19 @@ function frame() {
   fps += (1 / Math.max(dt, 1e-3) - fps) * 0.05;
   renderer.info.reset();
 
-  if (!isReading()) player.update(dt);
+  if (!isReading() && !isReadingSecret()) player.update(dt);
   guardFall(dt);
   pushOutOfSecretDoor(player.pos);
-  updateLibrary(camera);
+  updateLibrary(libCam());
   pushOutOfTownsfolk(player.pos);
   updateTownsfolk(dt, camera, player);
 
   const camY = camera.position.y;
-  const under = THREE.MathUtils.smoothstep(-camY, 1.0, 4.0);
+  sky.position.copy(camera.position);
+  const groundHere = fastTerrain(camera.position.x, camera.position.z);
+  const camLocal = camY - groundHere;
+  const under = THREE.MathUtils.smoothstep(-camLocal, 1.0, 4.0);
+  shared.uFogBase.value += (groundHere - 1.0 - shared.uFogBase.value) * Math.min(1, dt * 2);
   shared.uUnder.value = under;
   moon.intensity = 0.5 * (1 - under);
   hemi.intensity = (envReady ? 0.0 : 1.2) * (1 - under) + 0.015;
@@ -470,7 +518,7 @@ function frame() {
   moon.position.x = Math.round(moon.position.x); moon.position.z = Math.round(moon.position.z);
 
   // Pick the nearest lamps on the same side of the ground as the camera.
-  const isUnder = camY < -2.2;
+  const isUnder = camLocal < -2.2;
   const cand: { l: Lamp; d: number }[] = [];
   for (const l of lamps) {
     if (l.under !== isUnder) continue;
@@ -513,14 +561,26 @@ function frame() {
   if (regionTimer < 0) regionEl.classList.remove('show');
   hintEl.classList.toggle('show', isUnder && !lanternOn);
 
-  cull(isUnder);
-  audio?.update(dt, under, Math.hypot(player.pos.x - 0, player.pos.z + 45));
+  stream.update(camera.position, camera.getWorldDirection(tmpDir));
+  cull(isUnder, camLocal);
+  updateSecrets(camera);
+  audio?.update(dt, under, Math.hypot(player.pos.x - SITES.episcopium.x, player.pos.z - SITES.episcopium.z));
   if (!params.has('shot')) adaptResolution(rawDt);
   composer.render(dt);
-  if (params.has('debug')) document.title = `${fps.toFixed(0)} fps · cells ${cullStats.visible}/${cullStats.total} · occluded ${cullStats.occluded} · ${renderer.info.render.calls} calls`;
+  if (params.has('debug')) document.title = `${fps.toFixed(0)} fps · cells ${cullStats.visible}/${cells.length} · occluded ${cullStats.occluded} · ${renderer.info.render.calls} calls · ${(renderer.info.render.triangles / 1000).toFixed(0)}k tris · chunks ${stream.stats.ready}`;
   if (params.has('shot') && !held && frames > 12) { (window as unknown as { __done: boolean }).__done = true; return; }
   requestAnimationFrame(frame);
 }
+// ?at=<teleport name>[&yaw=..&pitch=..]: start at a named place (also for screenshots).
+if (params.has('at')) {
+  const want = params.get('at')!.toLowerCase();
+  const t = getTeleports().find((q) => q.name.toLowerCase() === want) ?? getTeleports().find((q) => q.name.toLowerCase().includes(want));
+  if (t) {
+    (window as unknown as { __teleport: (t: Teleport) => void }).__teleport({ ...t, yaw: params.has('yaw') ? Number(params.get('yaw')) : t.yaw });
+    if (params.has('pitch')) player.pitch = Number(params.get('pitch'));
+  }
+  if (params.has('shot')) overlay.classList.add('hidden');
+}
 frame();
 (window as unknown as { __ready: boolean }).__ready = true;
-(window as unknown as { __stats: () => string }).__stats = () => `build ${buildMs.toFixed(0)}ms, ${renderer.info.render.triangles} tris drawn, ${renderer.info.render.calls} calls, cells ${cullStats.visible}/${cullStats.total} visible, ${cullStats.occluded} occluded`;
+(window as unknown as { __stats: () => string }).__stats = () => `build ${buildMs.toFixed(0)}ms, ${renderer.info.render.triangles} tris drawn, ${renderer.info.render.calls} calls, cells ${cullStats.visible}/${cells.length} visible, ${cullStats.occluded} occluded, chunks ready ${stream.stats.ready} (built ${stream.stats.built}, avg ${(stream.stats.ms / Math.max(1, stream.stats.built)).toFixed(0)} ms), geo ${renderer.info.memory.geometries}, tex ${renderer.info.memory.textures}`;

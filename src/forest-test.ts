@@ -34,25 +34,9 @@ if (params.has('world')) {
   const w = await import('./world');
   const res = await w.buildWorld(scene);
   shared.uTown.value = res.townTex;
-  const md = w.getMapData();
-  const poly = md.wall;
-  inside = (x, z) => {
-    let c = false;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const a = poly[i], bb = poly[j];
-      if ((a.y > z) !== (bb.y > z) && x < ((bb.x - a.x) * (z - a.y)) / (bb.y - a.y) + a.x) c = !c;
-    }
-    return c;
-  };
-  const g = md.gate;
-  const [a0, a1] = md.aqueduct;
-  keepOut = (x, z) => {
-    if (Math.hypot(x - g.x, z - g.y) < 20) return true;
-    if (z > g.y && Math.abs(x - g.x - Math.sin(z * 0.05) * 2) < 18) return true;
-    const ab = a1.clone().sub(a0), ap = new THREE.Vector2(x - a0.x, z - a0.y);
-    const t = THREE.MathUtils.clamp(ap.dot(ab) / ab.lengthSq(), 0, 1);
-    return ap.sub(ab.multiplyScalar(t)).length() < 6;
-  };
+  const geo = await import('./benevento/geo');
+  inside = (x, z) => geo.insideWalls(x, z);
+  keepOut = (x, z) => geo.insideness(x, z) > 0.3;
 } else {
   // A plain ground grid with the real ground material and displacement.
   const n = 240, S = 480;

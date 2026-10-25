@@ -42,6 +42,9 @@ export const shared = {
   uUnder: { value: 0 },
   uMoonDir: { value: new THREE.Vector3(-0.92, 0.07, 0.38).normalize() },
   uTown: { value: null as THREE.Texture | null },
+  uTownBox: { value: new THREE.Vector4(-100, -100, 1 / 200, 1 / 200) },
+  uTownH: { value: new THREE.Vector2(-1.5, 2.5) },
+  uFogBase: { value: 0 },
   uNoise: { value: noiseTex as THREE.Texture },
 };
 

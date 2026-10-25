@@ -1,0 +1,189 @@
+{
+ "controls": [
+  {
+   "name": "Arch of Trajan",
+   "plan_px": [
+    923,
+    185
+   ],
+   "world_m": [
+    389.1,
+    -223.8
+   ],
+   "affine_residual_m": 4.8,
+   "source": "OSM way 249... building \"Arco di Traiano\" centroid; plan triangle 3 centroid"
+  },
+  {
+   "name": "Arch of Sacramento",
+   "plan_px": [
+    469,
+    425
+   ],
+   "world_m": [
+    -75.7,
+    -60.6
+   ],
+   "affine_residual_m": 7.1,
+   "source": "OSM building centroid; plan triangle 4 centroid"
+  },
+  {
+   "name": "Roman theatre",
+   "plan_px": [
+    322,
+    497
+   ],
+   "world_m": [
+    -222.0,
+    -23.0
+   ],
+   "affine_residual_m": 15.6,
+   "source": "OSM cavea polygon 373842941 centre; plan semicircle \"2\" centre"
+  },
+  {
+   "name": "Rocca dei Rettori",
+   "plan_px": [
+    1220,
+    515
+   ],
+   "world_m": [
+    623.0,
+    148.0
+   ],
+   "affine_residual_m": 19.1,
+   "source": "OSM way 480370253 centroid; plan SE castle"
+  },
+  {
+   "name": "NE wall corner (Torre del Santo Panaro)",
+   "plan_px": [
+    1205,
+    216
+   ],
+   "world_m": [
+    675.0,
+    -149.0
+   ],
+   "affine_residual_m": 18.2,
+   "source": "OSM building centroid; plan outline NE corner"
+  },
+  {
+   "name": "Road to Ponte Vanvitelli at the N wall",
+   "plan_px": [
+    472,
+    158
+   ],
+   "world_m": [
+    -75.0,
+    -318.0
+   ],
+   "affine_residual_m": 21.8,
+   "source": "OSM highway \"Ponte Vanvitelli\" reaching the bluff; plan double line (north stub)"
+  },
+  {
+   "name": "West tip (Port'Arsa)",
+   "plan_px": [
+    42,
+    462
+   ],
+   "world_m": [
+    -504.0,
+    -81.0
+   ],
+   "affine_residual_m": 8.7,
+   "source": "OSM city_gate Port'Arsa; plan outline W tip"
+  }
+ ],
+ "affine": [
+  [
+   0.9764916424034646,
+   0.1548596925646266
+  ],
+  [
+   -0.09928633780600755,
+   0.972548241826798
+  ],
+  [
+   -498.4528276821963,
+   -545.4979611303748
+  ]
+ ],
+ "affine_rms_m": 14.9,
+ "scale_m_per_px": [
+  0.989,
+  0.978
+ ],
+ "rotation_deg": 9.0,
+ "tps": {
+  "P": [
+   [
+    923.0,
+    185.0
+   ],
+   [
+    469.0,
+    425.0
+   ],
+   [
+    322.0,
+    497.0
+   ],
+   [
+    1220.0,
+    515.0
+   ],
+   [
+    1205.0,
+    216.0
+   ],
+   [
+    472.0,
+    158.0
+   ],
+   [
+    42.0,
+    462.0
+   ]
+  ],
+  "W": [
+   [
+    -3.85110977773398e-06,
+    -1.3848220172325682e-05
+   ],
+   [
+    8.966454667115199e-05,
+    0.00015144396770951584
+   ],
+   [
+    5.537944930326706e-05,
+    -0.00020501262405450918
+   ],
+   [
+    -0.00012878515288863735,
+    1.853683739398479e-05
+   ],
+   [
+    0.00013668721353346844,
+    -6.919041316107583e-06
+   ],
+   [
+    -0.0001340895319905164,
+    -2.058676024270405e-05
+   ],
+   [
+    -1.500541485099985e-05,
+    7.638584068214587e-05
+   ],
+   [
+    0.9851988244444458,
+    0.1402853851603332
+   ],
+   [
+    -0.10733397786888776,
+    0.9677656733557397
+   ],
+   [
+    -466.1572316776527,
+    -607.1398352339835
+   ]
+  ]
+ }
+}

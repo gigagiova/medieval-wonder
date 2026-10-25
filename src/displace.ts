@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import type { MatName } from './materials';
+import { baseHeight, insideness } from './benevento/geo';
+import { plateausNear } from './benevento/sites';
 
 // Nothing medieval is flat. Every vertex in the world is pushed through one
 // continuous world-space vector field, so walls bulge and lean, roofs sag and
@@ -33,28 +35,92 @@ function noise(x: number, y: number, z: number) {
   return y1 + (y2 - y1) * w;
 }
 
-// Gentle uneven hill under the whole town, flattened at the ossuary stair
-// (whose opening must stay at y = 0) and never sinking towards the catacombs.
+// The ground is real: the ridge of Benevento between the Calore and the
+// Sabato, from the DEM (see benevento/geo.ts), flattened into terraces where
+// a landmark needs level footing (PLATEAUS). Geometry is authored with y = 0
+// at the local ground; the Builder lifts every vertex by the terrain under it
+// (a vertical shear, so walls stay plumb), see lift().
+export { DATUM } from './benevento/geo';
+
+/**
+ * A landmark's local frame. While a site is active, module code works in its
+ * own coordinates (as authored for the old town); field() is evaluated at the
+ * matching world point and its result handed back in the local frame, so
+ * anything a module positions with field() lands where the Builder puts it.
+ */
+export const SITE = { on: false, x: 0, z: 0, lx: 0, lz: 0, c: 1, s: 0, rot: 0 };
+export function setSite(s: { x: number; z: number; rot: number; lx?: number; lz?: number } | null) {
+  if (!s) { SITE.on = false; return; }
+  Object.assign(SITE, { on: true, x: s.x, z: s.z, lx: s.lx ?? 0, lz: s.lz ?? 0, c: Math.cos(s.rot), s: Math.sin(s.rot), rot: s.rot });
+}
+/** Local (site) x/z to world, into out[0], out[1]. Identity when no site is active. */
+export function toWorldXZ(x: number, z: number, out: number[]) {
+  if (!SITE.on) { out[0] = x; out[1] = z; return out; }
+  const dx = x - SITE.lx, dz = z - SITE.lz;
+  out[0] = SITE.x + dx * SITE.c + dz * SITE.s;
+  out[1] = SITE.z - dx * SITE.s + dz * SITE.c;
+  return out;
+}
+/** World x/z to the active site's local frame. */
+export function toLocalXZ(x: number, z: number, out: number[]) {
+  if (!SITE.on) { out[0] = x; out[1] = z; return out; }
+  const dx = x - SITE.x, dz = z - SITE.z;
+  out[0] = SITE.lx + dx * SITE.c - dz * SITE.s;
+  out[1] = SITE.lz + dx * SITE.s + dz * SITE.c;
+  return out;
+}
+
+/** Terrain height (game units, DATUM below sea level) at a world point. */
+export function worldTerrain(x: number, z: number) {
+  let h = baseHeight(x, z);
+  for (const p of plateausNear(x, z)) {
+    const d = p.ex ? Math.max(Math.abs((x - p.x) * p.ca + (z - p.z) * p.sa) / p.ex, Math.abs(-(x - p.x) * p.sa + (z - p.z) * p.ca) / p.ez!) * p.r0 : Math.hypot(x - p.x, z - p.z);
+    if (d >= p.r1) continue;
+    const t = d <= p.r0 ? 0 : THREE.MathUtils.smoothstep(d, p.r0, p.r1);
+    h = p.h + (h - p.h) * t;
+  }
+  return h;
+}
+/**
+ * Ground height for code positioning things. Inside a site's local frame the
+ * ground is its terrace, which the site's own lift supplies: 0 there.
+ */
 export function terrain(x: number, z: number) {
-  let t = 0.5 + 1.2 * noise(x / 46 + 3, 0.3, z / 46 + 7) + 0.45 * noise(x / 17, 2.2, z / 17) + Math.max(0, -z - 10) * 0.012;
-  t = Math.max(t, -0.3);
-  const ds = Math.hypot(x + 36, z + 54);
-  return t * THREE.MathUtils.smoothstep(ds, 7, 22);
+  return SITE.on ? 0 : worldTerrain(x, z);
+}
+const _w = [0, 0];
+/** World terrain gradient (dh/dx, dh/dz). */
+export function terrainGrad(x: number, z: number, out: number[]) {
+  const e = 0.6;
+  out[0] = (worldTerrain(x + e, z) - worldTerrain(x - e, z)) / (2 * e);
+  out[1] = (worldTerrain(x, z + e) - worldTerrain(x, z - e)) / (2 * e);
+  return out;
 }
 let extra: ((x: number, z: number) => number) | null = null;
 /** Extra ground relief (street gutters), sampled for the 'ground' material only. */
 export function setGroundExtra(f: (x: number, z: number) => number) { extra = f; }
 
 export function groundBump(x: number, z: number) {
-  const r = Math.hypot(x, z);
-  const out = THREE.MathUtils.smoothstep(r, 92, 110);
-  return 0.09 * noise(x / 3.1, 7.7, z / 3.1) + 0.035 * noise(x / 1.2, 3.3, z / 1.2) + out * 0.9 * noise(x / 22, 1.1, z / 22);
+  // Rougher, lumpier ground outside the walls (fields, scrub, ruins).
+  const out = 1 - insideness(x, z);
+  return 0.09 * noise(x / 3.1, 7.7, z / 3.1) + 0.035 * noise(x / 1.2, 3.3, z / 1.2) + out * 0.5 * noise(x / 22, 1.1, z / 22);
 }
 
 const AMP: Partial<Record<MatName, number>> = { bone: 0.3, cloth: 0, marble: 0.5, horn: 0.2, clay: 0.1, bronze: 0.2, ember: 0.2 };
 
 /** The part of the field that bends shapes (used for normals): no hill, no ground ride. */
 export function shapeField(x: number, y: number, z: number, m: MatName, out: THREE.Vector3) {
+  if (SITE.on) { toWorldXZ(x, z, _w); shapeFieldW(_w[0], y, _w[1], m, out); return toLocalVec(out); }
+  return shapeFieldW(x, y, z, m, out);
+}
+/** Rotate a world-frame vector into the active site's frame. */
+function toLocalVec(v: THREE.Vector3) {
+  const x = v.x, z = v.z;
+  v.x = x * SITE.c - z * SITE.s;
+  v.z = x * SITE.s + z * SITE.c;
+  return v;
+}
+function shapeFieldW(x: number, y: number, z: number, m: MatName, out: THREE.Vector3) {
   const a = (AMP[m] ?? 1) * (1.6 - 0.6 * THREE.MathUtils.smoothstep(y, -4, -2));
   const dx = a * (0.2 * noise(x / 4.7, y / 4.7, z / 4.7) + 0.07 * noise(x / 1.3 + 31, y / 1.3, z / 1.3));
   const dy = a * (0.12 * noise(x / 4.7 + 17, y / 4.7, z / 4.7) + 0.07 * noise(x / 1.3, y / 1.3 + 19, z / 1.3));
@@ -63,6 +129,10 @@ export function shapeField(x: number, y: number, z: number, m: MatName, out: THR
 }
 
 export function field(x: number, y: number, z: number, m: MatName, out: THREE.Vector3) {
+  if (SITE.on) { toWorldXZ(x, z, _w); fieldW(_w[0], y, _w[1], m, out); return toLocalVec(out); }
+  return fieldW(x, y, z, m, out);
+}
+function fieldW(x: number, y: number, z: number, m: MatName, out: THREE.Vector3) {
   const a = (AMP[m] ?? 1) * (1.6 - 0.6 * THREE.MathUtils.smoothstep(y, -4, -2));
   const macro = 0.2, meso = 0.07;
   let dx = macro * noise(x / 4.7, y / 4.7, z / 4.7) + meso * noise(x / 1.3 + 31, y / 1.3, z / 1.3);
@@ -87,8 +157,6 @@ export function field(x: number, y: number, z: number, m: MatName, out: THREE.Ve
   const gw = Math.exp(-Math.abs(y) / 1.2) + 0.6 * Math.exp(-Math.abs(y + 7) / 0.8);
   if (gw > 0.01) dy += groundBump(x, z) * gw;
   if (m === 'ground' && extra) dy += extra(x, z);
-  // The whole town sits on the uneven hill.
-  dy += terrain(x, z) * THREE.MathUtils.smoothstep(y, -3, -1.5);
   out.set(dx, dy, dz);
   return out;
 }
@@ -102,9 +170,13 @@ export const TESS: Partial<Record<MatName, number>> = {
  * Split every triangle into n² smaller ones (n from its longest edge), in one
  * pass. Much faster than iterative longest-edge splitting.
  */
+let tessScale = 1;
+/** Coarser (k > 1) or finer subdivision for what is built next: the streamed town uses a coarser one. */
+export function setTessScale(k: number) { tessScale = k; }
 export function tessellate(g: THREE.BufferGeometry, m: MatName): THREE.BufferGeometry {
-  const L = TESS[m];
-  if (!L) return g;
+  const L0 = TESS[m];
+  if (!L0) return g;
+  const L = L0 * tessScale;
   const src = g.index ? g.toNonIndexed() : g;
   const P = src.attributes.position.array as ArrayLike<number>;
   const Nn = src.attributes.normal?.array as ArrayLike<number> | undefined;
@@ -189,3 +261,63 @@ export function displace(g: THREE.BufferGeometry, m: MatName) {
     pos.setXYZ(i, x + d0.x, y + d0.y, z + d0.z);
   }
 }
+
+// ---------------------------------------------------------------- lifting onto the terrain
+// The terrain is smooth: sample it once per metre in 64 m tiles, then
+// interpolate. Millions of vertices are lifted per chunk.
+const TILE = 64, TN = TILE + 1;
+const tiles = new Map<number, Float32Array>();
+function tileOf(ti: number, tj: number) {
+  const key = ti * 4096 + tj;
+  let t = tiles.get(key);
+  if (!t) {
+    t = new Float32Array(TN * TN);
+    for (let j = 0; j < TN; j++) for (let i = 0; i < TN; i++) t[j * TN + i] = worldTerrain(ti * TILE + i, tj * TILE + j);
+    tiles.set(key, t);
+  }
+  return t;
+}
+/** Terrain height, from the per-metre tiles (bilinear). */
+export function fastTerrain(x: number, z: number) {
+  const ti = Math.floor(x / TILE), tj = Math.floor(z / TILE);
+  const t = tileOf(ti, tj);
+  const fx = x - ti * TILE, fz = z - tj * TILE;
+  const i = Math.min(TILE - 1, Math.floor(fx)), j = Math.min(TILE - 1, Math.floor(fz));
+  const u = fx - i, v = fz - j, o = j * TN + i;
+  return (t[o] * (1 - u) + t[o + 1] * u) * (1 - v) + (t[o + TN] * (1 - u) + t[o + TN + 1] * u) * v;
+}
+/** Gradient of fastTerrain (central differences over 1 m). */
+export function fastGrad(x: number, z: number, out: number[]) {
+  out[0] = (fastTerrain(x + 0.5, z) - fastTerrain(x - 0.5, z));
+  out[1] = (fastTerrain(x, z + 0.5) - fastTerrain(x, z - 0.5));
+  return out;
+}
+/** Drop cached terrain tiles (after plateaus change). */
+export function resetTerrainCache() { tiles.clear(); }
+
+const _g = [0, 0];
+/**
+ * Lift world-x/z geometry onto the terrain: y += h(x, z), a vertical shear,
+ * with normals sheared to match (n' ∝ (nx - hx·ny, ny, nz - hz·ny)).
+ * `dy` is a constant added on top (a site's terrace already includes it).
+ */
+export function liftGeometry(g: THREE.BufferGeometry) {
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  const nor = g.attributes.normal as THREE.BufferAttribute | undefined;
+  const P = pos.array as Float32Array, N = nor?.array as Float32Array | undefined;
+  for (let i = 0, n = pos.count; i < n; i++) {
+    const o = i * 3, x = P[o], z = P[o + 2];
+    P[o + 1] += fastTerrain(x, z);
+    if (N) {
+      fastGrad(x, z, _g);
+      const ny = N[o + 1];
+      let nx = N[o] - _g[0] * ny, nz = N[o + 2] - _g[1] * ny;
+      const l = Math.hypot(nx, ny, nz) || 1;
+      nx /= l; nz /= l;
+      N[o] = nx; N[o + 1] = ny / l; N[o + 2] = nz;
+    }
+  }
+  pos.needsUpdate = true;
+  if (nor) nor.needsUpdate = true;
+}
+export function liftPoint(p: THREE.Vector3) { p.y += fastTerrain(p.x, p.z); return p; }

@@ -53,14 +53,39 @@ function wornBox(w: number, h: number, d: number, r: number, L: number) {
 /** Masonry never has knife edges: these materials get rounded, weathered arrises. */
 const WORN: Partial<Record<MatName, number>> = { stone: 1, block: 1, bigstone: 1.3, rubble: 1.2, brick: 0.8, marble: 0.9, slab: 0.7, plaster: 1.1, rock: 1.4, ground: 1.4, clay: 0.6 };
 import { mat, type MatName } from './materials';
-import { tessellate, displace, displacePositions, field, TESS } from './displace';
+import { tessellate, displace, displacePositions, field, TESS, SITE, toWorldXZ, liftGeometry, fastTerrain } from './displace';
 
 // Point features (lamps, flames, props) move with the same field as the walls
-// they hang on, so nothing floats off a bulging wall or the sloping ground.
+// they hang on, so nothing floats off a bulging wall or the sloping ground;
+// then, like every vertex, they go from the site's frame to the world and up
+// onto the terrain.
 const fv = new THREE.Vector3();
+const _xz = [0, 0];
 function follow(p: THREE.Vector3) {
   field(p.x, p.y, p.z, 'stone', fv);
-  return p.add(fv);
+  p.add(fv);
+  return placeWorld(p);
+}
+/** Site frame → world, then onto the terrain. */
+export function placeWorld(p: THREE.Vector3) {
+  toWorldXZ(p.x, p.z, _xz);
+  p.x = _xz[0]; p.z = _xz[1];
+  p.y += fastTerrain(p.x, p.z);
+  return p;
+}
+/** Local (above/below the ground under it) height of a world point. */
+export const localY = (x: number, y: number, z: number) => y - fastTerrain(x, z);
+/** Move a geometry from the active site's frame to world x/z (positions and normals). */
+function siteToWorldGeo(g: THREE.BufferGeometry) {
+  if (!SITE.on) return;
+  const P = g.attributes.position.array as Float32Array;
+  const N = g.attributes.normal?.array as Float32Array | undefined;
+  const c = SITE.c, s = SITE.s;
+  for (let o = 0; o < P.length; o += 3) {
+    toWorldXZ(P[o], P[o + 2], _xz);
+    P[o] = _xz[0]; P[o + 2] = _xz[1];
+    if (N) { const nx = N[o], nz = N[o + 2]; N[o] = nx * c + nz * s; N[o + 2] = -nx * s + nz * c; }
+  }
 }
 import type { FireKind, FireSource } from './fire';
 
@@ -69,7 +94,7 @@ export type PropKind = 'skull' | 'femur' | 'humerus' | 'tibia';
 export interface Prop { kind: PropKind; matrix: THREE.Matrix4; under: boolean }
 
 /** A spatial cell of merged geometry, used for frustum, zone and occlusion culling. */
-export interface Cell { key: string; under: boolean; box: THREE.Box3; meshes: THREE.Mesh[]; visible: boolean; occluded: number }
+export interface Cell { key: string; under: boolean; box: THREE.Box3; meshes: THREE.Mesh[]; visible: boolean; occluded: number; /** Draw distance (default 120 m). */ range?: number; /** A far stand-in (never occlusion-tested). */ lod?: boolean }
 export const CELL_SIZE = 36;
 export interface Lamp {
   pos: THREE.Vector3;
@@ -99,14 +124,36 @@ export class Builder {
    * Collision never uses the render mesh: it uses `proxy` (or the piece's own
    * un-tessellated shape), bent by the same field so it stays in place.
    */
+  /** 'collide': only collision is gathered (no render geometry); 'render': no collision. */
+  mode: 'full' | 'collide' | 'render' = 'full';
+  /**
+   * When set, geometry is raised by this constant instead of riding the
+   * terrain (bridges over a river valley, things hung at an absolute height).
+   */
+  absY: number | null = null;
+  private lift(g: THREE.BufferGeometry) {
+    if (this.absY === null) { liftGeometry(g); return; }
+    const P = g.attributes.position.array as Float32Array;
+    for (let o = 1; o < P.length; o += 3) P[o] += this.absY;
+    g.attributes.position.needsUpdate = true;
+  }
+  private place(p: THREE.Vector3) {
+    if (this.absY === null) return follow(p);
+    field(p.x, p.y, p.z, 'stone', fv); p.add(fv);
+    toWorldXZ(p.x, p.z, _xz); p.x = _xz[0]; p.z = _xz[1]; p.y += this.absY;
+    return p;
+  }
   add(g: THREE.BufferGeometry, m: MatName, matrix?: THREE.Matrix4, collide = true, fine = false, raw = false, proxy?: THREE.BufferGeometry) {
-    if (collide) {
+    if (collide && this.mode !== 'render') {
       let c = (proxy ?? g).clone();
       if (matrix) c.applyMatrix4(matrix);
       if (c.index) c = c.toNonIndexed();
       if (!raw) displacePositions(c, m);
-      this.collide(c);
+      siteToWorldGeo(c);
+      this.lift(c);
+      this.pushCollider(c);
     }
+    if (this.mode === 'collide') return;
     let geo = g.clone();
     if (matrix) geo.applyMatrix4(matrix);
     for (const k of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(k)) geo.deleteAttribute(k);
@@ -116,18 +163,46 @@ export class Builder {
       displace(geo, m);
     }
     if (geo.index) geo = geo.toNonIndexed();
+    siteToWorldGeo(geo);
+    this.lift(geo);
+    if (!this.parts.has(m)) this.parts.set(m, []);
+    this.parts.get(m)!.push(geo);
+  }
+
+  /** Add finished world-space geometry (already displaced and lifted). */
+  addWorld(geo: THREE.BufferGeometry, m: MatName) {
+    if (this.mode === 'collide') return;
+    if (geo.index) geo = geo.toNonIndexed();
+    if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
     if (!this.parts.has(m)) this.parts.set(m, []);
     this.parts.get(m)!.push(geo);
   }
 
   /** A collision-only shape, bent by the world field like everything else. */
   collideShape(g: THREE.BufferGeometry, m: MatName) {
+    if (this.mode === 'render') return;
     const c = g.index ? g.toNonIndexed() : g.clone();
     displacePositions(c, m);
-    this.collide(c);
+    siteToWorldGeo(c);
+    this.lift(c);
+    this.pushCollider(c);
+  }
+  /** Collision triangles already in world space. */
+  collideWorld(c: THREE.BufferGeometry) {
+    if (this.mode === 'render') return;
+    this.pushCollider(c.index ? c.toNonIndexed() : c);
   }
 
+  /** Collision triangles in the current frame (site-local, y above local ground): placed in the world like geometry, but not displaced. */
   collide(geo: THREE.BufferGeometry) {
+    if (this.mode === 'render') return;
+    const c = new THREE.BufferGeometry();
+    c.setAttribute('position', (geo.index ? geo.toNonIndexed() : geo).attributes.position.clone());
+    siteToWorldGeo(c);
+    this.lift(c);
+    this.colliders.push(c);
+  }
+  private pushCollider(geo: THREE.BufferGeometry) {
     const c = new THREE.BufferGeometry();
     c.setAttribute('position', geo.attributes.position.clone());
     this.colliders.push(c);
@@ -138,6 +213,7 @@ export class Builder {
     tmpE.set(rx, ry, rz, 'YXZ');
     tmpQ.setFromEuler(tmpE);
     tmpM.compose(new THREE.Vector3(x, y + h / 2, z), tmpQ, new THREE.Vector3(1, 1, 1));
+    if (this.mode === 'collide') { if (collide) this.add(new THREE.BoxGeometry(w, h, d), m, tmpM, true, true); return; }
     const L = TESS[m] ?? 1e9;
     const seg = (s: number) => Math.min(64, Math.max(1, Math.ceil(s / L)));
     const proxy = collide ? new THREE.BoxGeometry(w, h, d) : undefined;
@@ -171,22 +247,26 @@ export class Builder {
       poly: { c: new THREE.Color(1.0, 0.6, 0.3), i: 1.5, f: null, lift: 0 },
     }[kind];
     const fk = fire === undefined ? (cfg.f as FireKind | null) : fire;
-    pos = follow(pos.clone());
+    if (this.mode === 'collide') return;
+    pos = this.place(pos.clone());
     const lp = pos.clone();
     lp.y += cfg.lift * scale;
     this.lamps.push({ pos: lp, color: cfg.c, intensity: cfg.i, under, seed: Math.random() * 100 });
-    if (fk) this.flames.push({ pos: pos.clone(), kind: fk, scale });
+    if (fk) this.flames.push({ pos: pos.clone(), kind: fk, scale, under });
   }
 
   /** A flame without its own light (e.g. the cups of a polykandelon). */
   flame(kind: FireKind, pos: THREE.Vector3, scale = 1) {
-    this.flames.push({ pos: follow(pos.clone()), kind, scale });
+    if (this.mode === 'collide') return;
+    const under = pos.y < -2.5;
+    this.flames.push({ pos: this.place(pos.clone()), kind, scale, under });
   }
 
   prop(kind: PropKind, x: number, y: number, z: number, ry = 0, rx = 0, rz = 0, s = 1) {
-    tmpE.set(rx, ry, rz, 'YXZ');
+    if (this.mode === 'collide') return;
+    tmpE.set(rx, ry + (SITE.on ? SITE.rot : 0), rz, 'YXZ');
     tmpQ.setFromEuler(tmpE);
-    const m = new THREE.Matrix4().compose(follow(new THREE.Vector3(x, y, z)), tmpQ, new THREE.Vector3(s, s, s));
+    const m = new THREE.Matrix4().compose(this.place(new THREE.Vector3(x, y, z)), tmpQ, new THREE.Vector3(s, s, s));
     this.props.push({ kind, matrix: m, under: y < -2.5 });
   }
 
@@ -204,7 +284,7 @@ export class Builder {
       b.get(m)!.push(g);
     };
     const keyOf = (x: number, y: number, z: number) =>
-      `${y < -2.5 ? 'u' : 'a'}|${Math.floor(x / CELL_SIZE)}|${Math.floor(z / CELL_SIZE)}`;
+      `${localY(x, y, z) < -2.5 ? 'u' : 'a'}|${Math.floor(x / CELL_SIZE)}|${Math.floor(z / CELL_SIZE)}`;
     const box = new THREE.Box3(), c = new THREE.Vector3();
     for (const [m, geos] of this.parts) {
       for (const g of geos) {
@@ -241,13 +321,25 @@ export class Builder {
         }
       }
     }
+    this.parts.clear();
     const cells: Cell[] = [];
     for (const [key, b] of buckets) {
       const cell: Cell = { key, under: key[0] === 'u', box: new THREE.Box3(), meshes: [], visible: true, occluded: 0 };
       for (const [m, geos] of b) {
+        // Shading is all in world space: no texture coordinates are needed.
+        for (const g of geos) g.deleteAttribute('uv');
         const merged = mergeGeometries(geos, false)!;
+        geos.length = 0;
         merged.computeBoundingSphere();
         merged.computeBoundingBox();
+        // Normals as bytes: a third of the memory, no visible difference.
+        {
+          const N = merged.attributes.normal.array as Float32Array, n8 = new Int8Array(N.length);
+          for (let i = 0; i < N.length; i++) n8[i] = Math.max(-127, Math.min(127, Math.round(N[i] * 127)));
+          merged.setAttribute('normal', new THREE.BufferAttribute(n8, 3, true));
+        }
+        // Keep no CPU copy once the GPU has it.
+        for (const a of Object.values(merged.attributes)) (a as THREE.BufferAttribute).onUpload(function (this: THREE.BufferAttribute) { (this as unknown as { array: unknown }).array = null; });
         cell.box.union(merged.boundingBox!);
         const mesh = new THREE.Mesh(merged, mat(m));
         mesh.castShadow = !['window', 'ember', 'horn'].includes(m) && !cell.under;
@@ -259,6 +351,7 @@ export class Builder {
       cells.push(cell);
     }
     const col = mergeGeometries(this.colliders, false)!;
+    this.colliders.length = 0;
     return { collider: new THREE.Mesh(col), cells };
   }
 }

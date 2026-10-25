@@ -3,7 +3,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { loadGltf } from './gltf';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Builder } from './builder';
-import { field } from './displace';
+import { field, SITE, fastTerrain } from './displace';
+import { placeWorld } from './builder';
 import { shared } from './materials';
 import { noiseGLSL, atmosGLSL } from './shaders';
 
@@ -32,6 +33,10 @@ const RANGE: Partial<Record<PropId, number>> = {
   root_cluster_01: 70, root_cluster_02: 70, pine_roots: 70,
   nettle_plant: 32, fern_02: 32, grass_medium_02: 28, shrub_02: 36, weed_plant_02: 28,
   bark_debris_01: 30, dry_branches_medium_01: 40, street_rat: 25,
+  // Household things: mostly indoors or at doorsteps, and dense scans.
+  treasure_chest: 22, wine_barrel_01: 34, wooden_barrels_01: 38, wooden_bucket_01: 26, wooden_bucket_02: 26, ceramic_pot: 28,
+  planter_pot_clay: 28, wicker_basket_02: 28, wooden_bowl_01: 16, carved_wooden_plate: 16, folding_wooden_stool: 22,
+  WoodenTable_01: 26, wooden_cutting_board: 16, wooden_axe: 18, wooden_axe_02: 18, cross_pein_hammer: 16, stone_fire_pit: 34,
 };
 const DEFAULT_RANGE = 45;
 
@@ -163,7 +168,7 @@ export interface PlaceOpts {
   stretch?: [number, number, number];
 }
 
-interface Placement { id: PropId; variant: number; matrix: THREE.Matrix4 }
+interface Placement { id: PropId; variant: number; matrix: THREE.Matrix4; under: boolean }
 const pending: Placement[] = [];
 const fv = new THREE.Vector3();
 const q = new THREE.Quaternion(), e = new THREE.Euler();
@@ -180,32 +185,40 @@ export function placeProp(_scene: THREE.Scene | null, id: PropId, x: number, y: 
   const p = new THREE.Vector3(x, y, z);
   // Follow the same bend as the ground (and as walls near it) at this point.
   if (!opts.raw) { field(x, y, z, y < 0.5 && y > -0.5 ? 'ground' : 'stone', fv); p.add(fv); }
-  e.set(opts.tilt?.[0] ?? 0, ry, opts.tilt?.[1] ?? 0, 'YXZ');
+  // From the site's frame (if any) to the world, onto the terrain.
+  const under = y < -2.5;
+  placeWorld(p);
+  e.set(opts.tilt?.[0] ?? 0, ry + (SITE.on ? SITE.rot : 0), opts.tilt?.[1] ?? 0, 'YXZ');
   q.setFromEuler(e);
   const s = new THREE.Vector3(scale, scale, scale);
   if (opts.stretch) s.multiply(new THREE.Vector3(...opts.stretch));
   const matrix = new THREE.Matrix4().compose(p, q, s);
-  pending.push({ id, variant: vi, matrix });
+  pending.push({ id, variant: vi, matrix, under });
   if (opts.collide) {
     const box = list[vi].box;
     const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
     const g = new THREE.BoxGeometry(size.x * 0.9, size.y, size.z * 0.9).translate(c.x, c.y, c.z).applyMatrix4(matrix).toNonIndexed();
-    opts.collide.collide(g);
+    opts.collide.collideWorld(g);
   }
   return p;
 }
 
-interface Chunk { center: THREE.Vector3; range: number; meshes: THREE.InstancedMesh[] }
+interface Chunk { center: THREE.Vector3; range: number; meshes: THREE.InstancedMesh[]; under: boolean }
 const chunks: Chunk[] = [];
-const CHUNK = 40;
+const CHUNK = 64;
+/** Small near-only plants are grouped finer, so they can be dropped close by. */
+const chunkOf = (id: PropId) => ((RANGE[id] ?? DEFAULT_RANGE) < 40 ? 20 : CHUNK);
 let ticker: THREE.Object3D | null = null;
 
 /** Turn all pending placements into instanced meshes, chunked for culling. */
-export function commitProps(scene: THREE.Scene) {
+export function commitProps(scene: THREE.Object3D) {
+  // Placements are in world space: add to the root, not to a site's group.
+  while (scene.parent) scene = scene.parent;
   const groups = new Map<string, Placement[]>();
   for (const pl of pending) {
     const pos = new THREE.Vector3().setFromMatrixPosition(pl.matrix);
-    const key = `${pl.id}|${pl.variant}|${Math.floor(pos.x / CHUNK)}|${Math.floor(pos.z / CHUNK)}|${pos.y < -2.5 ? 'u' : 'a'}`;
+    const C = chunkOf(pl.id);
+    const key = `${pl.id}|${pl.variant}|${Math.floor(pos.x / C)}|${Math.floor(pos.z / C)}|${pl.under ? 'u' : 'a'}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(pl);
   }
@@ -216,7 +229,7 @@ export function commitProps(scene: THREE.Scene) {
     const center = new THREE.Vector3();
     for (const pl of list) center.add(new THREE.Vector3().setFromMatrixPosition(pl.matrix));
     center.divideScalar(list.length);
-    const chunk: Chunk = { center, range: (RANGE[id] ?? DEFAULT_RANGE) + CHUNK * 0.6, meshes: [] };
+    const chunk: Chunk = { center, range: (RANGE[id] ?? DEFAULT_RANGE) + chunkOf(id) * 0.6, meshes: [], under: list[0].under };
     for (const part of v.parts) {
       const im = new THREE.InstancedMesh(part.geometry, part.material, list.length);
       list.forEach((pl, i) => im.setMatrixAt(i, pl.matrix));
@@ -240,9 +253,9 @@ export function commitProps(scene: THREE.Scene) {
     ticker.onBeforeRender = (_r, _s, camera) => {
       if (n++ % 4) return;
       const cp = camera.getWorldPosition(tmp);
-      const under = cp.y < -2.4;
+      const under = cp.y - fastTerrain(cp.x, cp.z) < -2.4;
       for (const c of chunks) {
-        const vis = c.center.distanceTo(cp) < c.range && (c.center.y < -2.5) === under || c.center.distanceTo(cp) < 6;
+        const vis = c.center.distanceTo(cp) < c.range && c.under === under || c.center.distanceTo(cp) < 6;
         for (const m of c.meshes) m.visible = vis;
       }
     };
