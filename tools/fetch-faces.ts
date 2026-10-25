@@ -76,14 +76,16 @@ async function pack(F: (typeof FACES)[number], io: NodeIO) {
   // Everything in world space, in the face's frame.
   const E = new THREE.Vector3(...F.eyes), k = 0.063 / F.eyeSpan;
   const pos: number[] = [], uv: number[] = [], ix: number[] = [];
-  let texURI = '';
+  const texURIs: string[] = [], vmat: number[] = [];
   const v = new THREE.Vector3();
   for (const node of root.listNodes()) {
     const mesh = node.getMesh();
     if (!mesh) continue;
     const M = new THREE.Matrix4().fromArray(node.getWorldMatrix() as number[]);
     for (const pr of mesh.listPrimitives()) {
-      texURI ||= pr.getMaterial()?.getBaseColorTexture()?.getURI() ?? '';
+      const uri = pr.getMaterial()?.getBaseColorTexture()?.getURI() ?? '';
+      if (!texURIs.includes(uri)) texURIs.push(uri);
+      const mi = texURIs.indexOf(uri);
       const P = pr.getAttribute('POSITION')!, U = pr.getAttribute('TEXCOORD_0')!, I = pr.getIndices();
       const base = pos.length / 3;
       for (let i = 0; i < P.getCount(); i++) {
@@ -91,6 +93,7 @@ async function pack(F: (typeof FACES)[number], io: NodeIO) {
         pos.push(v.x, v.y, v.z);
         const t = U.getElement(i, []);
         uv.push(t[0], t[1]);
+        vmat.push(mi);
       }
       const n = I ? I.getCount() : P.getCount();
       for (let i = 0; i < n; i++) ix.push(base + (I ? I.getScalar(i) : i));
@@ -116,11 +119,12 @@ async function pack(F: (typeof FACES)[number], io: NodeIO) {
     tri = tri.filter((_, j) => find(weld[tri[j - (j % 3)]]) === big);
   }
   // Compact.
-  const remap = new Map<number, number>(), P3: number[] = [], U3: number[] = [];
-  const I3 = tri.map((i) => { let j = remap.get(i); if (j === undefined) { j = P3.length / 3; remap.set(i, j); P3.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]); U3.push(uv[i * 2], uv[i * 2 + 1]); } return j; });
+  const remap = new Map<number, number>(), P3: number[] = [], U3: number[] = [], T3: number[] = [];
+  const I3 = tri.map((i) => { let j = remap.get(i); if (j === undefined) { j = P3.length / 3; remap.set(i, j); P3.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]); U3.push(uv[i * 2], uv[i * 2 + 1]); T3.push(vmat[i]); } return j; });
   // New map: unrolled round the head's axis; colour baked from the scan's.
-  const src = await sharp(path.join(dir, texURI)).resize(4096, 4096).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-  const SW = src.info.width, SH = src.info.height, S = src.data;
+  const srcs = await Promise.all(texURIs.map((u) => sharp(path.join(dir, u)).resize(4096, 4096).removeAlpha().raw().toBuffer({ resolveWithObject: true })));
+  const SW = 4096, SH = 4096;
+  let S = srcs[0].data;
   const NU: number[] = [];
   const amax = F.cone, ylo = F.bottom, yhi = F.top;
   for (let i = 0; i < P3.length / 3; i++) {
@@ -136,6 +140,7 @@ async function pack(F: (typeof FACES)[number], io: NodeIO) {
   };
   for (let t = 0; t < I3.length; t += 3) {
     const [a, b, c] = [I3[t], I3[t + 1], I3[t + 2]];
+    S = srcs[T3[a]].data;
     const ax = NU[a * 2] * AT, ay = NU[a * 2 + 1] * AT, bx = NU[b * 2] * AT, by = NU[b * 2 + 1] * AT, cx = NU[c * 2] * AT, cy = NU[c * 2 + 1] * AT;
     const den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
     if (Math.abs(den) < 1e-9) continue;

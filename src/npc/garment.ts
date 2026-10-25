@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { skinMaterial } from './scan';
 import { canon, withAtmos, matte } from './rig';
 import { fabric } from './fabric';
-import { drape, ellipsoid, capsule, starField, gridSprings, smoothGrid, tethers } from './drape';
+import { capsule, starField } from './bodyshape';
 
 // Clothes, made the way game characters are dressed: each garment is
 // generated around the body in its bind pose, pushed out of the body with
@@ -1972,7 +1972,7 @@ const HOODS: Record<HoodKind, {
  * skull's ellipsoid (a little out from it, by the kind), below its middle an
  * upright wall (cheeks and jaw in front, the back of the head behind); where
  * it leaves the head it falls away like a tent over the clothed shoulders and
- * back (seen from the neck's axis and from above, as drape.ts's starField,
+ * back (seen from the neck's axis and from above, as bodyshape.ts's starField,
  * then exactly), and never tucks back in.
  */
 function layHood(M: Measure, kind: HoodKind, clothes: MeshBVH, under: MeshBVH, all: MeshBVH, yLow: number): Grid {
