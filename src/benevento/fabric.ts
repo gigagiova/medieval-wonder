@@ -437,13 +437,19 @@ export function lodChunk(it: ChunkItems): { walls: number[]; roofs: number[] } {
   };
   const Y = (x: number, z: number, y: number) => [x, y + fastTerrain(x, z), z];
   for (const l of it.lots) {
-    const c = l.c, h = l.h;
-    const lx = (c[0][0] + c[1][0] + c[2][0] + c[3][0]) / 4, lz = (c[0][1] + c[1][1] + c[2][1] + c[3][1]) / 4;
+    const c = l.c, h = l.h, n = c.length;
+    let lx = 0, lz = 0;
+    for (const [x, z] of c) { lx += x / n; lz += z / n; }
     inside = [lx, fastTerrain(lx, lz) + h * 0.5 - 2, lz];
-    for (let k = 0; k < 4; k++) {
-      const [ax, az] = c[k], [bx, bz] = c[(k + 1) % 4];
+    for (let k = 0; k < n; k++) {
+      const [ax, az] = c[k], [bx, bz] = c[(k + 1) % n];
       const A0 = Y(ax, az, -0.6), B0 = Y(bx, bz, -0.6), A1 = Y(ax, az, h), B1 = Y(bx, bz, h);
       tri(walls, A0, B0, B1); tri(walls, A0, B1, A1);
+    }
+    // Footprints drawn on the plan that are no quads: a flat cap at the eaves (it is far away).
+    if (n !== 4) {
+      for (let k = 1; k < n - 1; k++) tri(roofs, Y(c[0][0], c[0][1], h), Y(c[k][0], c[k][1], h), Y(c[k + 1][0], c[k + 1][1], h));
+      continue;
     }
     // Ridge along the longer side.
     const e01 = Math.hypot(c[1][0] - c[0][0], c[1][1] - c[0][1]), e12 = Math.hypot(c[2][0] - c[1][0], c[2][1] - c[1][1]);

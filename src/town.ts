@@ -73,6 +73,9 @@ export function prismWalls(c: V2[], y0: number, h: number, step = WALL_STEP, ski
   };
   const pos: number[] = [], idx: number[] = [];
   const nv = Math.max(1, Math.ceil(h / step));
+  // Winding from the polygon's signed area (right for concave footprints too).
+  let area2 = 0;
+  for (let k = 0; k < n; k++) { const a = c[k], b = c[(k + 1) % n]; area2 += a.x * b.y - b.x * a.y; }
   for (let k = 0; k < n; k++) {
     if (k === skip) continue;
     const a = c[k], b = c[(k + 1) % n];
@@ -91,8 +94,7 @@ export function prismWalls(c: V2[], y0: number, h: number, step = WALL_STEP, ski
         : u >= L - dB ? arc(kb, corner[kb].eB, L - u)
           : a.clone().addScaledVector(e, u));
     const nu = cols.length - 1;
-    const mx = (a.x + b.x) / 2 - cx, mz = (a.y + b.y) / 2 - cz;
-    const flip = -e.y * mx + e.x * mz < 0;
+    const flip = area2 > 0;
     const base = pos.length / 3;
     for (let j = 0; j <= nv; j++) for (const p of cols) pos.push(p.x, y0 + (h * j) / nv, p.y);
     for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
@@ -129,9 +131,15 @@ export function buildHouse(b: Builder, lot: Lot) {
   if (front) {
     const width = lot.street ?? 2;
     jetty = facade(b, acc, { a: front.a, b: front.b, out: front.out, base, h1, h: Math.max(h, h1 + 0.01), lower, upper, street: width, lamp: rand() < 0.2 });
-    if (jetty > 0) c = [c[0].clone().addScaledVector(front.out, jetty), c[1].clone().addScaledVector(front.out, jetty), c[2], c[3]];
+    if (jetty > 0) c = c.map((p, i) => (i < 2 ? p.clone().addScaledVector(front.out, jetty) : p));
   } else {
     backWindows(acc, c, base, h, lower);
+  }
+  // A footprint drawn on the plan that is no quad gets a hipped roof that follows it.
+  if (c.length !== 4) {
+    polyRoof(b, c, h, front ? 0.42 : 0.5, R(0.3, 0.45));
+    acc.flush(b);
+    return;
   }
   // Roof over the footprint's oriented bounds, ridge along or across the street.
   const e = c[1].clone().sub(c[0]).normalize();
@@ -157,13 +165,76 @@ export function buildHouse(b: Builder, lot: Lot) {
   acc.flush(b);
 }
 
+/**
+ * A hipped roof over any footprint: every eave runs along a wall (pushed out
+ * by `over`), rising at `pitch` to a ridge line along the footprint's long
+ * axis, so irregular plots from the plan keep their drawn shape. Plain tile
+ * surface, a low eave fascia; two triangles per wall.
+ */
+export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: number) {
+  const n = c.length;
+  let area2 = 0, cx = 0, cz = 0;
+  for (let k = 0; k < n; k++) { const a = c[k], q = c[(k + 1) % n]; const cr = a.x * q.y - q.x * a.y; area2 += cr; cx += (a.x + q.x) * cr; cz += (a.y + q.y) * cr; }
+  if (Math.abs(area2) < 1e-6) return;
+  cx /= 3 * area2; cz /= 3 * area2;
+  // Long axis from the second moments; the ridge runs along it through the centroid.
+  let sxx = 0, szz = 0, sxz = 0;
+  for (const p of c) { sxx += (p.x - cx) ** 2; szz += (p.y - cz) ** 2; sxz += (p.x - cx) * (p.y - cz); }
+  const th = 0.5 * Math.atan2(2 * sxz, sxx - szz), ax = V(Math.cos(th), Math.sin(th)), nx = V(-ax.y, ax.x);
+  let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity;
+  for (const p of c) { const u = (p.x - cx) * ax.x + (p.y - cz) * ax.y, w = (p.x - cx) * nx.x + (p.y - cz) * nx.y; u0 = Math.min(u0, u); u1 = Math.max(u1, u); w0 = Math.min(w0, w); w1 = Math.max(w1, w); }
+  const half = (w1 - w0) / 2, wm = (w0 + w1) / 2;
+  const ridgeH = h + Math.min(half * pitch, 3.2);
+  const r0 = Math.max(u0 + half * 0.8, (u0 + u1) / 2 - 0.01), r1 = Math.min(u1 - half * 0.8, (u0 + u1) / 2 + 0.01);
+  // Height of the roof over a point: rises from the eaves towards the ridge segment.
+  const ridgePt = (p: V2) => {
+    const u = THREE.MathUtils.clamp((p.x - cx) * ax.x + (p.y - cz) * ax.y, r0, r1);
+    return V(cx + ax.x * u + nx.x * wm, cz + ax.y * u + nx.y * wm);
+  };
+  const pos: number[] = [];
+  const sgn = area2 > 0 ? 1 : -1;
+  for (let k = 0; k < n; k++) {
+    const a = c[k], q = c[(k + 1) % n];
+    const e = q.clone().sub(a);
+    const L = e.length();
+    if (L < 0.05) continue;
+    e.multiplyScalar(1 / L);
+    const out = V(e.y, -e.x).multiplyScalar(sgn);
+    const A = a.clone().addScaledVector(out, over).addScaledVector(e, -over), Q = q.clone().addScaledVector(out, over).addScaledVector(e, over);
+    const ra = ridgePt(a), rq = ridgePt(q);
+    const yE = h - over * pitch;
+    const tri = (p1: number[], p2: number[], p3: number[]) => {
+      // Wind so the face looks up.
+      const ux = p2[0] - p1[0], uz = p2[2] - p1[2], vx = p3[0] - p1[0], vz = p3[2] - p1[2];
+      const ny = uz * vx - ux * vz;
+      if (ny >= 0) pos.push(...p1, ...p2, ...p3); else pos.push(...p1, ...p3, ...p2);
+    };
+    const PA = [A.x, yE, A.y], PQ = [Q.x, yE, Q.y], RA = [ra.x, ridgeH, ra.y], RQ = [rq.x, ridgeH, rq.y];
+    tri(PA, PQ, RQ);
+    if (ra.distanceTo(rq) > 0.02) tri(PA, RQ, RA);
+    // Fascia under the eave.
+    const FA = [A.x, yE - 0.18, A.y], FQ = [Q.x, yE - 0.18, Q.y];
+    {
+      // Wind the fascia to face outwards.
+      const ux = FA[0] - PA[0], uy = FA[1] - PA[1], uz = FA[2] - PA[2], vx = FQ[0] - PA[0], vy = FQ[1] - PA[1], vz = FQ[2] - PA[2];
+      const fx = uy * vz - uz * vy, fz = ux * vy - uy * vx;
+      if (fx * out.x + fz * out.y >= 0) pos.push(...PA, ...FA, ...FQ, ...PA, ...FQ, ...PQ);
+      else pos.push(...PA, ...FQ, ...FA, ...PA, ...PQ, ...FQ);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  b.add(g, 'roof', undefined, false, false);
+}
+
 /** Back buildings: a few small dark windows and putlog holes on their walls. */
 function backWindows(acc: Acc, c: V2[], base: number, h: number, m: MatName) {
   let cx = 0, cz = 0;
-  for (const p of c) { cx += p.x / 4; cz += p.y / 4; }
-  for (let k = 0; k < 4; k++) {
+  for (const p of c) { cx += p.x / c.length; cz += p.y / c.length; }
+  for (let k = 0; k < c.length; k++) {
     if (rand() < 0.45) continue;
-    const a = c[k], bb = c[(k + 1) % 4];
+    const a = c[k], bb = c[(k + 1) % c.length];
     const L = a.distanceTo(bb);
     if (L < 1.5) continue;
     const e = bb.clone().sub(a).normalize();
