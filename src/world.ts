@@ -1,8 +1,105 @@
 import * as THREE from 'three';
-import { Builder, rng } from './builder';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { Builder, rng, type Cell } from './builder';
 import type { MatName } from './materials';
-import { arcadeGeo, arcade, ruinGeo, ruin, column, fallenDrum, gable, leanTo, pyramidRoof, ringGeo, wellHead, WELLS, archRings, quoinBox } from './shapes';
+import { arcadeGeo, arcade, ruin, column, fallenDrum, gable, leanTo, pyramidRoof, ringGeo, archRings, quoinBox } from './shapes';
+import { torch, brazier, hornLantern, lucerna, polykandelon, candle } from './lights';
+import { buildCatacombs, CATACOMB_SPOTS, CELLA_STAIR } from './catacombs';
+import { buildForest, treeSpots } from './forest';
+import { buildBaths, BATHS_SPOT } from './baths';
+import { buildPalace, PALACE_SPOT } from './palace';
+import { buildLibrary } from './library';
+import { setSite, worldTerrain, fastTerrain, terrain, toLocalXZ } from './displace';
+import { placeProp, commitProps, rand01, type PropId } from './props';
+import { BOUNDS, RIVERS, WALL700, CIVITAS_NOVA, MEDIEVAL_OUTLINE, insideWalls, insideness, riverAt, inPoly, type P2 } from './benevento/geo';
+import { SITES, GATES, ROADS, siteToWorld, DISTRICTS, type SiteDef } from './benevento/sites';
+import { layoutTown, density, FREE, STREET, RESERVED, HOUSE, PLOT, type Layout } from './benevento/layout';
+import { makeChunks, buildChunk, CHUNK, type Hole, type ChunkItems } from './benevento/fabric';
+import { FabricStream } from './benevento/stream';
+import * as M from './benevento/monuments';
+import { buildRivers } from './benevento/rivers';
+import { interiorAnchors } from './benevento/interiors';
+import { PLACED, markReadableWorld } from './benevento/readables';
+import { LORE, explorableLore } from './benevento/lore';
 
+// Benevento in AD 700, under Duke Gisulf I: the town of the first Lombard
+// circuit on its ridge between the Calore and the Sabato, laid out on the
+// user's plan (registered on real survey data), streamed around the player;
+// the monuments where they stand; outside the walls the theatre, the baths,
+// the amphitheatre and the Santi Quaranta in the ruralised west, the bridges,
+// the nunnery of St Peter across the Sabato, the Lombard cemetery, S. Ilario
+// on the Traiana, and the fields, scrub and woods along the rivers.
+
+const rand = rng(1327);
+const R = (a: number, b: number) => a + (b - a) * rand();
+
+const STAIR_X = -36, STAIR_W = 3, STAIR_TOP = -52, HOLE_END = -56;
+
+let lay: Layout;
+let stream: FabricStream;
+
+/** Rotation that turns local +z into world direction (dx, dz). */
+const rotZTo = (dx: number, dz: number) => Math.atan2(dx, dz);
+
+const AUREA_DIR: [number, number] = [0.88, -0.48]; // Via Traiana through the arch
+export const SPAWN = (() => {
+  const s = SITES.arcusTraiani, x = s.x + AUREA_DIR[0] * 16, z = s.z + AUREA_DIR[1] * 16;
+  return new THREE.Vector3(x, worldTerrain(x, z) + 1.8, z);
+})();
+export const SPAWN_YAW = Math.atan2(AUREA_DIR[0], AUREA_DIR[1]);
+
+/** Where the ground opens onto a stair down: both the town and the underworld are drawn here. */
+export const STAIR_ZONES: { x: number; z: number; r: number }[] = [];
+
+export interface Teleport { name: string; x: number; y: number; z: number; yaw: number }
+const tp = (name: string, x: number, z: number, lookX: number, lookZ: number): Teleport =>
+  ({ name, x, z, y: worldTerrain(x, z) + 2.2, yaw: Math.atan2(-(lookX - x), -(lookZ - z)) });
+const sw = (s: SiteDef, lx: number, lz: number) => siteToWorld(s, lx, lz);
+
+/** Places the map can send you to (y is eye height; the landing finds the floor). */
+export function getTeleports(): Teleport[] {
+  const S = SITES;
+  const out: Teleport[] = [];
+  const at = (name: string, s: SiteDef, lx: number, lz: number, llx: number, llz: number) => {
+    const [x, z] = sw(s, lx, lz), [lx2, lz2] = sw(s, llx, llz);
+    out.push(tp(name, x, z, lx2, lz2));
+  };
+  at('Porta Aurea', S.arcusTraiani, 0, 14, 0, 0);
+  at('Arcus Sacramenti', S.arcusSacramenti, 0, 9, 0, 0);
+  at('Curtis Ducis', S.curtis, 39.6, -4.5, 39.6, -16);
+  at('Episcopium', S.episcopium, -15.5, -31, -17, -45);
+  at('Sancta Maria', S.episcopium, -17.6, -45, -17, -62);
+  at('Bibliotheca', S.episcopium, -12.6, -50, -7, -50);
+  at('Forum', S.forum, 21, 18, 21, 6);
+  at('Theatrum', S.theatrum, 6, 0, 30, 0);
+  at('Thermae', S.thermae, -20.6, 29.5, -30, 29.5);
+  at('Amphitheatrum', S.amphitheatrum, 0, -60, 0, 0);
+  at('Sancti Quadraginta', S.quadraginta, -36, -46, -36, -56);
+  at('Turris Catenae', S.turrisCatenae, -10, 0, 0, 0);
+  at('Pons Leprosus', S.pontesLeprosus, 0, 0, 30, 0);
+  at('Sanctus Petrus', S.sanctusPetrus, -15.5, -31, -17, -45);
+  at('Sanctus Hilarius', S.sanctusHilarius, -13, 0, 0, 0);
+  at('Iseum', S.iseum, 0, 16, 0, 0);
+  at('Coemeterium Langobardorum', S.necropolis, 0, 26, 0, 0);
+  at('Nux Sacra', S.nux, 0, 9, 0, 0);
+  at('Molendinum', S.molendinum, 0.8, -7, 0.8, 0);
+  at('Hortus Curtis', S.hortusSophiae, 0, 8, 0, 0);
+  {
+    const c = M.CISTERN;
+    const [x, z] = sw(S.hortusSophiae, 0, c.bottom - 3);
+    out.push({ name: 'Cisterna', x, z, y: fastTerrain(x, z) + c.depth + 1.85, yaw: 0 });
+  }
+  {
+    const cs = CATACOMB_SPOTS, s = S.quadraginta;
+    const lw = (v: THREE.Vector3) => { const [x, z] = sw(s, v.x, v.z); return { x, z, y: fastTerrain(x, z) + v.y + 0.2 }; };
+    out.push({ name: 'Catacumbae', ...lw(cs.stairBottom), yaw: s.rot });
+    out.push({ name: 'Crypta', ...lw(cs.crypt), yaw: 0.9 + s.rot });
+  }
+  for (const g of GATES) if (g.kind !== 'arch') out.push(tp(g.name, g.at[0], g.at[1], g.at[0] + 0.01, g.at[1] - 0.01));
+  return out;
+}
+
+// ---------------------------------------------------------------- the cathedral (the old abbey church, in the Episcopium frame)
 /** A buttress as stepped masses with weathered offsets, not a cube. */
 function buttress(b: Builder, m: MatName, w: number, h: number, d: number, x: number, y: number, z: number, ry: number) {
   const h1 = h * R(0.5, 0.62);
@@ -13,349 +110,6 @@ function buttress(b: Builder, m: MatName, w: number, h: number, d: number, x: nu
   b.box('stone', w + 0.06, 0.12, d * 0.45, x + X * d * 0.3, y + h1 - 0.04, z + Z * d * 0.3, ry, false, -0.45);
   b.box('stone', w * 0.86, 0.12, d * 0.4, x + X * d * 0.0, y + h - 0.06, z + Z * d * 0.0, ry, false, -0.5);
   quoinBox(b, 'block', w, h1, d, x, y, z, ry);
-}
-import { torch, brazier, hornLantern, bracketLantern, lucerna, polykandelon, candle } from './lights';
-import { layoutTown, lotsFor, buildHouse, buildBridges, townTexture, BRIDGE_SPOTS, type Town } from './town';
-import { setGroundExtra } from './displace';
-import { buildCatacombs, CATACOMB_SPOTS, CELLA_STAIR } from './catacombs';
-import { buildForest, treeSpots } from './forest';
-import { buildBaths, BATHS_SPOT } from './baths';
-import { buildPalace, PALACE_SPOT } from './palace';
-import { buildLibrary } from './library';
-import { terrain } from './displace';
-
-// A Lombard town around AD 750, packed inside what is left of a Roman circuit.
-// Houses of river cobble and reused brick stand wall to wall along crooked
-// alleys, rooms bridge the alleys on arches; the old forum is a quarry of
-// columns with houses built into the temple. In the north-west, an abbey:
-// an early-Christian basilica with its atrium, an ossuary chapel over the
-// catacombs. No campanili, no crenellations, no cloister arcades yet: those
-// belong to later centuries.
-
-const rand = rng(1327);
-const R = (a: number, b: number) => a + (b - a) * rand();
-
-const STAIR_X = -36, STAIR_W = 3, STAIR_TOP = -52, HOLE_END = -56;
-
-const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
-const V = (x: number, z: number) => new THREE.Vector2(x, z);
-
-// The Roman circuit: irregular, bulging north-west where the abbey is.
-const WALL: THREE.Vector2[] = (() => {
-  const pts: THREE.Vector2[] = [];
-  const n = 15;
-  for (let k = 0; k < n; k++) {
-    const th = (k / n) * Math.PI * 2 + R(-0.12, 0.12);
-    let dth = th - 3.72;
-    while (dth > Math.PI) dth -= Math.PI * 2;
-    while (dth < -Math.PI) dth += Math.PI * 2;
-    const r = 66 + 17 * Math.exp(-(dth * dth) / 0.55) + R(-5, 5);
-    pts.push(V(r * Math.sin(th), r * Math.cos(th)));
-  }
-  return pts;
-})();
-export const WALL_R = 70;
-
-/** Where the ray at angle th from the centre crosses the wall. */
-function wallAt(th: number) {
-  const d = V(Math.sin(th), Math.cos(th));
-  for (let k = 0; k < WALL.length; k++) {
-    const a = WALL[k], b = WALL[(k + 1) % WALL.length];
-    const e = b.clone().sub(a);
-    const den = d.x * e.y - d.y * e.x;
-    if (Math.abs(den) < 1e-6) continue;
-    const t = (a.x * e.y - a.y * e.x) / den;
-    const u = (a.x * d.y - a.y * d.x) / den;
-    if (t > 0 && u >= 0 && u <= 1) return { p: d.multiplyScalar(t), k, u };
-  }
-  throw new Error('wall');
-}
-const GATE = wallAt(0.06);
-const EAST = wallAt(1.62);
-// A postern in the north wall, right above the crypt.
-const NORTH = wallAt(Math.atan2(-20.3, -93.1));
-export const SPAWN = new THREE.Vector3(GATE.p.x + 1.5, 3, GATE.p.y + 30);
-
-let town: Town;
-const mapMarks = { trees: [] as THREE.Vector2[], tombs: [] as THREE.Vector2[], aqueduct: [] as THREE.Vector2[], arch: V(0, 0), well: V(0, 0) };
-
-export interface Teleport { name: string; x: number; y: number; z: number; yaw: number }
-/** Places the map can send you to. y is eye height (above ground ones are dropped in from a little higher). */
-export function getTeleports(): Teleport[] {
-  const above = (name: string, x: number, z: number, lookX: number, lookZ: number): Teleport =>
-    ({ name, x, z, y: terrain(x, z) + 2.2, yaw: Math.atan2(-(lookX - x), -(lookZ - z)) });
-  const out = GATE.p.clone().normalize();
-  const lane = town.streets[0].pts;
-  const mid = lane[Math.floor(lane.length * 0.55)];
-  const cs = CATACOMB_SPOTS;
-  return [
-    above('Porta', GATE.p.x + out.x * 9, GATE.p.y + out.y * 9, GATE.p.x, GATE.p.y),
-    above('Via Sepulcrorum', GATE.p.x + out.x * 32, GATE.p.y + out.y * 32, GATE.p.x, GATE.p.y),
-    above('Arcus', mapMarks.arch.x, mapMarks.arch.y + 4, mapMarks.arch.x, mapMarks.arch.y - 10),
-    above('Civitas', mid.x, mid.y, lane[Math.floor(lane.length * 0.55) + 1].x, lane[Math.floor(lane.length * 0.55) + 1].y),
-    above('Templum', 18.5, 21.5, 21, 6),
-    above('Atrium', -15.5, -31, -17, -45),
-    above('Basilica', -17.6, -45, -17, -62),
-    above('Bibliotheca', -12.6, -50, -7, -50),
-    above('Ossuarium', -36, -50.2, -36, -56),
-    { name: 'Catacumbae', x: cs.stairBottom.x, y: cs.stairBottom.y + 0.2, z: cs.stairBottom.z, yaw: 0 },
-    { name: 'Crypta', x: cs.crypt.x, y: cs.crypt.y + 0.2, z: cs.crypt.z, yaw: 0.9 },
-    // At the head of the martyr's stair inside the cella, looking down it.
-    { name: 'Cella Memoriae', x: cs.cellaTop.x, y: cs.cellaTop.y + 0.2, z: cs.cellaTop.z, yaw: Math.PI },
-    above('Aquaeductus', 92, -66, 140, -100),
-    above('Puteus', mapMarks.well.x - 2.4, mapMarks.well.y - 0.6, mapMarks.well.x, mapMarks.well.y),
-    above('Palatium', PALACE_SPOT.x, PALACE_SPOT.z, PALACE_SPOT.x, PALACE_SPOT.z - 10),
-    { name: 'Thermae', x: BATHS_SPOT.x, z: BATHS_SPOT.z, y: terrain(BATHS_SPOT.x, BATHS_SPOT.z) + 1.4 + 2.2, yaw: BATHS_SPOT.yaw },
-    above('Porta Septentrionalis', NORTH.p.x - 0.5, NORTH.p.y - 6, -20.3, -93.1),
-  ];
-}
-
-/** Everything the map needs: the town raster, the wall, streets, landmarks, surroundings. */
-export function getMapData() {
-  return {
-    grid: town.grid, n: Math.round(Math.sqrt(town.grid.length)), min: -100, res: 0.5,
-    codes: { free: 0, street: 1, reserved: 2, house: 3, outside: 4 },
-    wall: WALL, gate: GATE.p.clone(), eastGate: EAST.p.clone(), northGate: NORTH.p.clone(),
-    streets: town.streets.map((s) => ({ pts: s.pts, w: s.w, main: s.main })),
-    landmarks: [
-      { name: 'Porta', x: GATE.p.x, z: GATE.p.y },
-      { name: 'Porta Septentrionalis', x: NORTH.p.x, z: NORTH.p.y },
-      { name: 'Cella Memoriae', x: -20.3, z: -93.1 },
-      { name: 'Thermae', x: -33, z: 24 },
-      { name: 'Palatium', x: 40, z: -23 },
-      { name: 'Basilica', x: -17.3, z: -53 },
-      { name: 'Atrium', x: -16, z: -35 },
-      { name: 'Ossuarium', x: -36, z: -54.5 },
-      { name: 'Templum', x: 21, z: 6 },
-      { name: 'Arcus', x: mapMarks.arch.x, z: mapMarks.arch.y },
-    ],
-    trees: mapMarks.trees, tombs: mapMarks.tombs, aqueduct: mapMarks.aqueduct,
-    teleports: getTeleports(),
-  };
-}
-/** The main lane, gate to abbey, as a polyline (for the monk's round). */
-export const mainLane = () => town.streets[0].pts;
-
-/** Progress callback for the title card; each await lets the page breathe. */
-export type Progress = (label: string, frac: number) => Promise<void>;
-const noProgress: Progress = async () => {};
-
-export async function buildWorld(scene: THREE.Scene, progress: Progress = noProgress) {
-  const b = new Builder();
-  await progress('Surveying the old Roman walls', 0.02);
-  const abbey = [V(-49, -71), V(-30, -76), V(-8, -72), V(-3, -52), V(-6, -29), V(-24, -26), V(-41, -33), V(-50, -48)];
-  // Sites for the Roman baths (west) and the gastald's palace (east).
-  const thermae = [V(-48, 12), V(-18, 12), V(-18, 36), V(-48, 36)];
-  const palatium = [V(28, -36), V(52, -36), V(52, -10), V(28, -10)];
-  const temple = [V(12, -3), V(27, -6), V(30, 15), V(15, 18)];
-  town = layoutTown(WALL, [abbey, temple, thermae, palatium], GATE.p.clone().multiplyScalar(0.985), V(-15.5, -27.5), EAST.p.clone().multiplyScalar(0.985),
-    V(-16.2, 29.5), [[39.5, -6.5, 3.6], [NORTH.p.x * 0.96, NORTH.p.y * 0.96, 2.4]]);
-  setGroundExtra((x, z) => town.gutterAt(x, z));
-  townWall(b);
-  await progress('Raising the houses', 0.1);
-  const lots = lotsFor(town);
-  for (let i = 0; i < lots.length; i++) {
-    buildHouse(b, lots[i]);
-    if (i % 120 === 119) await progress('Raising the houses', 0.1 + 0.3 * (i / lots.length));
-  }
-  buildBridges(b, town);
-  (globalThis as unknown as { __archSpots: unknown }).__archSpots = BRIDGE_SPOTS;
-  await progress('Among the ruins of the forum', 0.42);
-  roman(b);
-  monastery(b);
-  await progress('Carving the catacombs', 0.48);
-  buildCatacombs(b);
-  await progress('In the old baths', 0.56);
-  buildBaths(b, scene);
-  await progress("At the gastald's palace", 0.6);
-  buildPalace(b, scene);
-  await progress('Copying the codices', 0.64);
-  buildLibrary(b, scene);
-  outskirts(b);
-  ground(b);
-  await progress('The wood grows dark', 0.7);
-  // The wood: dense, old and dead, right up to a cleared strip along the wall.
-  const insideWall = (x: number, z: number) => {
-    let c = false;
-    for (let i = 0, j = WALL.length - 1; i < WALL.length; j = i++) {
-      const a = WALL[i], bb = WALL[j];
-      if ((a.y > z) !== (bb.y > z) && x < ((bb.x - a.x) * (z - a.y)) / (bb.y - a.y) + a.x) c = !c;
-    }
-    return c;
-  };
-  const [a0, a1] = mapMarks.aqueduct;
-  const keepOut = (x: number, z: number) => {
-    if (Math.hypot(x - GATE.p.x, z - GATE.p.y) < 20) return true;
-    if (Math.hypot(x + 20.3, z + 93.1) < 9) return true;
-    {
-      const ab = new THREE.Vector2(-20.3 - NORTH.p.x, -93.1 - NORTH.p.y), ap = new THREE.Vector2(x - NORTH.p.x, z - NORTH.p.y);
-      const t = THREE.MathUtils.clamp(ap.dot(ab) / ab.lengthSq(), 0, 1);
-      if (ap.sub(ab.multiplyScalar(t)).length() < 4.5) return true;
-    }
-    if (z > GATE.p.y && Math.abs(x - GATE.p.x - Math.sin(z * 0.05) * 2) < 16) return true;
-    const ab = a1.clone().sub(a0), ap = new THREE.Vector2(x - a0.x, z - a0.y);
-    const t = THREE.MathUtils.clamp(ap.dot(ab) / ab.lengthSq(), 0, 1);
-    return ap.sub(ab.multiplyScalar(t)).length() < 6;
-  };
-  buildForest(scene, b, { inside: insideWall, keepOut });
-  mapMarks.trees.push(...treeSpots);
-  await progress('The fog gathers', 0.8);
-  const { collider, cells } = b.build(scene);
-  return { collider, cells, lamps: b.lamps, flames: b.flames, props: b.props, townTex: townTexture(town) };
-}
-
-// ---------------------------------------------------------------- town wall
-
-/** Late-Roman curtain, decayed: brick below, Lombard rubble patching above, broken tops. */
-function townWall(b: Builder) {
-  const T = 2.4;
-  for (let k = 0; k < WALL.length; k++) {
-    const a = WALL[k], c = WALL[(k + 1) % WALL.length];
-    const pieces: [THREE.Vector2, THREE.Vector2][] = [];
-    const gaps = [GATE, EAST, NORTH].filter((g) => g.k === k);
-    if (gaps.length) {
-      const g = gaps[0];
-      const gp = a.clone().lerp(c, g.u);
-      const dir = c.clone().sub(a).normalize();
-      const half = g === GATE ? 2.6 : 1.6;
-      pieces.push([a, gp.clone().addScaledVector(dir, -half)], [gp.clone().addScaledVector(dir, half), c]);
-      gateway(b, gp, dir, g === GATE);
-    } else pieces.push([a, c]);
-    for (const [p, q] of pieces) {
-      const L = p.distanceTo(q);
-      if (L < 0.5) continue;
-      const mid = p.clone().add(q).multiplyScalar(0.5);
-      const ry = Math.atan2(q.x - p.x, q.y - p.y) - Math.PI / 2;
-      const h = R(6.5, 9.5);
-      if (rand() < 0.3) {
-        ruin(b, 'brick', L + 0.8, h * R(0.5, 0.8), T, mid.x, -0.6, mid.y, ry, 0.6);
-      } else {
-        ruin(b, 'brick', L + 0.8, h - 2.5, T, mid.x, -0.6, mid.y, ry, 0.12);
-        ruin(b, 'rubble', L + 0.6, R(1.5, 3), T - 0.3, mid.x, h - 3.3, mid.y, ry, 0.7);
-      }
-    }
-  }
-  // Towers at some corners: Roman square and half-round, all decayed, a few
-  // re-roofed and lived in.
-  WALL.forEach((p, k) => {
-    if (rand() < 0.3) return;
-    const o = p.clone().normalize();
-    const kind = rand();
-    const h = R(8, 12.5);
-    if (kind < 0.45) {
-      const ry = Math.atan2(o.x, o.y) + R(-0.1, 0.1);
-      const tw = R(5, 6.5), td = R(5, 6.5);
-      b.box('brick', tw, h, td, p.x + o.x * 1.8, -0.6, p.y + o.y * 1.8, ry);
-      quoinBox(b, 'block', tw, h * R(0.55, 0.9), td, p.x + o.x * 1.8, -0.6, p.y + o.y * 1.8, ry);
-      if (rand() < 0.5) pyramidRoof(b, 6.6, 1.6, p.x + o.x * 1.8, h - 0.6, p.y + o.y * 1.8);
-      else ruin(b, 'rubble', 6, 2.2, 6, p.x + o.x * 1.8, h - 0.7, p.y + o.y * 1.8, ry, 0.8);
-    } else if (kind < 0.8) {
-      const r = R(3.2, 4.2);
-      b.geo('brick', new THREE.CylinderGeometry(r, r * 1.05, h, 26, 1), p.x + o.x * 2, h / 2 - 0.6, p.y + o.y * 2);
-      ruin(b, 'rubble', r * 1.6, 2, r * 1.6, p.x + o.x * 2, h - 0.7, p.y + o.y * 2, R(0, 3), 0.9);
-    } else {
-      b.geo('brick', new THREE.CylinderGeometry(3.6, 4.0, R(2, 4), 20, 1), p.x + o.x * 2, 0.8, p.y + o.y * 2);
-    }
-    if (k % 5 === 2) torch(b, p.x - o.x * 1.5, 3.2, p.y - o.y * 1.5, Math.atan2(-o.x, -o.y));
-  });
-}
-
-/** An arched gate in the curtain; one side keeps its tower, the other is a stump. */
-function gateway(b: Builder, p: THREE.Vector2, dir: THREE.Vector2, main: boolean) {
-  const ry = Math.atan2(dir.x, dir.y) - Math.PI / 2 + Math.PI / 2;
-  const span = main ? 5.2 : 3.2;
-  const out = V(dir.y, -dir.x);
-  const sgn = out.dot(p) > 0 ? 1 : -1;
-  out.multiplyScalar(sgn);
-  b.geo('brick', arcadeGeo(span + 1.6, main ? 9 : 6.5, 2.8, 1, main ? 3.9 : 2.4, main ? 3.6 : 2.4), p.x, -0.6, p.y, Math.atan2(-dir.y, dir.x));
-  archRings(b, main ? 'bigstone' : 'stone', p.x, -0.6, p.y, Math.atan2(-dir.y, dir.x), 2.8, main ? 3.9 : 2.4, main ? 3.6 : 2.4, main ? 0.62 : 0.45, main ? 0.34 : 0.26);
-  if (main) {
-    const tp = p.clone().addScaledVector(dir, 5.5).addScaledVector(out, 1.4);
-    b.box('brick', 6, 12, 6.4, tp.x, -0.6, tp.y, ry + 0.05);
-    quoinBox(b, 'block', 6, 11.8, 6.4, tp.x, -0.6, tp.y, ry + 0.05);
-    pyramidRoof(b, 6.8, 1.8, tp.x, 11.3, tp.y);
-    const sp = p.clone().addScaledVector(dir, -5.2).addScaledVector(out, 1.6);
-    ruin(b, 'brick', 6, 5.5, 5.8, sp.x, -0.6, sp.y, ry - 0.07, 0.7);
-    const bp = p.clone().addScaledVector(out, 6.5).addScaledVector(dir, 2.6);
-    brazier(b, bp.x, bp.y);
-    const tq = p.clone().addScaledVector(out, 1.5).addScaledVector(dir, -2.1);
-    torch(b, tq.x, 3.2, tq.y, Math.atan2(out.x, out.y));
-  }
-}
-
-// ---------------------------------------------------------------- Roman ruins
-
-function roman(b: Builder) {
-  // The temple in the old forum, houses grown against it; skewed off the grid.
-  const tx = 21, tz = 6, rot = 0.17;
-  const cs = Math.cos(rot), sn = Math.sin(rot);
-  const P = (lx: number, lz: number): [number, number] => [tx + lx * cs + lz * sn, tz - lx * sn + lz * cs];
-  b.box('marble', 11, 1.7, 16, tx, -0.3, tz, rot);
-  const front = [0.0, 1, 0.45, 0, 1, 0.3];
-  front.forEach((f, i) => {
-    if (f === 0) return;
-    const [x, z] = P(-4.6 + i * 1.9 + R(-0.05, 0.05), 7.3);
-    column(b, x, 1.4, z, R(8.4, 9), R(0.4, 0.47), f === 1 ? 0 : f);
-  });
-  const [ax, az] = P(-0.9, 7.3);
-  b.box('marble', 4.6, 0.85, 1.1, ax, 10.0, az, rot + 0.02, true, 0, 0.03);
-  for (let i = 0; i < 3; i++) {
-    const [x, z] = P(4.6, 4 - i * 4.2);
-    if (i !== 1) column(b, x, 1.4, z, 8.8, 0.44, i === 2 ? 0.4 : 0);
-  }
-  const [wx, wz] = P(0, -6);
-  ruin(b, 'brick', 9, 7.5, 0.9, wx, 1.4, wz, rot, 0.65);
-  for (let i = 0; i < 5; i++) {
-    const [x, z] = P(R(-5, 5), R(8.5, 10.5));
-    fallenDrum(b, x, z, 0.42, R(0.8, 2), R(0, Math.PI));
-  }
-  // Arch across the main lane, half swallowed by the houses either side.
-  const s = town.streets[0];
-  let acc = 0, idx = 0;
-  const total = s.pts.reduce((a2, p2, i) => (i ? a2 + p2.distanceTo(s.pts[i - 1]) : 0), 0);
-  for (let i = 1; i < s.pts.length; i++) {
-    acc += s.pts[i].distanceTo(s.pts[i - 1]);
-    if (acc > total * 0.42) { idx = i; break; }
-  }
-  const p = s.pts[idx], q = s.pts[Math.min(idx + 1, s.pts.length - 1)];
-  const d = q.clone().sub(p).normalize();
-  // Wall length across the lane: local x along the lane's normal.
-  b.geo('marble', ruinGeo(9, 9.5, 2.6, 0.3, 3.6, 3.8), p.x, -0.3, p.y, Math.atan2(-d.x, -d.y));
-  archRings(b, 'marble', p.x, -0.3, p.y, Math.atan2(-d.x, -d.y), 2.6, 3.6, 3.8, 0.55, 0.42);
-  mapMarks.arch.copy(p);
-  well(b, s.pts[Math.floor(s.pts.length * 0.62)].x + 2.2, s.pts[Math.floor(s.pts.length * 0.62)].y + 0.5);
-}
-
-function well(b: Builder, x: number, z: number) {
-  mapMarks.well.set(x, z);
-  // A reused Roman puteal: a marble drum, and a crooked wooden frame.
-  wellHead(b, 'rubble', x, 0, z, 0.95, 0.85, 'stone');
-  b.box('wood', 0.15, 2.2, 0.15, x + 0.85, 0, z + 0.1, 0, true, 0, 0.06);
-  b.box('wood', 0.15, 2.1, 0.15, x - 0.8, 0, z - 0.1, 0, true, 0.04, 0);
-  b.box('wood', 2.1, 0.13, 0.13, x, 2.08, z, 0.08, false);
-}
-
-// ---------------------------------------------------------------- abbey
-
-function monastery(b: Builder) {
-  church(b);
-  chapel(b);
-  // Graves between chapel and church: mounds, slabs, a few wooden crosses.
-  for (let i = 0; i < 26; i++) {
-    const x = R(-31, -24), z = R(-63, -44);
-    const ry = R(-0.5, 0.5);
-    if (rand() < 0.45) b.box('wood', 0.09, R(0.8, 1.2), 0.08, x, -0.2, z, ry, false, R(-0.2, 0.2), R(-0.2, 0.2));
-    else if (rand() < 0.6) b.box('ground', 0.8, 0.35, 1.9, x, -0.15, z, ry);
-    else b.box('marble', 0.7, 0.18, 1.8, x, -0.1, z, ry, true, R(-0.08, 0.08), R(-0.08, 0.08));
-  }
-  // A low precinct wall, in pieces, with a gap towards the north postern.
-  const enc = [V(-49, -71), V(-30, -76), V(-21.8, -74.5), V(-18.2, -73.9), V(-8, -72)];
-  for (let i = 0; i < enc.length - 1; i++) {
-    if (i === 2) continue;
-    const a = enc[i], c = enc[i + 1];
-    const mid = a.clone().add(c).multiplyScalar(0.5);
-    ruin(b, 'rubble', a.distanceTo(c), 3.2, 0.8, mid.x, -0.3, mid.y, Math.atan2(-(c.y - a.y), c.x - a.x), 0.5);
-  }
 }
 
 /**
@@ -485,96 +239,6 @@ function skullShelf(b: Builder, x: number, y: number, z: number, ry: number, len
 }
 
 
-// ---------------------------------------------------------------- ground
-
-// ---------------------------------------------------------------- ground
-
-function grid(x0: number, x1: number, step: number, y: number, skip: (cx: number, cz: number) => boolean, z0 = x0) {
-  const n = Math.round((x1 - x0) / step);
-  const pos = new Float32Array((n + 1) * (n + 1) * 3);
-  const nor = new Float32Array((n + 1) * (n + 1) * 3);
-  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
-    const k = (j * (n + 1) + i) * 3;
-    pos[k] = x0 + i * step; pos[k + 1] = y; pos[k + 2] = z0 + j * step;
-    nor[k + 1] = 1;
-  }
-  const idx: number[] = [];
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    if (skip(x0 + (i + 0.5) * step, z0 + (j + 0.5) * step)) continue;
-    const a = j * (n + 1) + i, b = a + 1, c = a + n + 1, d = c + 1;
-    idx.push(a, c, b, b, c, d);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  g.setIndex(idx);
-  return g;
-}
-
-const GROUND_STEP = 0.6;
-function ground(b: Builder) {
-  const IN = 96;
-  const hx0 = STAIR_X - STAIR_W / 2, hx1 = STAIR_X + STAIR_W / 2;
-  const ch = CELLA_STAIR.hole;
-  const inCella = (x: number, z: number, m = 0) => x > ch.x0 - m && x < ch.x1 + m && z > ch.z0 - m && z < ch.z1 + m;
-  const hole = (x: number, z: number) => (x > hx0 && x < hx1 && z < STAIR_TOP && z > HOLE_END) || inCella(x, z);
-  // Wells pierce the ground: drop the cells over each shaft and snap the
-  // remaining edge vertices onto a circle hidden inside the well's wall.
-  const inWell = (x: number, z: number) => WELLS.some((w) => Math.hypot(x - w.x, z - w.z) < (w.rIn + w.rOut) / 2);
-  const g = grid(-IN, IN, GROUND_STEP, 0, (x, z) => hole(x, z) || inWell(x, z));
-  const pos = g.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), z = pos.getZ(i);
-    for (const w of WELLS) {
-      const r = (w.rIn + w.rOut) / 2, d = Math.hypot(x - w.x, z - w.z);
-      if (d < r && d > 1e-4) pos.setXYZ(i, w.x + ((x - w.x) / d) * r, 0, w.z + ((z - w.z) / d) * r);
-    }
-  }
-  b.add(g, 'ground', undefined, false, true);
-  // The outer grid overlaps the town grid's last 2 m: hole it at the cella too.
-  b.add(grid(-400, 400, 4, -0.04, (x, z) => (Math.abs(x) < IN - 2 && Math.abs(z) < IN - 2) || inCella(x, z, 2)), 'ground', undefined, false, true);
-  // Walkable ground for collision: 4 m cells, lined up so the stair opening
-  // (x -38..-34, z -56..-52) is exactly one 4 x 4 cell, plus 10 m cells beyond.
-  // The martyr's stair (x -21..-19.2, z -96..-91.2) drops the 4 m cells it
-  // touches and the 10 m cell over it; patches put the ground back round it.
-  b.collideShape(grid(-98, 98, 4, 0, (x, z) => (x > -38 && x < -34 && z > -56 && z < -52) || inCella(x, z, 2), -96), 'ground');
-  b.collideShape(grid(-200, 200, 10, -0.04, (x, z) => (Math.abs(x) < 95 && Math.abs(z) < 95) || inCella(x, z, 5), -200), 'ground');
-  const patch = (x0: number, x1: number, z0: number, z1: number) => {
-    const nx = Math.max(1, Math.ceil((x1 - x0) / 1)), nz = Math.max(1, Math.ceil((z1 - z0) / 1));
-    const pos: number[] = [];
-    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-      const a = x0 + ((x1 - x0) * i) / nx, b2 = x0 + ((x1 - x0) * (i + 1)) / nx;
-      const c = z0 + ((z1 - z0) * j) / nz, d = z0 + ((z1 - z0) * (j + 1)) / nz;
-      pos.push(a, 0, c, a, 0, d, b2, 0, c, b2, 0, c, a, 0, d, b2, 0, d);
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    b.collideShape(g, 'ground');
-  };
-  // 4 m cells removed: x -22..-18, z -96..-88. Put back everything but the opening.
-  patch(-22, ch.x0, -96, -88);
-  patch(ch.x1, -18, -96, -88);
-  patch(ch.x0, ch.x1, ch.z1, -88);
-  // 10 m cell removed: x -30..-10, z -100..-90; the 4 m grid still covers z > -96.
-  patch(-30, -10, -100, -96);
-}
-
-
-function deadTree(b: Builder, x: number, z: number, h: number) {
-  b.geo('wood', new THREE.CylinderGeometry(0.12, 0.3, h, 6), x, h / 2, z, R(0, 3), true, R(-0.08, 0.08), R(-0.08, 0.08));
-  const n = 4 + Math.floor(rand() * 4);
-  for (let i = 0; i < n; i++) {
-    const y = h * R(0.45, 0.95), len = R(1, 2.6);
-    const a = rand() * Math.PI * 2, tilt = R(0.5, 1.1);
-    const g = new THREE.CylinderGeometry(0.03, 0.09, len, 5);
-    g.translate(0, len / 2, 0);
-    g.rotateZ(tilt);
-    g.rotateY(a);
-    b.geo('wood', g, x, y, z, 0, false);
-  }
-}
-
-
 /**
  * Outside the north postern: a little roofless martyr's chapel (cella
  * memoriae) standing over the crypt, reached by a trodden path.
@@ -602,69 +266,367 @@ function cellaMemoriae(b: Builder) {
   torch(b, tx, 2.2, tz, ry);
 }
 
-function outskirts(b: Builder) {
-  cellaMemoriae(b);
-  const inside = (x: number, z: number) => Math.hypot(x, z) < 92;
-  // The aqueduct, long dry, striding in from the hills; whole spans have fallen.
-  const a0 = V(78, -50), a1 = V(205, -150);
-  const dir = a1.clone().sub(a0);
-  const len = dir.length();
-  dir.normalize();
-  const ry = Math.atan2(-dir.y, dir.x);
-  const bay = 6;
-  mapMarks.aqueduct.push(a0.clone(), a1.clone());
-  for (let s = 0; s * bay * 3 < len; s++) {
-    if (s % 4 === 2 || s % 7 === 5) {
-      for (let k = 0; k < 3; k++) {
-        const p = a0.clone().addScaledVector(dir, s * bay * 3 + k * bay + R(-0.5, 0.5));
-        b.box('brick', R(1.8, 2.4), R(1, 4.5), R(1.8, 2.4), p.x, -0.4, p.y, ry + R(-0.2, 0.2), true, R(-0.08, 0.08));
-      }
-      continue;
-    }
-    const p = a0.clone().addScaledVector(dir, s * bay * 3 + bay * 1.5);
-    const h = 10 + s * 0.55 + R(-0.6, 0.6);
-    b.geo('brick', arcadeGeo(bay * 3 + 0.4, h * 0.75, 2.2, 3, bay - R(1.8, 2.3), h * 0.5), p.x, -0.4, p.y, ry + R(-0.03, 0.03));
-    ruin(b, 'brick', bay * 3 + 0.4, h * 0.25, 2.2, p.x, -0.45 + h * 0.75, p.y, ry, s % 3 === 1 ? 0.85 : 0.35);
+
+// ---------------------------------------------------------------- the nunnery of St Peter
+/**
+ * Theodorada's foundation (before 687) across the Sabato: the church (built
+ * like the cathedral's, in its own frame), a cloister-less enclosure of
+ * rubble, two ranges of cells and a refectory, the nuns' graves.
+ */
+function nunnery(b: Builder) {
+  const enc: [number, number][] = [[-50, -72], [-30, -78], [-4, -74], [2, -48], [-2, -22], [-26, -18], [-48, -26], [-52, -50]];
+  for (let i = 0; i < enc.length; i++) {
+    if (i === 5) continue; // the gate
+    const a = enc[i], c = enc[(i + 1) % enc.length], mid = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2];
+    ruin(b, 'rubble', Math.hypot(c[0] - a[0], c[1] - a[1]) + 0.4, R(2.6, 3.2), 0.7, mid[0], -0.3, mid[1], Math.atan2(-(c[1] - a[1]), c[0] - a[0]), 0.15);
   }
-  // Tombs along the road from the gate: drums, sarcophagi, cippi, broken mausolea.
-  for (let i = 0; i < 16; i++) {
-    const side = rand() < 0.5 ? 1 : -1;
-    const z = GATE.p.y + 8 + i * R(3.5, 5.5);
-    const x = GATE.p.x + side * R(5.5, 15) + Math.sin(z * 0.05) * 2;
-    if (inside(x, z)) continue;
-    mapMarks.tombs.push(V(x, z));
-    const kind = rand();
-    if (kind < 0.3) {
-      const r = R(2.2, 3.4), h = R(2.5, 4.5);
-      b.geo('brick', new THREE.CylinderGeometry(r, r * 1.03, h, 24, 4), x, h / 2 - 0.3, z);
-      b.geo('ground', new THREE.ConeGeometry(r * 1.02, r * 0.7, 24, 2), x, h - 0.3 + r * 0.35, z);
-    } else if (kind < 0.6) {
-      const r0 = R(-0.4, 0.4) + (rand() < 0.5 ? Math.PI / 2 : 0);
-      b.box('marble', 1.0, 0.85, 2.2, x, -0.1, z, r0);
-      b.box('marble', 1.1, 0.25, 2.3, x + R(-0.3, 0.3), 0.75, z + R(-0.4, 0.4), r0 + R(-0.4, 0.4), true, R(-0.1, 0.1));
-    } else if (kind < 0.85) {
-      b.box('marble', 0.55, R(0.9, 1.6), 0.4, x, -0.15, z, R(-0.3, 0.3), true, R(-0.12, 0.12), R(-0.12, 0.12));
-    } else {
-      ruin(b, 'brick', R(3, 5), R(2.5, 4), R(3, 4), x, -0.2, z, R(0, 3), 0.6);
-    }
-    if (i === 6) lucerna(b, x, 0.75, z, 0);
+  for (const [x, z, w, d, ry] of [[-36, -62, 14, 6, 0.05], [-38, -36, 12, 6, -0.04], [-8, -24, 8, 5.5, 0.1]] as const) {
+    b.box('rubble', w, 4.2, d, x, -0.3, z, ry);
+    gable(b, w + 0.3, d + 0.3, 1.4, x, 3.9, z, ry, 'rubble', 0.4);
+    b.box('wood', 1.0, 2.0, 0.1, x, -0.2, z + d / 2 + 0.02, ry, false);
+    if (rand() < 0.7) b.lamp('window', new THREE.Vector3(x + 1.5, 2.2, z + d / 2 + 0.1));
+  }
+  for (let i = 0; i < 22; i++) {
+    const x = R(-31, -24), z = R(-58, -42), ry = R(-0.3, 0.3);
+    if (rand() < 0.5) b.box('wood', 0.08, R(0.8, 1.1), 0.08, x, -0.2, z, ry, false, R(-0.15, 0.15), R(-0.15, 0.15));
+    else b.box('ground', 0.8, 0.3, 1.9, x, -0.12, z, ry);
+  }
+  torch(b, -26, 2.6, -17.6, 0);
+  candle(b, -8.5, 1.0, -21.2, 0.3);
+}
+
+/** Above the hypogea of the Santi Quaranta: vaults of the Roman complex, open to the sky. */
+function quadragintaRuins(b: Builder) {
+  for (let i = 0; i < 6; i++) {
+    const x = -60 + i * 7.5, z = -84;
+    b.geo('brick', arcadeGeo(7.6, R(5, 8), 2.0, 1, 4.6, 3.2), x, -0.4, z, 0);
+    if (rand() < 0.6) ruin(b, 'rubble', 7.6, R(1, 3), 2.0, x, 4.5, z, 0, 0.8);
+  }
+  ruin(b, 'brick', 30, 6, 1.4, -48, -0.4, -92, 0, 0.6);
+  ruin(b, 'rubble', 18, 3.5, 1.2, -66, -0.4, -70, Math.PI / 2, 0.7);
+  for (let i = 0; i < 6; i++) fallenDrum(b, R(-62, -30), R(-80, -66), 0.4, R(1, 2), R(0, 3));
+}
+
+/** The temple of the forum (old frame: centre 21, 6), its columns scavenged, houses grown against it. */
+function temple(b: Builder) {
+  const tx = 21, tz = 6, rot = 0.17;
+  const cs = Math.cos(rot), sn = Math.sin(rot);
+  const P = (lx: number, lz: number): [number, number] => [tx + lx * cs + lz * sn, tz - lx * sn + lz * cs];
+  b.box('marble', 11, 1.7, 16, tx, -0.3, tz, rot);
+  const front = [0.0, 1, 0.45, 0, 1, 0.3];
+  front.forEach((f, i) => {
+    if (f === 0) return;
+    const [x, z] = P(-4.6 + i * 1.9 + R(-0.05, 0.05), 7.3);
+    column(b, x, 1.4, z, R(8.4, 9), R(0.4, 0.47), f === 1 ? 0 : f);
+  });
+  const [ax, az] = P(-0.9, 7.3);
+  b.box('marble', 4.6, 0.85, 1.1, ax, 10.0, az, rot + 0.02, true, 0, 0.03);
+  for (let i = 0; i < 3; i++) {
+    const [x, z] = P(4.6, 4 - i * 4.2);
+    if (i !== 1) column(b, x, 1.4, z, 8.8, 0.44, i === 2 ? 0.4 : 0);
+  }
+  const [wx, wz] = P(0, -6);
+  ruin(b, 'brick', 9, 7.5, 0.9, wx, 1.4, wz, rot, 0.65);
+  for (let i = 0; i < 5; i++) {
+    const [x, z] = P(R(-5, 5), R(8.5, 10.5));
+    fallenDrum(b, x, z, 0.42, R(0.8, 2), R(0, Math.PI));
   }
 }
 
-export function regionName(p: THREE.Vector3): string {
-  if (p.y < -2.4) return 'Catacumbae';
-  const r = Math.hypot(p.x, p.z);
-  if (p.distanceTo(new THREE.Vector3(GATE.p.x, p.y, GATE.p.y)) < 9) return 'Porta';
-  if (Math.hypot(p.x - NORTH.p.x, p.z - NORTH.p.y) < 7) return 'Porta Septentrionalis';
-  if (Math.hypot(p.x + 20.3, p.z + 93.1) < 8) return 'Cella Memoriae';
-  if (p.x > -48 && p.x < -18 && p.z > 12 && p.z < 36) return 'Thermae';
-  if (p.x > 28 && p.x < 52 && p.z > -36 && p.z < -10) return 'Palatium';
-  if (r > 75 && p.z > 40) return 'Via Sepulcrorum';
-  if (r > 80) return 'Extra Muros';
-  if (p.x > 10 && p.x < 32 && p.z > -7 && p.z < 19) return 'Templum';
-  if (p.x > -41 && p.x < -31 && p.z > -60 && p.z < -49) return 'Ossuarium';
-  if (p.x > -23 && p.x < -9 && p.z > -68 && p.z < -41) return 'Basilica';
-  if (p.x > -23 && p.x < -9 && p.z > -41 && p.z < -28) return 'Atrium';
-  if (p.x > -50 && p.x < -3 && p.z > -76 && p.z < -28) return 'Monasterium';
-  return 'Civitas';
+/** Everything the map and the townsfolk need. */
+export function getMapData() {
+  const S = SITES;
+  const W = (s: SiteDef) => ({ x: s.x, z: s.z });
+  const landmarks: { name: string; x: number; z: number; kind?: string }[] = [
+    // Names the townsfolk module looks for (gate guards, palace guards, monks, a market crowd).
+    { name: 'Porta', ...W(S.arcusTraiani), kind: 'gate' },
+    { name: 'Palatium', ...(() => { const [x, z] = sw(S.curtis, 39.6, -9); return { x, z }; })(), kind: 'palace' },
+    { name: 'Atrium', ...(() => { const [x, z] = sw(S.episcopium, -16, -35); return { x, z }; })(), kind: 'church' },
+    { name: 'Basilica', ...(() => { const [x, z] = sw(S.episcopium, -17.3, -53); return { x, z }; })(), kind: 'church' },
+    { name: 'Templum', ...W(S.forum), kind: 'market' },
+  ];
+  for (const s of Object.values(S)) landmarks.push({ name: s.name, x: s.x, z: s.z, kind: 'site' });
+  for (const g of GATES) landmarks.push({ name: g.name, x: g.at[0], z: g.at[1], kind: 'gate' });
+  return {
+    bounds: BOUNDS,
+    raster: lay.r,
+    codes: { free: FREE, street: STREET, reserved: RESERVED, house: HOUSE, plot: PLOT, outside: 4 },
+    wall: WALL700, civitasNova: CIVITAS_NOVA, medievalOutline: MEDIEVAL_OUTLINE,
+    rivers: RIVERS.map((r) => ({ name: r.name, pts: r.pts, w: r.w })),
+    roads: ROADS,
+    gates: GATES,
+    streets: lay.streets.map((s) => ({ pts: s.pts, w: s.w, main: s.main, kind: s.kind })),
+    plots: lay.plots.map((p) => ({ pts: p.pts, kind: p.kind })),
+    landmarks,
+    /** Quarters of the town and its surroundings, for placing people (see sites.ts DISTRICTS). */
+    districts: DISTRICTS,
+    /** Houses and places with something to find (id, kind, door position). */
+    explorables: lay.lots.filter((l) => l.explore).map((l) => {
+      const a = interiorAnchors({ c: l.c.map((p) => [p.x, p.y] as P2), front: { a: [l.front!.a.x, l.front!.a.y], b: [l.front!.b.x, l.front!.b.y], out: [l.front!.out.x, l.front!.out.y] }, h: l.h, street: l.street ?? 2, seed: 1000 + l.id * 7919, explore: l.explore });
+      return { id: l.explore!.id, kind: l.explore!.kind, x: a.door[0], z: a.door[1], name: LORE[explorableLore(l.explore!.id)]?.place ?? l.explore!.id };
+    }),
+    readables: PLACED.map((p) => ({ id: p.id, x: p.pos.x, z: p.pos.z, title: LORE[p.id]?.title ?? p.id })),
+    trees: treeSpots, tombs: [] as THREE.Vector2[], aqueduct: [] as THREE.Vector2[],
+    teleports: getTeleports(),
+  };
 }
+
+export type Progress = (label: string, frac: number) => Promise<void>;
+const noProgress: Progress = async () => {};
+
+/** A group that carries a site's frame (for the objects modules add to the scene themselves). */
+function siteGroup(scene: THREE.Scene, s: SiteDef) {
+  const g = new THREE.Group();
+  const c = Math.cos(s.rot), sn = Math.sin(s.rot), lx = s.lx ?? 0, lz = s.lz ?? 0;
+  g.position.set(s.x - (lx * c + lz * sn), worldTerrain(s.x, s.z), s.z - (-lx * sn + lz * c));
+  g.rotation.y = s.rot;
+  scene.add(g);
+  g.updateMatrixWorld(true);
+  return g;
+}
+export const siteGroups: Record<string, THREE.Group> = {};
+
+/** Stair openings in the ground, in world space. */
+function holes(): Hole[] {
+  const S = SITES;
+  const rect = (s: SiteDef, x0: number, z0: number, x1: number, z1: number): Hole => ({ pts: [sw(s, x0, z0), sw(s, x1, z0), sw(s, x1, z1), sw(s, x0, z1)] });
+  const hx0 = STAIR_X - STAIR_W / 2, hx1 = STAIR_X + STAIR_W / 2, ch = CELLA_STAIR.hole, c = M.CISTERN;
+  const list = [rect(S.quadraginta, hx0, HOLE_END, hx1, STAIR_TOP), rect(S.quadraginta, ch.x0, ch.z0, ch.x1, ch.z1), rect(S.hortusSophiae, c.x0, c.bottom, c.x1, c.top)];
+  STAIR_ZONES.length = 0;
+  STAIR_ZONES.push({ ...xz(sw(S.quadraginta, STAIR_X, -54)), r: 9 }, { ...xz(sw(S.quadraginta, -20.1, -93.6)), r: 7 }, { ...xz(sw(S.hortusSophiae, 0, (c.top + c.bottom) / 2)), r: 8 });
+  return list;
+}
+const xz = ([x, z]: P2) => ({ x, z });
+
+export async function buildWorld(scene: THREE.Scene, progress: Progress = noProgress) {
+  const S = SITES;
+  await progress('Surveying the Lombard walls', 0.02);
+  lay = layoutTown();
+  const hl = holes();
+  const items = makeChunks(lay, hl);
+  await progress('Pacing out the lanes', 0.08);
+  // Collision of the whole town at once: cheap proxies only.
+  const bc = new Builder();
+  bc.mode = 'collide';
+  let n = 0;
+  for (const it of items.values()) {
+    buildChunk(bc, it);
+    if (++n % 400 === 0) await progress('Pacing out the lanes', 0.08 + 0.1 * (n / items.size));
+  }
+  groundCollider(bc, items, hl);
+
+  // Landmarks, built in full in their own frames.
+  const b = new Builder();
+  const at = async (label: string, frac: number, s: SiteDef, fn: (g: THREE.Group) => void) => {
+    await progress(label, frac);
+    setSite(s);
+    const g = siteGroup(scene, s);
+    siteGroups[s.id] = g;
+    try { fn(g); } finally { setSite(null); }
+  };
+  await at("At the dukes' curtis", 0.2, S.curtis, (g) => buildPalace(b, g as unknown as THREE.Scene));
+  await at('In the bishop\'s church', 0.26, S.episcopium, (g) => { church(b); buildLibrary(b, g as unknown as THREE.Scene); });
+  await at('Carving the hypogea of the Santi Quaranta', 0.32, S.quadraginta, () => { chapel(b); buildCatacombs(b); cellaMemoriae(b); quadragintaRuins(b); });
+  await at('In the old baths', 0.4, S.thermae, (g) => buildBaths(b, g as unknown as THREE.Scene));
+  await at('At the nuns of St Peter', 0.45, S.sanctusPetrus, () => { church(b); nunnery(b); });
+  await at('Under the Arch of Trajan', 0.5, S.arcusTraiani, () => M.arcusTraiani(b));
+  await at('At the forum', 0.52, S.arcusSacramenti, () => M.arcusSacramenti(b));
+  await at('At the forum', 0.53, { ...S.forum, x: S.forum.x - 9, z: S.forum.z - 7, lx: 21, lz: 6 }, () => temple(b));
+  await at('At the forum', 0.54, S.forum, () => M.forumMarket(b));
+  await at('In the theatre', 0.56, S.theatrum, () => M.theatrum(b));
+  await at('Among the stones of the amphitheatre', 0.6, S.amphitheatrum, () => M.amphitheatrum(b));
+  await at('Under the Torre della Catena', 0.63, S.turrisCatenae, () => M.turrisCatenae(b));
+  await at('At S. Ilario', 0.65, S.sanctusHilarius, () => M.sanctusHilarius(b));
+  await at('Among the ruins of the Iseum', 0.67, S.iseum, () => M.iseum(b));
+  await at('Among the Lombard graves', 0.69, S.necropolis, () => M.necropolis(b));
+  await at('By the old walnut', 0.7, S.nux, () => M.nux(b));
+  await at('At the mill', 0.71, S.molendinum, () => M.molendinum(b));
+  await at("In the dukes' orchard", 0.72, S.hortusSophiae, () => M.cisterna(b));
+  await progress('Over the rivers', 0.74);
+  M.bridge(b, [-793, -54], [-734, -145], 6.4, 5.5, 'block', 11);
+  M.bridge(b, [-73, -326], [-100, -424], 6.0, 4.5, 'block', 12);
+  // Readables in the houses one can enter.
+  for (const l of lay.lots) if (l.explore) {
+    const a = interiorAnchors({ c: l.c.map((p) => [p.x, p.y] as P2), front: { a: [l.front!.a.x, l.front!.a.y], b: [l.front!.b.x, l.front!.b.y], out: [l.front!.out.x, l.front!.out.y] }, h: l.h, street: 2, seed: 1000 + l.id * 7919, explore: l.explore });
+    markReadableWorld(explorableLore(l.explore!.id), a.read[0], a.read[1], a.read[2]);
+  }
+  await progress('Water in the valleys', 0.76);
+  buildRivers(scene);
+  await progress('The scrub grows dark', 0.78);
+  buildForest(scene, bc, {
+    inside: (x, z) => insideness(x, z) > 0.35,
+    keepOut,
+    density: woodDensity,
+    bounds: BOUNDS,
+    cover: (x, z) => Math.abs(x - 50) < 760 && Math.abs(z + 80) < 480,
+  });
+  townProps(scene);
+  await progress('The fog gathers', 0.8);
+  const { collider: landCol, cells } = b.build(scene);
+  // One collider: the landmarks and the whole town's proxies.
+  const colGeos = [landCol.geometry, ...bc.colliders];
+  const collider = new THREE.Mesh(mergeGeometries(colGeos.filter((g) => g.attributes.position.count > 0), false)!);
+  const lamps = b.lamps;
+  stream = new FabricStream(scene, items, cells, lamps, hl);
+  return { collider, cells, lamps, flames: b.flames, props: b.props, townTex: townTexture(lay), stream };
+}
+
+// ---------------------------------------------------------------- ground collision
+/** Walkable ground for the whole world: 4 m cells near the town, 8 m beyond; fine cells round the stair holes. */
+function groundCollider(b: Builder, items: Map<number, ChunkItems>, hl: Hole[]) {
+  const pos: number[] = [];
+  const gv = new THREE.Vector3();
+  const Y = (x: number, z: number) => { field0(x, z, gv); return gv.y + fastTerrain(x, z); };
+  const inHole = (x: number, z: number) => hl.some((h) => inPoly(x, z, h.pts));
+  for (const it of items.values()) {
+    const x0 = it.i * CHUNK, z0 = it.j * CHUNK;
+    const near = Math.abs(x0 + 16 - 60) < 900 && Math.abs(z0 + 16 + 90) < 560;
+    const st = it.holes.length ? 0.5 : near ? 4 : 8;
+    const n = Math.round(CHUNK / st);
+    const H: number[] = [];
+    for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) H.push(Y(x0 + i * st, z0 + j * st));
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const x = x0 + i * st, z = z0 + j * st;
+      if (it.holes.length && inHole(x + st / 2, z + st / 2)) continue;
+      const a = H[j * (n + 1) + i], c = H[j * (n + 1) + i + 1], d = H[(j + 1) * (n + 1) + i], e = H[(j + 1) * (n + 1) + i + 1];
+      pos.push(x, a, z, x, d, z + st, x + st, c, z, x + st, c, z, x, d, z + st, x + st, e, z + st);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  b.collideWorld(g);
+}
+import { field } from './displace';
+const field0 = (x: number, z: number, out: THREE.Vector3) => field(x, 0, z, 'ground', out);
+
+// ---------------------------------------------------------------- the wood and the clearings
+/** Where trees grow: thick along the rivers and on the bluffs, thin in the fields, none on the roads. */
+function woodDensity(x: number, z: number) {
+  const rv = riverAt(x, z, 90);
+  let d = 0.08;
+  if (rv) {
+    if (rv.d < rv.w / 2 + 1.5) return 0;
+    d = Math.max(d, 0.85 * Math.exp(-(((rv.d - rv.w / 2 - 6) / 30) ** 2)));
+  }
+  // Slopes: the bluffs under the town are scrub and wood.
+  const sl = Math.hypot(fastTerrain(x + 3, z) - fastTerrain(x - 3, z), fastTerrain(x, z + 3) - fastTerrain(x, z - 3)) / 6;
+  d = Math.max(d, Math.min(0.75, (sl - 0.08) * 3.5));
+  // Far from the town the woods close in.
+  const far = Math.hypot((x - 60) / 900, (z + 60) / 560);
+  d = Math.max(d, Math.min(0.8, (far - 0.85) * 2.2));
+  // Fields and gardens round the walls are kept open.
+  const ins = insideness(x, z);
+  if (ins > 0.05) d *= 0.2;
+  return Math.max(0, Math.min(0.9, d * (0.65 + 0.7 * rand01(Math.floor(x / 23) * 31 + Math.floor(z / 23)))));
+}
+function distToPolyline(x: number, z: number, pts: P2[]) {
+  let best = Infinity;
+  for (let k = 0; k < pts.length - 1; k++) {
+    const a = pts[k], c = pts[k + 1], dx = c[0] - a[0], dz = c[1] - a[1];
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz || 1)));
+    best = Math.min(best, Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t));
+  }
+  return best;
+}
+function keepOut(x: number, z: number) {
+  for (const r of ROADS) if (distToPolyline(x, z, r.pts) < r.w / 2 + 3.5) return true;
+  for (const s of Object.values(SITES)) {
+    const r = s.flat ? s.flat[1] + 4 : s.clear ? s.clear + 6 : 14;
+    if (Math.hypot(x - s.x, z - s.z) < r) return true;
+  }
+  // The bridges' approaches.
+  if (distToPolyline(x, z, [[-793, -54], [-734, -145]]) < 9) return true;
+  if (distToPolyline(x, z, [[-73, -326], [-100, -424]]) < 9) return true;
+  return false;
+}
+
+// ---------------------------------------------------------------- props in lanes and gardens
+function townProps(scene: THREE.Scene) {
+  const P = (id: PropId, x: number, z: number, ry: number, s: number) => placeProp(scene, id, x, 0, z, ry, s);
+  let k = 0;
+  for (const l of lay.lots) {
+    if (!l.front || (k++ % 4) !== 0) continue;
+    const f = l.front, t = rand01(l.id * 1.7);
+    const x = f.a.x + (f.b.x - f.a.x) * t + f.out.x * 0.45, z = f.a.y + (f.b.y - f.a.y) * t + f.out.y * 0.45;
+    const u = rand01(l.id * 3.1);
+    if (u < 0.22) P('wine_barrel_01', x, z, u * 20, 0.85);
+    else if (u < 0.4) P(u < 0.3 ? 'planter_pot_clay' : 'ceramic_pot', x, z, u * 9, 1.5);
+    else if (u < 0.52) P('wicker_basket_02', x, z, u * 7, 1);
+    else if (u < 0.62) P('wooden_bucket_01', x, z, u * 5, 1);
+    else if (u < 0.7) P('street_rat', x, z, u * 11, 1);
+    else P(u < 0.85 ? 'weed_plant_02' : 'nettle_plant', x, z, u * 13, 3);
+  }
+  for (const p of lay.plots) {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const [x, z] of p.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const n = Math.min(40, Math.round(((x1 - x0) * (z1 - z0)) / (p.kind === 'pratum' ? 18 : 30)));
+    for (let i = 0; i < n; i++) {
+      const x = x0 + (x1 - x0) * rand01(p.seed % 9973 + i * 1.31), z = z0 + (z1 - z0) * rand01(p.seed % 7919 + i * 2.17);
+      if (!inPoly(x, z, p.pts)) continue;
+      const u = rand01(i * 5.3 + p.seed % 101);
+      const id: PropId = p.kind === 'orto' ? (u < 0.5 ? 'weed_plant_02' : 'grass_medium_02') : p.kind === 'ruina' ? (u < 0.4 ? 'nettle_plant' : u < 0.7 ? 'rock_moss_set_02' : 'fern_02') : (u < 0.5 ? 'grass_medium_02' : u < 0.8 ? 'weed_plant_02' : 'shrub_02');
+      P(id, x, z, u * 30, id === 'rock_moss_set_02' ? 0.6 : id === 'shrub_02' ? 0.7 : id.startsWith('grass') ? 0.9 : 3.2);
+    }
+  }
+  commitProps(scene);
+}
+
+// ---------------------------------------------------------------- the town texture
+/** RGBA over the whole world at 1 m: R Roman paving (main), G any street or road, B gutter, A terrain height. */
+export const TOWN_TEX = { x0: BOUNDS.x0, z0: BOUNDS.z0, w: Math.ceil(BOUNDS.x1 - BOUNDS.x0), h: Math.ceil(BOUNDS.z1 - BOUNDS.z0), hMin: -10, hMax: 110 };
+function townTexture(L: Layout): THREE.DataTexture {
+  const T = TOWN_TEX, data = new Uint8Array(T.w * T.h * 4);
+  const r = L.r;
+  for (let j = 0; j < T.h; j++) for (let i = 0; i < T.w; i++) {
+    const x = T.x0 + i + 0.5, z = T.z0 + j + 0.5, o = (j * T.w + i) * 4;
+    data[o + 3] = Math.round(THREE.MathUtils.clamp((fastTerrain(x, z) - T.hMin) / (T.hMax - T.hMin), 0, 1) * 255);
+    const k = r.idx(x, z);
+    if (k < 0) continue;
+    data[o] = r.main[k];
+    data[o + 1] = r.grid[k] === STREET ? 255 : 0;
+  }
+  // Roads outside the walls: beaten earth, the Appia and the Traiana still paved in places.
+  for (const rd of ROADS) {
+    const paved = rd.name === 'Via Appia' || rd.name === 'Via Traiana';
+    for (let k = 0; k < rd.pts.length - 1; k++) {
+      const a = rd.pts[k], c = rd.pts[k + 1], L2 = Math.hypot(c[0] - a[0], c[1] - a[1]);
+      for (let s = 0; s <= L2; s += 0.5) {
+        const px = a[0] + ((c[0] - a[0]) * s) / L2, pz = a[1] + ((c[1] - a[1]) * s) / L2;
+        for (let dz = -rd.w / 2; dz <= rd.w / 2; dz += 0.7) for (let dx = -rd.w / 2; dx <= rd.w / 2; dx += 0.7) {
+          if (dx * dx + dz * dz > (rd.w / 2) ** 2) continue;
+          const i = Math.floor(px + dx - T.x0), j = Math.floor(pz + dz - T.z0);
+          if (i < 0 || j < 0 || i >= T.w || j >= T.h) continue;
+          const o = (j * T.w + i) * 4;
+          data[o + 1] = 255;
+          if (paved && rand01(i * 0.37 + j * 1.13) < 0.55) data[o] = 200;
+        }
+      }
+    }
+  }
+  const tex = new THREE.DataTexture(data, T.w, T.h, THREE.RGBAFormat);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// ---------------------------------------------------------------- where am I
+export function regionName(p: THREE.Vector3): string {
+  const ly = p.y - fastTerrain(p.x, p.z);
+  const near = (s: SiteDef, r: number) => Math.hypot(p.x - s.x, p.z - s.z) < r;
+  const S = SITES;
+  if (ly < -2.4) {
+    if (near(S.hortusSophiae, 30)) return 'Cisterna';
+    return 'Catacumbae Sanctorum Quadraginta';
+  }
+  for (const g of GATES) if (Math.hypot(p.x - g.at[0], p.z - g.at[1]) < 8) return g.name;
+  const named: [SiteDef, number][] = [[S.curtis, 26], [S.episcopium, 30], [S.forum, 18], [S.theatrum, 50], [S.thermae, 28], [S.amphitheatrum, 55], [S.quadraginta, 48],
+    [S.turrisCatenae, 14], [S.sanctusHilarius, 16], [S.sanctusPetrus, 32], [S.iseum, 22], [S.necropolis, 28], [S.nux, 14], [S.molendinum, 14], [S.hortusSophiae, 16], [S.pontesLeprosus, 50], [S.pontesOnuphrii, 45]];
+  for (const [s, r] of named) if (near(s, r)) return s.name;
+  for (const d of DISTRICTS) if (d.poly && inPoly(p.x, p.z, d.poly)) return d.name;
+  const rv = riverAt(p.x, p.z, 40);
+  if (rv && rv.d < rv.w / 2 + 25) return rv.river.name === 'Calor' ? 'Ripa Caloris' : 'Ripa Sabbati';
+  if (insideWalls(p.x, p.z)) return 'Beneventum';
+  return 'Extra Muros';
+}
+void density; void toLocalXZ; void terrain; void rotZTo; void CIVITAS_NOVA;

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Builder, rng } from './builder';
 import { shared } from './materials';
 import { noiseGLSL, atmosGLSL } from './shaders';
-import { field } from './displace';
+import { field, fastTerrain } from './displace';
 import { placeProp, commitProps, propsLoaded, type PropId } from './props';
 
 // The wood around the town: old oaks and chestnuts gone wild, thick gnarled
@@ -534,27 +534,44 @@ function barkMaterial() {
 // ------------------------------------------------------------- placement
 
 export const treeSpots: THREE.Vector2[] = [];
+const BK = 48;
+const NONE: number[] = [];
 
-interface Kind { geos: THREE.BufferGeometry[]; dists: number[]; meshes: THREE.InstancedMesh[]; mats: THREE.Matrix4[]; pos: THREE.Vector3[]; rad: number[]; cols: THREE.Color[] }
+interface Kind { geos: THREE.BufferGeometry[]; dists: number[]; meshes: THREE.InstancedMesh[]; mats: THREE.Matrix4[]; pos: THREE.Vector3[]; rad: number[]; cols: THREE.Color[]; buckets: Map<number, number[]> }
 
 /**
  * Plant the wood outside the walls. `inside(x,z)` is true within the town;
  * `keepOut(x,z)` marks clearings (gate, tomb road, aqueduct).
  * The returned object updates its own LOD/culling every few frames.
  */
-export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: number, z: number) => boolean; keepOut: (x: number, z: number) => boolean }): THREE.Object3D {
+export interface ForestOpts {
+  inside: (x: number, z: number) => boolean;
+  keepOut: (x: number, z: number) => boolean;
+  /** How wooded the land is here (0 open fields .. 1 thick wood). */
+  density?: (x: number, z: number) => number;
+  bounds?: { x0: number; z0: number; x1: number; z1: number };
+  /** Where scanned ground cover is worth placing (near where people walk). */
+  cover?: (x: number, z: number) => boolean;
+}
+export function buildForest(scene: THREE.Scene, b: Builder, o: ForestOpts): THREE.Object3D {
+  const opts = {
+    density: (x: number, z: number) => (Math.hypot(x, z) < 225 ? 1 : 0),
+    bounds: { x0: -225, z0: -225, x1: 225, z1: 225 },
+    cover: (x: number, z: number) => Math.hypot(x, z) < 150,
+    ...o,
+  };
   const rand = rng(90210);
   const R = (a: number, b2: number) => a + (b2 - a) * rand();
   const group = new THREE.Group();
   group.name = 'forest';
   const mat = barkMaterial();
   const gv = new THREE.Vector3();
-  const groundAt = (x: number, z: number) => field(x, 0, z, 'ground', gv).y;
+  const groundAt = (x: number, z: number) => field(x, 0, z, 'ground', gv).y + fastTerrain(x, z);
 
   const kinds: Kind[] = [];
   /** geos[i] is drawn out to dists[i] metres. */
   const mk = (geos: THREE.BufferGeometry[], dists: number[]): Kind => {
-    const k: Kind = { geos, dists, meshes: [], mats: [], pos: [], rad: [], cols: [] };
+    const k: Kind = { geos, dists, meshes: [], mats: [], pos: [], rad: [], cols: [], buckets: new Map() };
     kinds.push(k);
     return k;
   };
@@ -583,6 +600,9 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
     e.set(tiltX, ry, tiltZ, 'YXZ');
     q.setFromEuler(e);
     m4.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(s, s * R(0.92, 1.12), s));
+    const bk = Math.floor(x / BK) * 4096 + Math.floor(z / BK);
+    if (!k.buckets.has(bk)) k.buckets.set(bk, []);
+    k.buckets.get(bk)!.push(k.mats.length);
     k.mats.push(m4.clone());
     k.pos.push(new THREE.Vector3(x, y, z));
     k.rad.push(rad * s);
@@ -597,9 +617,10 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
   // Collision: a six-sided prism round the foot of each sizeable trunk.
   const colPos: number[] = [];
   const prism = (x: number, z: number, r: number) => {
+    if (r < 0.2) return;
     const y0 = groundAt(x, z) - 0.5, y1 = y0 + 3.5;
-    for (let i = 0; i < 6; i++) {
-      const a0 = (i / 6) * Math.PI * 2, a1 = ((i + 1) / 6) * Math.PI * 2;
+    for (let i = 0; i < 4; i++) {
+      const a0 = (i / 4) * Math.PI * 2, a1 = ((i + 1) / 4) * Math.PI * 2;
       const x0 = x + Math.cos(a0) * r, z0 = z + Math.sin(a0) * r, x1 = x + Math.cos(a1) * r, z1 = z + Math.sin(a1) * r;
       colPos.push(x0, y0, z0, x1, y0, z1, x1, y1, z1, x0, y0, z0, x1, y1, z1, x0, y1, z0);
     }
@@ -616,16 +637,18 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
   // Ground cover draws from its own sequence, so the trees stay where they were.
   const gr = rng(4711);
   const GR = (a: number, b2: number) => a + (b2 - a) * gr();
-  const STEP = 3.7, RMAX = 225;
-  for (let gz = -RMAX; gz <= RMAX; gz += STEP) for (let gx = -RMAX; gx <= RMAX; gx += STEP) {
+  const STEP = 3.7, B = opts.bounds;
+  for (let gz = B.z0; gz <= B.z1; gz += STEP) for (let gx = B.x0; gx <= B.x1; gx += STEP) {
     const x = gx + R(-0.48, 0.48) * STEP, z = gz + R(-0.48, 0.48) * STEP;
-    const r = Math.hypot(x, z);
-    if (r > RMAX || opts.inside(x, z) || opts.keepOut(x, z)) continue;
+    const wd = opts.density(x, z);
+    if (wd <= 0.02 || rand() > wd) continue;
+    if (opts.inside(x, z) || opts.keepOut(x, z)) continue;
     if (nearWall(x, z, 7)) { if (rand() < 0.93) continue; }
+    const r = opts.cover(x, z) ? 0 : 999;
     // Ground cover (scans) everywhere in the wood: ferns, nettles, weeds,
     // fallen branches, bark, mossy stones; thick near the town, where people
     // walk, it is thinner but the fog hides how far it goes anyway.
-    if (r < 150) for (let g = 0; g < 5; g++) {
+    if (r < 150) for (let g = 0; g < 3; g++) {
       if (gr() > 0.8) continue;
       const gx2 = x + GR(-1.8, 1.8), gz2 = z + GR(-1.8, 1.8);
       if (opts.inside(gx2, gz2) || opts.keepOut(gx2, gz2)) continue;
@@ -688,7 +711,7 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
   if (colPos.length) {
     const cg = new THREE.BufferGeometry();
     cg.setAttribute('position', new THREE.Float32BufferAttribute(colPos, 3));
-    b.collide(cg);
+    b.collideWorld(cg);
   }
 
   for (const k of kinds) {
@@ -716,7 +739,8 @@ export function buildForest(scene: THREE.Scene, b: Builder, opts: { inside: (x: 
       counts.length = 0;
       for (let l = 0; l < k.meshes.length; l++) counts.push(0);
       const maxD = k.dists[k.dists.length - 1];
-      for (let i = 0; i < k.mats.length; i++) {
+      const bx0 = Math.floor((cp.x - maxD) / BK), bx1 = Math.floor((cp.x + maxD) / BK), bz0 = Math.floor((cp.z - maxD) / BK), bz1 = Math.floor((cp.z + maxD) / BK);
+      for (let bi = bx0; bi <= bx1; bi++) for (let bj = bz0; bj <= bz1; bj++) for (const i of k.buckets.get(bi * 4096 + bj) ?? NONE) {
         const d = k.pos[i].distanceTo(cp);
         if (d > maxD) continue;
         sph.center.copy(k.pos[i]); sph.center.y += k.rad[i] * 2;

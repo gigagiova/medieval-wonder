@@ -11,7 +11,9 @@ import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.j
 // Solids are given as 8 corners; faces are wound outward automatically, so
 // callers never have to think about handedness.
 
-const rand = rng(90210);
+let rand = rng(90210);
+/** Restart the kit's random sequence (each streamed chunk builds from its own seed). */
+export function reseedKit(seed: number) { rand = rng(seed); }
 export const R = (a: number, b: number) => a + (b - a) * rand();
 export const chance = (p: number) => rand() < p;
 
@@ -24,9 +26,11 @@ const _a = v3(), _b = v3(), _n = v3(), _c = v3();
 const IRREG: Partial<Record<MatName, number>> = { block: 0.03, stone: 0.03, bigstone: 0.045, rubble: 0.045, marble: 0.02, slab: 0.025, brick: 0.012, plaster: 0.03, roof: 0.01 };
 const BEVEL: Partial<Record<MatName, number>> = { block: 0.035, stone: 0.035, bigstone: 0.045, marble: 0.03, rubble: 0.04, slab: 0.025, brick: 0.02, plaster: 0.04 };
 
-/** Numeric key for a position on a 4 mm lattice (±250 m). */
+/** Numeric key for a position on a 4 mm lattice (±250 m around the origin set by keyOrigin). */
+let KO = [0, 0, 0];
+const keyOrigin = (a: ArrayLike<number>) => { KO = [a[0] ?? 0, a[1] ?? 0, a[2] ?? 0]; };
 const key = (x: number, y: number, z: number) =>
-  ((Math.round(x * 250) + 65536) * 131072 + (Math.round(y * 250) + 65536)) * 131072 + (Math.round(z * 250) + 65536);
+  ((Math.round((x - KO[0]) * 250) + 65536) * 131072 + (Math.round((y - KO[1]) * 250) + 65536)) * 131072 + (Math.round((z - KO[2]) * 250) + 65536);
 
 export class Acc {
   private parts = new Map<MatName, number[]>();
@@ -125,6 +129,7 @@ export class Acc {
     const d = v3();
     for (const [m, a] of this.parts) {
       if (!a.length) continue;
+      keyOrigin(a);
       for (let i = 0; i < a.length; i += 3) {
         const k = key(a[i], a[i + 1], a[i + 2]);
         let o = cache.get(k);
@@ -252,6 +257,7 @@ export function addBent(b: Builder, g: THREE.BufferGeometry, m: MatName, M?: THR
   if (M) geo.applyMatrix4(M);
   geo = tessellate(geo, m);
   const a = geo.attributes.position.array as Float32Array;
+  keyOrigin(a);
   const cache = new Map<number, number[]>();
   const d = v3();
   for (let i = 0; i < a.length; i += 3) {

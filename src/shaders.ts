@@ -37,6 +37,7 @@ uniform vec3 uLampPos[${NLAMP}];
 uniform vec3 uLampCol[${NLAMP}];
 uniform vec3 uFogCol;
 uniform float uUnder;
+uniform float uFogBase;
 uniform vec3 uMoonDir;
 uniform sampler2D uNoise; // tiling low-frequency noise: R 4 cycles, G 8, B 16, A 6 (per tile)
 
@@ -44,8 +45,10 @@ vec3 applyAtmos(vec3 col, vec3 wpos){
   vec3 ro = cameraPosition;
   vec3 rd = wpos - ro; float L = max(length(rd), 1e-3); rd /= L;
   float dens = mix(0.045, 0.075, uUnder);
-  float b = mix(0.09, 0.0, uUnder);
-  float ground = mix(0.0, -7.0, uUnder);
+  float b = mix(0.06, 0.0, uUnder);
+  // Height fog anchored a little below the ground under the eye: looking out
+  // from the ridge the valleys lie in thicker mist.
+  float ground = uFogBase - 7.0 * uUnder;
   float od;
   float k = b * rd.y * L;
   if (abs(k) > 1e-3) od = dens * exp(-b*(ro.y-ground)) * (1.0 - exp(-k)) / (b*rd.y);
@@ -82,9 +85,13 @@ vec3 applyAtmos(vec3 col, vec3 wpos){
 export const surfaceGLSL = /* glsl */ `
 struct Surf { vec3 alb; float rough; float ao; vec3 nrm; vec3 emi; };
 
-uniform sampler2D uTown; // R main lane, G street, B gutter, A terrain height
-vec4 townAt(vec2 xz){ return texture2D(uTown, (xz + 100.)/200.); }
-float groundY(vec3 p){ return p.y < -2.5 ? -7.0 : townAt(p.xz).a*4. - 1.5; }
+uniform sampler2D uTown; // R Roman paving, G street, B gutter, A terrain height
+uniform vec4 uTownBox;   // x0, z0, 1/width, 1/depth (metres)
+uniform vec2 uTownH;     // terrain height range encoded in A
+vec4 townAt(vec2 xz){ return texture2D(uTown, (xz - uTownBox.xy) * uTownBox.zw); }
+float terrainY(vec2 xz){ return uTownH.x + townAt(xz).a * (uTownH.y - uTownH.x); }
+float groundY(vec3 p){ float g = terrainY(p.xz); return p.y < g - 2.5 ? g - 7.0 : g; }
+float underAt(vec3 p){ return step(p.y, terrainY(p.xz) - 2.5); }
 
 // Porous stone, brick, lime, timber and earth scatter light; they do not
 // mirror the sky. A grazing sky reflection on them is exactly what reads as
@@ -191,7 +198,7 @@ void weather(inout Surf s, vec3 p, vec3 n, float mossAmt){
   s.alb *= 0.86 + 0.28*nz.r;
   s.alb *= mix(vec3(1.0), vec3(1.05, 1.0, 0.92), nz.g);
   float y = p.y - groundY(p);
-  float under = step(p.y, -2.5);
+  float under = underAt(p);
   float damp = (1.0 - smoothstep(0.0, 0.25 + 0.8*nz2.r, y)) * (1.0 - under) * (1.0 - smoothstep(0.5, 0.9, n.y));
   s.alb *= mix(1.0, 0.72, damp);
   s.alb = mix(s.alb, s.alb*vec3(0.85, 0.95, 0.7), damp*0.5);
@@ -231,7 +238,7 @@ Surf surface(vec3 p, vec3 n){
   // Ground: river cobbles in the alleys, Roman basoli surviving on the main
   // lane, trodden mud everywhere else; height-blended where they meet.
   vec4 tw = townAt(p.xz);
-  float under = step(p.y, -2.5);
+  float under = underAt(p);
   vec4 nz = texture2D(uNoise, p.xz*0.03);
   float street = smoothstep(0.25, 0.75, tw.g) * (1.0 - under);
   float bas = street * smoothstep(0.3, 0.6, tw.r) * smoothstep(0.35, 0.55, nz.r);

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { getMapData, type Teleport } from './world';
+import { discovered } from './benevento/secrets';
 
 // A hand-drawn map of the town and its surroundings, in the manner of a
 // monastic scribe: aged parchment, sepia ink with a trembling hand,
@@ -9,7 +10,7 @@ import { getMapData, type Teleport } from './world';
 type MapData = ReturnType<typeof getMapData>;
 
 // Region shown: north (-z) up, +x right, metres.
-const CX = -2, CZ = 2, HALF = 130;
+const CX = -70, CZ = -60, HALF = 820;
 
 const INK = '#3b2a1a', INK_SOFT = 'rgba(59,42,26,0.55)', RED = '#8e2216';
 
@@ -80,7 +81,7 @@ function pickMark(e: MouseEvent): Teleport | null {
 /** Gilded travel marks: a little gold roundel with a cross, and the place name. */
 function drawMarks(ctx: CanvasRenderingContext2D, S: number, t: number) {
   if (!data) return;
-  const r = S * 0.011;
+  const r = S * 0.008;
   for (const m of data.teleports) {
     const [x, y] = markXY(m, S);
     const h = hover === m;
@@ -103,8 +104,8 @@ function drawMarks(ctx: CanvasRenderingContext2D, S: number, t: number) {
     ctx.moveTo(-r * 0.55, 0); ctx.lineTo(r * 0.55, 0);
     ctx.moveTo(0, -r * 0.55); ctx.lineTo(0, r * 0.55);
     ctx.stroke();
-    if (h || matchMedia('(pointer: coarse)').matches) {
-      ctx.font = `italic ${Math.max(10, S * 0.016)}px 'IM Fell English', Georgia, serif`;
+    if (h) {
+      ctx.font = `italic ${Math.max(11, S * 0.017)}px 'IM Fell English', Georgia, serif`;
       ctx.textAlign = 'center';
       ctx.lineWidth = 3;
       ctx.strokeStyle = 'rgba(236,222,190,0.85)';
@@ -163,56 +164,277 @@ function drawBase(ctx: CanvasRenderingContext2D, S: number, d: MapData) {
   const P = (x: number, z: number): [number, number] => [(x - (CX - HALF)) * k, (z - (CZ - HALF)) * k];
   ctx.clearRect(0, 0, S, S);
   ctx.save();
-
-  // Torn parchment outline: everything is clipped to it.
   const edge = tornEdge(S, rnd);
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.0)';
   edge();
   ctx.clip();
   parchment(ctx, S, rnd);
-
-  // Fields and pasture outside the walls: hatched strips, tufts.
-  fields(ctx, S, d, P, k, rnd);
-
-  // Washes over the built-up raster.
-  houses(ctx, S, d, P, k);
-
-  // The streets get a faint ochre line down the main lanes.
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  for (const s of d.streets) {
-    if (!s.main) continue;
-    ctx.strokeStyle = 'rgba(150,110,60,0.22)';
-    ctx.lineWidth = s.w * k * 0.55;
-    wobblyPath(ctx, s.pts.map((p) => P(p.x, p.y)), rnd, 0.6);
-    ctx.stroke();
-  }
-
-  // Roman road out of the gate, edged with tombs.
-  road(ctx, d, P, k, rnd);
-
-  // The aqueduct: a dotted line of little arches.
-  aqueduct(ctx, d, P, k);
-
-  // Trees and tombs outside.
-  for (const t of d.trees) tree(ctx, ...P(t.x, t.y), k, rnd);
-  for (const t of d.tombs) tomb(ctx, ...P(t.x, t.y), k, rnd);
-
-  // The wall: a heavy double ink line with towers.
+  fields(ctx, d, P, k, rnd);
+  rivers(ctx, d, P, k, rnd);
+  roads(ctx, d, P, k, rnd);
+  plots(ctx, d, P, k);
+  houses(ctx, d, P, k);
+  for (let i = 0; i < d.trees.length; i += 2) tree(ctx, ...P(d.trees[i].x, d.trees[i].y), Math.max(k, 0.6) * 2.2, rnd);
   wall(ctx, d, P, k, rnd);
-
-  // Landmarks.
   glyphs(ctx, d, P, k, rnd);
-
-  // Fog creeping in from the edges, and the burnt rim.
   fog(ctx, S, rnd);
   ctx.restore();
   burn(ctx, S, edge);
-
-  compass(ctx, S * 0.14, S * 0.84, S * 0.07);
+  compass(ctx, S * 0.12, S * 0.86, S * 0.065);
   cartouche(ctx, S * 0.045, S * 0.04, S);
-  scaleBar(ctx, S * 0.62, S * 0.93, k, S);
+  scaleBar(ctx, S * 0.6, S * 0.93, k, S);
+  ctx.restore();
+}
+
+/** Watercolour washes over the houses (the town raster, at 2 m), ink round the blocks. */
+function houses(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: number) => [number, number], k: number) {
+  const r = d.raster, STEP = 4; // raster cells per map cell (2 m)
+  const n = Math.floor(r.nx / STEP), m = Math.floor(r.nz / STEP);
+  const f = new Float32Array(n * m), st = new Float32Array(n * m);
+  for (let j = 0; j < m; j++) for (let i = 0; i < n; i++) {
+    let h = 0, s = 0;
+    for (let b = 0; b < STEP; b++) for (let a = 0; a < STEP; a++) {
+      const v = r.grid[(j * STEP + b) * r.nx + i * STEP + a];
+      if (v === d.codes.house) h++; else if (v === d.codes.street) s++;
+    }
+    f[j * n + i] = h / (STEP * STEP); st[j * n + i] = s / (STEP * STEP);
+  }
+  const wc = document.createElement('canvas');
+  wc.width = n; wc.height = m;
+  const wctx = wc.getContext('2d')!;
+  const img = wctx.createImageData(n, m);
+  for (let j = 0; j < m; j++) for (let i = 0; i < n; i++) {
+    const q = j * n + i, o = q * 4, v = f[q];
+    const x = r.x0 + (i + 0.5) * STEP * r.res, z = r.z0 + (j + 0.5) * STEP * r.res;
+    const t = 0.5 + 0.5 * Math.sin(x * 0.02 + Math.sin(z * 0.015) * 2) * Math.cos(z * 0.018 - x * 0.006);
+    if (v > 0.3) {
+      img.data[o] = 200 - 25 * t; img.data[o + 1] = 135 + 25 * t; img.data[o + 2] = 95 + 10 * t; img.data[o + 3] = Math.min(190, v * 260);
+    } else if (st[q] > 0.4) {
+      img.data[o] = 240; img.data[o + 1] = 228; img.data[o + 2] = 198; img.data[o + 3] = 110;
+    }
+  }
+  wctx.putImageData(img, 0, 0);
+  const [x0, y0] = P(r.x0, r.z0);
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.drawImage(wc, x0, y0, n * STEP * r.res * k, m * STEP * r.res * k);
+  ctx.restore();
+}
+
+/** Gardens, vines, pens and ruins inside the walls: hatched patches with a pale wash. */
+function plots(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: number) => [number, number], k: number) {
+  const fill: Record<string, string> = { orto: 'rgba(120,150,70,0.22)', vinea: 'rgba(110,80,110,0.18)', pratum: 'rgba(140,160,90,0.16)', ruina: 'rgba(120,110,95,0.22)', stabulum: 'rgba(160,130,80,0.2)' };
+  ctx.save();
+  for (const p of d.plots) {
+    ctx.beginPath();
+    p.pts.forEach(([x, z], i) => { const [a, b] = P(x, z); if (i) ctx.lineTo(a, b); else ctx.moveTo(a, b); });
+    ctx.closePath();
+    ctx.fillStyle = fill[p.kind] ?? 'rgba(140,160,90,0.15)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(70,60,40,0.3)';
+    ctx.lineWidth = Math.max(0.5, k * 0.25);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Fields and meadows round the town: strips in loose patches, tufts of grass. */
+function fields(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: number) => [number, number], k: number, rnd: () => number) {
+  ctx.save();
+  for (let f = 0; f < 70; f++) {
+    const x = CX - HALF + rnd() * HALF * 2, z = CZ - HALF + rnd() * HALF * 2;
+    if (insidePoly(x, z, d.wall)) continue;
+    const [px, py] = P(x, z);
+    const w = (40 + rnd() * 60) * k, h = (25 + rnd() * 40) * k, rot = rnd() * Math.PI;
+    ctx.save();
+    ctx.translate(px, py); ctx.rotate(rot);
+    ctx.fillStyle = rnd() < 0.5 ? 'rgba(140,150,90,0.1)' : 'rgba(170,140,80,0.1)';
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.strokeStyle = 'rgba(80,70,40,0.18)';
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    for (let y = -h / 2 + 2; y < h / 2; y += Math.max(2.5, k * 5)) { ctx.moveTo(-w / 2 + 1, y); ctx.lineTo(w / 2 - 1, y); }
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/** The two rivers: a grey-green wash between trembling banks. */
+function rivers(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: number) => [number, number], k: number, rnd: () => number) {
+  ctx.save();
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const r of d.rivers) {
+    const pts = r.pts.map(([x, z]) => P(x, z));
+    ctx.strokeStyle = 'rgba(110,130,125,0.45)';
+    ctx.lineWidth = r.w * k * 1.2;
+    wobblyPath(ctx, pts, rnd, 0.5); ctx.stroke();
+    ctx.strokeStyle = INK_SOFT;
+    ctx.lineWidth = Math.max(0.6, k * 0.6);
+    for (const s of [-1, 1]) {
+      const side = r.pts.map(([x, z], i) => {
+        const a = r.pts[Math.max(0, i - 1)], b = r.pts[Math.min(r.pts.length - 1, i + 1)];
+        const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1;
+        return P(x - (dz / l) * s * r.w * 0.6, z + (dx / l) * s * r.w * 0.6);
+      });
+      wobblyPath(ctx, side, rnd, 0.6); ctx.stroke();
+    }
+    const mid = r.pts[Math.floor(r.pts.length * 0.35)], nx = r.pts[Math.floor(r.pts.length * 0.35) + 3];
+    const [lx, ly] = P(mid[0], mid[1]);
+    label(ctx, r.name === 'Calor' ? 'Calor fluvius' : 'Sabbatus fluvius', lx, ly - r.w * k, Math.max(10, k * 22), Math.atan2(nx[1] - mid[1], nx[0] - mid[0]), true, 'center');
+  }
+  ctx.restore();
+}
+
+function roads(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: number) => [number, number], k: number, rnd: () => number) {
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const r of d.roads) {
+    const pts = r.pts.map(([x, z]) => P(x, z));
+    ctx.strokeStyle = 'rgba(200,175,130,0.55)';
+    ctx.lineWidth = Math.max(1.5, r.w * k * 1.3);
+    wobblyPath(ctx, pts, rnd, 0.5); ctx.stroke();
+    if (r.w >= 2.8) {
+      ctx.strokeStyle = INK_SOFT; ctx.lineWidth = Math.max(0.5, k * 0.4);
+      ctx.setLineDash([3, 2]);
+      wobblyPath(ctx, pts, rnd, 0.5); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (r.name.startsWith('Via') && r.pts.length > 3) {
+      const i = Math.floor(r.pts.length / 2), a = r.pts[i], b = r.pts[i + 1];
+      const [lx, ly] = P(a[0], a[1]);
+      label(ctx, r.name, lx, ly - 10, Math.max(9, k * 16), Math.atan2(b[1] - a[1], b[0] - a[0]), true, 'center');
+    }
+  }
+  ctx.restore();
+}
+
+function insidePoly(x: number, z: number, poly: [number, number][]) {
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a[1] > z) !== (b[1] > z) && x < ((b[0] - a[0]) * (z - a[1])) / (b[1] - a[1]) + a[0]) c = !c;
+  }
+  return c;
+}
+
+function wall(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: number) => [number, number], k: number, rnd: () => number) {
+  const pts = d.wall.map(([x, z]) => P(x, z));
+  const dense: [number, number][] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length];
+    const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 6);
+    for (let s = 0; s < steps; s++) dense.push([ax + ((bx - ax) * s) / steps, ay + ((by - ay) * s) / steps]);
+  }
+  const w = Math.max(2.2, k * 5);
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = INK; ctx.lineWidth = w;
+  wobblyPath(ctx, dense, rnd, 0.6, true); ctx.stroke();
+  ctx.strokeStyle = '#e4d0a4'; ctx.lineWidth = w * 0.45;
+  wobblyPath(ctx, dense, rnd, 0.4, true); ctx.stroke();
+  // Towers along the circuit.
+  let acc = 0;
+  for (let i = 0; i < dense.length; i++) {
+    const [x, y] = dense[i], [nx, ny] = dense[(i + 1) % dense.length];
+    acc += Math.hypot(nx - x, ny - y);
+    if (acc < 45 * k) continue;
+    acc = 0;
+    ctx.fillStyle = '#d9c08e'; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(0.8, k * 0.6);
+    ctx.beginPath();
+    if (rnd() < 0.5) ctx.arc(x, y, w * 0.9, 0, Math.PI * 2); else ctx.rect(x - w * 0.8, y - w * 0.8, w * 1.6, w * 1.6);
+    ctx.fill(); ctx.stroke();
+  }
+  for (const g of d.gates) {
+    const [x, y] = P(g.at[0], g.at[1]);
+    ctx.fillStyle = '#e8d7ae';
+    ctx.beginPath(); ctx.arc(x, y, w * 1.2, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = Math.max(1, k * 0.8); ctx.strokeStyle = INK;
+    ctx.beginPath();
+    ctx.moveTo(x - w * 0.7, y + w * 0.6); ctx.lineTo(x - w * 0.7, y - w * 0.1);
+    ctx.arc(x, y - w * 0.1, w * 0.7, Math.PI, 0); ctx.lineTo(x + w * 0.7, y + w * 0.6);
+    ctx.stroke();
+    label(ctx, g.name, x, y + w * 2.4, Math.max(9, k * 14), 0, true, 'center');
+  }
+  ctx.restore();
+}
+
+/** Landmark glyphs and names; discovered writings get a red dot. */
+function glyphs(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: number) => [number, number], k: number, rnd: () => number) {
+  const s = Math.max(3.2, k * 7);
+  const sz = Math.max(10, k * 17);
+  ctx.save();
+  ctx.strokeStyle = INK; ctx.lineWidth = Math.max(0.9, k * 1.1); ctx.lineJoin = 'round';
+  const church = (x: number, y: number) => {
+    ctx.fillStyle = '#ead9b0';
+    ctx.beginPath(); ctx.rect(x - s * 1.6, y - s * 0.8, s * 3.2, s * 1.8); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - s * 1.9, y - s * 0.7); ctx.lineTo(x, y - s * 2.1); ctx.lineTo(x + s * 1.9, y - s * 0.7); ctx.closePath();
+    ctx.fillStyle = '#b8714a'; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y - s * 2.1); ctx.lineTo(x, y - s * 3.1); ctx.moveTo(x - s * 0.4, y - s * 2.7); ctx.lineTo(x + s * 0.4, y - s * 2.7); ctx.stroke();
+  };
+  const ring = (x: number, y: number, rx: number, ry: number, half = false) => {
+    ctx.fillStyle = 'rgba(234,217,176,0.8)';
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, half ? -Math.PI / 2 : 0, half ? Math.PI / 2 : Math.PI * 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, y, rx * 0.55, ry * 0.5, 0, half ? -Math.PI / 2 : 0, half ? Math.PI / 2 : Math.PI * 2); ctx.stroke();
+  };
+  const arch = (x: number, y: number) => {
+    ctx.fillStyle = '#efe3c4';
+    ctx.beginPath();
+    ctx.moveTo(x - s, y + s * 0.8); ctx.lineTo(x - s, y - s); ctx.lineTo(x + s, y - s); ctx.lineTo(x + s, y + s * 0.8);
+    ctx.lineTo(x + s * 0.45, y + s * 0.8); ctx.lineTo(x + s * 0.45, y); ctx.arc(x, y, s * 0.45, 0, Math.PI, true); ctx.lineTo(x - s * 0.45, y + s * 0.8); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  };
+  const tower = (x: number, y: number) => {
+    ctx.fillStyle = '#d9c08e';
+    ctx.beginPath(); ctx.rect(x - s * 0.7, y - s * 1.6, s * 1.4, s * 2.4); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - s * 0.9, y - s * 1.6); ctx.lineTo(x, y - s * 2.4); ctx.lineTo(x + s * 0.9, y - s * 1.6); ctx.closePath(); ctx.fillStyle = '#b8714a'; ctx.fill(); ctx.stroke();
+  };
+  const mark = (name: string, draw: (x: number, y: number) => void, text = name, dx = 0, dy = 2.4) => {
+    const l = d.landmarks.find((q) => q.name === name);
+    if (!l) return;
+    const [x, y] = P(l.x, l.z);
+    draw(x, y);
+    label(ctx, text, x + dx * s, y + dy * s, sz, 0, false, 'center');
+  };
+  mark('Curtis Ducis', tower, 'Curtis Ducis');
+  mark('Episcopium', church, 'S. Maria · Episcopium');
+  mark('Sanctus Petrus extra muros', church, 'S. Petrus');
+  mark('Sanctus Hilarius ad Portam Auream', church, 'S. Hilarius', 0, 2.2);
+  mark('Theatrum', (x, y) => ring(x, y, 44 * k, 44 * k, true));
+  mark('Amphitheatrum', (x, y) => ring(x, y, 48 * k, 38 * k), 'Amphitheatrum');
+  mark('Porta Aurea', arch, 'Porta Aurea', 0, -1.6);
+  mark('Arcus Sacramenti', arch, 'Arcus', 0, -1.6);
+  mark('Turris Catenae', tower);
+  mark('Sancti Quadraginta', (x, y) => { ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(x, y, s * 0.5, 0, Math.PI * 2); ctx.fill(); }, 'SS. Quadraginta');
+  mark('Thermae', (x, y) => { ctx.fillStyle = '#efe3c4'; ctx.beginPath(); ctx.arc(x, y, s, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); });
+  mark('Forum', (x, y) => { ctx.beginPath(); for (let i = 0; i < 4; i++) { ctx.moveTo(x - s + i * s * 0.66, y + s * 0.7); ctx.lineTo(x - s + i * s * 0.66, y - s * 0.7); } ctx.stroke(); });
+  mark('Iseum', (x, y) => { ctx.fillStyle = '#c99a7a'; ctx.beginPath(); ctx.moveTo(x - s * 0.3, y + s); ctx.lineTo(x - s * 0.2, y - s * 1.4); ctx.lineTo(x, y - s * 1.8); ctx.lineTo(x + s * 0.2, y - s * 1.4); ctx.lineTo(x + s * 0.3, y + s); ctx.closePath(); ctx.fill(); ctx.stroke(); });
+  mark('Coemeterium Langobardorum', (x, y) => { ctx.beginPath(); for (let i = -1; i <= 1; i++) { ctx.moveTo(x + i * s * 0.8, y + s); ctx.lineTo(x + i * s * 0.8, y - s * 1.4); } ctx.stroke(); }, 'Coemeterium');
+  mark('Nux Sacra', (x, y) => tree(ctx, x, y + s, s * 0.6, rnd), 'Nux');
+  mark('Molendinum', (x, y) => { ctx.beginPath(); ctx.arc(x, y, s * 0.8, 0, Math.PI * 2); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * s * 0.8, y + Math.sin(a) * s * 0.8); } ctx.stroke(); });
+  mark('Pons Leprosus', () => {}, 'Pons Leprosus');
+  // Quarters, large and faint.
+  ctx.globalAlpha = 0.5;
+  for (const q of d.districts) {
+    if (!['curtis', 'platea', 'insulaeOccidentales', 'hortiSeptentrionales', 'ripaSabbati'].includes(q.id)) continue;
+    const [x, y] = P(q.center[0], q.center[1]);
+    label(ctx, q.name, x, y + s * 4, sz * 1.15, -0.06, true, 'center');
+  }
+  ctx.globalAlpha = 1;
+  // Houses one can enter: a little door; found writings: a red dot.
+  const found = discovered();
+  for (const e of d.explorables) {
+    const [x, y] = P(e.x, e.z);
+    ctx.fillStyle = found.has(e.id) ? RED : 'rgba(59,42,26,0.6)';
+    ctx.beginPath(); ctx.arc(x, y, Math.max(1.8, s * 0.32), 0, Math.PI * 2); ctx.fill();
+  }
+  for (const r of d.readables) {
+    if (!found.has(r.id)) continue;
+    const [x, y] = P(r.x, r.z);
+    ctx.fillStyle = RED;
+    ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, s * 0.25), 0, Math.PI * 2); ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -296,203 +518,6 @@ function wobblyPath(ctx: CanvasRenderingContext2D, pts: [number, number][], rnd:
   if (close) ctx.closePath();
 }
 
-/** Watercolour washes over houses and precincts, ink contours around blocks, roof hatching. */
-function houses(ctx: CanvasRenderingContext2D, S: number, d: MapData, P: (x: number, z: number) => [number, number], k: number) {
-  const n = d.n;
-  const { house, reserved, street } = d.codes;
-  // Smoothed house mask.
-  const m = new Float32Array(n * n);
-  for (let i = 0; i < n * n; i++) m[i] = d.grid[i] === house ? 1 : 0;
-  const blur = (src: Float32Array) => {
-    const out = new Float32Array(n * n);
-    for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
-      let s = 0;
-      for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) s += src[(j + b) * n + i + a];
-      out[j * n + i] = s / 9;
-    }
-    return out;
-  };
-  const f = blur(blur(m));
-
-  // Wash layer at raster resolution, scaled up smoothly.
-  const wc = document.createElement('canvas');
-  wc.width = wc.height = n;
-  const wctx = wc.getContext('2d')!;
-  const img = wctx.createImageData(n, n);
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    const q = j * n + i, o = q * 4, v = f[q];
-    const code = d.grid[q];
-    const x = d.min + (i + 0.5) * d.res, z = d.min + (j + 0.5) * d.res;
-    // Low-frequency hue drift: terracotta to ochre to umber.
-    const t = 0.5 + 0.5 * Math.sin(x * 0.07 + Math.sin(z * 0.05) * 2) * Math.cos(z * 0.06 - x * 0.02);
-    if (v > 0.35) {
-      const edgePool = 1 - Math.min(1, Math.abs(v - 0.55) * 2.2); // pigment pools at the edges
-      img.data[o] = 205 - 25 * t - 30 * edgePool;
-      img.data[o + 1] = 140 + 25 * t - 25 * edgePool;
-      img.data[o + 2] = 98 + 10 * t - 15 * edgePool;
-      img.data[o + 3] = Math.min(170, (v - 0.35) * 500) * (0.7 + 0.3 * edgePool);
-    } else if (code === reserved && Math.hypot(x, z) < 95) {
-      // Precinct grounds: a pale sage wash.
-      img.data[o] = 150; img.data[o + 1] = 160; img.data[o + 2] = 120; img.data[o + 3] = 70;
-    } else if (code === street) {
-      img.data[o] = 238; img.data[o + 1] = 226; img.data[o + 2] = 196; img.data[o + 3] = 90;
-    }
-  }
-  wctx.putImageData(img, 0, 0);
-  const [x0, y0] = P(d.min, d.min);
-  const span = n * d.res * k;
-  ctx.save();
-  ctx.imageSmoothingEnabled = true;
-  ctx.globalCompositeOperation = 'multiply';
-  ctx.drawImage(wc, x0, y0, span, span);
-  ctx.restore();
-
-  // Ink contours by marching squares on the smoothed mask.
-  const c = (i: number, j: number) => f[j * n + i];
-  const X = (i: number) => x0 + (i + 0.5) * d.res * k;
-  ctx.save();
-  ctx.strokeStyle = INK;
-  ctx.globalAlpha = 0.7;
-  ctx.lineWidth = Math.max(0.8, k * 0.2);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  const T = 0.5;
-  const lerp = (a: number, b: number) => (T - a) / (b - a);
-  for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
-    const a = c(i, j), b = c(i + 1, j), cc = c(i + 1, j + 1), dd = c(i, j + 1);
-    const idx = (a > T ? 1 : 0) | (b > T ? 2 : 0) | (cc > T ? 4 : 0) | (dd > T ? 8 : 0);
-    if (idx === 0 || idx === 15) continue;
-    const e: [number, number][] = [];
-    if ((a > T) !== (b > T)) e.push([X(i + lerp(a, b)), X(j)]);
-    if ((b > T) !== (cc > T)) e.push([X(i + 1), X(j + lerp(b, cc))]);
-    if ((dd > T) !== (cc > T)) e.push([X(i + lerp(dd, cc)), X(j + 1)]);
-    if ((a > T) !== (dd > T)) e.push([X(i), X(j + lerp(a, dd))]);
-    for (let q = 0; q + 1 < e.length; q += 2) {
-      ctx.moveTo(e[q][0], e[q][1]);
-      ctx.lineTo(e[q + 1][0], e[q + 1][1]);
-    }
-  }
-  ctx.stroke();
-
-  // Roof hatching: short strokes scattered inside the blocks, each block-ish
-  // patch hatched in its own direction.
-  ctx.lineWidth = Math.max(0.6, k * 0.12);
-  ctx.globalAlpha = 0.35;
-  const rnd = seeded(7);
-  ctx.beginPath();
-  for (let j = 2; j < n - 2; j += 3) for (let i = 2; i < n - 2; i += 3) {
-    if (c(i, j) < 0.85 || rnd() < 0.45) continue;
-    const cell = Math.floor(i / 14) * 131 + Math.floor(j / 14);
-    const ang = (cell % 2 ? 0.8 : -0.8) + Math.sin(cell) * 0.3;
-    const L = k * 1.1;
-    const px = X(i), py = X(j);
-    ctx.moveTo(px - Math.cos(ang) * L, py - Math.sin(ang) * L);
-    ctx.lineTo(px + Math.cos(ang) * L, py + Math.sin(ang) * L);
-  }
-  ctx.stroke();
-  ctx.restore();
-  void S;
-}
-
-function fields(ctx: CanvasRenderingContext2D, S: number, d: MapData, P: (x: number, z: number) => [number, number], k: number, rnd: () => number) {
-  ctx.save();
-  // Strip fields in loose patches beyond the walls.
-  for (let f = 0; f < 22; f++) {
-    const a = rnd() * Math.PI * 2, r = 100 + rnd() * 45;
-    const x = Math.sin(a) * r, z = Math.cos(a) * r;
-    if (Math.abs(x - d.gate.x) < 16 && z > 40) continue;
-    const [px, py] = P(x, z);
-    const w = (14 + rnd() * 18) * k, h = (10 + rnd() * 14) * k, rot = rnd() * Math.PI;
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(rot);
-    ctx.fillStyle = rnd() < 0.5 ? 'rgba(140,150,90,0.12)' : 'rgba(170,140,80,0.12)';
-    ctx.fillRect(-w / 2, -h / 2, w, h);
-    ctx.strokeStyle = 'rgba(80,70,40,0.25)';
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    for (let y = -h / 2 + 3; y < h / 2; y += Math.max(3, k * 1.6)) {
-      ctx.moveTo(-w / 2 + 1, y + (rnd() - 0.5));
-      ctx.lineTo(w / 2 - 1, y + (rnd() - 0.5));
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-  // Tufts of grass everywhere outside.
-  ctx.strokeStyle = 'rgba(70,75,40,0.35)';
-  ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  for (let i = 0; i < 700; i++) {
-    const x = (rnd() - 0.5) * 2 * HALF + CX, z = (rnd() - 0.5) * 2 * HALF + CZ;
-    if (insidePoly(x, z, d.wall)) continue;
-    const [px, py] = P(x, z);
-    const s = k * 0.7;
-    ctx.moveTo(px - s, py); ctx.lineTo(px - s * 0.3, py - s * 1.2);
-    ctx.moveTo(px, py); ctx.lineTo(px + s * 0.1, py - s * 1.5);
-    ctx.moveTo(px + s, py); ctx.lineTo(px + s * 0.4, py - s * 1.1);
-  }
-  ctx.stroke();
-  ctx.restore();
-  void S;
-}
-
-function insidePoly(x: number, z: number, poly: THREE.Vector2[]) {
-  let c = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[i], b = poly[j];
-    if ((a.y > z) !== (b.y > z) && x < ((b.x - a.x) * (z - a.y)) / (b.y - a.y) + a.x) c = !c;
-  }
-  return c;
-}
-
-function road(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: number) => [number, number], k: number, rnd: () => number) {
-  const pts: [number, number][] = [];
-  for (let z = d.gate.y; z < CZ + HALF + 5; z += 6) pts.push(P(d.gate.x + Math.sin(z * 0.05) * 2 - Math.sin(d.gate.y * 0.05) * 2, z));
-  ctx.save();
-  ctx.strokeStyle = 'rgba(200,175,130,0.55)';
-  ctx.lineWidth = 4.5 * k;
-  ctx.lineCap = 'round';
-  wobblyPath(ctx, pts, rnd, 0.8);
-  ctx.stroke();
-  for (const s of [-1, 1]) {
-    ctx.strokeStyle = INK_SOFT;
-    ctx.lineWidth = Math.max(0.8, k * 0.2);
-    ctx.setLineDash([k * 1.6, k * 1.0]);
-    wobblyPath(ctx, pts.map(([x, y]) => [x + s * 2.3 * k, y]), rnd, 0.8);
-    ctx.stroke();
-  }
-  ctx.restore();
-  const [lx, ly] = P(d.gate.x + 12, d.gate.y + 34);
-  label(ctx, 'Via Sepulcrorum', lx, ly, k * 4.20, Math.PI / 2 - 0.05, true);
-}
-
-function aqueduct(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: number) => [number, number], k: number) {
-  if (d.aqueduct.length < 2) return;
-  const [a, b] = d.aqueduct;
-  const [ax, ay] = P(a.x, a.y), [bx, by] = P(b.x, b.y);
-  const L = Math.hypot(bx - ax, by - ay), ang = Math.atan2(by - ay, bx - ax);
-  ctx.save();
-  ctx.translate(ax, ay);
-  ctx.rotate(ang);
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = Math.max(0.8, k * 0.22);
-  const bay = 6 * k;
-  ctx.beginPath();
-  ctx.moveTo(0, -bay * 0.55);
-  ctx.lineTo(L, -bay * 0.55);
-  ctx.stroke();
-  ctx.beginPath();
-  for (let x = 0, i = 0; x < L; x += bay, i++) {
-    if (i % 12 >= 6 && i % 12 < 9) continue; // fallen spans
-    ctx.moveTo(x, 0);
-    ctx.arc(x + bay / 2, 0, bay / 2 * 0.9, Math.PI, 0);
-  }
-  ctx.stroke();
-  ctx.restore();
-  const [lx, ly] = P(a.x + (b.x - a.x) * 0.22, a.y + (b.y - a.y) * 0.22);
-  label(ctx, 'Aquaeductus', lx - 6 * k * Math.sin(ang), ly + 6 * k * Math.cos(ang) + 6 * k, k * 4.55, ang, true);
-}
-
 function tree(ctx: CanvasRenderingContext2D, x: number, y: number, k: number, rnd: () => number) {
   const s = k * (1.3 + rnd() * 0.8);
   ctx.save();
@@ -537,156 +562,6 @@ function tomb(ctx: CanvasRenderingContext2D, x: number, y: number, k: number, rn
     ctx.stroke();
   }
   ctx.restore();
-}
-
-function wall(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: number) => [number, number], k: number, rnd: () => number) {
-  const pts = d.wall.map((p) => P(p.x, p.y));
-  // Densify so the wobble reads as hand-drawn.
-  const dense: [number, number][] = [];
-  for (let i = 0; i < pts.length; i++) {
-    const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length];
-    const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / (k * 4));
-    for (let s = 0; s < steps; s++) dense.push([ax + ((bx - ax) * s) / steps, ay + ((by - ay) * s) / steps]);
-  }
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = k * 2.6;
-  wobblyPath(ctx, dense, rnd, k * 0.25, true);
-  ctx.stroke();
-  ctx.strokeStyle = '#e4d0a4';
-  ctx.lineWidth = k * 1.2;
-  wobblyPath(ctx, dense, rnd, k * 0.2, true);
-  ctx.stroke();
-  // Little crenel ticks along the outside of the inner line.
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = Math.max(0.6, k * 0.15);
-  ctx.beginPath();
-  for (let i = 0; i < dense.length; i += 2) {
-    const [x, y] = dense[i], [nx, ny] = dense[(i + 1) % dense.length];
-    const ex = nx - x, ey = ny - y, l = Math.hypot(ex, ey) || 1;
-    const ox = ey / l, oy = -ex / l;
-    ctx.moveTo(x + ox * k * 1.2, y + oy * k * 1.2);
-    ctx.lineTo(x + ox * k * 2.2, y + oy * k * 2.2);
-  }
-  ctx.stroke();
-  // Towers at the corners: some round, some square.
-  for (let i = 0; i < pts.length; i++) {
-    if (rnd() < 0.25) continue;
-    const [x, y] = pts[i];
-    ctx.fillStyle = '#d9c08e';
-    ctx.lineWidth = Math.max(0.9, k * 0.25);
-    ctx.beginPath();
-    if (rnd() < 0.5) ctx.arc(x, y, k * 2.4, 0, Math.PI * 2);
-    else ctx.rect(x - k * 2.2, y - k * 2.2, k * 4.4, k * 4.4);
-    ctx.fill();
-    ctx.stroke();
-  }
-  // Gates: an arch drawn over the line.
-  for (const g of [d.gate, d.eastGate]) {
-    const [x, y] = P(g.x, g.y);
-    ctx.fillStyle = '#e8d7ae';
-    ctx.beginPath();
-    ctx.arc(x, y, k * 2.6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineWidth = Math.max(1, k * 0.3);
-    ctx.beginPath();
-    ctx.moveTo(x - k * 1.6, y + k * 1.4);
-    ctx.lineTo(x - k * 1.6, y - k * 0.2);
-    ctx.arc(x, y - k * 0.2, k * 1.6, Math.PI, 0);
-    ctx.lineTo(x + k * 1.6, y + k * 1.4);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function glyphs(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: number) => [number, number], k: number, rnd: () => number) {
-  const L = Object.fromEntries(d.landmarks.map((l) => [l.name, l]));
-  const s = k * 2.3;
-  ctx.save();
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = Math.max(1, k * 0.32);
-  ctx.lineJoin = 'round';
-  // Basilica: a little church with its apse and a cross.
-  if (L.Basilica) {
-    const [x, y] = P(L.Basilica.x, L.Basilica.z);
-    ctx.fillStyle = '#ead9b0';
-    ctx.beginPath();
-    ctx.rect(x - s * 2.2, y - s * 1.2, s * 4.4, s * 2.6);
-    ctx.fill(); ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x - s * 2.6, y - s * 1.1); ctx.lineTo(x, y - s * 3.0); ctx.lineTo(x + s * 2.6, y - s * 1.1);
-    ctx.closePath(); ctx.fillStyle = '#b8714a'; ctx.fill(); ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y - s * 3.0); ctx.lineTo(x, y - s * 4.4);
-    ctx.moveTo(x - s * 0.5, y - s * 3.9); ctx.lineTo(x + s * 0.5, y - s * 3.9);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x - s * 0.5, y + s * 1.4); ctx.lineTo(x - s * 0.5, y + s * 0.4);
-    ctx.arc(x, y + s * 0.4, s * 0.5, Math.PI, 0); ctx.lineTo(x + s * 0.5, y + s * 1.4);
-    ctx.stroke();
-    label(ctx, 'Basilica', x + s * 3.2, y - s * 0.2, k * 4.73, -0.04);
-  }
-  if (L.Atrium) {
-    const [x, y] = P(L.Atrium.x, L.Atrium.z);
-    label(ctx, 'Atrium', x + s * 3.5, y + s * 0.6, k * 3.68, 0.03, true);
-  }
-  // Ossuarium: a tiny skull.
-  if (L.Ossuarium) {
-    const [x, y] = P(L.Ossuarium.x, L.Ossuarium.z);
-    ctx.fillStyle = '#efe4c8';
-    ctx.beginPath();
-    ctx.arc(x, y - s * 0.3, s * 1.1, Math.PI * 0.85, Math.PI * 2.15);
-    ctx.lineTo(x + s * 0.6, y + s * 0.9);
-    ctx.lineTo(x - s * 0.6, y + s * 0.9);
-    ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    ctx.fillStyle = INK;
-    for (const dx of [-0.42, 0.42]) { ctx.beginPath(); ctx.arc(x + dx * s, y - s * 0.2, s * 0.28, 0, Math.PI * 2); ctx.fill(); }
-    ctx.beginPath(); ctx.moveTo(x, y + s * 0.15); ctx.lineTo(x - s * 0.12, y + s * 0.45); ctx.lineTo(x + s * 0.12, y + s * 0.45); ctx.fill();
-    label(ctx, 'Ossuarium', x - s * 1.6, y + s * 2.9, k * 3.85, 0.02, true, 'right');
-  }
-  // Templum: pediment on little columns.
-  if (L.Templum) {
-    const [x, y] = P(L.Templum.x, L.Templum.z);
-    ctx.fillStyle = '#efe3c4';
-    ctx.beginPath();
-    ctx.moveTo(x - s * 2.4, y - s * 1.2); ctx.lineTo(x, y - s * 2.4); ctx.lineTo(x + s * 2.4, y - s * 1.2); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    ctx.beginPath();
-    for (let i = 0; i < 5; i++) {
-      const cx = x - s * 1.9 + i * s * 0.95;
-      if (i === 3) { ctx.moveTo(cx, y + s * 1.3); ctx.lineTo(cx, y + s * 0.1); continue; } // a broken one
-      ctx.moveTo(cx, y + s * 1.3); ctx.lineTo(cx, y - s * 1.2);
-    }
-    ctx.moveTo(x - s * 2.5, y + s * 1.35); ctx.lineTo(x + s * 2.5, y + s * 1.35);
-    ctx.stroke();
-    label(ctx, 'Templum Vetus', x, y + s * 3.4, k * 4.20, -0.03, false, 'center');
-  }
-  // Arcus: a lone arch across the lane.
-  if (L.Arcus) {
-    const [x, y] = P(L.Arcus.x, L.Arcus.z);
-    ctx.fillStyle = '#efe3c4';
-    ctx.beginPath();
-    ctx.moveTo(x - s * 1.6, y + s * 1.1); ctx.lineTo(x - s * 1.6, y - s * 1.5); ctx.lineTo(x + s * 1.6, y - s * 1.5); ctx.lineTo(x + s * 1.6, y + s * 1.1);
-    ctx.lineTo(x + s * 0.7, y + s * 1.1); ctx.lineTo(x + s * 0.7, y - s * 0.1);
-    ctx.arc(x, y - s * 0.1, s * 0.7, 0, Math.PI, true);
-    ctx.lineTo(x - s * 0.7, y + s * 1.1); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    label(ctx, 'Arcus', x + s * 2.2, y + s * 0.3, k * 3.85, 0.05, true);
-  }
-  if (L.Porta) {
-    const [x, y] = P(L.Porta.x, L.Porta.z);
-    label(ctx, 'Porta', x + s * 2.8, y + s * 2.2, k * 4.20, 0.04);
-  }
-  // Area names, large and faint.
-  ctx.globalAlpha = 0.55;
-  const [cx, cy] = P(30, 40);
-  label(ctx, 'Civitas', cx, cy, k * 7.35, -0.12, false, 'center');
-  const [ex, ey] = P(-95, 40);
-  label(ctx, 'Extra Muros', ex, ey, k * 5.25, 0.1, true, 'center');
-  ctx.restore();
-  void rnd;
 }
 
 function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, rot = 0, italic = false, align: CanvasTextAlign = 'left') {
@@ -819,16 +694,16 @@ function cartouche(ctx: CanvasRenderingContext2D, x: number, y: number, S: numbe
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = `${h * 0.48}px 'UnifrakturMaguntia', serif`;
-  ctx.fillText('Civitas', w / 2, h * 0.42);
+  ctx.fillText('Beneventum', w / 2, h * 0.42);
   ctx.font = `italic ${h * 0.19}px 'IM Fell English', Georgia, serif`;
   ctx.fillStyle = RED;
-  ctx.fillText('Anno Domini DCCXXVII', w / 2, h * 0.8);
+  ctx.fillText('Anno Domini DCC', w / 2, h * 0.8);
   ctx.restore();
 }
 
 function scaleBar(ctx: CanvasRenderingContext2D, x: number, y: number, k: number, S: number) {
   // Roman paces (passus, ~1.48 m).
-  const passus = 1.48, n = 4, per = 5;
+  const passus = 1.48, n = 4, per = 50;
   const seg = per * passus * k;
   ctx.save();
   ctx.translate(x, y);

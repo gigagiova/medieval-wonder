@@ -6,7 +6,9 @@ import { Acc, Frame, box as kbox, voussoirs } from './arch/kit';
 import { tiledGable, tiledLeanTo } from './arch/roof';
 
 // Reusable architectural pieces. Everything takes a Builder and world coordinates.
-const rand = rng(4242);
+let rand = rng(4242);
+/** Restart this module's random sequence. */
+export function reseedShapes(seed: number) { rand = rng(seed); }
 const R = (a: number, b: number) => a + (b - a) * rand();
 
 /** A wall of length L along local x with n round-arched openings, extruded `depth` along z. */
@@ -94,6 +96,7 @@ export function ruinGeo(L: number, h: number, depth: number, jag = 0.5, openW = 
 }
 export function ruin(b: Builder, m: MatName, L: number, h: number, depth: number, x: number, y: number, z: number, ry: number, jag = 0.5, openW = 0, spring = 0) {
   const proxy = openW <= 0 ? new THREE.BoxGeometry(L, h * (1 - jag / 2), depth).translate(0, (h * (1 - jag / 2)) / 2, 0) : undefined;
+  if (b.mode === 'collide' && proxy) { b.geo(m, proxy, x, y, z, ry, true, 0, 0, true); return; }
   lastTops = null;
   b.geo(m, ruinGeo(L, h, depth, jag, openW, spring), x, y, z, ry, true, 0, 0, openW <= 0, proxy);
   if (!lastTops || jag < 0.05) return;
@@ -183,6 +186,7 @@ export const WELLS: { x: number; z: number; rIn: number; rOut: number }[] = [];
  */
 export function wellHead(b: Builder, m: MatName, x: number, y: number, z: number, rOut: number, h: number, cap: MatName = 'stone') {
   const rIn = rOut - 0.4;
+  if (b.mode === 'collide') { b.geo(m, new THREE.CylinderGeometry(rOut, rOut, h, 10, 1, true).translate(0, h / 2, 0), x, y, z, 0, true, 0, 0, true); return; }
   const shaft = 3.0;
   // Body: outer face, inner face continuing down the shaft (one closed lathe).
   // Outer face climbing, across the top, inner face descending the shaft:

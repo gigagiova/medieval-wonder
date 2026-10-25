@@ -6,7 +6,7 @@ import { noiseGLSL } from './shaders';
 // domain-warped flame with a blackbody colour ramp, plus rising embers.
 
 export type FireKind = 'torch' | 'brazier' | 'oil' | 'candle';
-export interface FireSource { pos: THREE.Vector3; kind: FireKind; scale?: number }
+export interface FireSource { pos: THREE.Vector3; kind: FireKind; scale?: number; under?: boolean }
 
 interface Tongue { x: number; z: number; w: number; h: number; turb: number }
 
