@@ -43,9 +43,8 @@ def plain(name, imgs, alpha=False):
 
 def prepare(basemesh, garments, rig, spec):
     for o in [o for o in bpy.data.objects if o.type == 'MESH']:
-        old = o.active_material
-        imgs = images_of(old)
-        kind = 'skin' if o == basemesh else o.name
         alpha = any(s in o.name.lower() for s in ('eyebrow', 'eyelash', 'hair', 'beard'))
-        o.data.materials.clear()
-        o.data.materials.append(plain(kind, imgs, alpha))
+        for i, old in enumerate(o.data.materials):
+            imgs = images_of(old)
+            kind = ('head' if old and old.name.startswith('head') else 'skin') if o == basemesh else o.name
+            o.data.materials[i] = plain(kind, imgs, alpha)

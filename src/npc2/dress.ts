@@ -37,7 +37,7 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
     if (g.layer === 'belt' && g.map !== 'color') { m.material = dyes.belt; return; }
     let mat: THREE.MeshStandardMaterial;
     if (KIND[g.fabric]) {
-      mat = fabric(KIND[g.fabric], g.map === 'color' ? col.clone().lerp(new THREE.Color(1, 1, 1), 0.55) : col, { attr: 'rest', vertexColors: false });
+      mat = fabric(KIND[g.fabric], g.map === 'color' ? col.clone().lerp(new THREE.Color(1, 1, 1), 0.55) : col, { attr: 'rest', vertexColors: true });
     } else {
       mat = matte(0xffffff, 0.95);
     }

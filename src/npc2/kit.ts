@@ -32,7 +32,8 @@ export interface OutfitV2 {
 const DIR = 'models/npc2/';
 /** The bodies, and which v1 outfits each can wear (by sex). */
 export const BODIES_V2: { id: string; sex: Sex }[] = [
-  { id: 'm_mid', sex: 'man' },
+  { id: 'm_young', sex: 'man' }, { id: 'm_mid', sex: 'man' }, { id: 'm_old', sex: 'man' },
+  { id: 'w_young', sex: 'woman' }, { id: 'w_mid', sex: 'woman' },
 ];
 
 export const kitsV2 = new Map<string, KitV2>();
@@ -61,9 +62,10 @@ function prep(t: THREE.Object3D) {
     if (!m.isSkinnedMesh) return;
     m.frustumCulled = false;
     m.castShadow = false;
-    const n = m.name;
-    m.userData.npc2 = /^G_/.test(n) ? 'garment' : /body$/.test(n) ? 'body' : /eye/i.test(n) ? 'eyes' : 'part';
-    if (m.userData.npc2 === 'garment') m.userData.garment = n.slice(2);
+    // (A mesh of several materials loads as a group of meshes, named after it.)
+    const n = /^G_|body|eye/i.test(m.name) ? m.name : m.parent?.name ?? m.name;
+    m.userData.npc2 = /^G_/.test(n) ? 'garment' : /body/.test(n) ? 'body' : /eye/i.test(n) ? 'eyes' : 'part';
+    if (m.userData.npc2 === 'garment') m.userData.garment = n.replace(/^G_/, '').replace(/_\d+$/, '');
     if (m.userData.npc2 === 'body') {
       // Skin: npc.ts tints it per person and gives it the soft wrapped light of skin (withAtmos).
       const src = m.material as THREE.MeshStandardMaterial;
@@ -118,14 +120,24 @@ export function outfitV2(id: string, body: string): OutfitV2 {
     g.setIndex(keep);
     g.deleteAttribute('_hide');
     // The bind pose, for the weave (fabric.ts lays it in metres on the rest shape).
-    if (m.userData.npc2 === 'garment') { g.setAttribute('rest', g.attributes.position); g.setAttribute('restN', g.attributes.normal); }
+    if (m.userData.npc2 === 'garment') {
+      g.setAttribute('rest', g.attributes.position);
+      g.setAttribute('restN', g.attributes.normal);
+      g.setAttribute('color', grime(g, k.m));
+    }
     m.geometry = g;
   });
   drop.forEach((d) => d.parent!.remove(d));
   t.updateMatrixWorld(true);
+  const garment = beltOf(t, k.m);
+  t.traverse((x) => {
+    const b = x.userData.npc2_brooch as number[] | undefined;
+    // (Blender's Z-up bind-pose coordinates.)
+    if (b && x.userData.npc2 === 'garment') garment.brooch = new THREE.Vector3(b[0], b[2], -b[1]);
+  });
   o = {
     v2: true, id, body, sex: k.sex, template: t, m: k.m,
-    garment: beltOf(t, k.m),
+    garment,
     garments: of.garments.map((g) => ({ id: g, ...k.meta.garments[g] })),
   };
   outfitsV2.set(key, o);
@@ -155,4 +167,25 @@ function beltOf(t: THREE.Object3D, M: Measure): Garment {
     return THREE.MathUtils.lerp(rs[i] || 0.15, rs[j] || 0.15, f - i);
   };
   return { belt: { y, cx: hips.x, cz: hips.z, r } } as unknown as Garment;
+}
+
+/**
+ * Wear baked into a garment's vertex colours (multiplied over the dye):
+ * dust and mud splashed up the hem from the street, fading out by the knee,
+ * and the grubby, worn edges of cuffs round the wrists.
+ */
+function grime(g: THREE.BufferGeometry, M: Measure) {
+  const p = g.attributes.position, c = new Float32Array(p.count * 3);
+  const wr = [M.bone('LeftHand'), M.bone('RightHand')], v = new THREE.Vector3();
+  const mud = new THREE.Color(0.72, 0.62, 0.5);
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    const hem = (1 - THREE.MathUtils.smoothstep(v.y, 0.04, 0.5)) * (0.75 + 0.25 * Math.sin(v.x * 37 + v.z * 23));
+    const cuff = Math.max(...wr.map((w) => (1 - THREE.MathUtils.smoothstep(v.distanceTo(w), 0.03, 0.12)))) * 0.6;
+    const k = Math.min(1, hem + cuff);
+    c[i * 3] = THREE.MathUtils.lerp(1, mud.r, k);
+    c[i * 3 + 1] = THREE.MathUtils.lerp(1, mud.g, k);
+    c[i * 3 + 2] = THREE.MathUtils.lerp(1, mud.b, k);
+  }
+  return new THREE.BufferAttribute(c, 3);
 }

@@ -58,6 +58,10 @@ GARMENTS = {
     'hose': {'sex': ['man'], 'mhclo': 'rehmanpolanski_viking_pants/rehmanpolanski_viking_pants.mhclo', 'fabric': 'twill', 'layer': 'leg', 'map': 'detail'},
     'boots': {'sex': ['man'], 'mhclo': 'rehmanpolanski_viking_boots/rehmanpolanski_viking_boots.mhclo', 'fabric': 'leather', 'layer': 'shoe', 'map': 'color'},
     'shoes': {'sex': ['man', 'woman'], 'mhclo': 'punkduck_medieval_boots/punkduck_medieval_boots.mhclo', 'fabric': 'leather', 'layer': 'shoe', 'map': 'color'},
+    # Modelled here (drape.py): a Lombard cloak of fulled wool fastened at
+    # the right shoulder, to the calf; a woman's shawl round the shoulders.
+    'cloak': {'sex': ['man'], 'drape': {'from': 35, 'to': 335, 'length': 0.95, 'over': ['tunic'], 'reach': 0.34}, 'fabric': 'felt', 'layer': 'over', 'depth': 80},
+    'shawl': {'sex': ['woman'], 'drape': {'from': 120, 'to': 420, 'length': 0.5, 'over': ['gown', 'veil'], 'reach': 0.3, 'collar': 0.11}, 'fabric': 'twill', 'layer': 'over', 'depth': 80},
     'gown': {'sex': ['woman'], 'mhclo': 'punkduck_medieval_dress/punkduck_medieval_dress.mhclo', 'fabric': 'twill', 'layer': 'tunic'},
     'veil': {'sex': ['woman'], 'mhclo': 'elvs_charity_veil1/elvs_charity_veil1.mhclo', 'fabric': 'linen', 'layer': 'head'},
 }
@@ -66,9 +70,9 @@ GARMENTS = {
 OUTFITS = {
     'monk': {'sex': 'man', 'garments': ['robe', 'rope', 'cowl', 'shoes']},
     'peasantHood': {'sex': 'man', 'garments': ['tunic', 'hood', 'hose', 'boots']},
-    'peasantCloak': {'sex': 'man', 'garments': ['tunic', 'hose', 'boots']},
+    'peasantCloak': {'sex': 'man', 'garments': ['tunic', 'cloak', 'hose', 'boots']},
     'soldier': {'sex': 'man', 'garments': ['shirt', 'belt', 'hose', 'boots']},
-    'soldierCloak': {'sex': 'man', 'garments': ['tunic', 'hose', 'boots']},
+    'soldierCloak': {'sex': 'man', 'garments': ['shirt', 'belt', 'cloak', 'hose', 'boots']},
     'woman': {'sex': 'woman', 'garments': ['gown', 'veil', 'shoes']},
-    'womanShawl': {'sex': 'woman', 'garments': ['gown', 'veil', 'shoes']},
+    'womanShawl': {'sex': 'woman', 'garments': ['gown', 'veil', 'shawl', 'shoes']},
 }

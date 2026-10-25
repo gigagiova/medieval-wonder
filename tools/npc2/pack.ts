@@ -6,7 +6,7 @@
 // geometry next to its .webp files (the host serves neither .glb nor .bin).
 //
 //   npx tsx tools/npc2/pack.ts WORKDIR BODY...      (reads WORKDIR/BODY.glb)
-import { NodeIO, Document } from '@gltf-transform/core';
+import { NodeIO, Document, PropertyType, Texture } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { prune, simplifyPrimitive, weld, dedup } from '@gltf-transform/functions';
 import { MeshoptSimplifier } from 'meshoptimizer';
@@ -54,12 +54,21 @@ async function pack(work: string, id: string, io: NodeIO) {
   // seams, wear and shading; the game multiplies the dye by twice it), or
   // dropped (the scanned weave does the rest), per tools/npc2/specs.py.
   const meta = JSON.parse(String(root.listScenes()[0].getExtras().npc2 ?? '{}'));
+  const done = new Map<Texture, string>();
   for (const mat of root.listMaterials()) {
     const edge = TEX.find(([r]) => r.test(mat.getName()))![1];
     const g = /^G_/.test(mat.getName()) ? meta.garments?.[mat.getName().slice(2)] : null;
     if (g && !g.map && mat.getBaseColorTexture()) mat.setBaseColorTexture(null);
+    // A map shared by garments that use it differently is copied for each.
+    const mode = g?.map ?? 'color';
+    const bc = mat.getBaseColorTexture();
+    if (bc) {
+      if (done.has(bc) && done.get(bc) !== mode) mat.setBaseColorTexture(bc.clone());
+      else if (done.has(bc)) mat.setBaseColorTexture(bc);
+    }
     for (const [tex, isN] of [[mat.getBaseColorTexture(), false], [mat.getNormalTexture(), true]] as const) {
-      if (!tex) continue;
+      if (!tex || done.has(tex)) continue;
+      done.set(tex, isN ? 'normal' : mode);
       let img = sharp(Buffer.from(tex.getImage()!));
       const info = await img.metadata();
       const s = Math.min(edge, info.width ?? edge);
@@ -78,7 +87,7 @@ async function pack(work: string, id: string, io: NodeIO) {
       tex.setImage(buf).setMimeType('image/webp');
     }
   }
-  await doc.transform(dedup(), prune({ keepAttributes: true, keepLeaves: true }));
+  await doc.transform(dedup({ propertyTypes: [PropertyType.ACCESSOR, PropertyType.MESH, PropertyType.TEXTURE] }), prune({ keepAttributes: true, keepLeaves: true }));
   console.log(`${id}: ${total} tris in all meshes`);
   await write(doc, io, id);
 }

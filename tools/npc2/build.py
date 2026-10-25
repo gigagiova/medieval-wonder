@@ -66,7 +66,8 @@ log('body', basemesh.name, len(basemesh.data.vertices))
 
 if spec.get('scan') and 'nohead' not in OPTS:
     import headfit
-    headfit.fit(basemesh, spec)  # adds the "scanfit" shape key and re-bakes the head's skin
+    headfit.fit(basemesh, spec)  # adds the "scanfit" shape key
+    HS.refit(basemesh)  # the rig's head joints and the eyes to the new head
 
 # ------------------------------------------------------------------ garments
 garments = {}
@@ -92,6 +93,12 @@ for gid, g in GARMENTS.items():
         # A derived garment covering what its source did keeps its delete group.
         gspec[gid] = {'depth': gspec[src]['depth'], 'delete': gspec[src]['delete'] if not g['derive'].get('cut') and 'gown' not in g['derive'].get('drop', []) and not g['derive'].get('keep') else None}
         log('derived', gid, len(garments[gid].data.vertices))
+# Modelled garments, draped as cloth over the fitted ones.
+import drape  # noqa: E402
+for gid, g in GARMENTS.items():
+    if sex in g['sex'] and 'drape' in g:
+        garments[gid] = drape.make(gid, g, garments, basemesh, rig)
+        gspec[gid] = {'depth': g.get('depth', 80), 'delete': None}
 # Sources only used to derive others are not exported.
 for gid in list(garments):
     if GARMENTS[gid].get('only_source'):
@@ -125,6 +132,16 @@ bmesh.ops.delete(bm, geom=kill, context='VERTS')
 bm.to_mesh(basemesh.data)
 bm.free()
 log('body after helpers', len(basemesh.data.vertices), len(basemesh.data.polygons))
+
+if 'prebake' in OPTS:
+    bpy.ops.wm.save_as_mainfile(filepath=OUT.replace('.glb', '.prebake.blend'))
+    sys.exit(0)
+if spec.get('scan') and 'nohead' not in OPTS:
+    headfit.bake(basemesh, spec, os.path.dirname(OUT))
+    # The scan's eyes are in its skin now.
+    for o in list(bpy.data.objects):
+        if o.type == 'MESH' and o.name.endswith('low-poly'):
+            bpy.data.objects.remove(o)
 
 # ------------------------------------------------------------------ hidden surfaces
 import hide  # noqa: E402
