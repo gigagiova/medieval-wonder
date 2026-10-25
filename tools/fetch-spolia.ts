@@ -176,6 +176,8 @@ async function pack(id: string): Promise<Meta> {
     m.setMetallicFactor(0).setRoughnessFactor(0.92).setAlphaMode('OPAQUE').setDoubleSided(false);
     if (!cfg.normal) m.setNormalTexture(null);
     m.setBaseColorFactor([1, 1, 1, 1]);
+    // Unlit scans would lose their normals in prune(): they are lit here.
+    m.setExtension('KHR_materials_unlit', null);
   }
   for (const mesh of root.listMeshes()) for (const p of mesh.listPrimitives()) for (const s of p.listSemantics()) if (!['POSITION', 'TEXCOORD_0'].includes(s)) p.setAttribute(s, null);
   await doc.transform(dedup(), prune(), join({ keepNamed: false }), weld());

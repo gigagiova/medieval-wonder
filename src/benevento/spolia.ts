@@ -119,9 +119,14 @@ function inWall(id: SpoliaId, x: number, z: number, out: P2, hAbove: number, o: 
 class Occupancy {
   cells = new Set<number>();
   constructor(builders: Builder[], areas: { x: number; z: number; r: number }[]) {
-    const inArea = (x: number, z: number) => areas.some((a) => Math.abs(x - a.x) < a.r && Math.abs(z - a.z) < a.r);
+    // Cells of 32 m worth looking at: round the sites and along the circuit.
+    const roi = new Set<number>();
+    const K = (x: number, z: number) => Math.floor(x / 32) * 4096 + Math.floor(z / 32);
+    for (const a of areas) for (let x = a.x - a.r; x <= a.x + a.r + 31; x += 32) for (let z = a.z - a.r; z <= a.z + a.r + 31; z += 32) roi.add(K(x, z));
+    const inArea = (x: number, z: number) => roi.has(K(x, z));
     const mark = (x: number, z: number, y: number) => {
-      if (y - fastTerrain(x, z) > 0.3 && y - fastTerrain(x, z) < 12) this.cells.add(Math.floor(x) * 8192 + Math.floor(z));
+      const h = y - groundY(x, z);
+      if (h > 0.45 && h < 12) this.cells.add(Math.floor(x) * 8192 + Math.floor(z));
     };
     for (const b of builders) for (const g of b.colliders) {
       const P = g.attributes.position.array as ArrayLike<number>;
@@ -191,7 +196,7 @@ const WALL_KINDS: SpoliaId[] = ['relief_couple', 'relief_funerary', 'tondo', 'li
 const HOUSE_KINDS: SpoliaId[] = ['head_priestess', 'bust_man', 'head_priestess', 'relief_funerary'];
 const RUIN_KINDS: SpoliaId[] = ['torso_apollo', 'torso_woman', 'torso_dionysus', 'capital', 'foot_colossal', 'bust_aurelius', 'altar_grave', 'lion_corbridge', 'relief_funerary', 'tondo', 'sarcophagus'];
 
-function walls(b: Builder) {
+function walls(b: Builder, occ: Occupancy) {
   const wp = wallPlan();
   const g = (id: string) => GATES.find((q) => q.id === id)?.at;
   const hot: { at?: P2; r: number; w: number }[] = [{ at: g('rufina'), r: 130, w: 0.55 }, { at: g('sacramenti'), r: 110, w: 0.45 }, { at: g('summa'), r: 90, w: 0.4 }];
@@ -206,7 +211,7 @@ function walls(b: Builder) {
     for (const h of hot) if (h.at && Math.hypot(mx - h.at[0], mz - h.at[1]) < h.r) p += h.w;
     if (rand() > p) continue;
     const t = R(0.2, 0.8), x = w.a[0] + (w.b[0] - w.a[0]) * t + w.out[0] * 1.25, z = w.a[1] + (w.b[1] - w.a[1]) * t + w.out[1] * 1.25;
-    if (towersNear(x, z)) continue;
+    if (towersNear(x, z) || !occ.free(x + w.out[0] * 2.2, z + w.out[1] * 2.2, 0.3)) continue;
     // By Porta Summa the Iseum's beasts were built into the wall.
     if (summa && egypt < 2 && Math.hypot(mx - summa[0], mz - summa[1]) < 60) {
       const id: SpoliaId = egypt === 0 ? 'sphinx' : 'ram_amun';
@@ -221,13 +226,16 @@ function walls(b: Builder) {
     // Torsos go in as building blocks, on their sides; a few slabs upside down.
     const roll = lying ? (rand() < 0.5 ? Math.PI / 2 : -Math.PI / 2) : id === 'altar_grave' || id.startsWith('relief') ? (rand() < 0.2 ? Math.PI : 0) : 0;
     const proud = id.startsWith('head') || id.startsWith('bust') ? 0.55 : lying ? 0.45 : id === 'capital' || id === 'altar_grave' ? 0.3 : 0.4;
-    inWall(id, x, z, w.out, h, { roll, proud, range: id.startsWith('head') ? 50 : 80 });
+    // Funerary stelae and portraits came in all sizes; most built in are big ones.
+    const sc = id.startsWith('relief') || id === 'tondo' || id === 'altar_grave' ? R(1.25, 1.7) : id.startsWith('head') ? R(1.3, 1.8) : id.startsWith('bust') ? R(1.05, 1.3) : 1;
+    inWall(id, x, z, w.out, h, { roll, proud, s: sc, range: id.startsWith('head') ? 50 : 80 });
     count('wall');
   }
   // The gravestone with a readable text, low by Porta Rufina.
   const ru = wp.pieces.filter((w) => { const r = g('rufina'); return r && Math.hypot((w.a[0] + w.b[0]) / 2 - r[0], (w.a[1] + w.b[1]) / 2 - r[1]) < 30; });
-  if (ru.length) {
-    const w = ru[ru.length - 1], x = w.a[0] + (w.b[0] - w.a[0]) * 0.5 + w.out[0] * 1.25, z = w.a[1] + (w.b[1] - w.a[1]) * 0.5 + w.out[1] * 1.25;
+  const ruOk = ru.filter((w) => { const x = (w.a[0] + w.b[0]) / 2 + w.out[0] * 2.4, z = (w.a[1] + w.b[1]) / 2 + w.out[1] * 2.4; return !towersNear(x, z) && occ.free(x, z, 0.8); });
+  if (ruOk.length) {
+    const w = ruOk[0], x = w.a[0] + (w.b[0] - w.a[0]) * 0.5 + w.out[0] * 1.25, z = w.a[1] + (w.b[1] - w.a[1]) * 0.5 + w.out[1] * 1.25;
     inWall('altar_grave', x, z, w.out, 1.9, { roll: Math.PI, proud: 0.3 });
     count('wall');
     markReadableWorld('spoliaTitulus', x + w.out[0] * 0.9, 1.5, z + w.out[1] * 0.9);
@@ -241,6 +249,7 @@ function walls(b: Builder) {
       if (rand() < 0.25) continue;
       const u = side * (open / 2 + R(0.7, 1.1));
       const x = gt.x + gt.dx * u + n[0] * 1.5, z = gt.z + gt.dz * u + n[1] * 1.5;
+      if (!occ.free(x + n[0] * 2.0, z + n[1] * 2.0, 0.3)) continue;
       const id = pick(['relief_funerary', 'altar_grave', 'head_priestess', 'tondo', 'bust_man'] as SpoliaId[]);
       inWall(id, x, z, n, id === 'altar_grave' ? R(0.0, 0.3) : R(1.4, 2.6), { proud: id.startsWith('head') || id.startsWith('bust') ? 0.5 : 0.3, roll: id === 'altar_grave' && rand() < 0.5 ? Math.PI / 2 : 0, s: id === 'altar_grave' ? 0.9 : 1 });
       count('gate');
@@ -248,7 +257,7 @@ function walls(b: Builder) {
   }
 }
 
-function houses(lay: Layout) {
+function houses(lay: Layout, occ: Occupancy) {
   let k = 0;
   for (const l of lay.lots) {
     if (!l.front || l.explore || l.h < 3.5) continue;
@@ -259,6 +268,7 @@ function houses(lay: Layout) {
     const end = rand() < 0.5 ? 0 : 1, u = end ? L - 0.22 : 0.22;
     const e = f.b.clone().sub(f.a).normalize();
     const x = f.a.x + e.x * u, z = f.a.y + e.y * u;
+    if (!occ.free(x + f.out.x * 1.0, z + f.out.y * 1.0, 0.4)) continue;
     const id = pick(HOUSE_KINDS);
     if (id === 'relief_funerary' && L < 4) continue;
     inWall(id, x - (id === 'relief_funerary' ? 0 : 0), z, [f.out.x, f.out.y], id === 'relief_funerary' ? R(0.1, 0.4) : R(1.75, 2.4), { proud: id === 'relief_funerary' ? 0.25 : 0.5, s: id === 'relief_funerary' ? 0.6 : 1, mat: 'stone', range: 45 });
@@ -398,14 +408,14 @@ function weather(m: THREE.MeshStandardMaterial) {
           c *= 1.0 - 0.38 * smoothstep(0.5, 0.85, st);
           // Crustose lichen in patches, grey-green, now and then orange.
           float li = vnoise(o * 4.7) * 0.65 + vnoise(o * 13.0) * 0.35;
-          float lm = smoothstep(0.58, 0.68, li);
+          float lm = smoothstep(0.64, 0.72, li);
           vec3 lc = mix(vec3(0.33, 0.35, 0.27), vec3(0.42, 0.27, 0.1), step(0.78, vnoise(o * 1.9 + 4.0)));
-          c = mix(c, lc * (0.8 + 0.4 * vnoise(o * 30.0)), lm * 0.75);
+          c = mix(c, lc * (0.85 + 0.4 * vnoise(o * 30.0)), lm * 0.45);
           // Moss where water lies: the tops and ledges.
-          float up = smoothstep(0.3, 0.85, vWNS.y) * smoothstep(0.35, 0.6, vnoise(o * 2.3 + 9.0));
-          c = mix(c, vec3(0.07, 0.09, 0.035) * (0.8 + 0.5 * vnoise(o * 22.0)), up * 0.8);
+          float up = smoothstep(0.45, 0.9, vWNS.y) * smoothstep(0.4, 0.62, vnoise(o * 2.3 + 9.0));
+          c = mix(c, vec3(0.07, 0.09, 0.035) * (0.8 + 0.5 * vnoise(o * 22.0)), up * 0.6);
           // Soil at the foot.
-          c = mix(c, vec3(0.07, 0.06, 0.045), smoothstep(0.3, 0.0, vObjS.y) * 0.55);
+          c = mix(c, vec3(0.07, 0.06, 0.045), (1.0 - smoothstep(0.0, 0.3, vObjS.y)) * 0.55);
           diffuseColor.rgb = c * 0.82;
         }`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
@@ -427,9 +437,21 @@ async function loadModel(name: string, loader: GLTFLoader): Promise<Model> {
   gltf.scene.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
-    const g = mesh.geometry.clone();
+    // Quantized attributes (int16 / int8, normalized) cannot hold transformed
+    // values: widen to floats before baking the node's (dequantizing) matrix.
+    const g = new THREE.BufferGeometry();
+    for (const [k, a] of Object.entries(mesh.geometry.attributes)) {
+      const src = a as THREE.BufferAttribute, f = new Float32Array(src.count * src.itemSize);
+      for (let i = 0; i < src.count; i++) for (let c = 0; c < src.itemSize; c++) f[i * src.itemSize + c] = src.getComponent(i, c);
+      g.setAttribute(k, new THREE.BufferAttribute(f, src.itemSize));
+    }
+    if (mesh.geometry.index) g.setIndex(mesh.geometry.index);
     g.applyMatrix4(mesh.matrixWorld);
-    const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial;
+    if (!g.attributes.normal) g.computeVertexNormals();
+    // Some scans come unlit (KHR_materials_unlit): always shade them as stone.
+    const src = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial;
+    const mat = new THREE.MeshStandardMaterial({ map: src.map ?? null, normalMap: src.normalMap ?? null, name: src.name });
+    if (src.normalMap) mat.normalScale.set(0.8, 0.8);
     parts.push({ geometry: g, material: weather(mat) });
   });
   return { parts };
@@ -511,11 +533,20 @@ export async function buildSpolia(scene: THREE.Scene, b: Builder, builders: Buil
     .filter(Boolean).map((s) => ({ x: s.x, z: s.z, r: 90 }));
   const su = GATES.find((g) => g.id === 'summa');
   if (su) areas.push({ x: su.at[0], z: su.at[1], r: 20 });
+  for (const w of wallPlan().pieces) areas.push({ x: (w.a[0] + w.b[0]) / 2, z: (w.a[1] + w.b[1]) / 2, r: 12 });
+  for (const l of lay.lots) if (l.front) areas.push({ x: l.front.a.x, z: l.front.a.y, r: 6 });
   const occ = new Occupancy(builders, areas);
-  walls(b);
-  houses(lay);
+  walls(b, occ);
+  houses(lay, occ);
   ruins(occ, b);
   roads(occ, b);
+  await loadSpolia();
+  draw(scene);
+}
+
+/** Test page: one of each model in a row along x at y = 0, then drawn (see tools). */
+export async function spoliaTestGrid(scene: THREE.Scene) {
+  IDS.forEach((id, i) => put(id, new THREE.Vector3((i % 6) * 2.6 - 6.5, SIZE(id).y / 2 - Math.floor(i / 6) * 2.4, 0), new THREE.Quaternion(), 1, 1000));
   await loadSpolia();
   draw(scene);
 }
