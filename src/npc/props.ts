@@ -359,7 +359,8 @@ export function makeShield(paint: THREE.Color) {
   boss.rotateX(Math.PI / 2).translate(0, 0, 0.026);
   const rivets: THREE.BufferGeometry[] = [];
   for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; rivets.push(at(new THREE.SphereGeometry(0.009, 6, 4), Math.sin(a) * 0.075, Math.cos(a) * 0.075, 0.03)); }
-  const grip = at(new THREE.BoxGeometry(0.03, 0.34, 0.02), 0, 0, -0.03);
+  // The grip stands off the back on two cleats, room for a fist and a sleeve behind the boss.
+  const grip = merge([at(new THREE.BoxGeometry(0.03, 0.34, 0.02), 0, 0, -0.065), at(new THREE.BoxGeometry(0.03, 0.03, 0.065), 0, 0.155, -0.035), at(new THREE.BoxGeometry(0.03, 0.03, 0.065), 0, -0.155, -0.035)]);
   const o = new THREE.Group();
   o.add(new THREE.Mesh(board, face), new THREE.Mesh(rim, m.darkLeather), new THREE.Mesh(merge([boss, ...rivets]), m.darkIron), new THREE.Mesh(grip, m.ash));
   return o;
@@ -501,4 +502,32 @@ export function prepScan(root: THREE.Object3D, top = false) {
     mm.material = withAtmos(mat);
   });
   return g;
+}
+
+/**
+ * A lidded wicker basket for carrying over the forearm: the scanned basket
+ * with its lid shut (the scan has it lying open beside it) and a bent-withy
+ * handle arching across the top, side to side. Origin where the forearm runs
+ * through the handle, resting under its crown; the arch spans X, so the arm
+ * runs along Z.
+ */
+export function makeArmBasket(scan: THREE.Object3D) {
+  const o = new THREE.Group();
+  let mat: THREE.Material | null = null;
+  scan.traverse((x) => {
+    const m = x as THREE.Mesh;
+    if (!m.isMesh) return;
+    const lid = /lid/i.test(m.name);
+    const g = m.geometry.clone();
+    g.computeBoundingBox();
+    const b = g.boundingBox!;
+    // The base standing on y = 0; the lid flat on its rim.
+    g.translate(-(b.min.x + b.max.x) / 2, lid ? 0.2 - b.min.y - 0.012 : -b.min.y, -(b.min.z + b.max.z) / 2);
+    if (!lid) mat = m.material as THREE.Material;
+    o.add(new THREE.Mesh(g, m.material));
+  });
+  const arch = new THREE.CatmullRomCurve3([[-0.098, 0.19], [-0.096, 0.3], [-0.06, 0.385], [0, 0.4], [0.06, 0.385], [0.096, 0.3], [0.098, 0.19]].map(([x, y]) => new THREE.Vector3(x, y, 0)));
+  o.add(new THREE.Mesh(new THREE.TubeGeometry(arch, 20, 0.0085, 6, false), mat ?? propMats().ash));
+  for (const c of o.children) (c as THREE.Mesh).geometry.translate(0, -0.336, 0);
+  return o;
 }
