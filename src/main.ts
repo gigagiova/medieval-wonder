@@ -22,6 +22,7 @@ import { isReading } from './codex';
 import { loadNpcAssets, spawnTownsfolk, updateTownsfolk, pushOutOfTownsfolk, npcDebug } from './npc';
 Object.assign(window, { __npc: npcDebug });
 import type { Lamp, Cell, PropKind } from './builder';
+import { fogHides } from './fogcull';
 import { perfT, perfAdd, perfFrame, perfStats, initHud, gpuBegin, gpuEnd } from './perf';
 
 const params = new URLSearchParams(location.search);
@@ -434,7 +435,8 @@ function cull(isUnder: boolean, camLocal: number) {
   const live: Cell[] = [];
   for (const c of cells) {
     const zoneOk = c.under ? showUnder : showAbove;
-    const near = c.box.distanceToPoint(eye) < (c.range ?? 120);
+    // Past its draw distance, or wholly inside the fog (see fogcull.ts).
+    const near = c.box.distanceToPoint(eye) < (c.range ?? 120) && !(zoneOk && !c.under && fogHides(c.box, eye, shared.uFogBase.value, shared.uUnder.value));
     if (zoneOk && near && !c.lod) live.push(c);
     else c.occluded = 0;
     c.visible = zoneOk && near;
@@ -490,7 +492,7 @@ function frame() {
   frames++;
   const rawDt = clock.getDelta();
   const dt = Math.min(rawDt, 0.05);
-  const t = clock.elapsedTime;
+  const t = fixedTime ?? clock.elapsedTime;
   shared.uTime.value = t;
   grade.uniforms.uTime.value = t;
   fps += (1 / Math.max(dt, 1e-3) - fps) * 0.05;
@@ -580,15 +582,16 @@ function frame() {
   perfAdd('render', pt);
   if (captureNext && frames > 12) { captureNext = false; (window as unknown as { __shot: string }).__shot = renderer.domElement.toDataURL('image/png'); }
   const mi = renderer.info;
-  perfFrame({ calls: mi.render.calls, tris: mi.render.triangles, textures: mi.memory.textures, geometries: mi.memory.geometries, ratio, chunks: stream.stats.ready });
+  perfFrame({ calls: mi.render.calls, tris: mi.render.triangles, textures: mi.memory.textures, geometries: mi.memory.geometries, ratio, chunks: stream.stats.ready, extra: debugHud ? `cells ${cullStats.visible}/${cells.length} · occluded ${cullStats.occluded} · mid ${stream.stats.mid}` : undefined });
   if (params.has('debug')) document.title = `${fps.toFixed(0)} fps · cells ${cullStats.visible}/${cells.length} · occluded ${cullStats.occluded} · ${renderer.info.render.calls} calls · ${(renderer.info.render.triangles / 1000).toFixed(0)}k tris · chunks ${stream.stats.ready}`;
   if (params.has('shot') && !held && frames > 12) { (window as unknown as { __done: boolean }).__done = true; running = false; return; }
   requestAnimationFrame(frame);
 }
 // Benchmarks: restart the frame loop after a ?shot run has finished.
-let running = true, captureNext = false;
-Object.assign(window, { __renderer: renderer, __perf: perfStats, __resume: (n = 12, capture = false) => { captureNext = capture; (window as unknown as { __done: boolean }).__done = false; frames = 12 - n; if (!running) { running = true; requestAnimationFrame(frame); } } });
-if (params.has('debug')) initHud(renderer, scene);
+let running = true, captureNext = false, fixedTime: number | null = null;
+Object.assign(window, { __THREE: THREE, __cells: cells, __cullStats: cullStats, __fixTime: (v: number | null) => { fixedTime = v; }, __renderer: renderer, __perf: perfStats, __resume: (n = 12, capture = false) => { captureNext = capture; (window as unknown as { __done: boolean }).__done = false; frames = 12 - n; if (!running) { running = true; requestAnimationFrame(frame); } } });
+const debugHud = params.has('debug');
+if (debugHud) initHud(renderer, scene);
 // ?at=<teleport name>[&yaw=..&pitch=..]: start at a named place (also for screenshots).
 if (params.has('at')) {
   const want = params.get('at')!.toLowerCase();
