@@ -1094,14 +1094,14 @@ export function buildGarment(root: THREE.Object3D, full: THREE.Object3D, M: Meas
       wmap[i] = m;
     }
   }
-  // A close cloak moves with the tunic beneath it down to the belt, so the
-  // shoulders never rise through it; below, it hangs as before.
+  // A close cloak moves with the tunic beneath it, so neither the shoulders nor
+  // the skirt pushed back by a stride come through it; less so towards the hem.
   if (cape && spec.cloakClose) {
     const base = hoodBase + (hood ? hood.pos.length / 3 : 0) + scap.reduce((a, g) => a + g.pos.length / 3, 0);
     const ix = tunicGeo.index!;
     for (let i = base; i < base + cape.pos.length / 3; i++) {
       vv.fromArray(bind, i * 3);
-      const t = ss(yBelt - 0.08, yBelt + 0.04, vv.y);
+      const t = 1 - 0.35 * ss(yBelt, yHem, vv.y);
       if (t <= 0) continue;
       tunicBVH.closestPointToPoint(vv, tmp);
       const vs = [ix.getX(tmp.faceIndex * 3), ix.getX(tmp.faceIndex * 3 + 1), ix.getX(tmp.faceIndex * 3 + 2)];
