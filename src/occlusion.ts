@@ -89,7 +89,7 @@ function shared(ax: number, az: number, bx: number, bz: number, self: number) {
   return false;
 }
 
-/** The occluder prisms of one chunk (built once). */
+/** The occluder prisms of one chunk: its houses and stretches of town wall (built once). */
 export function chunkPrisms(it: ChunkItems): Float32Array {
   let p = prisms.get(it.key);
   if (p) return p;
@@ -124,11 +124,29 @@ export function chunkPrisms(it: ChunkItems): Float32Array {
     let area0 = 0;
     for (let k = 0; k < 4; k++) area0 += c[k][0] * c[(k + 1) % 4][1] - c[(k + 1) % 4][0] * c[k][1];
     if (Math.sign(area) !== Math.sign(area0) || Math.abs(area) < 2 * 2) continue;
-    let tMin = Infinity;
-    for (const [x, z] of c) tMin = Math.min(tMin, fastTerrain(x, z));
+    // Walls ride the terrain vertex by vertex: the lowest of corners, edge midpoints and centre.
+    let tMin = fastTerrain(cx, cz);
+    for (let k = 0; k < 4; k++) {
+      const [x, z] = c[k], [x2, z2] = c[(k + 1) % 4];
+      tMin = Math.min(tMin, fastTerrain(x, z), fastTerrain((x + x2) / 2, (z + z2) / 2));
+    }
     const y0 = tMin - 0.2, y1 = tMin + l.h - DROP;
     if (y1 - y0 < 1.5) continue;
     out.push(...q, y0, y1);
+  }
+  // The town walls (ruin() curtains, 2.5 m thick, base 1.2 m down, broken top
+  // at 93-100 % of h): a 1.2 m-thick core, topped 0.4 m under the lowest break.
+  for (const w of it.walls) {
+    const [ax, az] = w.a, [bx, bz] = w.b;
+    const L = Math.hypot(bx - ax, bz - az);
+    if (L < 1) continue;
+    const nx = (-(bz - az) / L) * 0.6, nz = ((bx - ax) / L) * 0.6;
+    let tMin = Infinity;
+    const ns = Math.ceil(L / 2);
+    for (let k = 0; k <= ns; k++) for (const sd of [-1, 1]) tMin = Math.min(tMin, fastTerrain(ax + ((bx - ax) * k) / ns + nx * sd, az + ((bz - az) * k) / ns + nz * sd));
+    const y0 = tMin - 0.2, y1 = tMin - 1.2 + 0.93 * w.h - 0.4;
+    if (y1 - y0 < 1.5) continue;
+    out.push(ax + nx, az + nz, bx + nx, bz + nz, bx - nx, bz - nz, ax - nx, az - nz, y0, y1);
   }
   p = new Float32Array(out);
   prisms.set(it.key, p);
