@@ -318,13 +318,9 @@ export function iseum(b: Builder) {
     b.box('stone', 0.5, 0.55, 0.5, sx, 1.3, fz + 1.05, 0, false);
     b.geo('stone', new THREE.CylinderGeometry(0.1, 0.36, 0.55, 4), sx, 1.45, fz + 0.9, Math.PI / 4, false);
   }
-  // The Apis bull, couchant, sunk to its belly at the corner of the square; the sun-disc between its horns.
-  const bx = -5.5, bz = -9.5, by = -0.35;
-  b.geo('marble', new THREE.SphereGeometry(1, 16, 10).scale(1.25, 0.65, 0.55), bx, by + 0.45, bz, 0.3, false);
-  b.geo('marble', new THREE.SphereGeometry(0.42, 12, 8).scale(1.2, 0.9, 0.8), bx + Math.cos(0.3) * 1.35, by + 0.85, bz - Math.sin(0.3) * 1.35, 0.3, false);
-  for (const s of [-1, 1]) b.geo('marble', new THREE.CylinderGeometry(0.05, 0.08, 0.5, 6), bx + Math.cos(0.3) * 1.3 + Math.sin(0.3) * s * 0.25, by + 1.25, bz - Math.sin(0.3) * 1.3 + Math.cos(0.3) * s * 0.25, 0.3, false, 0, s * 0.6);
-  b.geo('bronze', new THREE.CylinderGeometry(0.28, 0.28, 0.06, 18), bx + Math.cos(0.3) * 1.25, by + 1.55, bz - Math.sin(0.3) * 1.25, 0.3 + Math.PI / 2, false, Math.PI / 2);
-  b.collide(new THREE.BoxGeometry(2.6, 1.3, 1.2).rotateY(0.3).translate(bx + 0.3, 0.3, bz));
+  // Where the Apis bull lies, sunk to its belly at the corner of the square.
+  const bx = -5.5, bz = -9.5;
+  // (The bull itself is the scanned Apis among the spolia: src/benevento/spolia.ts.)
   // The relief of the Lady with the serpent at her brow, propped against the podium.
   b.box('marble', 1.1, 1.5, 0.22, px + pw / 2 + 0.75, -0.2, pz + 3.5, Math.PI / 2 - 0.2, false, 0.12);
   hornLantern(b, px - 4.6, 2.2, pz - 2.0);

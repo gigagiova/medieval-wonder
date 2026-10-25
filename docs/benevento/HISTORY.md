@@ -263,3 +263,74 @@ World coordinates in metres (x, z).
   per frame; JS heap ~340–365 MB after GC (it was ~900 MB before the CPU copies of the meshes were
   freed). Collision is one merged proxy mesh (boxes and prisms) with a BVH.
 - Secrets, explorables and easter eggs: `SECRETS.md`.
+
+## 9. Ponte Fratto (Pons Maior)
+
+**What is known.** The ruins of a Roman bridge over the **Calore at Cellarulo**, the plain north-west of
+the town where the Calore turns south to meet the Sabato. Meomartini (1889, *I monumenti*, pp. 250-251,
+on the Via Latina) puts it upstream of the confluence, "at the end of the contrada Cellarulo, where one
+still sees the ruins of a bridge, which is therefore called *Ponte Fratto*, that is broken bridge", and
+notes the Roman road still under the fields from the bridge to S. Maria delle Grazie; he thought the
+visible ruins later than the first Roman bridge, but the crossing itself certain
+(https://it.wikisource.org/wiki/Pagina:Meomartini_-_I_monumenti_e_le_opere_d%27arte_della_citt%C3%A0_di_Benevento.djvu/276).
+The Treccani *Enciclopedia dell'Arte Antica*, "Benevento"
+(https://www.treccani.it/enciclopedia/benevento_(Enciclopedia-dell'-Arte-Antica)/) gives it to the
+second Roman artery, the branch of the **Via Latina** from Teanum by Allifae and Telesia: "the remains
+of the piers of a bridge, the so-called Ponte Fratto, which crossed the Calore in contrada Cellarulo",
+next to Republican-to-Imperial kilns and workshops. Local archaeology calls it the **Pons Maior** of the
+texts and says it fell after the Middle Ages and was not rebuilt (Archeomedia, "Salviamo e valorizziamo
+il Parco archeologico di Cellarulo"; Anteprima24 on the LIPU paths); today only pier stumps show, worn by
+floods (Meer, "I ponti della provincia di Benevento"). It is often confused with Ponte Leproso (the Appia
+over the Sabato). Torelli brings the Via Latina in by this bridge, Rotili by the bridge of S. Onofrio.
+Position: OpenStreetMap node 3734199956 "Ponte Fratto" (41.13920 N, 14.75850 E), on the Calore's real
+course (OSM way 838750109). No survey of its spans or masonry was found.
+
+**What the game shows (a reconstruction).** Five round arches of 8.8 m clear span on piers 3.2 m thick,
+with pointed cutwaters upstream (the Calore runs south here) and blunter ones downstream; a deck 6.4 m
+wide about 7.4 m over the water; abutments into the banks and low embankments (*aggeres*) carrying the
+road down to the plain; faced with large limestone blocks over a rubble core (the "massi lapidei a bozze"
+reported for the ruins), voussoir rings of dressed stone. In AD 700 it is drawn **damaged but in use**: a
+flood has carried off the middle arch (its blocks lie in the river, one with the end of the building
+inscription), the gap is spanned with timber on a trestle in the stream, the next arch has lost its
+upstream half, the parapets are broken, the road's paving robbed for building, weeds and shrubs grow on
+the piers. "Fratto" is the later name; the game calls it Pons Maior, with the modern name in the
+teleport. Dimensions, damage and repair are inferences; the two readables there are invented.
+
+**How it is built.** The bridge lies 160 m north of the edge of the baked map (z < -800), so
+`src/benevento/cellarulo.ts` supplies the ground there: EU-DEM 25 m from OpenTopoData sampled every
+12.5 m, blended into the map's last row over 30 m, with the Calore's real course carved the way
+`gen_geo.py` carves the rivers; `geo.ts` `baseHeight()` defers to it north of the map.
+`pontefratto.ts` draws that ground and its collision, the water along the real course (trimming the baked
+course's shortcut beyond the map edge), the bridge, the road remnants and a wood along the banks (a second
+`buildForest` call bounded to the patch, kept off the bridge and roads). Teleport "Pons Maior (Ponte
+Fratto)"; region name "Pons Maior"; map landmark.
+
+## 10. Spolia: Roman sculpture in the walls and the ruins
+
+Benevento's late-antique and Lombard walls are known for the Roman material built into them: funerary
+portraits and reliefs, inscriptions, altars, heads and column pieces, and Egyptian sculpture of the
+Iseum (sphinxes, an Apis bull and other pieces in the Museo del Sannio came out of walls and later
+buildings: Treccani EAA "Benevento"; Bertelli Buquicchio 1992; Rotili 1986; H. W. Müller, *Il culto di
+Iside nell'antica Benevento*, 1971). The game places 23 scanned pieces (photogrammetry of real Roman and
+Egyptian sculpture in museums, CC BY / CC0, credited in `public/models/spolia/CREDITS.md`; none is from
+Benevento, so which scan stands for which kind of piece is illustrative):
+
+- **in the outer face of the curtain** all round, thickest by Porta Rufina, the Arcus Sacramenti and Porta
+  Summa (where a sphinx and a ram of Amun lie in the footing as building blocks); stelae sometimes upside
+  down, torsos laid on their sides as blocks; an epitaph to read by Porta Rufina;
+- **in gate jambs** (low, on the gates' outer faces) and **in house fronts** (small heads and a stele, at
+  the ends of a front where no opening is cut);
+- **lying broken**, half sunk, in the theatre, amphitheatre, baths, Santi Quaranta, by the Arcus
+  Sacramenti and S. Ilario, and along the Appia by Ponte Leproso (the roads' tombs);
+- **reused**: a headless cuirassed emperor still on a base at the forum (readable "The iron man"), a
+  Roman sarcophagus for a burial in the bishop's atrium and another for a Lombard grave (both practices
+  attested), a sarcophagus as the mill's trough, a lion and a capital by the church, an altar set up as a
+  milestone at Ponte Fratto, a torso as a mounting block inside Porta Summa;
+- **Egyptian pieces round the Iseum** (sphinx, seated king, Isis, Apis, ram, a dark sarcophagus lid),
+  placed relative to `SITES.iseum`, so they follow the site if it moves.
+
+Placement (`src/benevento/spolia.ts`) is computed at load from the wall plan, the gates, the lots and the
+sites, and every spot is tested against the collision already built (1 m occupancy cells), so the pieces
+follow the layout when it changes. The scans are packed by `tools/fetch-spolia.ts` (decimated to 5-12k
+triangles with ~1-2k far versions, scaled to real sizes, colour greyed); a shader adds grime in the
+hollows, rain streaks, lichen, moss on the tops and soil at the foot, and the common fog.

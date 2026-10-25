@@ -102,3 +102,12 @@ Underground and high places:
 - **S. Sofia**: six Roman columns stacked in the dukes' orchard, two holding up a vine: sixty years on,
   Arechis II will raise his star-shaped church here round six such columns.
 - **The marble bridge**: the three emperors' names on the Ponte Leproso's parapet.
+- **Isis**: the Iseum ruins, east of the walls. Its obelisk and Apis survive today in the town.
+- **Ponte Fratto** (teleport "Pons Maior (Ponte Fratto)", ~(-1350, -962), north of the old map edge on
+  the Calore): a block of the building inscription lies in the shallows under the fallen arch (`pontisTitulus`,
+  "...vetustate conlapsum restituit": restored once, fallen again), and someone has cut "Pons Maior
+  fractus est" into the timber trestle (`pontisNomen`): the name the ruin still has. Both invented (style).
+- **Spolia**: Roman sculpture in the walls and ruins (HISTORY.md section 10). Readables: an epitaph set
+  upside down in the wall by Porta Rufina (`spoliaTitulus`, style), the headless cuirassed "iron man" on
+  his base at the forum (`spoliaImperator`, style), and the sphinx built into the wall by Porta Summa
+  (`spoliaSphinx`, paraphrase: Iseum pieces did come out of Benevento's walls).
