@@ -35,7 +35,7 @@ const flatNormal = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1
 flatNormal.needsUpdate = true;
 /** The bodies, and which v1 outfits each can wear (by sex). */
 export const BODIES_V2: { id: string; sex: Sex }[] = [
-  { id: 'm_young', sex: 'man' }, { id: 'm_mid', sex: 'man' }, { id: 'm_old', sex: 'man' },
+  { id: 'm_young', sex: 'man' }, { id: 'm_mid', sex: 'man' }, { id: 'm_old', sex: 'man' }, { id: 'm_elder', sex: 'man' },
   { id: 'w_young', sex: 'woman' }, { id: 'w_mid', sex: 'woman' },
 ];
 

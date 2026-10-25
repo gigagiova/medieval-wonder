@@ -44,6 +44,10 @@ def lower_arms(rig, angle):
 def make(gid, g, garments, basemesh, rig):
     d = g['drape']
     sc = bpy.context.scene
+    # The whole body collides: MPFB's masks hiding it under the fitted clothes are off meanwhile.
+    masks = [m for m in basemesh.modifiers if m.type == 'MASK' and m.name.startswith('Delete')]
+    for m in masks:
+        m.show_viewport = False
     lower_arms(rig, math.radians(d.get('arms', 38)))
     neck = bone_world(rig, 'Neck')
     sh = (bone_world(rig, 'LeftArm') + bone_world(rig, 'RightArm')) / 2
@@ -233,6 +237,8 @@ def make(gid, g, garments, basemesh, rig):
     bpy.context.view_layer.update()
     # Where it is fastened (a brooch, src/npc/props.ts): the collar's end at the right shoulder.
     o['npc2_brooch'] = list(o.matrix_world @ o.data.vertices[0].co)
+    for m in masks:
+        m.show_viewport = True
     o.parent = rig
     am = o.modifiers.new('Armature', 'ARMATURE')
     am.object = rig

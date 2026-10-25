@@ -41,7 +41,8 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
     if (kind) {
       mat = fabric(kind, g.map === 'color' ? col.clone().lerp(new THREE.Color(1, 1, 1), 0.55) : col, { attr: 'rest', vertexColors: true });
     } else {
-      mat = matte(0xffffff, 0.95);
+      // Hemp rope: its own photographed twist (the map), toned to unbleached fibre.
+      mat = matte(0x8a7a5c, 0.95);
     }
     if (src.normalMap) { mat.normalMap = src.normalMap; mat.normalScale = new THREE.Vector2(1, 1); }
     // The viking tunic's map is a mail shirt's: worn so by soldiers only.

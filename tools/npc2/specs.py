@@ -25,6 +25,13 @@ BODIES = {
         'skin': 'old_caucasian_male/old_caucasian_male.mhmat',
         'scan': 'manuel',
     },
+    'm_elder': {
+        'sex': 'man', 'height': 1.64,
+        'phenotype': {'gender': 1.0, 'age': 0.95, 'muscle': 0.4, 'weight': 0.55, 'height': 0.33, 'proportions': 0.45},
+        'race': {'caucasian': 0.9, 'asian': 0.05, 'african': 0.05},
+        'skin': 'old_caucasian_male/old_caucasian_male.mhmat',
+        'scan': 'face_grandpa',
+    },
     'w_young': {
         'sex': 'woman', 'height': 1.59,
         'phenotype': {'gender': 0.0, 'age': 0.45, 'muscle': 0.45, 'weight': 0.5, 'height': 0.35, 'proportions': 0.6, 'cupsize': 0.5, 'firmness': 0.5},
@@ -54,14 +61,14 @@ GARMENTS = {
     'hood': {'sex': ['man'], 'mhclo': 'donitz_monk_robe_hood/donitz_monk_robe_hood.mhclo', 'fabric': 'felt', 'layer': 'head', 'map': 'detail'},
     'tunic': {'sex': ['man'], 'derive': {'from': 'robe_src', 'cut': 'knee', 'drop': ['capelet', 'rope'], 'collar': 0.012}, 'fabric': 'tabby', 'layer': 'tunic', 'map': 'detail'},
     'vtunic_src': {'sex': ['man'], 'mhclo': 'rehmanpolanski_viking_tunic/rehmanpolanski_viking_tunic.mhclo', 'only_source': True},
-    'shirt': {'sex': ['man'], 'derive': {'from': 'vtunic_src', 'keep': ['tunic'], 'lengthen': 0.2}, 'fabric': 'twill', 'layer': 'tunic', 'map': 'detail'},
+    'shirt': {'sex': ['man'], 'derive': {'from': 'vtunic_src', 'keep': ['tunic'], 'lengthen': 0.3}, 'fabric': 'twill', 'layer': 'tunic', 'map': 'detail'},
     'belt': {'sex': ['man'], 'derive': {'from': 'vtunic_src', 'keep': ['belt']}, 'fabric': 'leather', 'layer': 'belt', 'map': 'color'},
     'hose': {'sex': ['man'], 'mhclo': 'rehmanpolanski_viking_pants/rehmanpolanski_viking_pants.mhclo', 'fabric': 'twill', 'layer': 'leg', 'map': 'detail'},
     'boots': {'sex': ['man'], 'mhclo': 'rehmanpolanski_viking_boots/rehmanpolanski_viking_boots.mhclo', 'fabric': 'leather', 'layer': 'shoe', 'map': 'color'},
     'shoes': {'sex': ['man', 'woman'], 'mhclo': 'punkduck_medieval_boots/punkduck_medieval_boots.mhclo', 'fabric': 'leather', 'layer': 'shoe', 'map': 'color'},
     # Modelled here (drape.py): a Lombard cloak of fulled wool fastened at
     # the right shoulder, to the calf; a woman's shawl round the shoulders.
-    'cloak': {'sex': ['man'], 'drape': {'from': 165, 'to': 375, 'length': 1.05, 'over': ['shirt', 'belt'], 'bend': 2.0, 'frames': 25}, 'fabric': 'felt', 'layer': 'over', 'depth': 80},
+    'cloak': {'sex': ['man'], 'drape': {'from': 165, 'to': 375, 'length': 1.05, 'over': ['shirt'], 'bend': 2.0, 'frames': 25}, 'fabric': 'felt', 'layer': 'over', 'depth': 80},
     'shawl': {'sex': ['woman'], 'drape': {'from': 140, 'to': 400, 'length': 0.5, 'over': ['gown', 'veil'], 'collar': 0.11, 'bend': 2.0, 'frames': 25}, 'fabric': 'twill', 'layer': 'over', 'depth': 80},
     'gown': {'sex': ['woman'], 'mhclo': 'punkduck_medieval_dress/punkduck_medieval_dress.mhclo', 'fabric': 'twill', 'layer': 'tunic'},
     'veil': {'sex': ['woman'], 'mhclo': 'elvs_charity_veil1/elvs_charity_veil1.mhclo', 'fabric': 'linen', 'layer': 'head', 'relax': 12},

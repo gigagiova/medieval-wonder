@@ -67,6 +67,9 @@ def make(gid, g, garments, basemesh, rig):
         bmesh.ops.bisect_plane(bm, geom=geom, plane_co=Vector((0, 0, z)), plane_no=Vector((0, 0, 1)), clear_inner=True)
     if d.get('collar'):
         collar(bm, o, basemesh, rig, d['collar'])
+    # (Extrusions can come out wound the other way: faces turned consistently outwards.)
+    if d.get('lengthen') or d.get('collar'):
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
     bm.to_mesh(o.data)
     bm.free()
     o.data.update()

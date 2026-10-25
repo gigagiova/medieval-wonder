@@ -26,6 +26,10 @@ from mathutils.bvhtree import BVHTree
 from mathutils.kdtree import KDTree
 
 SCANS = os.environ.get('NPC2_SCANS', '')
+# Face-only scans: their landmarks in their photograph (u, v from the top-left).
+SCAN_LANDMARKS = {
+    'face_grandpa': {'eyeL': (0.69, 0.37), 'eyeR': (0.33, 0.37), 'mouthL': (0.585, 0.695), 'mouthR': (0.405, 0.695), 'nose': (0.5, 0.53)},
+}
 HEAD_BONES = ('Head', 'Neck', 'LeftEye', 'RightEye', 'HeadJaw', 'HeadJawEnd', 'HeadMouthLeft', 'HeadMouthRight',
               'HeadEyelidLeft', 'HeadEyelidRight', 'HeadBrowLeft', 'HeadBrowRight', 'HeadTop_End')
 
@@ -42,13 +46,42 @@ class Scan:
         bpy.ops.import_scene.gltf(filepath=os.path.join(SCANS, name + '.gltf'))
         self.objs = [o for o in bpy.data.objects if o not in before]
         self.mesh = next(o for o in self.objs if o.type == 'MESH' and len(o.data.vertices) > 1000)
-        self.arm = next(o for o in self.objs if o.type == 'ARMATURE')
-        self.arm.data.pose_position = 'REST'
+        self.arm = next((o for o in self.objs if o.type == 'ARMATURE'), None)
+        if self.arm:
+            self.arm.data.pose_position = 'REST'
         bpy.context.view_layer.update()
         dg = bpy.context.evaluated_depsgraph_get()
         me = self.mesh.evaluated_get(dg).to_mesh()
         mw = self.mesh.matrix_world
         self.co = [mw @ v.co for v in me.vertices]
+        if self.arm is None:
+            # A face-only scan (fetch-faces.ts: no rig, no eyeballs): all of it
+            # is head; its landmarks are where they are in its photograph.
+            self.dom = ['Head'] * len(self.co)
+            self.head = [True] * len(self.co)
+            self.bvh = BVHTree.FromPolygons(self.co, [tuple(p.vertices) for p in me.polygons])
+            uvs = [Vector((0, 0)) for _ in self.co]
+            cnt = [0] * len(self.co)
+            for l in me.loops:
+                uvs[l.vertex_index] += me.uv_layers.active.data[l.index].uv
+                cnt[l.vertex_index] += 1
+            uvs = [u / max(1, c) for u, c in zip(uvs, cnt)]
+            self.mesh.evaluated_get(dg).to_mesh_clear()
+            at = lambda u, v: self.co[min(range(len(uvs)), key=lambda i: (uvs[i] - Vector((u, 1 - v))).length)]
+            L = SCAN_LANDMARKS[name]
+            # Eye centres: a little behind the surface of the eye (the scan looks along -Y).
+            back = Vector((0, 0.011, 0))
+            self.eyeL, self.eyeR = at(*L['eyeL']) + back, at(*L['eyeR']) + back
+            if self.eyeL.x < self.eyeR.x:
+                self.eyeL, self.eyeR = self.eyeR, self.eyeL
+            self.mouthL, self.mouthR = at(*L['mouthL']), at(*L['mouthR'])
+            if self.mouthL.x < self.mouthR.x:
+                self.mouthL, self.mouthR = self.mouthR, self.mouthL
+            self.nose = at(*L['nose'])
+            em = (self.eyeL + self.eyeR) / 2
+            self.neck = em - Vector((0, 0, 0.16))
+            log('scan', name, 'face only', 'eyes', fmt(self.eyeL), fmt(self.eyeR), 'nose', fmt(self.nose))
+            return
         names = {g.index: g.name for g in self.mesh.vertex_groups}
         dom = []
         for v in self.mesh.data.vertices:
@@ -75,7 +108,7 @@ class Scan:
 
     def transform(self, M):
         """Move the scan (its armature root) by M; refresh its surface."""
-        root = self.arm
+        root = self.arm or self.mesh
         while root.parent:
             root = root.parent
         root.matrix_world = M @ root.matrix_world
@@ -396,13 +429,16 @@ def bake(basemesh, spec, out_dir, size=1024):
     mm = bpy.data.materials.new('skinmask')
     mm.use_nodes = True
     at = mm.node_tree.nodes.new('ShaderNodeAttribute')
-    at.attribute_name = '_SKIN'
+    at.attribute_name = '_SKIN' if '_SKIN' in scan.mesh.data.attributes else 'none'
     ah = mm.node_tree.nodes.new('ShaderNodeAttribute')
     ah.attribute_name = '_HAIR'
     mx = mm.node_tree.nodes.new('ShaderNodeMath')
     mx.operation = 'MAXIMUM'
     mm.node_tree.links.new(at.outputs['Fac'], mx.inputs[0])
-    mm.node_tree.links.new(ah.outputs['Fac'], mx.inputs[1])
+    if '_SKIN' in scan.mesh.data.attributes:
+        mm.node_tree.links.new(ah.outputs['Fac'], mx.inputs[1])
+    else:
+        mx.inputs[1].default_value = 1.0  # a face-only scan is all skin
     # ...and nothing of the scan below the jaw's shadow on the neck (a collar
     # sits there on most): the neck is continued from the skin above it.
     geo = mm.node_tree.nodes.new('ShaderNodeNewGeometry')
@@ -429,13 +465,14 @@ def bake(basemesh, spec, out_dir, size=1024):
     tex.image = img
     # The scan's atlas is padded with a flat colour (fetch-people.ts) that
     # shows round its eyeballs where they meet the lids: masked out too.
-    alb = next(n.image for m in scan.mesh.data.materials for n in m.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image and 'albedo' in n.image.name)
+    imgs = [n.image for m in scan.mesh.data.materials for n in m.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image]
+    alb = next((i for i in imgs if 'albedo' in i.name), None) or next(i for i in imgs if 'normal' not in i.name and 'rough' not in i.name)
     w0 = alb.size[0]
     bg = list(alb.pixels[(2 * w0 + 2) * 4:(2 * w0 + 2) * 4 + 3])
     transfer(basemesh, hidx, scan, alb, img)
     alpha = fill_non_skin(img, mask, bg)
     nt.links.new(tex.outputs['Color'], nt.nodes['Principled BSDF'].inputs['Base Color'])
-    body_img = match_body_tone(basemesh, skin, img, hidx, zc)
+    body_img = match_body_tone(basemesh, skin, img, hidx, zc, alpha)
     under_scan(basemesh, hidx, body_img, img, alpha)
     blend_neck(basemesh, hidx, body_img, img, zc)
     me.uv_layers.remove(me.uv_layers['mhuv'])
@@ -499,38 +536,45 @@ def fill_non_skin(img, mask, bg=None):
     log('filled', round(float((alpha < 0.5).mean()), 3), 'of the head image')
 
 
-def match_body_tone(basemesh, skin, head_img, hidx, zc):
-    """Scale the painted body skin's colour so it meets the scanned neck in
-    tone: the scan's neck just above `zc` (in the head image) against the
-    painted skin of the same faces (MakeHuman's own UVs)."""
+def match_body_tone(basemesh, skin, head_img, hidx, zc, alpha):
+    """Scale the painted body skin's colour to the scanned skin's: compared
+    texel for texel wherever the head has scanned skin (alpha), through the
+    head's UVs and MakeHuman's own. Mostly a change of lightness; the hue
+    moves at most 8%."""
     import numpy as np
-    me, mw = basemesh.data, basemesh.matrix_world
+    me = basemesh.data
     body_img = next(n.image for n in skin.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image and n.image.name != 'dummy' and 'normal' not in n.image.name.lower())
     huv, muv = me.uv_layers[0].data, me.uv_layers['mhuv'].data
-
-    def mean_at(img, uv, faces):
-        n, m = img.size
-        px = np.array(img.pixels[:], dtype=np.float32).reshape(m, n, 4)
-        acc, k = np.zeros(3), 0
-        for p in faces:
-            for li in p.loop_indices:
-                u, v = uv[li].uv
-                acc += px[min(m - 1, max(0, int(v * m))), min(n - 1, max(0, int(u * n))), :3]
-                k += 1
-        return acc / max(1, k)
-    band = [p for p in me.polygons if p.index in hidx and zc + 0.005 < (mw @ p.center).z < zc + 0.04]
-    hm, bmn = mean_at(head_img, huv, band), mean_at(body_img, muv, band)
-    k = np.clip(hm / np.maximum(bmn, 1e-3), 0.5, 1.6)
-    n, m = body_img.size
-    px = np.array(body_img.pixels[:], dtype=np.float32).reshape(-1, 4)
-    px[:, :3] = np.clip(px[:, :3] * k, 0, 1)
-    new = bpy.data.images.new('body_skin', n, m, alpha=False)
+    n = head_img.size[0]
+    hp = np.array(head_img.pixels[:], dtype=np.float32).reshape(n, n, 4)
+    W, H = body_img.size
+    bp = np.array(body_img.pixels[:], dtype=np.float32).reshape(H, W, 4)
+    hs, bs = np.zeros(3), np.zeros(3)
+    k = 0
+    for p in me.polygons:
+        if p.index not in hidx:
+            continue
+        for li in p.loop_indices:
+            u, v = huv[li].uv
+            x, y = min(n - 1, max(0, int(u * n))), min(n - 1, max(0, int(v * n)))
+            if alpha[y, x] < 0.9:
+                continue
+            mu, mv = muv[li].uv
+            hs += hp[y, x, :3]
+            bs += bp[min(H - 1, max(0, int(mv * H))), min(W - 1, max(0, int(mu * W))), :3]
+            k += 1
+    kc = hs / np.maximum(bs, 1e-3)
+    kl = hs.mean() / max(bs.mean(), 1e-3)
+    kc = np.clip(kl * np.clip(kc / kl, 0.92, 1.08), 0.4, 1.8)
+    px = bp.reshape(-1, 4).copy()
+    px[:, :3] = np.clip(px[:, :3] * kc, 0, 1)
+    new = bpy.data.images.new('body_skin', W, H, alpha=False)
     new.pixels[:] = px.ravel()
     new.pack()
     for nd in skin.node_tree.nodes:
         if nd.type == 'TEX_IMAGE' and nd.image == body_img:
             nd.image = new
-    log('body tone x', [round(float(x), 3) for x in k])
+    log('body tone x', [round(float(x), 3) for x in kc], 'from', k, 'texels')
     return new
 
 
@@ -708,10 +752,17 @@ def under_scan(basemesh, hidx, body_img, head_img, alpha):
         S = np.array([[muv[l].uv.x, muv[l].uv.y] for l in t.loops])
         raster(base, D, S, src)
     a = alpha.copy()
-    for _ in range(3):  # soften the scan's edge over a few texels
-        p = np.pad(a, 1, mode='edge')
-        a = (p[:-2, 1:-1] + p[2:, 1:-1] + p[1:-1, :-2] + p[1:-1, 2:] + p[1:-1, 1:-1]) / 5
-    a = np.minimum(a, alpha + 0.0)[..., None] if False else a[..., None]
+    # Soften the scan's edge over ~16 texels (three box blurs), keeping it
+    # inside the scan: the painted skin fades in only where the scan ends.
+    def box(x, r):
+        c = np.cumsum(np.pad(x, ((r + 1, r), (0, 0)), mode='edge'), 0)
+        x = (c[2 * r + 1:] - c[:-2 * r - 1]) / (2 * r + 1)
+        c = np.cumsum(np.pad(x, ((0, 0), (r + 1, r)), mode='edge'), 1)
+        return (c[:, 2 * r + 1:] - c[:, :-2 * r - 1]) / (2 * r + 1)
+    for _ in range(3):
+        a = box(a, 5)
+    a = np.clip((a - 0.5) * 2, 0, 1) * alpha
+    a = a[..., None]
     out = cur * a + base * (1 - a)
     out[..., 3] = 1
     head_img.pixels[:] = out.ravel()
