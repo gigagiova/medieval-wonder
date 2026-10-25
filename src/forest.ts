@@ -537,7 +537,8 @@ export const treeSpots: THREE.Vector2[] = [];
 const BK = 48;
 const NONE: number[] = [];
 
-interface Kind { geos: THREE.BufferGeometry[]; dists: number[]; meshes: THREE.InstancedMesh[]; mats: THREE.Matrix4[]; pos: THREE.Vector3[]; rad: number[]; cols: THREE.Color[]; buckets: Map<number, number[]> }
+/** Instances are kept flat (16 floats of matrix, xyz, radius, rgb each): a wood has 100k of them. */
+interface Kind { geos: THREE.BufferGeometry[]; dists: number[]; meshes: THREE.InstancedMesh[]; n: number; m: number[] | Float32Array; p: number[] | Float32Array; rad: number[] | Float32Array; c: number[] | Float32Array; buckets: Map<number, number[]> }
 
 /**
  * Plant the wood outside the walls. `inside(x,z)` is true within the town;
@@ -571,7 +572,7 @@ export function buildForest(scene: THREE.Scene, b: Builder, o: ForestOpts): THRE
   const kinds: Kind[] = [];
   /** geos[i] is drawn out to dists[i] metres. */
   const mk = (geos: THREE.BufferGeometry[], dists: number[]): Kind => {
-    const k: Kind = { geos, dists, meshes: [], mats: [], pos: [], rad: [], cols: [], buckets: new Map() };
+    const k: Kind = { geos, dists, meshes: [], n: 0, m: [], p: [], rad: [], c: [], buckets: new Map() };
     kinds.push(k);
     return k;
   };
@@ -602,12 +603,12 @@ export function buildForest(scene: THREE.Scene, b: Builder, o: ForestOpts): THRE
     m4.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(s, s * R(0.92, 1.12), s));
     const bk = Math.floor(x / BK) * 4096 + Math.floor(z / BK);
     if (!k.buckets.has(bk)) k.buckets.set(bk, []);
-    k.buckets.get(bk)!.push(k.mats.length);
-    k.mats.push(m4.clone());
-    k.pos.push(new THREE.Vector3(x, y, z));
-    k.rad.push(rad * s);
+    k.buckets.get(bk)!.push(k.n++);
+    (k.m as number[]).push(...m4.elements);
+    (k.p as number[]).push(x, y, z);
+    (k.rad as number[]).push(rad * s);
     const t = R(0.8, 1.15);
-    k.cols.push(new THREE.Color(t * R(0.95, 1.05), t, t * R(0.92, 1.0)));
+    (k.c as number[]).push(t * R(0.95, 1.05), t, t * R(0.92, 1.0));
   };
 
   // Scanned ground cover (Poly Haven), when loaded. Returns false otherwise.
@@ -712,10 +713,12 @@ export function buildForest(scene: THREE.Scene, b: Builder, o: ForestOpts): THRE
     const cg = new THREE.BufferGeometry();
     cg.setAttribute('position', new THREE.Float32BufferAttribute(colPos, 3));
     b.collideWorld(cg);
+    colPos.length = 0;
   }
 
   for (const k of kinds) {
-    const n = Math.max(1, k.mats.length);
+    k.m = new Float32Array(k.m); k.p = new Float32Array(k.p); k.rad = new Float32Array(k.rad); k.c = new Float32Array(k.c);
+    const n = Math.max(1, k.n);
     for (const g of k.geos) {
       const im = new THREE.InstancedMesh(g, mat, n);
       im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
@@ -741,16 +744,17 @@ export function buildForest(scene: THREE.Scene, b: Builder, o: ForestOpts): THRE
       const maxD = k.dists[k.dists.length - 1];
       const bx0 = Math.floor((cp.x - maxD) / BK), bx1 = Math.floor((cp.x + maxD) / BK), bz0 = Math.floor((cp.z - maxD) / BK), bz1 = Math.floor((cp.z + maxD) / BK);
       for (let bi = bx0; bi <= bx1; bi++) for (let bj = bz0; bj <= bz1; bj++) for (const i of k.buckets.get(bi * 4096 + bj) ?? NONE) {
-        const d = k.pos[i].distanceTo(cp);
+        const P = k.p, px = P[i * 3], py = P[i * 3 + 1], pz = P[i * 3 + 2];
+        const d = Math.hypot(px - cp.x, py - cp.y, pz - cp.z);
         if (d > maxD) continue;
-        sph.center.copy(k.pos[i]); sph.center.y += k.rad[i] * 2;
+        sph.center.set(px, py + k.rad[i] * 2, pz);
         sph.radius = k.rad[i] * 4 + 4;
         if (!frustum.intersectsSphere(sph)) continue;
         let l = 0;
         while (d > k.dists[l]) l++;
         const im = k.meshes[l];
-        im.setMatrixAt(counts[l], k.mats[i]);
-        im.setColorAt(counts[l], k.cols[i]);
+        (im.instanceMatrix.array as Float32Array).set((k.m as Float32Array).subarray(i * 16, i * 16 + 16), counts[l] * 16);
+        (im.instanceColor!.array as Float32Array).set((k.c as Float32Array).subarray(i * 3, i * 3 + 3), counts[l] * 3);
         counts[l]++;
       }
       k.meshes.forEach((im, l) => {
@@ -769,7 +773,7 @@ export function buildForest(scene: THREE.Scene, b: Builder, o: ForestOpts): THRE
   group.userData.stats = () => {
     let inst = 0, tris = 0, drawn = 0;
     for (const k of kinds) {
-      inst += k.mats.length;
+      inst += k.n;
       tris += k.geos[0].index!.count / 3;
       k.meshes.forEach((im, l) => { drawn += im.count * (k.geos[l].index!.count / 3); });
     }

@@ -19,7 +19,7 @@ import { FabricStream } from './benevento/stream';
 import * as M from './benevento/monuments';
 import { buildRivers } from './benevento/rivers';
 import { interiorAnchors } from './benevento/interiors';
-import { PLACED, markReadableWorld } from './benevento/readables';
+import { PLACED, markReadable, markReadableWorld } from './benevento/readables';
 import { LORE, explorableLore } from './benevento/lore';
 
 // Benevento in AD 700, under Duke Gisulf I: the town of the first Lombard
@@ -161,6 +161,8 @@ function church(b: Builder) {
     b.box('brick', 1.45, 7.2, 0.8, acx + Math.sin(a) * ar, -0.3, z0 + Math.cos(a) * ar, a);
   }
   b.geo('roof', new THREE.ConeGeometry(ar + 0.7, 1.9, 18, 2, false, Math.PI / 2 + 0.08, Math.PI), acx, 6.9 + 0.95, z0);
+  // The nave's east wall above the apse arch, up to the roof.
+  b.box('rubble', x1 - x0 + 0.9, H - 6.4, 0.8, cx, 6.6, z0 - 0.1, 0.012);
   // The collapsed west annex.
   ruin(b, 'rubble', 10, 4.5, 0.7, x0 - 4.5, -0.3, z0 + 8, 0, 0.8);
   ruin(b, 'rubble', 7, 3.5, 0.7, x0 - 8.5, -0.3, z0 + 11.5, Math.PI / 2 + 0.1, 0.8);
@@ -425,7 +427,7 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
     try { fn(g); } finally { setSite(null); }
   };
   await at("At the dukes' curtis", 0.2, S.curtis, (g) => buildPalace(b, g as unknown as THREE.Scene));
-  await at('In the bishop\'s church', 0.26, S.episcopium, (g) => { church(b); buildLibrary(b, g as unknown as THREE.Scene); });
+  await at('In the bishop\'s church', 0.26, S.episcopium, (g) => { church(b); markReadable('calix', -17.0, 1.1, -62.4); buildLibrary(b, g as unknown as THREE.Scene); });
   await at('Carving the hypogea of the Santi Quaranta', 0.32, S.quadraginta, () => { chapel(b); buildCatacombs(b); cellaMemoriae(b); quadragintaRuins(b); });
   await at('In the old baths', 0.4, S.thermae, (g) => buildBaths(b, g as unknown as THREE.Scene));
   await at('At the nuns of St Peter', 0.45, S.sanctusPetrus, () => { church(b); nunnery(b); });

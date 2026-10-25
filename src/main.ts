@@ -56,11 +56,26 @@ const { collider, cells, lamps, flames, props, townTex, stream } = await buildWo
 shared.uTown.value = townTex;
 shared.uTownBox.value.set(TOWN_TEX.x0, TOWN_TEX.z0, 1 / TOWN_TEX.w, 1 / TOWN_TEX.h);
 shared.uTownH.value.set(TOWN_TEX.hMin, TOWN_TEX.hMax);
-Object.assign(window, { __stream: stream });
+Object.assign(window, { __stream: stream, __scene: scene, __collider: collider });
 (window as unknown as { __camera: THREE.Camera }).__camera = camera;
 const bvh = new MeshBVH(collider.geometry);
 (collider.geometry as unknown as { boundsTree: MeshBVH }).boundsTree = bvh;
 const buildMs = performance.now() - t0;
+// Hand meshes to the GPU at once, so their CPU copies can go (the builder and
+// the stream free each array on upload): a cheap pass into a 1x1 target.
+const upRT = new THREE.WebGLRenderTarget(1, 1), upScene = new THREE.Scene();
+upScene.overrideMaterial = new THREE.MeshBasicMaterial();
+function gpuUpload(meshes: THREE.Mesh[]) {
+  if (!meshes.length) return;
+  const st = meshes.map((m) => ({ p: m.parent, v: m.visible, f: m.frustumCulled }));
+  for (const m of meshes) { m.visible = true; m.frustumCulled = false; upScene.add(m); }
+  renderer.setRenderTarget(upRT);
+  renderer.render(upScene, camera);
+  renderer.setRenderTarget(null);
+  meshes.forEach((m, i) => { upScene.remove(m); st[i].p?.add(m); m.visible = st[i].v; m.frustumCulled = st[i].f; });
+}
+gpuUpload(cells.flatMap((c) => c.meshes as THREE.Mesh[]));
+stream.uploader = gpuUpload;
 
 // Moonlight and a faint sky fill.
 // Overcast dusk: the sun is just down; light comes from the whole sky,

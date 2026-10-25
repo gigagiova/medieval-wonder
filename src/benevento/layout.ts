@@ -256,9 +256,13 @@ export function layoutTown(seed = 700): Layout {
 
   // 5. What each block was in 700: built up, built along its lanes with a
   //    garden behind, or gardens, vines, pens and ruins.
-  type Use = 'built' | 'mixed' | PlotKind;
+  type Use = 'built' | 'mixed' | 'site' | PlotKind;
   const use: Use[] = [];
+  // Blocks a landmark precinct cuts into belong to the landmark.
+  const tot = new Uint32Array(parcels.length + 1), res = new Uint32Array(parcels.length + 1);
+  for (let k = 0; k < r.grid.length; k++) { const q = r.parcel[k]; if (q && q <= parcels.length) { tot[q]++; if (r.grid[k] === RESERVED) res[q]++; } }
   parcels.forEach((p, n) => {
+    if (res[n + 1] > tot[n + 1] * 0.05) { use[n + 1] = 'site'; return; }
     let cx = 0, cz = 0;
     for (const [x, z] of p.pts) { cx += x / p.pts.length; cz += z / p.pts.length; }
     const D = density(cx, cz);

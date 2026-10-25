@@ -20,6 +20,8 @@ interface Super { key: number; si: number; sj: number; members: number[]; dirty:
 export class FabricStream {
   chunks = new Map<number, ChunkState>();
   supers = new Map<number, Super>();
+  /** Sends new meshes to the GPU straight away (so their CPU arrays can be freed). */
+  uploader?: (meshes: THREE.Mesh[]) => void;
   private workers: { w: Worker; busy: number | null }[] = [];
   private queue: number[] = [];
   stats = { built: 0, ms: 0, ready: 0, building: 0, lodRebuilds: 0, tris: 0 };
@@ -134,6 +136,7 @@ export class FabricStream {
       tris += bk.pos.length / 9;
     }
     this.stats.tris += tris;
+    this.uploader?.(cell.meshes as THREE.Mesh[]);
     c.cell = cell;
     this.cells.push(cell);
     c.lamps = r.lamps.map((l, i) => ({ pos: new THREE.Vector3(...l.p), color: new THREE.Color(l.c[0], l.c[1], l.c[2]), intensity: l.i, under: l.under, seed: (r.key % 97) + i * 7.3 }));
@@ -216,13 +219,14 @@ export class FabricStream {
       g.computeVertexNormals();
       g.computeBoundingBox(); g.computeBoundingSphere();
       cell.box.union(g.boundingBox!);
+      for (const a of Object.values(g.attributes)) (a as THREE.BufferAttribute).onUpload(function (this: THREE.BufferAttribute) { (this as unknown as { array: unknown }).array = null; });
       const mesh = new THREE.Mesh(g, mat(m));
       mesh.matrixAutoUpdate = false;
       this.scene.add(mesh);
       cell.meshes.push(mesh);
     };
     add(walls, 'rubble'); add(roofs, 'roof'); add(gp, 'ground');
-    if (cell.meshes.length) { s.cell = cell; this.cells.push(cell); }
+    if (cell.meshes.length) { this.uploader?.(cell.meshes as THREE.Mesh[]); s.cell = cell; this.cells.push(cell); }
   }
 }
 

@@ -201,7 +201,7 @@ export function placeProp(_scene: THREE.Scene | null, id: PropId, x: number, y: 
 
 interface Chunk { center: THREE.Vector3; range: number; meshes: THREE.InstancedMesh[]; under: boolean }
 const chunks: Chunk[] = [];
-const CHUNK = 40;
+const CHUNK = 64;
 let ticker: THREE.Object3D | null = null;
 
 /** Turn all pending placements into instanced meshes, chunked for culling. */

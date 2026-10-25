@@ -332,6 +332,12 @@ export class Builder {
         geos.length = 0;
         merged.computeBoundingSphere();
         merged.computeBoundingBox();
+        // Normals as bytes: a third of the memory, no visible difference.
+        {
+          const N = merged.attributes.normal.array as Float32Array, n8 = new Int8Array(N.length);
+          for (let i = 0; i < N.length; i++) n8[i] = Math.max(-127, Math.min(127, Math.round(N[i] * 127)));
+          merged.setAttribute('normal', new THREE.BufferAttribute(n8, 3, true));
+        }
         // Keep no CPU copy once the GPU has it.
         for (const a of Object.values(merged.attributes)) (a as THREE.BufferAttribute).onUpload(function (this: THREE.BufferAttribute) { (this as unknown as { array: unknown }).array = null; });
         cell.box.union(merged.boundingBox!);
