@@ -502,3 +502,31 @@ export function prepScan(root: THREE.Object3D, top = false) {
   });
   return g;
 }
+
+/**
+ * A lidded wicker basket for carrying over the forearm: the scanned basket
+ * with its lid shut (the scan has it lying open beside it) and a bent-withy
+ * handle arching across the top, side to side. Origin where the forearm runs
+ * through the handle, resting under its crown; the arch spans X, so the arm
+ * runs along Z.
+ */
+export function makeArmBasket(scan: THREE.Object3D) {
+  const o = new THREE.Group();
+  let mat: THREE.Material | null = null;
+  scan.traverse((x) => {
+    const m = x as THREE.Mesh;
+    if (!m.isMesh) return;
+    const lid = /lid/i.test(m.name);
+    const g = m.geometry.clone();
+    g.computeBoundingBox();
+    const b = g.boundingBox!;
+    // The base standing on y = 0; the lid flat on its rim.
+    g.translate(-(b.min.x + b.max.x) / 2, lid ? 0.2 - b.min.y - 0.012 : -b.min.y, -(b.min.z + b.max.z) / 2);
+    if (!lid) mat = m.material as THREE.Material;
+    o.add(new THREE.Mesh(g, m.material));
+  });
+  const arch = new THREE.CatmullRomCurve3([[-0.098, 0.19], [-0.096, 0.3], [-0.06, 0.385], [0, 0.4], [0.06, 0.385], [0.096, 0.3], [0.098, 0.19]].map(([x, y]) => new THREE.Vector3(x, y, 0)));
+  o.add(new THREE.Mesh(new THREE.TubeGeometry(arch, 20, 0.0085, 6, false), mat ?? propMats().ash));
+  for (const c of o.children) (c as THREE.Mesh).geometry.translate(0, -0.336, 0);
+  return o;
+}

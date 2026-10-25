@@ -35,8 +35,8 @@ const OUTFITS: Record<OutfitId, { kit: Kit; spec: GarmentSpec; beard: boolean; w
   peasantCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.2, folds: 0.03, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather' } },
   soldier: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, belt: 'leather' } },
   soldierCloak: { kit: 'man', beard: true, wraps: true, spec: { hem: 'knee', flare: 0.18, folds: 0.025, sleeve: 'fitted', hood: null, cape: 'cloak', belt: 'leather' } },
-  woman: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.12, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
-  womanShawl: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.12, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
+  woman: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', belt: 'sash' } },
+  womanShawl: { kit: 'woman', beard: false, wraps: false, spec: { hem: 'ankle', flare: 0.2, trail: 0.2, folds: 0.026, sleeve: 'fitted', hood: 'veil', cape: 'shawl', belt: 'sash' } },
 };
 const ROLE_OUTFITS: Record<Role, OutfitId[]> = { monk: ['monk'], peasant: ['peasantHood', 'peasantCloak'], woman: ['woman', 'womanShawl'], soldier: ['soldier', 'soldierCloak'] };
 
@@ -119,7 +119,7 @@ function tailor(id: OutfitId): Outfit {
 // ------------------------------------------------------------------ a person
 
 interface Gear { lantern?: boolean; cap?: boolean; helmet?: boolean | 'spangen' | 'lamellar'; shield?: 'back' | 'arm'; spear?: boolean; arms?: boolean; sticks?: boolean; bucket?: boolean; basket?: boolean; jar?: boolean }
-interface Held { obj: THREE.Object3D; kind: 'hang' | 'spear'; drop: number; swing: { a: number; v: number; b: number; w: number }; last: THREE.Vector3 }
+interface Held { obj: THREE.Object3D; kind: 'hang' | 'spear' | 'arm'; drop: number; swing: { a: number; v: number; b: number; w: number }; last: THREE.Vector3 }
 
 const ANIMS: ClipName[] = ['walk', 'idle', 'talk', 'bless', 'kneel'];
 const UP = new THREE.Vector3(0, 1, 0);
@@ -154,6 +154,8 @@ export class Person {
   dist = 0;
   private bones = new Map<string, THREE.Bone>();
   private kit: KitData;
+  /** A woman's load: a jar balanced on the head, or a basket over the right forearm. */
+  private load: { jar: THREE.Object3D | null; jarQ: THREE.Quaternion; basket: boolean } = { jar: null, jarQ: new THREE.Quaternion(), basket: false };
 
   constructor(private scene: THREE.Scene, public outfit: Outfit, public role: Role, public rnd: () => number, gear: Gear) {
     const k = (this.kit = kits![outfit.kit]);
@@ -272,7 +274,10 @@ export class Person {
     }
     if (g.jar) {
       const h = m.head;
-      on('Head', Props.makeHeadJar(scans.jar), Props.placeAt(new THREE.Vector3(h.c.x, h.top + 0.022, h.c.z - 0.01)));
+      const jar = Props.makeHeadJar(scans.jar);
+      on('Head', jar, Props.placeAt(new THREE.Vector3(h.c.x, h.top + 0.022, h.c.z - 0.01)));
+      this.load.jar = jar;
+      this.load.jarQ.copy(jar.quaternion);
     }
     const hang = (obj: THREE.Object3D, kind: Held['kind'], drop: number) => {
       obj.traverse((o) => { o.frustumCulled = false; });
@@ -287,7 +292,13 @@ export class Person {
       this.lamp = { pos: new THREE.Vector3(), color: new THREE.Color(1, 0.5, 0.18), intensity: 0.5, under: false, seed: r() * 50 };
     }
     if (g.bucket && scans.bucket) { const b = scans.bucket.clone(); b.scale.setScalar(0.8); const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.02); }
-    if (g.basket && scans.basket) { const b = scans.basket.clone(); b.scale.setScalar(1.25); const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.0); }
+    if (g.basket && scans.basket && this.role === 'woman') {
+      // Over the crook of her right arm, clear of her skirts.
+      const b = Props.makeArmBasket(scans.basket);
+      b.scale.setScalar(0.8);
+      hang(b, 'arm', 0);
+      this.load.basket = true;
+    } else if (g.basket && scans.basket) { const b = scans.basket.clone(); b.scale.setScalar(1.25); const o = new THREE.Group(); o.add(b); hang(o, 'hang', 0.0); }
     if (g.spear) hang(Props.makeSpear(), 'spear', 0);
   }
 
@@ -327,6 +338,8 @@ export class Person {
       a = Math.atan2(Math.sin(a), Math.cos(a));
       if (Math.abs(a) < 1.9) target = THREE.MathUtils.clamp(a, -1.1, 1.1);
     }
+    // A veil is pinned at the shoulders: she turns her body sooner than wring her neck in it.
+    if (this.role === 'woman') target = THREE.MathUtils.clamp(target, -0.6, 0.6);
     this.look.yaw += (target - this.look.yaw) * Math.min(1, dt * every * 3);
     if (Math.abs(this.look.yaw) > 0.01) {
       for (const [n, f] of [['Neck', 0.4], ['Head', 0.6]] as const) {
@@ -338,7 +351,51 @@ export class Person {
         b.quaternion.premultiply(_q).premultiply(_q2).premultiply(_q.invert());
       }
     }
+    if (this.load.jar || this.load.basket) this.poseLoad();
     return true;
+  }
+
+  /**
+   * Turn a bone (in world space, by the least rotation) so that the line to
+   * its child points along `dir`, `k` of the way. World matrices of the
+   * bone's ancestors must be current; its own subtree is updated.
+   */
+  private aim(name: string, child: string, dir: THREE.Vector3, k = 1) {
+    const b = this.bones.get(name), c = this.bones.get(child);
+    if (!b || !c) return;
+    const cur = c.getWorldPosition(_v3).sub(b.getWorldPosition(_v2)).normalize();
+    _q2.setFromUnitVectors(cur, dir);
+    if (k < 1) _q2.slerp(_q.identity(), 1 - k);
+    b.parent!.getWorldQuaternion(_q);
+    // local' = P⁻¹ · R · P · local
+    b.quaternion.premultiply(_q).premultiply(_q2).premultiply(_q.invert());
+    b.updateMatrixWorld(true);
+  }
+
+  /** What a woman carries shapes how she holds herself. */
+  private poseLoad() {
+    this.group.updateMatrixWorld(true);
+    const yq = this.group.quaternion, d = new THREE.Vector3();
+    if (this.load.jar) {
+      // A jar on the head: she keeps her head level under it and the jar
+      // stays upright, whatever the clip does with her head.
+      const m = this.outfit.m, bind = m.bone('HeadTop_End').sub(m.bone('Head')).normalize();
+      this.aim('Head', 'HeadTop_End', d.copy(bind).applyQuaternion(yq), 0.75);
+      const jar = this.load.jar;
+      jar.quaternion.copy(this.load.jarQ);
+      jar.updateMatrixWorld(true);
+      const up = _v.set(0, 1, 0).applyQuaternion(jar.getWorldQuaternion(_q2));
+      _q2.setFromUnitVectors(up, UP);
+      jar.parent!.getWorldQuaternion(_q);
+      jar.quaternion.premultiply(_q).premultiply(_q2).premultiply(_q.invert());
+    }
+    if (this.load.basket) {
+      // The right arm bent at the elbow, the forearm carried forward level
+      // with the basket's handle over it; the wrist relaxed.
+      this.aim('RightArm', 'RightForeArm', d.set(-0.5, -1, 0.16).normalize().applyQuaternion(yq));
+      this.aim('RightForeArm', 'RightHand', d.set(-0.5, 0.1, 1).normalize().applyQuaternion(yq));
+      this.aim('RightHand', 'RightHandMiddle1', d.set(0.06, -0.35, 1).normalize().applyQuaternion(yq));
+    }
   }
 
   /** Lanterns, buckets and spears follow the hand. */
@@ -359,17 +416,25 @@ export class Person {
         h.obj.quaternion.setFromEuler(new THREE.Euler(0.06 * walk + 0.02, this.yaw, -0.06 + 0.03 * (1 - walk), 'YXZ'));
         continue;
       }
+      const arm = h.kind === 'arm';
+      if (arm) {
+        // Where the handle rests: on the forearm, just short of the wrist.
+        this.bones.get('RightForeArm')!.getWorldPosition(_v3);
+        _v.lerp(_v3, 0.12);
+      }
       const hv = _v.clone().sub(h.last).divideScalar(Math.max(dt, 1e-3));
       if (h.last.lengthSq() === 0 || hv.lengthSq() > 100) hv.set(0, 0, 0);
       h.last.copy(_v);
       const s = h.swing;
       s.v += (-s.a * 28 - hv.dot(fwd) * 0.7 - s.v * 3.2) * dt;
-      s.a = THREE.MathUtils.clamp(s.a + s.v * dt, -0.6, 0.6);
+      s.a = THREE.MathUtils.clamp(s.a + s.v * dt, arm ? -0.12 : -0.6, arm ? 0.12 : 0.6);
       const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
       s.w += (-s.b * 28 - hv.dot(side) * 0.5 - s.w * 3.2) * dt;
       s.b = THREE.MathUtils.clamp(s.b + s.w * dt, -0.4, 0.4);
-      h.obj.position.copy(_v).addScaledVector(fwd, 0.03).y -= h.drop;
-      h.obj.quaternion.setFromEuler(new THREE.Euler(s.a, this.yaw, s.b, 'YXZ'));
+      h.obj.position.copy(_v).addScaledVector(fwd, arm ? 0 : 0.03).y -= h.drop;
+      // Over the forearm, the handle's arch square across it.
+      const yaw = arm ? Math.atan2(_v.x - _v3.x, _v.z - _v3.z) : this.yaw;
+      h.obj.quaternion.setFromEuler(new THREE.Euler(s.a, yaw, s.b, 'YXZ'));
     }
     if (this.lamp && this.lanternLight) {
       this.held[0].obj.updateMatrixWorld(true);

@@ -36,7 +36,7 @@ export class Clothing {
     this.caps = ([
       ['LeftUpLeg', 'LeftLeg', 0.085], ['RightUpLeg', 'RightLeg', 0.085],
       ['LeftLeg', 'LeftFoot', 0.065], ['RightLeg', 'RightFoot', 0.065],
-      ['LeftFoot', 'LeftToeBase', 0.055], ['RightFoot', 'RightToeBase', 0.055],
+      ['LeftFoot', 'LeftToeBase', 0.085], ['RightFoot', 'RightToeBase', 0.085],
       ['LeftUpLeg', 'RightUpLeg', 0.12], ['Spine', 'Spine2', 0.14],
       ['LeftArm', 'LeftForeArm', 0.06], ['RightArm', 'RightForeArm', 0.06],
       ['LeftForeArm', 'LeftHand', 0.05], ['RightForeArm', 'RightHand', 0.05],
@@ -149,6 +149,15 @@ export class Clothing {
     S.lastRoot.copy(root);
     const caps = this.caps;
     for (const c of caps) { c.a.getWorldPosition(c.pa); c.b.getWorldPosition(c.pb); }
+    // The foot bone sits at the ankle: carry its capsule back to the heel and
+    // down the shin's line to the sole, which otherwise kick up through a long
+    // skirt's hem.
+    for (const ci of [4, 5]) {
+      const c = caps[ci], sh = caps[ci - 2];
+      _sd.copy(sh.pb).sub(sh.pa).normalize().multiplyScalar(0.04 * this.scale);
+      c.pa.lerp(c.pb, -0.45).add(_sd);
+      c.pb.addScaledVector(_sd, 0.5).lerp(c.pa, -0.12);
+    }
     const ground = root.y + 0.012;
     const collide = (arr: Float32Array, i: number, mask: number) => {
       let x = arr[i * 3], y = arr[i * 3 + 1], z = arr[i * 3 + 2];
