@@ -12,7 +12,7 @@ import { CHUNK, lodChunk, type ChunkItems, type ChunkResult, type Hole } from '.
 // swap in as they arrive, and are dropped again when left behind. The fog
 // closes in at ~70 m, so nobody sees the swap.
 
-export const R_IN = 72, R_OUT = 104;
+export const R_IN = 48, R_OUT = 68;
 const SUPER = 4; // chunks per super-chunk side
 interface ChunkState { it: ChunkItems; status: 'lod' | 'queued' | 'building' | 'ready'; cell?: Cell; lamps: Lamp[]; fire?: THREE.Object3D; lod?: { walls: number[]; roofs: number[] } }
 interface Super { key: number; si: number; sj: number; members: number[]; dirty: boolean; cell?: Cell; holes: Hole[] }

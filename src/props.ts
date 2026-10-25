@@ -33,6 +33,10 @@ const RANGE: Partial<Record<PropId, number>> = {
   root_cluster_01: 70, root_cluster_02: 70, pine_roots: 70,
   nettle_plant: 32, fern_02: 32, grass_medium_02: 28, shrub_02: 36, weed_plant_02: 28,
   bark_debris_01: 30, dry_branches_medium_01: 40, street_rat: 25,
+  // Household things: mostly indoors or at doorsteps, and dense scans.
+  treasure_chest: 22, wine_barrel_01: 34, wooden_barrels_01: 38, wooden_bucket_01: 26, wooden_bucket_02: 26, ceramic_pot: 28,
+  planter_pot_clay: 28, wicker_basket_02: 28, wooden_bowl_01: 16, carved_wooden_plate: 16, folding_wooden_stool: 22,
+  WoodenTable_01: 26, wooden_cutting_board: 16, wooden_axe: 18, wooden_axe_02: 18, cross_pein_hammer: 16, stone_fire_pit: 34,
 };
 const DEFAULT_RANGE = 45;
 
@@ -202,6 +206,8 @@ export function placeProp(_scene: THREE.Scene | null, id: PropId, x: number, y: 
 interface Chunk { center: THREE.Vector3; range: number; meshes: THREE.InstancedMesh[]; under: boolean }
 const chunks: Chunk[] = [];
 const CHUNK = 64;
+/** Small near-only plants are grouped finer, so they can be dropped close by. */
+const chunkOf = (id: PropId) => ((RANGE[id] ?? DEFAULT_RANGE) < 40 ? 20 : CHUNK);
 let ticker: THREE.Object3D | null = null;
 
 /** Turn all pending placements into instanced meshes, chunked for culling. */
@@ -211,7 +217,8 @@ export function commitProps(scene: THREE.Object3D) {
   const groups = new Map<string, Placement[]>();
   for (const pl of pending) {
     const pos = new THREE.Vector3().setFromMatrixPosition(pl.matrix);
-    const key = `${pl.id}|${pl.variant}|${Math.floor(pos.x / CHUNK)}|${Math.floor(pos.z / CHUNK)}|${pl.under ? 'u' : 'a'}`;
+    const C = chunkOf(pl.id);
+    const key = `${pl.id}|${pl.variant}|${Math.floor(pos.x / C)}|${Math.floor(pos.z / C)}|${pl.under ? 'u' : 'a'}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(pl);
   }
@@ -222,7 +229,7 @@ export function commitProps(scene: THREE.Object3D) {
     const center = new THREE.Vector3();
     for (const pl of list) center.add(new THREE.Vector3().setFromMatrixPosition(pl.matrix));
     center.divideScalar(list.length);
-    const chunk: Chunk = { center, range: (RANGE[id] ?? DEFAULT_RANGE) + CHUNK * 0.6, meshes: [], under: list[0].under };
+    const chunk: Chunk = { center, range: (RANGE[id] ?? DEFAULT_RANGE) + chunkOf(id) * 0.6, meshes: [], under: list[0].under };
     for (const part of v.parts) {
       const im = new THREE.InstancedMesh(part.geometry, part.material, list.length);
       list.forEach((pl, i) => im.setMatrixAt(i, pl.matrix));

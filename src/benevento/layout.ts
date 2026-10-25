@@ -263,11 +263,14 @@ export function layoutTown(seed = 700): Layout {
   for (let k = 0; k < r.grid.length; k++) { const q = r.parcel[k]; if (q && q <= parcels.length) { tot[q]++; if (r.grid[k] === RESERVED) res[q]++; } }
   parcels.forEach((p, n) => {
     if (res[n + 1] > tot[n + 1] * 0.05) { use[n + 1] = 'site'; return; }
+    // A block a gate road was cut through keeps no fenced plot across the road.
+    const cut = tot[n + 1] * r.res * r.res < p.a * 0.9;
     let cx = 0, cz = 0;
     for (const [x, z] of p.pts) { cx += x / p.pts.length; cz += z / p.pts.length; }
     const D = density(cx, cz);
     let pb = D * (p.a > 1600 ? 0.55 : p.a > 700 ? 0.85 : 1.05);
     if (p.k === 'open') pb = 0;
+    if (cut && p.k !== 'open') pb = 1;
     const u = rand();
     let k: Use;
     if (u < pb) k = 'built';
@@ -275,7 +278,7 @@ export function layoutTown(seed = 700): Layout {
     else {
       const v = rand();
       k = v < 0.42 ? 'orto' : v < 0.56 ? 'vinea' : v < 0.74 ? 'pratum' : v < 0.88 ? 'ruina' : 'stabulum';
-      if (p.a > 2500 && k === 'stabulum') k = 'pratum';
+      if ((p.a > 2500 && k === 'stabulum') || cut) k = 'pratum';
     }
     use[n + 1] = k;
     if (k !== 'built' && k !== 'mixed') {

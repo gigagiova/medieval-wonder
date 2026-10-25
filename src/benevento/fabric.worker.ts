@@ -1,9 +1,15 @@
 import { Builder } from '../builder';
 import { buildChunk, bake, packLights, type ChunkItems, type ChunkResult } from './fabric';
+import { setTessScale } from '../displace';
 
 // Builds the render geometry of town chunks off the main thread: houses,
 // bridges, plots, walls and ground, bent and lifted onto the terrain, merged
 // per material. The main thread uploads them as they arrive.
+
+// Town houses are many: walls and roofs are subdivided at about twice the
+// spacing of the monuments (the bend of the walls still shows; the triangle
+// count falls by about three quarters).
+setTessScale(1.9);
 
 self.onmessage = (e: MessageEvent<{ items: ChunkItems }>) => {
   const it = e.data.items;

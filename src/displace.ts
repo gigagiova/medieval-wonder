@@ -170,9 +170,13 @@ export const TESS: Partial<Record<MatName, number>> = {
  * Split every triangle into n² smaller ones (n from its longest edge), in one
  * pass. Much faster than iterative longest-edge splitting.
  */
+let tessScale = 1;
+/** Coarser (k > 1) or finer subdivision for what is built next: the streamed town uses a coarser one. */
+export function setTessScale(k: number) { tessScale = k; }
 export function tessellate(g: THREE.BufferGeometry, m: MatName): THREE.BufferGeometry {
-  const L = TESS[m];
-  if (!L) return g;
+  const L0 = TESS[m];
+  if (!L0) return g;
+  const L = L0 * tessScale;
   const src = g.index ? g.toNonIndexed() : g;
   const P = src.attributes.position.array as ArrayLike<number>;
   const Nn = src.attributes.normal?.array as ArrayLike<number> | undefined;
