@@ -147,28 +147,30 @@ def mark(basemesh, garments, outfits, specs, knee=None):
             # about it). A garment under another: wherever the one over it lies
             # straight out from it (a cloak's shoulders over a tunic's).
             m = covered(pos, nrm, [bvh[g] for g in over], math.radians(25) if k == 'body' else 0.0) if over else [False] * len(pos)
+            cm = None
             if k != 'body' and cloaks:
-                # Under a cloak: the back of the shoulders, upper back and upper
-                # arms, which the cloak hangs over in every pose (the sleeves
-                # and shoulders came through it as the arms swung). Only faces
-                # not turned to the front (the face looks -y in Blender's
-                # frame) and above the waist, where the cloak lies straight out.
-                back = [i for i in range(len(pos)) if not m[i] and nrm[i].y > -0.2 and pos[i].z > waist]
-                cov = covered([pos[i] for i in back], [nrm[i] for i in back], [bvh[g] for g in cloaks], 0.0)
-                for i, c in zip(back, cov):
-                    if c:
-                        m[i] = True
-                # And the backs of the sleeves inside the cloak's hull (a ray
-                # straight back from them meets the cloak), which a walking
-                # arm pushes out through its sides; faces turned backwards only.
+                # Under a cloak: every surface of this garment the cloak hangs
+                # behind — shoulders, back, the backs of the sleeves, the
+                # tunic's back and skirt — which the walking body pushes out
+                # through it. Faces not turned to the front (the face looks -y
+                # in Blender's frame) where a ray out along the normal, or
+                # straight back, meets the cloak. The mask is then grown by two
+                # rings (below), so its border lies well inside the cloak.
                 from mathutils import Vector as _V
                 bk = _V((0, 1, 0))
-                sl = [i for i in range(len(pos)) if not m[i] and nrm[i].y > 0.2 and pos[i].z > waist]
-                cov = covered([pos[i] for i in sl], [bk] * len(sl), [bvh[g] for g in cloaks], 0.0)
-                for i, c in zip(sl, cov):
-                    if c:
-                        m[i] = True
+                cand = [i for i in range(len(pos)) if nrm[i].y > -0.2]
+                c1 = covered([pos[i] for i in cand], [nrm[i] for i in cand], [bvh[g] for g in cloaks], 0.0)
+                c2 = covered([pos[i] for i in cand], [bk] * len(cand), [bvh[g] for g in cloaks], 0.0)
+                cm = [False] * len(pos)
+                for i, x, y in zip(cand, c1, c2):
+                    if x or (y and nrm[i].y > 0.0):
+                        cm[i] = True
             m = erode(m, nbs[k], 1)
+            if cm is not None:
+                # Grown two rings (never onto faces turned to the front), and not eroded.
+                for _ in range(2):
+                    cm = [c or (nrm[i].y > -0.35 and any(cm[j] for j in nbs[k][i])) for i, c in enumerate(cm)]
+                m = [x or y for x, y in zip(m, cm)]
             if k == 'body':
                 # The artists' own delete groups (for whole-garment coverage such as hose under boots).
                 for g in over:
