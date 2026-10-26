@@ -1,0 +1,93 @@
+# Handover: state of the game (26 October 2026)
+
+This is the state of `claude/medieval-town` at handover. Read `AGENTS.md` for the rules and the build commands.
+
+## What exists
+
+- **The city.** Benevento inside its walls at 1:1 scale, from the owner's urban plan:
+  - walls, gates and the Calore and Sabato rivers;
+  - about 81% of the plan's blocks are built, with the streets narrowed by encroachment as the sources describe (shops, walled yards, gardens);
+  - landmarks:
+    - the ducal curtis;
+    - S. Maria (episcopium) and its library;
+    - the Iseum in the centre, near today's Duomo;
+    - the forum and cryptoporticus;
+    - the reused theatre and the abandoned amphitheatre and baths;
+    - the castellum aquae, the Rocca dei Rettori area and the S. Sofia site;
+    - Ponte Leproso at its surveyed size (Meomartini 1889) and Ponte Fratto;
+    - Ad Caballum: the broken equestrian statue and S. Petrus ad Caballum;
+    - about 122 scanned Roman spolia and statues, some set into the walls;
+    - monasteries, catacombs and cisterns.
+- **Explorables and secrets.** Interiors with readable texts and easter eggs are listed in `docs/benevento/SECRETS.md`. Lore is in `src/benevento/lore.ts`, `readables.ts` and `secrets.ts`.
+- **People.** Townsfolk with period roles (`src/npc/population.ts`, documented in `docs/benevento/PEOPLE.md`) and spoken lines (`src/npc/lines*.ts`). The default bodies are v2: MakeHuman bodies with scanned faces, wearing modelled garments that swing on spring "cloth bones".
+- **Rendering:**
+  - **Light field** (`src/lightfield.ts`): a top-down height map gives the key-light shadow, sky occlusion and the roof test.
+  - **Shafts and grading:** light shafts (`src/shafts.ts`), N8AO ambient occlusion, AgX tone mapping, and FXAA in the grade pass.
+  - **Fog culling** (`src/fogcull.ts`).
+- **Performance:**
+  - **Occlusion:** a software depth-buffer occlusion test (`src/occlusion.ts`).
+  - **Town streaming:** the town streams in chunks built in a worker (`src/benevento/fabric.ts`, `fabric.worker.ts`), with a middle level of detail out to 80–96 m.
+  - **Clusters:** each mesh is split into house-sized clusters (`src/clusters.ts`).
+  - **One draw call per material** for the whole town (`src/benevento/pool.ts`), using WebGL2 buffer copies and `GLBufferAttribute`.
+  - **Props:** instanced, with a simplified far version made at load by meshoptimizer.
+
+## Map of the code
+
+| Area | Files |
+|---|---|
+| Entry and frame loop | `src/main.ts`, `src/world.ts` (assembles the world, teleports, landmarks), `src/player.ts` |
+| City layout from the plan | `src/benevento/geo.json`, `geo.ts`, `layout.ts` (blocks, lots, encroachment §7b), `sites.ts` (landmark sites, terraces, floor masks) |
+| Town buildings | `src/benevento/fabric.ts` and its worker, `src/arch/*` (facades, roofs, dressing), `src/town.ts` |
+| Landmarks | `src/benevento/monuments.ts`, `theatrum.ts`, `pons.ts` (Leproso), `pontefratto.ts`, `spolia.ts`, `cellarulo.ts`, `interiors.ts`, `src/palace.ts`, `src/library.ts`, `src/baths.ts`, `src/catacombs.ts` |
+| Terrain, water and vegetation | `src/displace.ts`, `src/benevento/rivers.ts`, `src/vegetation/*`, `src/forest.ts` |
+| Materials and shading | `src/shaders.ts`, `src/materials.ts`, `src/ktx2.ts`, `src/lights.ts`, `src/fire.ts` |
+| People, v1 | `src/npc.ts` (switches between v1 and v2, spawns and updates), `src/npc/*` (scan bodies, procedural garments, population, lines) |
+| People, v2 | `src/npc2/kit.ts` (loading), `dress.ts` (outfits), `springs.ts` (cloth-bone solver with 15 m distance LOD), `arms.ts` (smaller backward arm swing under cloaks), `audit.ts` |
+| v2 asset pipeline (offline) | `tools/npc2/*`: headless Blender 4.2 with MPFB2. Read `tools/npc2/README.md` before touching it |
+| Other offline tools | `tools/fetch-*.ts` (download scans, textures and models; the Sketchfab ones need `SKETCHFAB_TOKEN`), `tools/encode-ktx2.mjs`, `tools/bake-*.ts` |
+| Research notes | `docs/benevento/HISTORY.md`, `ARCHITECTURE.md`, `PEOPLE.md`, `SECRETS.md`, `docs/REALISM.md` |
+
+## Owner feedback that drove the recent work
+
+- The townsfolk read as "broken puppets":
+  - long necks, faces detached from bodies, floating hands;
+  - rigid, synthetic-looking clothes;
+  - crumpled faces, broken cloak appendages.
+
+  This led to the v2 pipeline and its rounds of fixes.
+- The town inside the walls was too empty. The streets were narrowed, following Arthur, Santangeli Valenzani, Brogiolo and Gelichi, and Bertelli and Rotili on Benevento.
+- Ponte Leproso looked too big. Its dimensions were already right; the terrain buried the arches. The 700 riverbed is now restored with a "cut" terrace.
+- Earlier rendering bugs, all fixed:
+  - impossibly dark shadow bands on facades;
+  - cracks in facades;
+  - water not rendering, caused by triangle winding;
+  - a grainy fog overlay;
+  - an iPhone crash from texture memory.
+
+## Open defects and next steps
+
+1. **Real-phone check.** No change since the latest performance pass has been checked on an iPhone. That pass measured, headless at 390×844:
+
+   | View | Triangles | Draw calls |
+   |---|---|---|
+   | Curtis Ducis | 334k | 116 |
+   | Episcopium | 326k | 102 |
+   | Other street views | 157–266k | 46–91 |
+
+   Risks: the WebGL2 buffer-copy path in `pool.ts`, index re-uploads while turning, and spring cost (about 0.6 ms on the headless CPU with 15 m LOD).
+2. **Cloaks.** While walking, thin slivers of tunic and belt show at the cloak's side edges. The cloak's edge also looks ragged near the collar from the front.
+
+   The hide mask (`tools/npc2/hide.py`) can't reach these, because the cloak does not hang behind them in the rest pose. Options:
+   - wrap the cloak further round the sides;
+   - also limit how far the arms swing out to the side.
+3. **Hoods.** The face-opening lining is now dark and matte. A tiny skin patch still shows at the shoulder edge in the talk pose from behind.
+4. **Ad Caballum church.** S. Petrus ad Caballum should have two domes on square drums, like S. Ilario. From the street it reads as a plain box. Showing it as standing in 700 is itself a hypothesis.
+5. **Landmarks are the next performance lever.** They draw 139–152k triangles at Curtis Ducis and Episcopium. Coarser wall subdivision on landmarks would save 12–18%.
+6. **Loading.** The v1 bodies still load as a fallback in v2 mode, which adds load time.
+7. **README.** Bring the intro up to date with the Benevento setting.
+
+## Hosting
+
+The game was previewed as a claude.ai artifact, which only coding sessions in that product can publish to. For a new agent, host `dist/` anywhere static, for example GitHub Pages. Tilt-to-look also needs a normally hosted page, because the artifact frame blocks motion sensors.
+
+The asset format rules in `AGENTS.md` came from that host. They are harmless elsewhere.
