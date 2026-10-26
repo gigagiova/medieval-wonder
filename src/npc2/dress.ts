@@ -8,7 +8,7 @@ import type { OutfitV2 } from './kit';
 // dye of its layer, over its own modelled detail (the artist's normal map,
 // with seams and folds, and a grey map of the cloth's wear), mud at the hems.
 
-export interface Dyes { tunic: THREE.Color; over: THREE.Color; head: THREE.Color; belt: THREE.Material; leg: THREE.Color; shoe: THREE.Color; kinds?: [FabricKind, FabricKind, FabricKind] }
+export interface Dyes { tunic: THREE.Color; over: THREE.Color; head: THREE.Color; belt: THREE.Material; leg: THREE.Color; shoe: THREE.Color; kinds?: [FabricKind, FabricKind, FabricKind]; role?: string }
 
 /** Stands in for v1's Clothing (cloth.ts): v2 garments are plainly skinned. */
 export class ClothingV2 {
@@ -41,10 +41,12 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
     if (kind) {
       mat = fabric(kind, g.map === 'color' ? col.clone().lerp(new THREE.Color(1, 1, 1), 0.55) : col, { attr: 'rest', vertexColors: true });
     } else {
-      mat = matte(0xffffff, 0.95);
+      // Hemp rope: its own photographed twist (the map), toned to unbleached fibre.
+      mat = matte(0x8a7a5c, 0.95);
     }
     if (src.normalMap) { mat.normalMap = src.normalMap; mat.normalScale = new THREE.Vector2(1, 1); }
-    if (src.map) {
+    // The viking tunic's map is a mail shirt's: worn so by soldiers only.
+    if (src.map && !(g.id === 'shirt' && dyes.role !== 'soldier')) {
       mat.map = src.map;
       src.map.colorSpace = g.map === 'detail' ? THREE.NoColorSpace : THREE.SRGBColorSpace;
       if (g.map === 'detail') detailMap(mat);

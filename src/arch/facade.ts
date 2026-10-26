@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import type { Builder } from '../builder';
 import type { MatName } from '../materials';
-import { Acc, Frame, R, chance, box, voussoirs, planks, addBent } from './kit';
+import { Acc, Frame, R, chance, box, voussoirs, planks, addBent, withStream } from './kit';
 import { tiledLeanTo } from './roof';
 import { torch, bracketLantern } from '../lights';
+import { rng, DETAIL } from '../builder';
+import { dressWall, washing, jar, type StairPlan } from './dress';
 
 // A street front, built the way these walls were: a thick wall of rubble or
 // reused brick, pierced by a few small openings with deep reveals; arches of
@@ -64,6 +66,10 @@ export interface FacadeSpec {
   lower: MatName; upper: MatName;
   street: number;              // width of the street in front
   lamp: boolean;
+  /** An outside stair against this front (see dress.ts planFront). */
+  stair?: StairPlan | null;
+  /** Seed for the decoration stream (full detail only). */
+  seed?: number;
 }
 
 /** Build one street front. Returns the jetty depth, so the roof can follow it. */
@@ -82,7 +88,20 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
   // ---- ground floor: a door (arched or under a lintel), maybe a slit or a shop arch
   const ops: Opening[] = [];
   const dw = R(0.92, 1.22);
-  const du = THREE.MathUtils.clamp(R(0.55, L - 0.55 - dw), 0.45, Math.max(0.45, L - 0.45 - dw));
+  let du = THREE.MathUtils.clamp(R(0.55, L - 0.55 - dw), 0.45, Math.max(0.45, L - 0.45 - dw));
+  // The outside stair, in this frame: its span along the wall and the landing.
+  let st: { s0: number; s1: number; l0: number; l1: number; hL: number } | null = null;
+  if (s.stair) {
+    const uOf = (q: V2) => (q.x - A.x) * e.x + (q.y - A.y) * e.y;
+    const uE = uOf(s.stair.end), uF = uOf(s.stair.foot), dir = Math.sign(uF - uE);
+    const uL = uE + dir * s.stair.land;
+    st = { s0: Math.min(uE, uF), s1: Math.max(uE, uF), l0: Math.min(uE, uL), l1: Math.max(uE, uL), hL: s.stair.hL };
+    // The street door goes beside the flight, never under it.
+    if (du + dw > st.s0 - 0.25 && du < st.s1 + 0.25) {
+      const left = st.s0 - 0.35 - dw, right = st.s1 + 0.35;
+      du = left >= 0.4 ? THREE.MathUtils.clamp(R(0.4, left), 0.4, left) : right + dw < L - 0.4 ? right : du;
+    }
+  }
   const archDoor = chance(0.65);
   const door: Opening = { u0: du, u1: du + dw, v0: 0, v1: archDoor ? R(1.62, 1.9) : R(1.95, 2.15), arch: archDoor };
   if (door.u1 < L - 0.3) ops.push(door);
@@ -92,16 +111,25 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
   const slitU = R(0.4, L - 0.8);
   const slit: Opening = { u0: slitU, u1: slitU + R(0.16, 0.26), v0: R(1.2, 1.5), v1: 0, arch: false };
   slit.v1 = slit.v0 + R(0.45, 0.7);
-  if (chance(0.45) && free(slit.u0, slit.u1)) ops.push(slit);
+  // A workshop front: a wide arch with a masonry counter, its shutter
+  // propped up as an awning (the bottega of every later Italian town).
+  let shop: Opening | null = null;
+  if (s.street >= 2.2 && L >= 4.2 && chance(0.3)) {
+    const sw = R(1.5, Math.min(2.3, L * 0.45)), su = R(0.4, L - 0.4 - sw);
+    const o: Opening = { u0: su, u1: su + sw, v0: 0, v1: R(1.5, 1.75), arch: true };
+    if (free(o.u0, o.u1) && !(st && o.u1 > st.s0 - 0.3 && o.u0 < st.s1 + 0.3) && o.v1 + sw / 2 < s.h1 - 0.25) { ops.push(o); shop = o; }
+  }
+  if (chance(0.45) && free(slit.u0, slit.u1) && !(st && slit.u1 > st.s0 - 0.2 && slit.u0 < st.s1 + 0.2)) ops.push(slit);
   const lowTop = Math.min(s.h, s.h1 + (s.upper === s.lower ? 0 : 0));
-  const jetty = s.upper !== s.lower && (s.upper === 'wood' || s.upper === 'plaster') && chance(0.55) ? R(0.3, 0.55) : 0;
+  let jetty = s.upper !== s.lower && (s.upper === 'wood' || s.upper === 'plaster') && chance(0.55) ? R(0.3, 0.55) : 0;
+  if (st) jetty = 0;
   const oneMass = s.upper === s.lower && jetty === 0;
 
   // ---- upper floors: small windows at irregular places
   const up: Opening[] = [];
   const floors: number[] = [];
   for (let y = s.h1 + R(0.75, 1.15); y < s.h - 1.0; y += R(2.4, 3.0)) floors.push(y);
-  const balcony = floors.length > 0 && jetty === 0 && chance(0.13) && L > 2.6;
+  const balcony = floors.length > 0 && jetty === 0 && chance(0.2) && L > 2.6 && !st && s.street > 1.9;
   for (const fy of floors) {
     const n = Math.max(1, Math.round(L / R(2.3, 3.6)));
     for (let i = 0; i < n; i++) {
@@ -109,6 +137,7 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
       const ww = R(0.42, 0.68), wh = R(0.6, 0.92);
       const u0 = R(0.45, L - 0.45 - ww);
       const o: Opening = { u0, u1: u0 + ww, v0: fy, v1: fy + wh, arch: chance(0.5) };
+      if (st && o.u1 > st.s0 - 0.3 && o.u0 < st.s1 + 0.3 && o.v0 < st.hL + 2.4) continue;
       if (up.every((q) => q.v0 !== fy || o.u1 < q.u0 - 0.5 || o.u0 > q.u1 + 0.5) && o.v1 + (o.arch ? ww / 2 : 0) < s.h - 0.35) up.push(o);
     }
   }
@@ -117,6 +146,14 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
     const u0 = THREE.MathUtils.clamp(R(0.5, L - 0.5 - bw), 0.45, L - 0.45 - bw);
     for (let i = up.length - 1; i >= 0; i--) if (up[i].v0 === floors[0] && !(up[i].u1 < u0 - 0.4 || up[i].u0 > u0 + bw + 0.4)) up.splice(i, 1);
     up.push({ u0, u1: u0 + bw, v0: fy, v1: fy + R(1.6, 1.8), arch: false });
+  }
+
+  // The upper door the stair leads to, on its landing.
+  let stairDoor: Opening | null = null;
+  if (st) {
+    const w = Math.min(0.95, st.l1 - st.l0 - 0.2), c = (st.l0 + st.l1) / 2;
+    stairDoor = { u0: c - w / 2, u1: c + w / 2, v0: st.hL + 0.03, v1: Math.min(st.hL + R(1.7, 1.9), s.h - 0.5), arch: false };
+    if (stairDoor.v1 - stairDoor.v0 > 1.5) up.push(stairDoor); else stairDoor = null;
   }
 
   // ---- the wall panels
@@ -178,6 +215,31 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
     } else {
       // Ajar: darkness inside, the leaf swung in against the reveal.
       box(acc, 'iron', f, (door.u0 + door.u1) / 2, (door.v1 + door.v0) / 2 + 0.2, -T + 0.03, dw / 2, (door.v1 - door.v0) / 2 + 0.4, 0.01);
+    }
+  }
+  if (shop) {
+    const o = shop, c = (o.u0 + o.u1) / 2, w = o.u1 - o.u0;
+    detailOpening(o, 0, true, false);
+    // Counter: a parapet of the wall's own stuff, a slab on top reaching out.
+    box(acc, s.lower, f, c, 0.4, -T * 0.55, w / 2 + 0.02, 0.48, T * 0.45, 0.01);
+    box(acc, 'slab', f, c, 0.9, -T * 0.4 + 0.12, w / 2 + 0.06, 0.05, T * 0.4 + 0.14, 0.01);
+    // The dark shop behind (firelit now and then).
+    box(acc, chance(0.25) ? 'window' : 'iron', f, c, (o.v1 + 0.95 + w / 2) / 2, -T + 0.03, w / 2 + 0.02, (o.v1 + w / 2 - 0.95) / 2 + 0.02, 0.01);
+    // The shutter, hinged at the springing, propped out over the street on two poles.
+    const reach = Math.min(R(0.7, 0.95), s.street * 0.35), drop = R(0.3, 0.45);
+    const yH = Math.min(o.v1 + w / 2 + 0.38, s.h1 - 0.1);
+    const q = (u: number, v: number, ww: number) => f.p(u, v, ww);
+    acc.hexa('wood', [q(o.u0 - 0.05, yH - 0.04, 0.03), q(o.u1 + 0.05, yH - 0.04, 0.03), q(o.u1 + 0.05, yH - drop - 0.04, reach), q(o.u0 - 0.05, yH - drop - 0.04, reach),
+      q(o.u0 - 0.05, yH, 0.03), q(o.u1 + 0.05, yH, 0.03), q(o.u1 + 0.05, yH - drop, reach), q(o.u0 - 0.05, yH - drop, reach)], true);
+    for (const u of [o.u0 + 0.08, o.u1 - 0.08]) {
+      const p0 = q(u - 0.025, 0.93, reach - 0.12), p1 = q(u + 0.025, 0.93, reach - 0.12);
+      const top = v3(0, yH - drop - 0.97, 0);
+      acc.hexa('wood', [p0, p1, p1.clone().add(v3(0, 0, 0)).addScaledVector(f.z, 0.05), p0.clone().addScaledVector(f.z, 0.05), p0.clone().add(top), p1.clone().add(top), p1.clone().add(top).addScaledVector(f.z, 0.05), p0.clone().add(top).addScaledVector(f.z, 0.05)], true);
+    }
+    // Wares on the counter: jars and bowls (decoration, full detail only).
+    if (!DETAIL.mid) {
+      const r = rng(Math.floor(o.u0 * 1000 + L * 77 + T * 911));
+      for (let u = o.u0 + 0.2; u < o.u1 - 0.15; u += 0.25 + r() * 0.3) if (r() < 0.7) jar(acc, f, u, 0.02 + r() * 0.12, 0.2 + r() * 0.25, 0.08 + r() * 0.06, r, 0.95);
     }
   }
   if (ops.includes(slit)) {
@@ -309,6 +371,20 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
     const ry = Math.atan2(s.out.x, s.out.y);
     if (chance(0.6)) bracketLantern(b, p.x, 2.2, p.z, ry);
     else torch(b, p.x, 2.4, p.z, ry);
+  }
+  // ---- decoration on its own stream, full detail only: lacing courses,
+  // render patches, joist heads, washing out of an upper window.
+  if (!DETAIL.mid && s.seed !== undefined) {
+    const seed = s.seed;
+    withStream(seed * 3 + 1, () => {
+      dressWall(acc, { f, L, lower: s.lower, upper: s.upper, lowTop, h: s.h, upFace, oneMass, holes: [...ops, ...up, ...(st ? [{ u0: st.s0, u1: st.s1, v0: 0, v1: st.hL + 1 }] : [])] }, seed);
+      const r = rng(seed * 5 + 2);
+      const wins = up.filter((o) => o !== stairDoor && o.v1 - o.v0 < 1.4);
+      if (wins.length && r() < (s.street < 3.2 ? 0.32 : 0.18)) {
+        const o = wins[Math.floor(r() * wins.length)];
+        washing(acc, f, (o.u0 + o.u1) / 2, o.v0 + 0.05, upFace + 0.02, s.street, r);
+      }
+    });
   }
   return jetty;
 }

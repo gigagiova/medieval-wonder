@@ -9,7 +9,9 @@ import { RIVERS, DATUM } from './geo';
 // (the fog is denser low down, so the valleys fill with it).
 
 function riverMaterial() {
-  const m = new THREE.MeshStandardMaterial({ color: 0x1b1d19, roughness: 0.2, metalness: 0 });
+  // Lit like any surface (the light field shades it under bridges and banks),
+  // but its sheen is our own sky, not the image-based light (a sunny road).
+  const m = new THREE.MeshStandardMaterial({ color: 0x1b1d19, roughness: 0.9, metalness: 0, envMapIntensity: 0 });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, shared);
     sh.vertexShader = sh.vertexShader
@@ -18,30 +20,34 @@ function riverMaterial() {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>\nvarying vec3 vWorldPos;\nvarying vec2 vFlow;\nvarying float vEdge;\n${noiseGLSL}\n${atmosGLSL}`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-        {
-          // Ripples carried downstream.
-          vec2 q = vWorldPos.xz - vFlow * uTime * 0.35;
-          float e = 0.06;
-          #define H(p) (vnoise(vec3((p)*0.9, uTime*0.08)) + 0.45*vnoise(vec3((p)*2.7, uTime*0.17)) + 0.2*vnoise(vec3((p)*7.0, uTime*0.3)))
-          float h0 = H(q), hx = H(q + vec2(e, 0.)), hz = H(q + vec2(0., e));
-          vec3 nw = normalize(vec3(-(hx-h0)/e*0.05, 1.0, -(hz-h0)/e*0.05));
-          normal = normalize((viewMatrix * vec4(nw, 0.0)).xyz);
-        }`)
+        // Slow, silty water: two drifting octaves of the shared noise texture
+        // (two fetches, no per-pixel noise maths), flattened towards the banks.
+        vec2 rq = vWorldPos.xz - vFlow * uTime * 0.3;
+        vec2 rn = (texture2D(uNoise, rq * 0.07 + uTime * 0.004).rg - 0.5) * 0.9
+                + (texture2D(uNoise, rq * 0.23 - uTime * 0.006 + 0.37).ba - 0.5) * 0.5;
+        float rDeep = 1.0 - smoothstep(0.55, 1.0, vEdge);
+        vec3 rNw = normalize(vec3(rn.x * 0.22 * rDeep, 1.0, rn.y * 0.22 * rDeep));
+        normal = normalize((viewMatrix * vec4(rNw, 0.0)).xyz);`)
       .replace('#include <color_fragment>', `#include <color_fragment>
-        // Silt-brown near the banks, darker in the deep middle; foam streaks in the current.
-        diffuseColor.rgb = mix(vec3(0.06,0.065,0.055), vec3(0.11,0.1,0.08), smoothstep(0.55, 1.0, vEdge));
-        float foam = smoothstep(0.72, 0.9, vnoise(vec3((vWorldPos.xz - vFlow*uTime*0.6)*vec2(0.6, 0.6), uTime*0.05)));
-        diffuseColor.rgb += foam * 0.05 * (1.0 - vEdge);`)
+        // Brown-grey and opaque with silt; shallows over the drowned bank take
+        // the colour of wet mud, so the shore line has no hard seam.
+        diffuseColor.rgb = mix(vec3(0.07, 0.062, 0.048), vec3(0.03, 0.034, 0.031), smoothstep(0.0, 0.6, 1.0 - vEdge));
+        float foam = smoothstep(0.7, 0.9, texture2D(uNoise, (vWorldPos.xz - vFlow * uTime * 0.5) * 0.05).b);
+        diffuseColor.rgb += foam * 0.025 * (1.0 - vEdge);`)
       .replace('#include <fog_fragment>', `{
+          // The overcast in the water: Fresnel (Schlick, F0 0.02) times the
+          // sky dome's own gradient and its grey western glow; none in the
+          // shallows, where the mud shows through.
           vec3 vdir = normalize(cameraPosition - vWorldPos);
-          vec3 nw = normalize((vec4(normal, 0.0) * viewMatrix).xyz);
-          float fr = 0.03 + 0.97 * pow(1.0 - max(dot(vdir, nw), 0.0), 5.0);
-          vec3 sky = mix(vec3(0.2,0.205,0.215), vec3(0.11,0.115,0.13), clamp(reflect(-vdir, nw).y * 1.6, 0., 1.));
-          gl_FragColor.rgb = mix(gl_FragColor.rgb, sky * 1.1, fr * 0.75);
+          float fr = 0.02 + 0.98 * pow(1.0 - max(dot(vdir, rNw), 0.0), 5.0);
+          vec3 rr = reflect(-vdir, rNw);
+          vec3 sky = mix(vec3(0.19, 0.195, 0.205), vec3(0.06, 0.065, 0.075), smoothstep(-0.02, 0.55, rr.y));
+          sky += vec3(0.9, 0.92, 0.95) * 0.12 * pow(max(dot(rr, uMoonDir), 0.0), 6.0);
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, sky, fr * 0.85 * rDeep);
         }
         gl_FragColor.rgb = applyAtmos(gl_FragColor.rgb, vWorldPos);`);
   };
-  m.customProgramCacheKey = () => 'river1';
+  m.customProgramCacheKey = () => 'river2';
   return m;
 }
 

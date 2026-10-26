@@ -31,9 +31,11 @@ export interface OutfitV2 {
 }
 
 const DIR = 'models/npc2/';
+const flatNormal = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1);
+flatNormal.needsUpdate = true;
 /** The bodies, and which v1 outfits each can wear (by sex). */
 export const BODIES_V2: { id: string; sex: Sex }[] = [
-  { id: 'm_young', sex: 'man' }, { id: 'm_mid', sex: 'man' }, { id: 'm_old', sex: 'man' },
+  { id: 'm_young', sex: 'man' }, { id: 'm_mid', sex: 'man' }, { id: 'm_old', sex: 'man' }, { id: 'm_elder', sex: 'man' },
   { id: 'w_young', sex: 'woman' }, { id: 'w_mid', sex: 'woman' },
 ];
 
@@ -73,6 +75,8 @@ function prep(t: THREE.Object3D) {
       const src = m.material as THREE.MeshStandardMaterial;
       if (src.map) src.map.colorSpace = THREE.SRGBColorSpace;
       if (!m.geometry.getAttribute('beard')) m.geometry.setAttribute('beard', new THREE.BufferAttribute(new Float32Array(m.geometry.attributes.position.count), 1));
+      // (The shared skin shader lays its pores on the normal map's UVs: a flat one where the body has none.)
+      if (!src.normalMap) src.normalMap = flatNormal;
       m.material = skinMaterial(src);
     }
   });
@@ -92,8 +96,10 @@ function measureBody(t: THREE.Object3D): Measure {
 const outfitsV2 = new Map<string, OutfitV2>();
 
 /** Bodies that can wear a v1 outfit id in v2 (none: v2 doesn't make it). */
+/** Outfits worn only by some bodies: a bare-headed monk is the old man (close-cropped, as if tonsured). */
+const ONLY: Record<string, string[]> = { monkBare: ['m_elder'] };
 export function bodiesV2(outfit: string, sex: Sex) {
-  return [...kitsV2.values()].filter((k) => k.sex === sex && k.meta.outfits[outfit]).map((k) => k.id);
+  return [...kitsV2.values()].filter((k) => k.sex === sex && k.meta.outfits[outfit] && (!ONLY[outfit] || ONLY[outfit].includes(k.id))).map((k) => k.id);
 }
 
 /** An outfit on a body: the body's template with that outfit's garments, hidden parts dropped. */

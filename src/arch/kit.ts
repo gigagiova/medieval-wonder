@@ -15,6 +15,16 @@ let rand = rng(90210);
 
 /** Restart the kit's random sequence (each streamed chunk builds from its own seed). */
 export function reseedKit(seed: number) { rand = rng(seed); }
+/**
+ * Run fn on its own random stream (seeded), then give the kit its old stream
+ * back: decoration built only at full detail must not shift the draws of
+ * what comes after it, or the middle detail would no longer match.
+ */
+export function withStream<T>(seed: number, fn: () => T): T {
+  const keep = rand;
+  rand = rng(seed);
+  try { return fn(); } finally { rand = keep; }
+}
 export const R = (a: number, b: number) => a + (b - a) * rand();
 export const chance = (p: number) => rand() < p;
 
@@ -67,10 +77,11 @@ export class Acc {
    * edge and a facet at every corner): no stone in a medieval wall has a
    * knife-sharp arris, and the bevels catch the light the way real ones do.
    */
-  hexa(m: MatName, c: V3[], keep = false) {
+  hexa(m: MatName, c: V3[], keep = false, flat = false) {
     // Nothing hand-made is square: nudge every corner of a block a little
     // (more for rough stone, less for brick), so edges are never ruled lines.
-    const irr = IRREG[m] ?? 0;
+    // (`flat`: a mass of masonry, not a block: no jitter, no worn edges.)
+    const irr = flat ? 0 : IRREG[m] ?? 0;
     if (irr > 0) {
       let minEdge = Infinity;
       for (let i = 0; i < 4; i++) minEdge = Math.min(minEdge, c[i].distanceTo(c[(i + 1) % 4]), c[i].distanceTo(c[i + 4]));
@@ -83,7 +94,7 @@ export class Acc {
     let small = false;
     if (DETAIL.mid && !keep) { let r2 = 0; for (const p of c) r2 = Math.max(r2, p.distanceToSquared(ctr)); small = r2 < 0.25 * 0.25; }
     const F = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]];
-    const bev = BEVEL[m] ?? 0;
+    const bev = flat ? 0 : BEVEL[m] ?? 0;
     if (bev > 0) {
       let minEdge = Infinity;
       for (const f of F) for (let i = 0; i < 4; i++) minEdge = Math.min(minEdge, c[f[i]].distanceTo(c[f[(i + 1) % 4]]));
