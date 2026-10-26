@@ -20,9 +20,9 @@ import { CHUNK, lodChunk, type Baked, type ChunkItems, type ChunkResult, type Ho
 // chunk while that one is drawn and comes back the moment it is dropped, so
 // neither swap rebuilds anything; its super-chunk leaves out its blocks.
 
-export const R_IN = 48, R_OUT = 68;
+export const R_IN = 40, R_OUT = 56;
 /** Middle detail is built within R_MID and forgotten beyond R_MID_OUT. */
-export const R_MID = 88, R_MID_OUT = 104;
+export const R_MID = 80, R_MID_OUT = 96;
 const SUPER = 4; // chunks per super-chunk side
 interface ChunkState { it: ChunkItems; status: 'lod' | 'queued' | 'building' | 'ready'; cell?: Cell; lamps: Lamp[]; fire?: THREE.Object3D; lod?: { walls: number[]; roofs: number[] };
   /** Middle detail (kept on the GPU while within R_MID_OUT); shown when in this.cells. */

@@ -51,7 +51,7 @@ function wornBox(w: number, h: number, d: number, r: number, L: number) {
 }
 
 /**
- * Detail level of what is built. 'mid' is for town chunks seen from 48-110 m
+ * Detail level of what is built. 'mid' is for town chunks seen from 40-96 m
  * (see benevento/stream.ts): small pieces (< ~0.5 m), roof tiles and worn or
  * bevelled edges are dropped and surfaces are tessellated coarsely, but every
  * random draw still happens, so the houses keep exactly the same shapes,

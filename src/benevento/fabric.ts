@@ -5,7 +5,7 @@ import type { MatName } from '../materials';
 import type { FireSource } from '../fire';
 import { buildHouse, buildBridge, reseedTown, type BridgeSpec, type Lot } from '../town';
 import { reseedKit } from '../arch/kit';
-import { planFront, frontColliders } from '../arch/dress';
+import { planFront, frontColliders, sideLine } from '../arch/dress';
 import { reseedShapes, ruin, arcadeGeo, archRings, quoinBox, pyramidRoof, wellHead, fallenDrum } from '../shapes';
 import { fastTerrain } from '../displace';
 import { torch, brazier } from '../lights';
@@ -26,7 +26,38 @@ const V = (x: number, z: number) => new THREE.Vector2(x, z);
 
 export interface LotData { c: P2[]; front?: { a: P2; b: P2; out: P2 }; h: number; street: number; seed: number; explore?: { id: string; kind: string };
   /** A tower house (taller, few openings, low hipped roof) or a roofless ruin; see lotForm(). */
-  form?: 'tower' | 'ruin' }
+  form?: 'tower' | 'ruin';
+  /** Walls other than the front that stand on a lane (edge index, width of the lane): they get windows, doors and things against them. */
+  side?: [number, number][] }
+
+/**
+ * The walls of a lot (other than its front) that stand on a lane: sampled
+ * a metre out from three points along each, with the lane's width there.
+ */
+function streetSides(lay: Layout, c: THREE.Vector2[], front: boolean): [number, number][] | undefined {
+  const r = lay.r, out: [number, number][] = [];
+  let cx = 0, cz = 0;
+  for (const p of c) { cx += p.x / c.length; cz += p.y / c.length; }
+  for (let k = front ? 1 : 0; k < c.length; k++) {
+    const a = c[k], b = c[(k + 1) % c.length], L = a.distanceTo(b);
+    if (L < 2.4) continue;
+    const ex = (b.x - a.x) / L, ez = (b.y - a.y) / L;
+    let ox = -ez, oz = ex;
+    if (ox * ((a.x + b.x) / 2 - cx) + oz * ((a.y + b.y) / 2 - cz) < 0) { ox = -ox; oz = -oz; }
+    let hits = 0, w = 99;
+    for (const t of [0.2, 0.5, 0.8]) {
+      const px = a.x + (b.x - a.x) * t, pz = a.y + (b.y - a.y) * t;
+      if (r.at(px + ox * 1.0, pz + oz * 1.0) !== STREET_CODE) continue;
+      hits++;
+      let d = 1.0;
+      while (d < 9 && r.at(px + ox * (d + 0.25), pz + oz * (d + 0.25)) === STREET_CODE) d += 0.25;
+      w = Math.min(w, d);
+    }
+    if (hits >= 2) out.push([k, Math.round(w * 4) / 4]);
+  }
+  return out.length ? out : undefined;
+}
+const STREET_CODE = 1; // layout.ts STREET
 
 /**
  * Some houses are not like the rest: here and there a back building has
@@ -384,7 +415,7 @@ export function prismSoup(c: P2[], y0: number, y1: number) {
 
 // ---------------------------------------------------------------- one chunk
 const toLot = (l: LotData): Lot => ({
-  c: l.c.map(([x, z]) => V(x, z)), h: l.h, street: l.street, seed: l.seed, form: l.form,
+  c: l.c.map(([x, z]) => V(x, z)), h: l.h, street: l.street, seed: l.seed, form: l.form, side: l.side,
   front: l.front ? { a: V(...l.front.a), b: V(...l.front.b), out: V(...l.front.out) } : undefined,
 });
 /** Build a chunk's content. In 'collide' mode only the cheap collision proxies are made. */
@@ -399,6 +430,11 @@ export function buildChunk(b: Builder, it: ChunkItems) {
       if (l.front) {
         const fr = { a: V(...l.front.a), b: V(...l.front.b), out: V(...l.front.out) };
         const g = frontColliders(fr, planFront(fr, l.street, l.h, l.seed));
+        if (g) b.collideShape(g, 'rubble');
+      }
+      for (const [k, w] of l.side ?? []) {
+        const fr = sideLine(l.c, k);
+        const g = frontColliders(fr, planFront(fr, w, l.h, l.seed + k * 101, true));
         if (g) b.collideShape(g, 'rubble');
       }
       continue;
@@ -458,6 +494,7 @@ export function makeChunks(lay: Layout, holes: Hole[]): Map<number, ChunkItems> 
       c: l.c.map((p) => [p.x, p.y] as P2), h: l.h, street: l.street ?? 2, seed: 1000 + l.id * 7919,
       front: l.front ? { a: [l.front.a.x, l.front.a.y], b: [l.front.b.x, l.front.b.y], out: [l.front.out.x, l.front.out.y] } : undefined,
       explore: l.explore,
+      side: l.explore ? undefined : streetSides(lay, l.c, !!l.front),
       ...(l.explore ? {} : lotForm(l.c.map((p) => [p.x, p.y] as P2), !!l.front, 1000 + l.id * 7919)),
     });
   }
