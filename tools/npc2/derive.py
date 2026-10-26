@@ -269,6 +269,14 @@ def lift_hood(o, basemesh, above=0.045, slump_k=0.7):
             continue
         v.co = owi @ (c + u * (r + (want - r) * k * slump_k))
         slump += 1
+    # At the nape the hood's hem is let down 4 cm onto the collar (as the head
+    # bows to talk, the skin showed between them): behind the ears, below
+    # the jaw, easing in.
+    for v in bm.verts:
+        p = ow @ v.co
+        k = ss(eye.y + 0.03, eye.y + 0.09, p.y) * ss(eye.z - 0.06, eye.z - 0.14, p.z)
+        if k > 0:
+            v.co = owi @ (p + Vector((0, 0, -0.04 * k)))
     # The face's opening kept clear, without cutting the cloth: hood cloth in
     # front of the face (chin to brow, cheekbone to cheekbone) is drawn back
     # and aside to the face's outline, the cloth round it following smoothly

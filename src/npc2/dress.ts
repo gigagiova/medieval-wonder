@@ -54,7 +54,7 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
     }
     inside(mat);
     // Hood and cowl: closed shells wound outwards (tools/npc2/derive.py), drawn one-sided.
-    if (g.id === 'hood' || g.id === 'cowl') mat.side = THREE.FrontSide;
+    if (g.id === 'hood' || g.id === 'cowl') { mat.side = THREE.FrontSide; lining(mat, m.geometry); }
     m.material = mat;
   });
   return new ClothingV2(meshes);
@@ -75,6 +75,33 @@ function inside(m: THREE.MeshStandardMaterial) {
       #include <opaque_fragment>`);
   };
   m.customProgramCacheKey = () => key + '-in';
+}
+
+/**
+ * A hood's lining (the shell's faces that look in at the head, seen round
+ * the face): in its own shadow and without sheen — dark and matte, so the
+ * opening reads as a soft fold of wool, not a glossy crumpled strip. Told
+ * from the outer face in the bind pose: the rest normal against the
+ * direction from the head's middle.
+ */
+function lining(m: THREE.MeshStandardMaterial, g: THREE.BufferGeometry) {
+  const prev = m.onBeforeCompile, key = m.customProgramCacheKey();
+  // The skull's middle, from the hood itself: 12 cm under its crown, midway across.
+  const b = new THREE.Box3().setFromBufferAttribute(g.attributes.rest as THREE.BufferAttribute);
+  const u = { value: new THREE.Vector4((b.min.x + b.max.x) / 2, b.max.y - 0.12, (b.min.z + b.max.z) / 2, b.max.z) };
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    sh.uniforms.uHeadC = u;
+    // The lining, and the folded rim round the face (the front 6 cm of the
+    // hood, +z being forward): light taken down after shading, sheen and all.
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform vec4 uHeadC; varying float vLin;')
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        vLin = max(smoothstep(0.05, -0.35, dot(normalize(restN), normalize(rest - uHeadC.xyz))),
+                   0.8 * smoothstep(uHeadC.w - 0.08, uHeadC.w - 0.02, rest.z));`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vLin;')
+      .replace('#include <opaque_fragment>', 'outgoingLight *= 1.0 - 0.7 * vLin;\n#include <opaque_fragment>');
+  };
+  m.customProgramCacheKey = () => key + '-lining';
 }
 
 /** The map is a grey detail (mean 0.5): the dye times twice it. */

@@ -158,6 +158,16 @@ def mark(basemesh, garments, outfits, specs, knee=None):
                 for i, c in zip(back, cov):
                     if c:
                         m[i] = True
+                # And the backs of the sleeves inside the cloak's hull (a ray
+                # straight back from them meets the cloak), which a walking
+                # arm pushes out through its sides; faces turned backwards only.
+                from mathutils import Vector as _V
+                bk = _V((0, 1, 0))
+                sl = [i for i in range(len(pos)) if not m[i] and nrm[i].y > 0.2 and pos[i].z > waist]
+                cov = covered([pos[i] for i in sl], [bk] * len(sl), [bvh[g] for g in cloaks], 0.0)
+                for i, c in zip(sl, cov):
+                    if c:
+                        m[i] = True
             m = erode(m, nbs[k], 1)
             if k == 'body':
                 # The artists' own delete groups (for whole-garment coverage such as hose under boots).
@@ -187,7 +197,8 @@ def mark(basemesh, garments, outfits, specs, knee=None):
                 eye = (_hf.group_centroid(o, co, 'helper-l-eye') + _hf.group_centroid(o, co, 'helper-r-eye')) / 2
                 def near(p, g):
                     if specs[g].get('layer') == 'head' or g in ('hood', 'cowl'):
-                        return (p - eye).length < 0.16
+                        # (The face's opening only: at the nape the hood's hem lies on the collar.)
+                        return (p - eye).length < 0.16 and p.y < eye.y + 0.06
                     return any((p - c).length < r for c, r in spots)
                 for g in over:
                     go = garments[g]
