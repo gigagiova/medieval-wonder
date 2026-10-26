@@ -76,8 +76,9 @@ function detailMap(m: THREE.MeshStandardMaterial) {
  * skull, in the bind pose, in the tone of the forehead's skin.
  */
 function tonsure(body: THREE.Object3D, o: OutfitV2) {
-  const M = o.m, eyes = M.bone('LeftEye').add(M.bone('RightEye')).multiplyScalar(0.5), hb = M.bone('Head');
-  const u = { value: new THREE.Vector4(hb.x, eyes.y + 0.075, eyes.z - 0.085, 0.058) };
+  // (The MakeHuman rig has no eye bones: the crown from the head's measured box.)
+  const h = o.m.head;
+  const u = { value: new THREE.Vector4(h.c.x, h.top - 0.045, h.c.z - 0.012, 0.055) };
   body.traverse((x) => {
     const m = x as THREE.SkinnedMesh;
     if (!m.isSkinnedMesh || x.userData.npc2 !== 'body') return;
