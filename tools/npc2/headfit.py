@@ -735,8 +735,30 @@ def transfer(basemesh, hidx, scan, alb, img):
         yy, xx = np.nonzero(inside)
         out[yy + y0, xx + x0, :3] = col[yy, xx, :3]
         done += 1
+    # The scans' lids are raw and pink round the eye (inner lids, tear
+    # ducts, a photographer's flash): reddish texels there are pulled back
+    # towards the skin's own hue, keeping their lightness.
+    written = np.zeros((n, n), bool)
+    for t in me.loop_triangles:
+        if t.polygon_index not in hidx:
+            continue
+        c3 = mw @ me.polygons[t.polygon_index].center
+        if min((c3 - e).length for e in eyes) > 0.022:
+            continue
+        D = np.array([[huv[l].uv.x * n, huv[l].uv.y * n] for l in t.loops])
+        x0, y0 = np.clip(np.floor(D.min(0)).astype(int), 0, n - 1)
+        x1, y1 = np.clip(np.ceil(D.max(0)).astype(int), 0, n - 1)
+        written[y0:y1 + 1, x0:x1 + 1] = True
+    rgb = out[..., :3]
+    red = rgb[..., 0] / np.maximum(rgb[..., 1], 1e-3)
+    ok = written & (red < 1.35) & (rgb.sum(-1) > 0.3)
+    skin = np.median(rgb[ok], 0) if ok.any() else np.array([0.6, 0.45, 0.38])
+    lum = rgb.mean(-1, keepdims=True)
+    tgt = skin[None, None, :] * (lum / max(skin.mean(), 1e-3))
+    k = np.clip((red - 1.3) / 0.35, 0, 1)[..., None] * written[..., None] * 0.85
+    out[..., :3] = rgb * (1 - k) + tgt * k
     img.pixels[:] = out.ravel()
-    log('transferred', done, 'triangles from the scan atlas')
+    log('transferred', done, 'triangles from the scan atlas; lids toned', int((k > 0.1).sum()))
 
 
 def under_scan(basemesh, hidx, body_img, head_img, alpha):

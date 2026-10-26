@@ -138,8 +138,11 @@ def mark(basemesh, garments, outfits, specs):
             if not over:
                 continue
             pos, nrm = rest[k]
-            m = covered(pos, nrm, [bvh[g] for g in over], TILT if k == 'body' else math.radians(30))
-            m = erode(m, nbs[k], 2 if k == 'body' else 1)
+            # The body: covered all round (rays out along its normal and tilted 25°
+            # about it). A garment under another: wherever the one over it lies
+            # straight out from it (a cloak's shoulders over a tunic's).
+            m = covered(pos, nrm, [bvh[g] for g in over], math.radians(25) if k == 'body' else 0.0)
+            m = erode(m, nbs[k], 1)
             if k == 'body':
                 # The artists' own delete groups (for whole-garment coverage such as hose under boots).
                 for g in over:
