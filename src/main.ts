@@ -88,7 +88,6 @@ function gpuUpload(meshes: THREE.Mesh[]) {
   meshes.forEach((m, i) => { upScene.remove(m); st[i].p?.add(m); m.visible = st[i].v; m.frustumCulled = st[i].f; });
 }
 gpuUpload(cells.flatMap((c) => c.meshes as THREE.Mesh[]));
-stream.uploader = gpuUpload;
 
 // The key light: the bright, low part of the overcast in the west (~19°),
 // shadowed by the town through the light field (lightfield.ts) rather than

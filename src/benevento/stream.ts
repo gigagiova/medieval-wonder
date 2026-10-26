@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { mat, type MatName } from '../materials';
+import type { MatName } from '../materials';
 import { makeFire } from '../fire';
 import type { Cell, Lamp } from '../builder';
 import { field, fastTerrain } from '../displace';
 import { BOUNDS } from './geo';
-import { newClusters, addBoxes } from '../clusters';
+import { newClusters, addBoxes, sortByCluster } from '../clusters';
 import { poolAdd } from './pool';
 import { CHUNK, lodChunk, type Baked, type ChunkItems, type ChunkResult, type Hole } from './fabric';
 
@@ -34,8 +34,6 @@ interface Super { key: number; si: number; sj: number; members: number[]; dirty:
 export class FabricStream {
   chunks = new Map<number, ChunkState>();
   supers = new Map<number, Super>();
-  /** Sends new meshes to the GPU straight away (so their CPU arrays can be freed). */
-  uploader?: (meshes: THREE.Mesh[]) => void;
   private workers: { w: Worker; busy: number | null }[] = [];
   private queue: number[] = [];
   private midQueue: number[] = [];
@@ -252,7 +250,7 @@ export class FabricStream {
     s.dirty = false;
     this.stats.lodRebuilds++;
     if (s.cell) {
-      for (const m of s.cell.meshes) { this.scene.remove(m); m.geometry.dispose(); }
+      s.cell.pool!.free();
       const i = this.cells.indexOf(s.cell);
       if (i >= 0) this.cells.splice(i, 1);
       s.cell = undefined;
@@ -287,22 +285,27 @@ export class FabricStream {
       const a = H[j * (N + 1) + i], b = H[j * (N + 1) + i + 1], c = H[(j + 1) * (N + 1) + i], d = H[(j + 1) * (N + 1) + i + 1];
       gp.push(x, a, z, x, c, z + ST, x + ST, b, z, x + ST, b, z, x, c, z + ST, x + ST, d, z + ST);
     }
-    const cell: Cell = { key: 's' + s.key, under: false, box: new THREE.Box3(), meshes: [], visible: true, occluded: 0, range: 420, lod: true };
+    // Into the town's shared buffers too (no draw calls of its own), by 32 m cluster.
+    const cell: Cell = { key: 's' + s.key, under: false, box: new THREE.Box3(), meshes: [], visible: true, occluded: 0, range: 420, lod: true, clusters: newClusters() };
+    const baked: Baked[] = [];
     const add = (pos: number[], m: MatName) => {
       if (!pos.length) return;
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       g.computeVertexNormals();
-      g.computeBoundingBox(); g.computeBoundingSphere();
-      cell.box.union(g.boundingBox!);
-      for (const a of Object.values(g.attributes)) (a as THREE.BufferAttribute).onUpload(function (this: THREE.BufferAttribute) { (this as unknown as { array: unknown }).array = null; });
-      const mesh = new THREE.Mesh(g, mat(m));
-      mesh.matrixAutoUpdate = false;
-      this.scene.add(mesh);
-      cell.meshes.push(mesh);
+      const N = g.attributes.normal.array as Float32Array, nor = new Int8Array(N.length);
+      for (let i = 0; i < N.length; i++) nor[i] = Math.max(-127, Math.min(127, Math.round(N[i] * 127)));
+      const srt = sortByCluster(g.attributes.position.array as Float32Array, nor, x0, z0, SUPER * CHUNK);
+      baked.push({ m, pos: srt.pos, nor: srt.nor as Int8Array, start: srt.start, count: srt.count, box: srt.box });
+      addBoxes(cell.clusters!, srt.box);
     };
     add(walls, 'rubble'); add(roofs, 'roof'); add(gp, 'ground');
-    if (cell.meshes.length) { this.uploader?.(cell.meshes as THREE.Mesh[]); s.cell = cell; this.cells.push(cell); }
+    if (baked.length) {
+      for (const b of cell.clusters!.boxes) if (b) cell.box.union(b);
+      cell.pool = poolAdd(baked);
+      s.cell = cell;
+      this.cells.push(cell);
+    }
     for (const c of showing) this.showMid(c);
     this.stats.superMs += performance.now() - t0;
   }
