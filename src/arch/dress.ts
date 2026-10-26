@@ -185,7 +185,8 @@ export function buildFront(acc: Acc, fr: FrontLine, p: FrontPlan, stoneM: MatNam
         const y = k * (it.h / rows) + 0.01;
         for (let u = u0 + R(0, 0.06); u < u1 - 0.08; u += R(0.12, 0.17)) {
           const rr = R(0.05, 0.075), w = D - 0.06 + R(-0.01, 0.04), j = R(-0.01, 0.01);
-          acc.quad('wood', f.p(u, y + j, w), f.p(u + 2 * rr, y, w), f.p(u + 2 * rr + j, y + 2 * rr, w), f.p(u, y + 2 * rr, w), back);
+          // Fresh-cut ends are pale against the grey bark.
+          acc.quad(r() < 0.7 ? 'marble' : 'wood', f.p(u, y + j, w), f.p(u + 2 * rr, y, w), f.p(u + 2 * rr + j, y + 2 * rr, w), f.p(u, y + 2 * rr, w), back);
         }
       }
       box(acc, 'wood', f, (u0 + u1) / 2, it.h + 0.03, D / 2 + 0.05, (u1 - u0) / 2 + 0.1, 0.02, D / 2 + 0.12, 0.02);
@@ -236,7 +237,7 @@ export function jar(acc: Acc, f: Frame, u: number, w: number, h: number, rad: nu
   const ctr = f.p(u, y0 + h * 0.5, w);
   for (let j = 0; j + 1 < rings.length; j++) for (let i = 0; i < seg; i++) {
     const a = rings[j][i], b = rings[j][(i + 1) % seg], c = rings[j + 1][(i + 1) % seg], d = rings[j + 1][i];
-    acc.quad('clay', a, b, c, d, ctr);
+    acc.quad('roof', a, b, c, d, ctr); // terracotta (the coppi's own material: no extra draw call)
   }
 }
 
@@ -350,7 +351,7 @@ export function dressWall(acc: Acc, d: WallDress, seed: number) {
   if (!d.oneMass || d.h > 4.5) {
     const v = (d.oneMass ? Math.min(3.2, d.h * 0.48) : d.lowTop) + 0.12;
     if (v < d.h - 0.6 && r() < 0.6) for (const [a, b] of runs(v - 0.1, v + 0.1, 0.25, d.L - 0.25)) {
-      for (let u = a + R(0, 0.2); u < b; u += R(0.5, 0.7)) box(acc, 'wood', d.f, u, v, d.upFace * 0 + 0.06, 0.07, 0.08, 0.08, 0.012);
+      for (let u = a + R(0, 0.2); u < b; u += R(0.5, 0.7)) box(acc, 'wood', d.f, u, v, 0.0, 0.06, 0.07, 0.05, 0.01);
     }
   }
 }
