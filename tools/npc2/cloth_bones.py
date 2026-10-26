@@ -163,5 +163,15 @@ def add(gid, o, rig, spec):
         for nm, w in top4:
             o.vertex_groups[nm].add([v.index], w / s4, 'REPLACE')
         k += 1
+    # Smoothed over the cloth (no hard panels between chains), then four
+    # influences at most, summing to one.
+    bpy.ops.object.select_all(action='DESELECT')
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
+    bpy.ops.object.vertex_group_smooth(group_select_mode='ALL', factor=0.5, repeat=ch.get('smooth', 6))
+    bpy.ops.object.vertex_group_limit_total(group_select_mode='ALL', limit=4)
+    bpy.ops.object.vertex_group_normalize_all(group_select_mode='ALL', lock_active=False)
+    bpy.ops.object.mode_set(mode='OBJECT')
     log(gid, n, 'chains x', nb, 'bones,', k, 'vertices')
     return k

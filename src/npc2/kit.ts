@@ -66,8 +66,14 @@ function prep(t: THREE.Object3D) {
     m.frustumCulled = false;
     m.castShadow = false;
     // (A mesh of several materials loads as a group of meshes, named after it.)
-    const n = /^G_|body|eye/i.test(m.name) ? m.name : m.parent?.name ?? m.name;
-    m.userData.npc2 = /^G_/.test(n) ? 'garment' : /body/.test(n) ? 'body' : /eye/i.test(n) ? 'eyes' : 'part';
+    const n = /^G_|body|eye|low-poly/i.test(m.name) ? m.name : m.parent?.name ?? m.name;
+    m.userData.npc2 = /^G_/.test(n) ? 'garment' : /body/.test(n) ? 'body' : /eye|low-poly/i.test(n) ? 'eyes' : 'part';
+    if (m.userData.npc2 === 'eyes') {
+      // Wet, a little shadowed by the lids: a soft highlight, the whites not paper-white.
+      const src = m.material as THREE.MeshStandardMaterial;
+      if (src.map) src.map.colorSpace = THREE.SRGBColorSpace;
+      m.material = new THREE.MeshStandardMaterial({ map: src.map, color: 0xc8beb4, roughness: 0.18, metalness: 0 });
+    }
     if (m.userData.npc2 === 'garment') m.userData.garment = n.replace(/^G_/, '').replace(/_\d+$/, '');
     if (m.userData.npc2 === 'body') {
       // Skin: npc.ts tints it per person and gives it the soft wrapped light of skin (withAtmos).

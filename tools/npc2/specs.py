@@ -69,9 +69,8 @@ GARMENTS = {
     # Modelled here (drape.py): a Lombard cloak of fulled wool fastened at
     # the right shoulder, to the calf; a woman's shawl round the shoulders.
     'cloak': {'sex': ['man'], 'drape': {'from': 165, 'to': 375, 'length': 1.05, 'over': ['shirt'], 'frames': 1, 'gap': 0.03, 'folds': 0.05, 'nfolds': 13}, 'fabric': 'felt', 'layer': 'over', 'depth': 80, 'skirt': {'top': 0.5, 'hem': 0.3}, 'chains': {'set': 'cape', 'around': 'neck', 'n': 9, 'bones': 6, 'arc': (165, 375), 'parent': 'Spine2', 'top': -0.08}},
-    'shawl': {'sex': ['woman'], 'drape': {'from': 185, 'to': 355, 'length': 0.5, 'over': ['gown', 'veil'], 'collar': 0.11, 'frames': 1, 'folds': 0.03, 'gap': 0.025, 'arm_follow': 0.25, 'arm_top': 0.4}, 'fabric': 'twill', 'layer': 'over', 'depth': 80, 'skirt': {'top': 0.5, 'hem': 0.3}, 'chains': {'set': 'cape', 'around': 'neck', 'n': 9, 'bones': 4, 'arc': (185, 355), 'parent': 'Spine2', 'top': -0.08}},
-    'gown': {'sex': ['woman'], 'mhclo': 'punkduck_medieval_dress/punkduck_medieval_dress.mhclo', 'fabric': 'twill', 'layer': 'tunic', 'skirt': {'top': 0.85, 'hem': 0.55}, 'chains': {'set': 'long', 'around': 'hips', 'n': 12, 'bones': 5, 'parent': 'Hips', 'top': 0.0}},
-    'veil': {'sex': ['woman'], 'mhclo': 'elvs_charity_veil1/elvs_charity_veil1.mhclo', 'fabric': 'linen', 'layer': 'head', 'relax': 12},
+    'gown': {'sex': ['woman'], 'mhclo': 'punkduck_medieval_dress/punkduck_medieval_dress.mhclo', 'fabric': 'twill', 'layer': 'tunic', 'nrm': 0.4, 'skirt': {'top': 0.85, 'hem': 0.55}, 'chains': {'set': 'long', 'around': 'hips', 'n': 12, 'bones': 5, 'parent': 'Hips', 'top': 0.0}},
+    'veil': {'sex': ['woman'], 'mhclo': 'elvs_charity_veil1/elvs_charity_veil1.mhclo', 'fabric': 'linen', 'layer': 'head', 'relax': 30},
 }
 
 # Outfits: what each kind of person wears (the game picks dyes and props).
@@ -87,5 +86,6 @@ OUTFITS = {
     'robe': {'sex': 'man', 'garments': ['longrobe', 'belt', 'shoes']},
     'robeCloak': {'sex': 'man', 'garments': ['longrobe', 'belt', 'cloak', 'shoes']},
     'woman': {'sex': 'woman', 'garments': ['gown', 'veil', 'shoes']},
-    'womanShawl': {'sex': 'woman', 'garments': ['gown', 'veil', 'shawl', 'shoes']},
+    # (A shawl draped here read as a stiff sheet: the woman's veil falls over her shoulders instead.)
+    'womanShawl': {'sex': 'woman', 'garments': ['gown', 'veil', 'shoes']},
 }

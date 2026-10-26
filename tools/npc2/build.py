@@ -217,7 +217,7 @@ import exportprep  # noqa: E402
 exportprep.prepare(basemesh, garments, rig, spec)
 meta = {
     'body': BODY, 'sex': sex, 'height': spec['height'],
-    'garments': {gid: {**{k: v for k, v in GARMENTS[gid].items() if k in ('fabric', 'layer', 'map', 'chains')}, 'depth': gspec[gid]['depth']} for gid in garments},
+    'garments': {gid: {**{k: v for k, v in GARMENTS[gid].items() if k in ('fabric', 'layer', 'map', 'chains', 'nrm')}, 'depth': gspec[gid]['depth']} for gid in garments},
     'outfits': {k: {'garments': v['garments'], 'bit': i} for i, (k, v) in enumerate(myoutfits.items())},
 }
 bpy.context.scene['npc2'] = json.dumps(meta)
