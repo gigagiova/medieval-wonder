@@ -10,7 +10,7 @@ import { reseedShapes, ruin, arcadeGeo, archRings, quoinBox, pyramidRoof, wellHe
 import { fastTerrain } from '../displace';
 import { torch, brazier } from '../lights';
 import { WALL700, BOUNDS, insideness, type P2 } from './geo';
-import { GATES, SITES } from './sites';
+import { GATES, SITES, siteToWorld } from './sites';
 import type { Layout, Plot, PlotKind } from './layout';
 import { buildInterior, interiorCollider } from './interiors';
 
@@ -59,6 +59,8 @@ export interface ChunkItems {
   holes: Hole[];
   /** House footprint mask for the ground (CHUNK/0.5 square, 1 = under a house). */
   mask?: Uint8Array;
+  /** (while building the masks) landmark floors over this chunk. */
+  floors?: P2[][]; floorMask?: Uint8Array;
 }
 export const chunkKey = (i: number, j: number) => (i + 2048) * 4096 + (j + 2048);
 
@@ -518,6 +520,33 @@ export function makeChunks(lay: Layout, holes: Hole[]): Map<number, ChunkItems> 
   }
   // Ground mask under houses (wells and holes stay open).
   const r = lay.r;
+  // Landmarks with their own floors (a church's slabs lie a little below grade): no town ground over them.
+  const floors: P2[][] = [];
+  for (const s of Object.values(SITES)) for (const f of s.floors ?? []) floors.push(f.map(([lx, lz]) => siteToWorld(s, lx, lz)));
+  for (const P of floors) {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const [x, z] of P) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    for (let i = Math.floor(x0 / CHUNK); i <= Math.floor(x1 / CHUNK); i++) for (let j = Math.floor(z0 / CHUNK); j <= Math.floor(z1 / CHUNK); j++) {
+      const c = map.get(chunkKey(i, j));
+      if (!c) continue;
+      (c.floors ??= []).push(P);
+    }
+  }
+  for (const c of map.values()) {
+    if (c.floors) {
+      const MR = CHUNK / 0.5, m = new Uint8Array(MR * MR);
+      for (let j = 0; j < MR; j++) for (let i = 0; i < MR; i++) {
+        const x = c.i * CHUNK + (i + 0.5) * 0.5, z = c.j * CHUNK + (j + 0.5) * 0.5;
+        // A margin of a cell round the floor, so the ground's quads clear it.
+        for (const P of c.floors) for (const [dx, dz] of [[0, 0], [0.6, 0], [-0.6, 0], [0, 0.6], [0, -0.6]]) {
+          let ins = false;
+          for (let a = 0, q = P.length - 1; a < P.length; q = a++) if ((P[a][1] > z + dz) !== (P[q][1] > z + dz) && x + dx < ((P[q][0] - P[a][0]) * (z + dz - P[a][1])) / (P[q][1] - P[a][1]) + P[a][0]) ins = !ins;
+          if (ins) { m[j * MR + i] = 1; break; }
+        }
+      }
+      c.floorMask = m;
+    }
+  }
   for (const c of map.values()) {
     if (!c.lots.length) continue;
     const MR = CHUNK / 0.5, m = new Uint8Array(MR * MR);
@@ -536,6 +565,11 @@ export function makeChunks(lay: Layout, holes: Hole[]): Map<number, ChunkItems> 
       }
     }
     c.mask = m;
+  }
+  for (const c of map.values()) if (c.floorMask) {
+    if (!c.mask) c.mask = c.floorMask;
+    else for (let k = 0; k < c.mask.length; k++) c.mask[k] |= c.floorMask[k];
+    delete c.floorMask; delete c.floors;
   }
   void WALL700;
   return map;
