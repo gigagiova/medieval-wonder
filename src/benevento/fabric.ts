@@ -220,6 +220,7 @@ function plot(b: Builder, p: PlotData) {
       if (gap > 0 && L > 3) { const gw = 1.4 / L; seg(0, gap - gw / 2); seg(gap + gw / 2, 1); } else seg(0, 1);
     }
   }
+  if (p.kind === 'cortis') { yardWalls(b, p); yardThings(b, p); }
   if (p.kind === 'orto' || p.kind === 'stabulum') yardThings(b, p);
   if (b.mode === 'collide' && p.kind !== 'ruina') return;
   // Interior: rows of beds in the gardens, vine stakes, a shed in the pens,
@@ -278,6 +279,47 @@ function plot(b: Builder, p: PlotData) {
       const x = R(x0 + 2, x1 - 2), z = R(z0 + 2, z1 - 2);
       if (inside(x, z)) fallenDrum(b, x, z, R(0.3, 0.45), R(0.8, 2), R(0, 3));
     }
+  }
+}
+
+/**
+ * A walled yard in front of a house, taken out of the old street (layout.ts §7b): pts are
+ * [street-left, street-right, house-right, house-left]. Rubble walls a little over head height on
+ * the street and the two sides, the gate in the street wall (a plank leaf standing open, now and
+ * then a tiled coping over it); the house's own front closes the fourth side.
+ */
+function yardWalls(b: Builder, p: PlotData) {
+  const r = rng(p.seed * 7 + 3);
+  const P = p.pts, T = 0.45;
+  const h = 1.9 + r() * 0.7;
+  let cx = 0, cz = 0;
+  for (const [x, z] of P) { cx += x / 4; cz += z / 4; }
+  for (const k of [0, 1, 3]) {
+    const a = P[k], c = P[(k + 1) % 4];
+    const L = Math.hypot(c[0] - a[0], c[1] - a[1]);
+    if (L < 0.6) continue;
+    const ry = Math.atan2(c[0] - a[0], c[1] - a[1]) - Math.PI / 2;
+    // Set the wall inside the yard's edge by half its thickness.
+    const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2, il = Math.hypot(cx - mx, cz - mz) || 1;
+    const ox = ((cx - mx) / il) * T / 2, oz = ((cz - mz) / il) * T / 2;
+    const seg = (t0: number, t1: number) => {
+      if (t1 - t0 < 0.05) return;
+      const tm = (t0 + t1) / 2;
+      const hh = h * (k === 0 ? 1 : 0.92);
+      b.box('rubble', (t1 - t0) * L, hh, T, a[0] + (c[0] - a[0]) * tm + ox, -0.3, a[1] + (c[1] - a[1]) * tm + oz, ry);
+      if (b.mode === 'collide') return;
+      // A coping of flat stones.
+      b.box('slab', (t1 - t0) * L + 0.05, 0.08, T + 0.1, a[0] + (c[0] - a[0]) * tm + ox, hh - 0.3, a[1] + (c[1] - a[1]) * tm + oz, ry, false);
+    };
+    if (k === 0 && L > 2.2) {
+      // The gate: 1.2 m, somewhere along the street wall.
+      const g = 1.2 / L, t = g / 2 + 0.1 / L + r() * Math.max(0, 1 - g - 0.2 / L);
+      seg(0, t - g / 2); seg(t + g / 2, 1);
+      if (b.mode === 'collide') continue;
+      // One leaf standing open into the yard.
+      const hx = a[0] + (c[0] - a[0]) * (t - g / 2), hz = a[1] + (c[1] - a[1]) * (t - g / 2);
+      b.box('wood', 1.15, 1.75, 0.07, hx + ox * 2 + (cx - mx) / il * 0.5, -0.2, hz + oz * 2 + (cz - mz) / il * 0.5, ry + Math.PI / 2 - 0.3 + r() * 0.3, false);
+    } else seg(0, 1);
   }
 }
 

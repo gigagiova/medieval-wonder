@@ -631,12 +631,13 @@ function townProps(scene: THREE.Scene) {
   for (const p of lay.plots) {
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const [x, z] of p.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
-    const n = Math.min(40, Math.round(((x1 - x0) * (z1 - z0)) / (p.kind === 'pratum' ? 18 : 30)));
+    const n = Math.min(40, Math.round(((x1 - x0) * (z1 - z0)) / (p.kind === 'pratum' ? 18 : p.kind === 'cortis' ? 7 : 30)));
     for (let i = 0; i < n; i++) {
       const x = x0 + (x1 - x0) * rand01(p.seed % 9973 + i * 1.31), z = z0 + (z1 - z0) * rand01(p.seed % 7919 + i * 2.17);
       if (!inPoly(x, z, p.pts)) continue;
       const u = rand01(i * 5.3 + p.seed % 101);
-      const id: PropId = p.kind === 'orto' ? (u < 0.5 ? 'weed_plant_02' : 'grass_medium_02') : p.kind === 'ruina' ? (u < 0.4 ? 'nettle_plant' : u < 0.7 ? 'rock_moss_set_02' : 'fern_02') : (u < 0.5 ? 'grass_medium_02' : u < 0.8 ? 'weed_plant_02' : 'shrub_02');
+      const id: PropId = p.kind === 'cortis' ? (['wooden_barrels_01', 'wicker_basket_02', 'wooden_bucket_01', 'dry_branches_medium_01', 'ceramic_pot', 'folding_wooden_stool', 'weed_plant_02'] as PropId[])[Math.floor(u * 7)] : p.kind === 'orto' ? (u < 0.5 ? 'weed_plant_02' : 'grass_medium_02') : p.kind === 'ruina' ? (u < 0.4 ? 'nettle_plant' : u < 0.7 ? 'rock_moss_set_02' : 'fern_02') : (u < 0.5 ? 'grass_medium_02' : u < 0.8 ? 'weed_plant_02' : 'shrub_02');
+      if (p.kind === 'cortis') { P(id, x, z, u * 30, id === 'weed_plant_02' ? 3 : id === 'ceramic_pot' ? 1.5 : 1); continue; }
       P(id, x, z, u * 30, id === 'rock_moss_set_02' ? 0.6 : id === 'shrub_02' ? 0.7 : id.startsWith('grass') ? 0.9 : 3.2);
     }
   }
@@ -655,7 +656,8 @@ function townTexture(L: Layout): THREE.DataTexture {
     const k = r.idx(x, z);
     if (k < 0) continue;
     data[o] = r.main[k];
-    data[o + 1] = r.grid[k] === STREET ? (r.trod[k] ? 255 : 40) : 0;
+    // (yards walled off the street keep its trodden earth)
+    data[o + 1] = r.grid[k] === STREET ? (r.trod[k] ? 255 : 40) : r.trod[k] ? 200 : 0;
   }
   // Roads outside the walls: beaten earth, the Appia and the Traiana still paved in places.
   for (const rd of ROADS) {

@@ -62,8 +62,8 @@ export class Raster {
   }
 }
 
-export interface Street { pts: V2[]; w: number; main: boolean; kind: 'lane' | 'road' }
-export type PlotKind = 'orto' | 'vinea' | 'pratum' | 'ruina' | 'stabulum';
+export interface Street { pts: V2[]; w: number; main: boolean; kind: 'lane' | 'road'; /** One of the plan's lanes. */ plan?: boolean }
+export type PlotKind = 'orto' | 'vinea' | 'pratum' | 'ruina' | 'stabulum' | 'cortis';
 export interface Plot { pts: P2[]; kind: PlotKind; seed: number; cx: number; cz: number }
 export interface TownLot extends Lot { id: number; explore?: { id: string; kind: ExploreKind }; parcel: number }
 export interface Well { x: number; z: number }
@@ -76,6 +76,15 @@ export interface Layout {
   wells: Well[];
   squares: { x: number; z: number; r: number }[];
 }
+
+/**
+ * Open places the street-narrowing pass leaves alone (beyond the lanes, wells, gates and squares it
+ * keeps by itself): the little square of the equestrian statue by the curtis (S. Petrus ad Caballum).
+ */
+/** Tools (tools/benevento) may ask for the keep-open mask of the street-narrowing pass. */
+export let DEBUG_KEEP = false;
+export const setDebugKeep = (v: boolean) => { DEBUG_KEEP = v; };
+export const KEEP_OPEN: { x: number; z: number; r: number }[] = [];
 
 // ---------------------------------------------------------------- intensity of settlement
 // High along the decumanus, round the dukes' curtis and the bishop's church,
@@ -229,7 +238,7 @@ export function layoutTown(seed = 700): Layout {
     const pts = g.pts.map(([x, z]) => V(x, z));
     if (lengthOf(pts) < 3) continue;
     const w = Math.max(1.2, g.w);
-    const s: Street = { pts, w, main: g.main, kind: 'lane' };
+    const s: Street = { pts, w, main: g.main, kind: 'lane', plan: true };
     lay.streets.push(s);
     paint(s);
     if (g.w >= 7.5 && lengthOf(pts) > 6) { const m = along(pts, lengthOf(pts) / 2)!; lay.squares.push({ x: m.p.x, z: m.p.y, r: g.w / 2 }); }
@@ -324,11 +333,17 @@ export function layoutTown(seed = 700): Layout {
   const pidOf = (c: V2[]) => { const m = c[0].clone().add(c[1]).add(c[2]).add(c[3]).multiplyScalar(0.25); return r.pid(m.x, m.y); };
   let lotId = 0;
   const frontOk = (pid: number) => use[pid] === 'built';
-  // Street width in front of a point, looking out along n.
+  // Street width in front of a point, looking out along n: from a house front, across the strip of
+  // the plan's ink line that belongs to the block, to the far side of the street (capped: a square
+  // is not a lane). An earlier version started counting at the wall and found the ink strip, so
+  // every front thought it stood on a lane 1.5 m wide: no stairs, woodpiles or carts anywhere.
   const widthAt = (p: V2, n: V2) => {
+    let s0 = 0;
+    while (s0 < 2.5) { const k = r.idx(p.x + n.x * (s0 + 0.25), p.y + n.y * (s0 + 0.25)); if (k >= 0 && r.grid[k] === STREET) break; s0 += 0.25; }
+    if (s0 >= 2.5) return 0;
     let w = 0;
-    while (w < 16) { const k = r.idx(p.x + n.x * (w + 0.25), p.y + n.y * (w + 0.25)); if (k < 0 || r.grid[k] !== STREET) break; w += 0.5; }
-    return w;
+    while (w < 16) { const k = r.idx(p.x + n.x * (s0 + w + 0.25), p.y + n.y * (s0 + w + 0.25)); if (k < 0 || r.grid[k] !== STREET) break; w += 0.5; }
+    return Math.min(12, s0 + w);
   };
   const strict = (pid: number) => (q: number) => q === pid;
   // The plan draws the houses themselves: every cell of a block between its
@@ -536,6 +551,248 @@ export function layoutTown(seed = 700): Layout {
       if (dd < bd) { bd = dd; best = l; }
     }
     if (best) { best.explore = { id: t.id, kind: t.kind }; best.h = Math.max(best.h, 5.2); taken.add(best.id); }
+  }
+
+  // 7b. The street spaces narrowed. The plan draws the streets of the later medieval town at the
+  //     width the Roman grid left them; by 700 they had been built into. In the excavated towns of
+  //     the period the public street is encroached on by private building: porticoes walled up into
+  //     shops, house fronts brought forward, lean-tos, sheds and yard walls set out into the old
+  //     roadway, until a Roman street of 6-10 m is a lane of 2-4 m (Naples: P. Arthur, *Naples, from
+  //     Roman town to city-state*, 2002; Rome: R. Santangeli Valenzani; northern Italy: G. P.
+  //     Brogiolo; for Benevento, Bertelli 1992 and Rotili 1986 on the reuse of the Roman fabric and
+  //     the pontili allowed over the lanes "with the obligation to keep the street public"). So:
+  //     every lane of the plan keeps a clear way down its middle (the decumanus 6 m, the lanes their
+  //     drawn width up to 4-5 m), the gates, wells, open places, the landmarks' frontages and the
+  //     doors of the houses one can enter keep their room, and the rest of the street space is
+  //     taken: house fronts brought forward, low shops and workshops built against the fronts, walled
+  //     yards in front of the houses, and where a street space is wide enough, small islands of
+  //     houses and sheds standing in it. docs/benevento/HISTORY.md §6.
+  {
+    const N = r.grid.length, nx = r.nx;
+    const keep = new Uint8Array(N);
+    const disc = (x: number, z: number, rad: number) => {
+      const i0 = Math.floor((x - rad - r.x0) / r.res), i1 = Math.ceil((x + rad - r.x0) / r.res);
+      const j0 = Math.floor((z - rad - r.z0) / r.res), j1 = Math.ceil((z + rad - r.z0) / r.res);
+      for (let j = Math.max(0, j0); j <= Math.min(r.nz - 1, j1); j++) for (let i = Math.max(0, i0); i <= Math.min(nx - 1, i1); i++) {
+        const cx = r.x0 + (i + 0.5) * r.res - x, cz = r.z0 + (j + 0.5) * r.res - z;
+        if (cx * cx + cz * cz <= rad * rad) keep[j * nx + i] = 1;
+      }
+    };
+    for (const st of lay.streets) {
+      if (st.kind !== 'lane') continue;
+      const rad = st.main ? 2.8 : !st.plan ? 2.4 : Math.min(1.75, Math.max(1.0, st.w * 0.5));
+      for (let k = 0; k < st.pts.length - 1; k++) {
+        const a = st.pts[k], b = st.pts[k + 1], L = a.distanceTo(b);
+        for (let t = 0; t <= L; t += 0.5) disc(a.x + ((b.x - a.x) * t) / L, a.y + ((b.y - a.y) * t) / L, rad);
+      }
+    }
+    // The open places that stay open: the forum and the places with a well.
+    for (const q of lay.squares) if (q.r >= 10) disc(q.x, q.z, q.r + 2);
+    for (const w of lay.wells) disc(w.x, w.z, 5.5);
+    for (const g of GATES) disc(g.at[0], g.at[1], 14);
+    for (const l of lay.lots) if (l.explore && l.front) {
+      const m = l.front.a.clone().add(l.front.b).multiplyScalar(0.5);
+      disc(m.x + l.front.out.x * 2.5, m.y + l.front.out.y * 2.5, 4);
+    }
+    for (const q of KEEP_OPEN) disc(q.x, q.z, q.r);
+    // The frontages of the landmarks' precincts and the band inside the curtain: 6 m kept open.
+    {
+      const d = new Uint8Array(N).fill(255);
+      let front: number[] = [];
+      for (let k = 0; k < N; k++) if (r.grid[k] === RESERVED) { d[k] = 0; front.push(k); }
+      for (let step = 1; step <= 12 && front.length; step++) {
+        const next: number[] = [];
+        for (const k of front) for (const o of [1, -1, nx, -nx]) { const q = k + o; if (q >= 0 && q < N && d[q] === 255) { d[q] = step; next.push(q); } }
+        front = next;
+      }
+      for (let k = 0; k < N; k++) if (d[k] <= 12) keep[k] = 1;
+    }
+    const open = (k: number) => k >= 0 && r.grid[k] === STREET && !keep[k];
+    // Cells a strip in front of a house may take: open street, or the house's own share of the plan's ink line.
+    const takeable = (k: number, pid: number) => open(k) || (k >= 0 && r.grid[k] === FREE && r.parcel[k] === pid);
+    const fill = (c: V2[], v: number, pid: number) => {
+      r.fill(c.map((p) => [p.x, p.y] as P2), (k) => { if (r.grid[k] === STREET || r.grid[k] === FREE) { r.grid[k] = v; if (v === HOUSE && !r.parcel[k]) r.parcel[k] = pid; } });
+    };
+    const backed = new Set<number>(); // houses with a shop built against their front
+    const yards = new Map<number, number>(); // houses with a walled yard in front: its depth
+    const fronts = lay.lots.filter((l) => l.front && !l.explore);
+    for (const l of fronts) {
+      const f = l.front!, A = f.a, B = f.b;
+      const L = A.distanceTo(B);
+      if (L < 2.4) continue;
+      const dir = B.clone().sub(A).divideScalar(L);
+      // How far out the street may be taken at each point along the front.
+      const us: number[] = [], es: number[] = [];
+      for (let u = 0.3; u <= L - 0.3 + 1e-6; u += 0.45) {
+        let e = 0;
+        while (e < 7) {
+          let ok = true;
+          for (let de = 0.15; de <= 0.5; de += 0.35) {
+            const k = r.idx(A.x + dir.x * u + f.out.x * (e + de), A.y + dir.y * u + f.out.y * (e + de));
+            if (!takeable(k, l.parcel) && !(e + de < 0.6 && k >= 0 && r.grid[k] === HOUSE)) { ok = false; break; }
+          }
+          if (!ok) break;
+          e += 0.5;
+        }
+        us.push(u); es.push(e);
+      }
+      const eAll = Math.min(...es);
+      const v = rand();
+      const A2 = (d: number) => A.clone().addScaledVector(f.out, d), B2 = (d: number) => B.clone().addScaledVector(f.out, d);
+      if (eAll >= 1.5 && (v < 0.45 || eAll < 2.4)) {
+        // The front brought forward: the house grows into the street.
+        const d = Math.min(eAll, R(1.5, 4.5));
+        const near = (P: V2) => l.c.findIndex((q) => q.distanceTo(P) < 0.05);
+        const i0 = near(A), i1 = near(B);
+        if (i0 < 0 || i1 < 0) continue;
+        fill([A, B, B2(d), A2(d)], HOUSE, l.parcel);
+        l.c[i0] = A2(d);
+        l.c[i1] = B2(d);
+        l.front = { a: A2(d), b: B2(d), out: f.out };
+        continue;
+      }
+      // Otherwise: along each stretch of the front with room before it (the whole front or part of
+      // it), a shop against the wall or a walled yard.
+      let i = 0;
+      while (i < us.length) {
+        if (es[i] < 2.4) { i++; continue; }
+        let j = i, m = es[i];
+        while (j + 1 < us.length && es[j + 1] >= 2.4) { j++; m = Math.min(m, es[j]); }
+        const u0 = i === 0 ? 0 : us[i] - 0.2, u1 = j === us.length - 1 ? L : us[j] + 0.2;
+        i = j + 1;
+        if (u1 - u0 < 2.4) continue;
+        const P = A.clone().addScaledVector(dir, u0), Q = A.clone().addScaledVector(dir, u1);
+        const P2 = (d: number) => P.clone().addScaledVector(f.out, d), Q2 = (d: number) => Q.clone().addScaledVector(f.out, d);
+        if (rand() < 0.68) {
+          // A shop or workshop of one storey built against the front (a walled-up portico, a bottega).
+          const d = Math.min(m, R(2.4, 4.5));
+          const c = [P2(d), Q2(d), Q.clone(), P.clone()];
+          fill(c, HOUSE, l.parcel);
+          lay.lots.push({ id: lotId++, c, front: { a: c[0], b: c[1], out: f.out }, h: R(3.0, 4.3), parcel: l.parcel });
+          backed.add(l.id);
+        } else {
+          // A walled yard before the house, with its gate on the lane.
+          const d = Math.min(m, R(2.5, 6));
+          const c: P2[] = [[P2(d).x, P2(d).y], [Q2(d).x, Q2(d).y], [Q.x, Q.y], [P.x, P.y]];
+          fill([P2(d), Q2(d), Q, P], PLOT, l.parcel);
+        r.fill([[P2(d).x, P2(d).y], [Q2(d).x, Q2(d).y], [Q.x, Q.y], [P.x, P.y]], (k) => { r.trod[k] = 255; });
+          const cx = (c[0][0] + c[2][0]) / 2, cz = (c[0][1] + c[2][1]) / 2;
+          lay.plots.push({ pts: c, kind: 'cortis', seed: Math.floor(rand() * 1e9), cx, cz });
+          yards.set(l.id, d);
+        }
+      }
+      void v;
+    }
+    // Every street door keeps a passage before it (an andito of a metre and a half) whatever is built
+    // in the street space beyond.
+    for (const l of lay.lots) {
+      if (!l.front) continue;
+      const f = l.front, L = f.a.distanceTo(f.b), d = f.b.clone().sub(f.a).divideScalar(L || 1);
+      for (let u = 0; u <= L; u += 0.4) for (let e = 0.3; e <= 1.6; e += 0.4) {
+        const k = r.idx(f.a.x + d.x * u + f.out.x * e, f.a.y + d.y * u + f.out.y * e);
+        if (k >= 0) keep[k] = 1;
+      }
+    }
+    // Islands: what is left of a wide street space, built over with small houses and sheds turned
+    // to the lanes round them.
+    {
+      const comp = new Int32Array(N).fill(-1);
+      const comps: number[][] = [];
+      for (let k0 = 0; k0 < N; k0++) {
+        if (comp[k0] >= 0 || !open(k0)) continue;
+        const cells = [k0]; comp[k0] = comps.length;
+        for (let q = 0; q < cells.length; q++) {
+          const k = cells[q];
+          for (const o of [1, -1, nx, -nx]) { const m = k + o; if (m >= 0 && m < N && comp[m] < 0 && open(m)) { comp[m] = comps.length; cells.push(m); } }
+        }
+        comps.push(cells);
+      }
+      const cxOf = (k: number) => r.x0 + ((k % nx) + 0.5) * r.res, czOf = (k: number) => r.z0 + (Math.floor(k / nx) + 0.5) * r.res;
+      for (let ci = 0; ci < comps.length; ci++) {
+        const cells = comps[ci];
+        if (cells.length * r.res * r.res < 14) continue;
+        // Principal axis of the patch: the island's grain.
+        let mx = 0, mz = 0;
+        for (const k of cells) { mx += cxOf(k); mz += czOf(k); }
+        mx /= cells.length; mz /= cells.length;
+        let sxx = 0, szz = 0, sxz = 0;
+        for (const k of cells) { const dx = cxOf(k) - mx, dz = czOf(k) - mz; sxx += dx * dx; szz += dz * dz; sxz += dx * dz; }
+        const ang = 0.5 * Math.atan2(2 * sxz, sxx - szz);
+        const ex = V(Math.cos(ang), Math.sin(ang)), ez = V(-Math.sin(ang), Math.cos(ang));
+        let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity;
+        for (const k of cells) { const x = cxOf(k), z = czOf(k), u = x * ex.x + z * ex.y, w = x * ez.x + z * ez.y; u0 = Math.min(u0, u); u1 = Math.max(u1, u); w0 = Math.min(w0, w); w1 = Math.max(w1, w); }
+        const at = (u: number, w: number) => V(ex.x * u + ez.x * w, ex.y * u + ez.y * w);
+        const inComp = (c: V2[]) => {
+          const [c0, c1, c2, c3] = c;
+          for (let a = 0.06; a < 1; a += 0.11) for (let b2 = 0.06; b2 < 1; b2 += 0.11) {
+            const p = c0.clone().lerp(c1, a).lerp(c3.clone().lerp(c2, a), b2);
+            const k = r.idx(p.x, p.y);
+            if (k < 0 || comp[k] !== ci || r.grid[k] !== STREET) return false;
+          }
+          return true;
+        };
+        const place = (placed: V2[], shed: boolean) => {
+          fill(placed, HOUSE, 0);
+          const ctr = placed[0].clone().add(placed[2]).multiplyScalar(0.5);
+          // The front: the side with the most street before it.
+          let best = -1, bw = 0;
+          for (let q = 0; q < 4; q++) {
+            const a = placed[q], b2 = placed[(q + 1) % 4], m = a.clone().add(b2).multiplyScalar(0.5);
+            const e2 = b2.clone().sub(a).normalize(), o = V(e2.y, -e2.x);
+            if (o.dot(m.clone().sub(ctr)) < 0) o.negate();
+            const ww = widthAt(m, o);
+            if (ww > bw + 0.4) { bw = ww; best = q; }
+          }
+          if (best >= 0 && bw >= 1.2 && placed[0].distanceTo(placed[1]) >= 2.4 && placed[1].distanceTo(placed[2]) >= 2.4) {
+            const c = [0, 1, 2, 3].map((q) => placed[(best + q) % 4]);
+            const e2 = c[1].clone().sub(c[0]).normalize(), o = V(e2.y, -e2.x);
+            if (o.dot(c[0].clone().sub(c[3])) < 0) o.negate();
+            lay.lots.push({ id: lotId++, c, front: { a: c[0], b: c[1], out: o }, h: shed ? R(3.0, 4.2) : R(4.2, 7.8), parcel: 0 });
+          } else lay.lots.push({ id: lotId++, c: placed, h: shed ? R(2.6, 3.6) : R(3.6, 6.5), parcel: 0 });
+        };
+        // Rows of houses on the island's grain where it is wide...
+        for (let w = w0 + 0.3; w < w1 - 1.5; ) {
+          const dw = R(3.6, 7);
+          for (let u = u0 + 0.3; u < u1 - 1.5; ) {
+            const du = R(3.6, 7);
+            for (const f of [1, 0.8, 0.6]) {
+              const c = [at(u, w), at(u + du * f, w), at(u + du * f, w + dw * f), at(u, w + dw * f)];
+              if (du * f >= 2.2 && dw * f >= 2.2 && inComp(c)) { place(c, false); break; }
+            }
+            u += du;
+          }
+          w += dw;
+        }
+        // ...then whatever is left, piece by piece: small houses, then sheds, lean-tos and stalls.
+        const order = cells.slice();
+        for (let q = order.length - 1; q > 0; q--) { const t = Math.floor(rand() * (q + 1)); [order[q], order[t]] = [order[t], order[q]]; }
+        let tries = 0;
+        for (const k of order) {
+          if (r.grid[k] !== STREET) continue;
+          if (++tries > cells.length / 4) break;
+          const x = cxOf(k), z = czOf(k), u = x * ex.x + z * ex.y, w = x * ez.x + z * ez.y;
+          let done = false;
+          for (const [lo, hi, shed] of [[3.4, 5.5, false], [2.0, 3.4, true]] as [number, number, boolean][]) {
+            if (done) break;
+            const du = R(lo, hi), dw = R(lo, hi);
+            for (const [su, sv] of [[0.5, 0.5], [0, 0], [1, 0], [0, 1], [1, 1]]) {
+              const c = [at(u - su * du, w - sv * dw), at(u + (1 - su) * du, w - sv * dw), at(u + (1 - su) * du, w + (1 - sv) * dw), at(u - su * du, w + (1 - sv) * dw)];
+              if (inComp(c)) { place(c, shed); done = true; break; }
+            }
+          }
+        }
+      }
+    }
+    if (DEBUG_KEEP) (lay as unknown as { keep: Uint8Array }).keep = keep;
+    // Every front measured again against the street as it now is; along the decumanus the houses
+    // that mattered rise to two and three storeys.
+    for (const l of lay.lots) {
+      if (!l.front || l.explore) continue;
+      const m = l.front.a.clone().add(l.front.b).multiplyScalar(0.5);
+      l.street = backed.has(l.id) ? 1.5 : yards.has(l.id) ? yards.get(l.id)! : Math.max(1.5, widthAt(m, l.front.out));
+      const k = r.idx(m.x + l.front.out.x * 2, m.y + l.front.out.y * 2);
+      if (k >= 0 && r.main[k] > 0 && !backed.has(l.id) && l.h < 7.2) l.h = R(7.2, 10.5);
+    }
   }
 
   // 8. Pontili and flying arches where both sides of a lane are built.
