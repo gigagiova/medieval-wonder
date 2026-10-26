@@ -40,7 +40,7 @@ BODIES = {
         'scan': 'claudia',
     },
     'w_mid': {
-        'sex': 'woman', 'height': 1.57,
+        'sex': 'woman', 'height': 1.61,
         'phenotype': {'gender': 0.0, 'age': 0.65, 'muscle': 0.4, 'weight': 0.6, 'height': 0.3, 'proportions': 0.5, 'cupsize': 0.55, 'firmness': 0.4},
         'race': {'caucasian': 0.85, 'asian': 0.05, 'african': 0.1},
         'skin': 'middleage_caucasian_female/middleage_caucasian_female.mhmat',
@@ -54,23 +54,23 @@ BODIES = {
 # `layer`: the dye slot (tunic, over, belt, head, leg, shoe).
 GARMENTS = {
     'robe_src': {'sex': ['man'], 'mhclo': 'donitz_monk_robe/donitz_monk_robe.mhclo', 'only_source': True},
-    'robe': {'sex': ['man'], 'derive': {'from': 'robe_src', 'drop': ['rope']}, 'fabric': 'tabby', 'layer': 'tunic', 'map': 'detail'},
-    'longrobe': {'sex': ['man'], 'derive': {'from': 'robe_src', 'drop': ['rope']}, 'fabric': 'twill', 'layer': 'tunic', 'map': 'detail'},
+    'robe': {'sex': ['man'], 'derive': {'from': 'robe_src', 'drop': ['rope']}, 'fabric': 'tabby', 'layer': 'tunic', 'map': 'detail', 'skirt': {'top': 0.85, 'hem': 0.55}},
+    'longrobe': {'sex': ['man'], 'derive': {'from': 'robe_src', 'drop': ['rope']}, 'fabric': 'twill', 'layer': 'tunic', 'map': 'detail', 'skirt': {'top': 0.85, 'hem': 0.55}},
     'rope': {'sex': ['man'], 'derive': {'from': 'robe_src', 'keep': ['rope']}, 'fabric': 'rope', 'layer': 'belt', 'map': 'color'},
     'cowl': {'sex': ['man'], 'mhclo': 'donitz_monk_robe_hood_down/donitz_monk_robe_hood_down.mhclo', 'fabric': 'tabby', 'layer': 'over', 'map': 'detail', 'lift': True},
     'hood': {'sex': ['man'], 'mhclo': 'donitz_monk_robe_hood/donitz_monk_robe_hood.mhclo', 'fabric': 'felt', 'layer': 'head', 'map': 'detail', 'lift': True},
-    'tunic': {'sex': ['man'], 'derive': {'from': 'robe_src', 'cut': 'knee', 'drop': ['capelet', 'rope'], 'collar': 0.012}, 'fabric': 'tabby', 'layer': 'tunic', 'map': 'detail'},
+    'tunic': {'sex': ['man'], 'derive': {'from': 'robe_src', 'cut': 'knee', 'drop': ['capelet', 'rope'], 'collar': 0.012}, 'fabric': 'tabby', 'layer': 'tunic', 'map': 'detail', 'skirt': {'top': 0.9, 'hem': 0.75}},
     'vtunic_src': {'sex': ['man'], 'mhclo': 'rehmanpolanski_viking_tunic/rehmanpolanski_viking_tunic.mhclo', 'only_source': True},
-    'shirt': {'sex': ['man'], 'derive': {'from': 'vtunic_src', 'keep': ['tunic'], 'lengthen': 0.3}, 'fabric': 'twill', 'layer': 'tunic', 'map': 'detail'},
+    'shirt': {'sex': ['man'], 'derive': {'from': 'vtunic_src', 'keep': ['tunic'], 'lengthen': 0.3}, 'fabric': 'twill', 'layer': 'tunic', 'skirt': {'top': 0.9, 'hem': 0.75}},
     'belt': {'sex': ['man'], 'derive': {'from': 'vtunic_src', 'keep': ['belt']}, 'fabric': 'leather', 'layer': 'belt', 'map': 'color'},
     'hose': {'sex': ['man'], 'mhclo': 'rehmanpolanski_viking_pants/rehmanpolanski_viking_pants.mhclo', 'fabric': 'twill', 'layer': 'leg', 'map': 'detail'},
     'boots': {'sex': ['man'], 'mhclo': 'rehmanpolanski_viking_boots/rehmanpolanski_viking_boots.mhclo', 'fabric': 'leather', 'layer': 'shoe', 'map': 'color'},
     'shoes': {'sex': ['man', 'woman'], 'mhclo': 'punkduck_medieval_boots/punkduck_medieval_boots.mhclo', 'fabric': 'leather', 'layer': 'shoe', 'map': 'color'},
     # Modelled here (drape.py): a Lombard cloak of fulled wool fastened at
     # the right shoulder, to the calf; a woman's shawl round the shoulders.
-    'cloak': {'sex': ['man'], 'drape': {'from': 165, 'to': 375, 'length': 1.05, 'over': ['shirt'], 'frames': 1}, 'fabric': 'felt', 'layer': 'over', 'depth': 80},
-    'shawl': {'sex': ['woman'], 'drape': {'from': 140, 'to': 400, 'length': 0.5, 'over': ['gown', 'veil'], 'collar': 0.11, 'frames': 1, 'folds': 0.015}, 'fabric': 'twill', 'layer': 'over', 'depth': 80},
-    'gown': {'sex': ['woman'], 'mhclo': 'punkduck_medieval_dress/punkduck_medieval_dress.mhclo', 'fabric': 'twill', 'layer': 'tunic'},
+    'cloak': {'sex': ['man'], 'drape': {'from': 165, 'to': 375, 'length': 1.05, 'over': ['shirt'], 'frames': 1, 'gap': 0.03, 'folds': 0.05, 'nfolds': 13}, 'fabric': 'felt', 'layer': 'over', 'depth': 80, 'skirt': {'top': 0.5, 'hem': 0.3}},
+    'shawl': {'sex': ['woman'], 'drape': {'from': 140, 'to': 400, 'length': 0.5, 'over': ['gown', 'veil'], 'collar': 0.11, 'frames': 1, 'folds': 0.03, 'gap': 0.025, 'arm_follow': 0.9}, 'fabric': 'twill', 'layer': 'over', 'depth': 80, 'skirt': {'top': 0.5, 'hem': 0.3}},
+    'gown': {'sex': ['woman'], 'mhclo': 'punkduck_medieval_dress/punkduck_medieval_dress.mhclo', 'fabric': 'twill', 'layer': 'tunic', 'skirt': {'top': 0.85, 'hem': 0.55}},
     'veil': {'sex': ['woman'], 'mhclo': 'elvs_charity_veil1/elvs_charity_veil1.mhclo', 'fabric': 'linen', 'layer': 'head', 'relax': 12},
 }
 
