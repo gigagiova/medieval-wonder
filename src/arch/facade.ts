@@ -157,12 +157,32 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
     if (stairDoor.v1 - stairDoor.v0 > 1.5) up.push(stairDoor); else stairDoor = null;
   }
 
+  // ---- putlog holes: the sockets the builders' scaffold poles left, in
+  // rows; real holes through the wall panel (a square of dark stone at the
+  // back), not boxes stuck on its face.
+  const putlogs: Opening[] = [];
+  if (s.upper !== 'wood' || oneMass) {
+    for (let v = 1.5 + R(-0.2, 0.2); v < s.h - 0.6; v += R(1.3, 1.8)) {
+      if (!oneMass && s.upper === 'wood' && v > lowTop) break;
+      for (let u = R(0.3, 1.0); u < L - 0.3; u += R(1.1, 2.0)) {
+        if (chance(0.5)) continue;
+        if (Math.abs(v - lowTop) < 0.25 && !oneMass) continue;
+        const clear = [...ops, ...up].every((o) => u < o.u0 - 0.3 || u > o.u1 + 0.3 || v < o.v0 - 0.3 || v > o.v1 + 0.6);
+        if (!clear || (st && u > st.s0 - 0.3 && u < st.s1 + 0.3 && v < st.hL + 1)) continue;
+        const hs = R(0.05, 0.065);
+        putlogs.push({ u0: u - hs, u1: u + hs, v0: v - hs, v1: v + hs, arch: false });
+      }
+    }
+  }
+  const lowLogs = putlogs.filter((o) => oneMass || o.v1 < lowTop), upLogs = putlogs.filter((o) => !oneMass && o.v0 > lowTop);
+  for (const o of putlogs) box(acc, 'iron', f, (o.u0 + o.u1) / 2, (o.v0 + o.v1) / 2, (lowLogs.includes(o) ? 0 : jetty) - 0.17, (o.u1 - o.u0) / 2 + 0.03, (o.v1 - o.v0) / 2 + 0.03, 0.02, 0, true);
+
   // ---- the wall panels
   if (oneMass) {
-    panel(b, s.lower, f, L, s.base, s.h, T, [...ops, ...up]);
+    panel(b, s.lower, f, L, s.base, s.h, T, [...ops, ...up, ...lowLogs]);
   } else {
-    panel(b, s.lower, f, L, s.base, lowTop, T, ops);
-    panel(b, s.upper, f, L, lowTop, s.h, s.upper === 'wood' ? 0.22 : 0.4, up, jetty);
+    panel(b, s.lower, f, L, s.base, lowTop, T, [...ops, ...lowLogs]);
+    panel(b, s.upper, f, L, lowTop, s.h, s.upper === 'wood' ? 0.22 : 0.4, [...up, ...upLogs], jetty);
     if (jetty > 0) {
       // Joists carry the jettied floor; their ends show under the overhang.
       for (let u = R(0.1, 0.3); u < L - 0.05; u += R(0.42, 0.55)) box(acc, 'wood', f, u, lowTop - 0.11, jetty / 2 - 0.1, 0.07, 0.1, jetty / 2 + 0.16, 0.012);
@@ -179,7 +199,11 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
     const w = o.u1 - o.u0, c = (o.u0 + o.u1) / 2, r = w / 2;
     const brick = s.lower === 'brick' || chance(0.4);
     if (o.arch) {
-      voussoirs(acc, brick ? 'brick' : stoneM, f, c, o.v1, r, r + (brick ? R(0.3, 0.42) : R(0.24, 0.34)), wFace - 0.09, wFace + 0.005, 0, Math.PI, brick ? 0.075 : R(0.17, 0.24));
+      // The ring stands a little proud of the wall (the wall is bent on a coarse grid, the
+      // voussoirs exactly: flush, the wall swallowed some and left a spiky sunburst), and
+      // its depth goes with the opening: deep rings on small windows read as spikes.
+      const ring = brick ? THREE.MathUtils.clamp(r * 0.55, 0.15, 0.36) : THREE.MathUtils.clamp(r * 0.5, 0.17, 0.32);
+      voussoirs(acc, brick ? 'brick' : stoneM, f, c, o.v1, r, r + ring * R(0.9, 1.1), wFace - 0.09, wFace + 0.04, 0, Math.PI, brick ? 0.075 : R(0.17, 0.24));
       // Jamb stones up the sides of doorways.
       if (isDoor && !brick) {
         for (let v = o.v0, k = 0; v < o.v1 - 0.1; k++) {
@@ -198,7 +222,7 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
       box(acc, wood ? 'wood' : stoneM, f, c, o.v1 + 0.1, wFace - (big ? T / 2 : 0.15) + 0.02, r + ext, 0.1, big ? T / 2 + 0.02 : 0.17, 0.012);
       if (big || chance(0.4)) {
         const rr = r + ext * 0.7;
-        voussoirs(acc, 'brick', f, c, o.v1 + 0.2, rr, rr + 0.18, wFace - 0.06, wFace + 0.004, 0.25, Math.PI - 0.25, 0.075);
+        voussoirs(acc, 'brick', f, c, o.v1 + 0.2, rr, rr + 0.18, wFace - 0.06, wFace + 0.035, 0.25, Math.PI - 0.25, 0.075);
       }
     }
     // Sill or threshold.
@@ -339,15 +363,7 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
     box(acc, stoneM === 'brick' ? 'rubble' : stoneM, f, (u0 + u1) / 2, -0.05, 0.04, (u1 - u0) / 2, 0.28, 0.08, 0.02);
   }
 
-  // ---- putlog holes in rows, a reused Roman block, an old arch walled up
-  for (let v = 1.5 + R(-0.2, 0.2); v < s.h - 0.6; v += R(1.3, 1.8)) {
-    for (let u = R(0.3, 1.0); u < L - 0.3; u += R(1.1, 2.0)) {
-      if (chance(0.45)) continue;
-      const clear = [...ops, ...up].every((o) => u < o.u0 - 0.3 || u > o.u1 + 0.3 || v < o.v0 - 0.3 || v > o.v1 + 0.6);
-      if (!clear) continue;
-      box(acc, 'iron', f, u, v, (v > lowTop && !oneMass ? upFace : 0) + 0.004, 0.065, 0.065, 0.006);
-    }
-  }
+  // ---- a reused Roman block, an old arch walled up
   if (chance(0.22)) {
     const u = R(0.4, L - 1.3), v = R(0.35, Math.max(0.4, lowTop - 0.9));
     if ([...ops].every((o) => u + 1 < o.u0 - 0.1 || u > o.u1 + 0.1)) box(acc, 'marble', f, u + 0.5, v, 0.012, R(0.35, 0.55), R(0.16, 0.26), 0.03, 0.01);
@@ -357,7 +373,7 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
     const bw = R(1.6, Math.min(2.6, L - 1)), u0 = R(0.4, L - 0.4 - bw);
     const blk: Opening = { u0, u1: u0 + bw, v0: 0, v1: R(1.3, 1.7), arch: true };
     if (free(blk.u0, blk.u1)) {
-      voussoirs(acc, s.lower === 'brick' ? 'block' : 'brick', f, u0 + bw / 2, blk.v1, bw / 2, bw / 2 + 0.36, -0.06, 0.012, 0, Math.PI, 0.09);
+      voussoirs(acc, s.lower === 'brick' ? 'block' : 'brick', f, u0 + bw / 2, blk.v1, bw / 2, bw / 2 + 0.32, -0.06, 0.04, 0, Math.PI, 0.09);
       box(acc, s.lower === 'brick' ? 'rubble' : 'brick', f, u0 + bw / 2, blk.v1 / 2, 0.006, bw / 2 - 0.02, blk.v1 / 2, 0.01);
       for (let k = 0; k < 7; k++) {
         const a = (k + 0.5) / 7 * Math.PI, rr = bw / 2 - 0.05;

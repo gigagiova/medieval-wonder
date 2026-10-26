@@ -398,8 +398,8 @@ function backWindows(acc: Acc, c: V2[], base: number, h: number, m: MatName) {
     for (let i = 0; i < Math.max(1, Math.floor(L / 3)); i++) {
       if (rand() < 0.4) continue;
       const u = R(0.5, L - 0.5), v = R(1.4, Math.max(1.5, h - 1.2));
-      kbox(acc, 'iron', f, u, v, 0.006, R(0.18, 0.3), R(0.25, 0.4), 0.01);
-      kbox(acc, m === 'brick' ? 'block' : 'wood', f, u, v + 0.3, 0.03, 0.4, 0.07, 0.04, 0.01);
+      kbox(acc, 'iron', f, u, v, 0.02, R(0.18, 0.3), R(0.25, 0.4), 0.02);
+      kbox(acc, m === 'brick' ? 'block' : 'wood', f, u, v + 0.3, 0.05, 0.4, 0.07, 0.05, 0.01);
     }
     void base;
   }
