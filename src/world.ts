@@ -91,8 +91,8 @@ export function getTeleports(): Teleport[] {
   at('Sancti Quadraginta', S.quadraginta, -36, -46, -36, -56);
   at('Turris Catenae', S.turrisCatenae, -10, 0, 0, 0);
   {
-    // On the lane along the town bank, upstream: the cutwaters, the five arches, the Sabato under the last two.
-    const [x, z] = PONS.at(24, 15), [lx, lz] = PONS.at(PONS.arch(2), 0);
+    // In the meadow on the town bank upstream, 40 m off: the whole bridge, cutwaters, five arches, the Sabato under the last two.
+    const [x, z] = PONS.at(6, 42), [lx, lz] = PONS.at(PONS.arch(2), 0);
     out.push(tp('Pons Leprosus', x, z, lx, lz));
   }
   at('Sanctus Petrus', S.sanctusPetrus, -15.5, -31, -17, -45);
