@@ -158,23 +158,41 @@ def mark(basemesh, garments, outfits, specs, knee=None):
                 # cuffs, hems and the slits of the artists' seams — so a
                 # gap opening there as the cloth moves shows skin, never a
                 # hole (no floating hands at the cuffs, no void at a seam).
+                # (Only where nothing else lies over it: a hood's hem on a robe's
+                # chest keeps the chest under the robe hidden.)
+                # Only at the openings people look at: the neck, the wrists and
+                # (a hood's) the face; elsewhere a slit's skin would show
+                # through its closed edges.
                 from mathutils.kdtree import KDTree
-                edge = []
+                import bmesh as _bm
+                import headfit as _hf
+                co = _hf.mix_coords(o)
+                spots = [(_hf.group_centroid(o, co, 'joint-neck'), 0.16), (_hf.group_centroid(o, co, 'joint-l-hand'), 0.12),
+                         (_hf.group_centroid(o, co, 'joint-r-hand'), 0.12)]
+                eye = (_hf.group_centroid(o, co, 'helper-l-eye') + _hf.group_centroid(o, co, 'helper-r-eye')) / 2
+                def near(p, g):
+                    if specs[g].get('layer') == 'head' or g in ('hood', 'cowl'):
+                        return (p - eye).length < 0.16
+                    return any((p - c).length < r for c, r in spots)
                 for g in over:
                     go = garments[g]
                     gm = go.matrix_world
-                    import bmesh as _bm
                     t = _bm.new()
                     t.from_mesh(go.data)
-                    edge += [gm @ v.co for v in t.verts if v.is_boundary]
+                    edge = [gm @ v.co for v in t.verts if v.is_boundary]
                     t.free()
-                if edge:
+                    if not edge:
+                        continue
                     kd = KDTree(len(edge))
                     for j, q in enumerate(edge):
                         kd.insert(q, j)
                     kd.balance()
-                    for i in range(len(m)):
-                        if m[i] and kd.find(pos[i])[2] < 0.04:
+                    reach = 0.06 if specs[g].get('layer') == 'head' or g in ('hood', 'cowl') else 0.04
+                    cand = [i for i in range(len(m)) if m[i] and near(pos[i], g) and kd.find(pos[i])[2] < reach]
+                    others = [bvh[x] for x in over if x != g]
+                    still = covered([pos[i] for i in cand], [nrm[i] for i in cand], others, math.radians(25)) if others else [False] * len(cand)
+                    for i, c in zip(cand, still):
+                        if not c:
                             m[i] = False
             if k == 'body' and knee is not None and any(specs[g].get('long') for g in over):
                 # Below the knee a long skirt doesn't follow the legs (skirt.py): a

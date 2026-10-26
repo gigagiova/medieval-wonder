@@ -61,7 +61,7 @@ GARMENTS = {
     'hood': {'sex': ['man'], 'mhclo': 'donitz_monk_robe_hood/donitz_monk_robe_hood.mhclo', 'fabric': 'felt', 'layer': 'head', 'map': 'detail', 'lift': True, 'nrm': 0.5},
     'tunic': {'sex': ['man'], 'derive': {'from': 'robe_src', 'cut': 'knee', 'drop': ['capelet', 'rope'], 'collar': 0.012}, 'fabric': 'tabby', 'layer': 'tunic', 'map': 'detail', 'skirt': {'top': 0.9, 'hem': 0.75}, 'chains': {'set': 'short', 'around': 'hips', 'n': 12, 'bones': 3, 'parent': 'Hips', 'top': 0.02}},
     'vtunic_src': {'sex': ['man'], 'mhclo': 'rehmanpolanski_viking_tunic/rehmanpolanski_viking_tunic.mhclo', 'only_source': True},
-    'shirt': {'sex': ['man'], 'derive': {'from': 'vtunic_src', 'keep': ['tunic'], 'lengthen': 0.3}, 'fabric': 'twill', 'layer': 'tunic', 'skirt': {'top': 0.9, 'hem': 0.75}, 'chains': {'set': 'short', 'around': 'hips', 'n': 12, 'bones': 3, 'parent': 'Hips', 'top': 0.02}},
+    'shirt': {'sex': ['man'], 'derive': {'from': 'vtunic_src', 'keep': ['tunic'], 'lengthen': 0.3, 'collar': 0.012}, 'fabric': 'twill', 'layer': 'tunic', 'skirt': {'top': 0.9, 'hem': 0.75}, 'chains': {'set': 'short', 'around': 'hips', 'n': 12, 'bones': 3, 'parent': 'Hips', 'top': 0.02}},
     'belt': {'sex': ['man'], 'derive': {'from': 'vtunic_src', 'keep': ['belt']}, 'fabric': 'leather', 'layer': 'belt', 'map': 'color'},
     'hose': {'sex': ['man'], 'mhclo': 'rehmanpolanski_viking_pants/rehmanpolanski_viking_pants.mhclo', 'fabric': 'twill', 'layer': 'leg', 'map': 'detail'},
     'boots': {'sex': ['man'], 'mhclo': 'rehmanpolanski_viking_boots/rehmanpolanski_viking_boots.mhclo', 'fabric': 'leather', 'layer': 'shoe', 'map': 'color'},

@@ -69,7 +69,7 @@ function inside(m: THREE.MeshStandardMaterial) {
   m.onBeforeCompile = (sh, r) => {
     prev.call(m, sh, r);
     sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
-      if (!gl_FrontFacing) outgoingLight *= 0.32;
+      if (!gl_FrontFacing) outgoingLight *= 0.6;
       #include <opaque_fragment>`);
   };
   m.customProgramCacheKey = () => key + '-in';

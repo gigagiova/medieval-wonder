@@ -1,5 +1,5 @@
 """Garments derived from the fitted MakeHuman ones (build.py)."""
-import bpy, bmesh
+import bpy, bmesh, math
 from mathutils import Vector
 
 
@@ -104,12 +104,7 @@ def collar(bm, o, basemesh, rig, gap):
     the skin weights of the edge they grew from."""
     import math
     from mathutils.bvhtree import BVHTree
-    dg = bpy.context.evaluated_depsgraph_get()
-    be = basemesh.evaluated_get(dg)
-    me = be.to_mesh()
-    mw = basemesh.matrix_world
-    tree = BVHTree.FromPolygons([mw @ v.co for v in me.vertices], [tuple(p.vertices) for p in me.polygons])
-    be.to_mesh_clear()
+    tree = body_tree(basemesh)
     neck = bone_head(rig, 'Neck')
     sh = (bone_head(rig, 'LeftArm').z + bone_head(rig, 'RightArm').z) / 2
     ow, owi = o.matrix_world, o.matrix_world.inverted()
@@ -199,12 +194,7 @@ def relax(o, basemesh, iters, gap=0.006):
     bm.from_mesh(o.data)
     for _ in range(iters):
         bmesh.ops.smooth_vert(bm, verts=[v for v in bm.verts if not v.is_boundary], factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
-    dg = bpy.context.evaluated_depsgraph_get()
-    be = basemesh.evaluated_get(dg)
-    me = be.to_mesh()
-    mw = basemesh.matrix_world
-    tree = BVHTree.FromPolygons([mw @ v.co for v in me.vertices], [tuple(p.vertices) for p in me.polygons])
-    be.to_mesh_clear()
+    tree = body_tree(basemesh)
     ow, owi = o.matrix_world, o.matrix_world.inverted()
     moved = 0
     for v in bm.verts:
@@ -222,7 +212,7 @@ def relax(o, basemesh, iters, gap=0.006):
     return moved
 
 
-def lift_hood(o, basemesh, above=0.045, slump_k=0.85):
+def lift_hood(o, basemesh, above=0.045, slump_k=0.7):
     """A hood fitted over a scanned head (fuller than MakeHuman's, with its
     hair) falls over the eyes: its front is raised (and drawn back a little)
     until the opening's top edge clears the brows by `above`."""
@@ -254,27 +244,30 @@ def lift_hood(o, basemesh, above=0.045, slump_k=0.85):
     # quarter (plus 1 cm), along the head's normal, so the cloth's layers keep
     # their order; easing in over the forehead.
     from mathutils.bvhtree import BVHTree
-    dg = bpy.context.evaluated_depsgraph_get()
-    be = basemesh.evaluated_get(dg)
-    bme = be.to_mesh()
-    bw = basemesh.matrix_world
-    head = BVHTree.FromPolygons([bw @ v.co for v in bme.vertices], [tuple(p.vertices) for p in bme.polygons])
-    be.to_mesh_clear()
+    head = body_tree(basemesh)
+    # (Radially, from the skull's middle, so neighbouring cloth moves together
+    # and no folds are made: the head's surface along each ray is smooth.)
+    c = eye + Vector((0, 0.085, 0.03))
     slump = 0
     for v in bm.verts:
         p = ow @ v.co
-        k = ss(eye.z - 0.04, eye.z + 0.03, p.z)
+        k = ss(eye.z + 0.0, eye.z + 0.06, p.z) * ss(eye.y + 0.03, eye.y + 0.08, p.y)
         if k <= 0:
             continue
-        loc, nrm, _, dist = head.find_nearest(p, 0.4)
-        if loc is None:
+        u = p - c
+        r = u.length
+        if r < 1e-6:
             continue
-        side = (p - loc).dot(nrm)
-        want = 0.01 + 0.25 * max(0.0, side)
-        q = loc + nrm * want
-        v.co = owi @ p.lerp(q, k * slump_k)
+        u /= r
+        hit = head.ray_cast(c, u, 0.4)
+        if hit[0] is None:
+            continue
+        rh = (hit[0] - c).length
+        want = rh + 0.016 + 0.4 * max(0.0, r - rh - 0.016)
+        if want >= r:
+            continue
+        v.co = owi @ (c + u * (r + (want - r) * k * slump_k))
         slump += 1
-
     # The face's opening kept clear, without cutting the cloth: hood cloth in
     # front of the face (chin to brow, cheekbone to cheekbone) is drawn back
     # and aside to the face's outline, the cloth round it following smoothly
@@ -286,13 +279,20 @@ def lift_hood(o, basemesh, above=0.045, slump_k=0.85):
     bm.verts.ensure_lookup_table()
     disp = [Vector() for _ in bm.verts]
     fixed = [False] * len(bm.verts)
+    # The opening an ellipse round the face (brow to chin, cheekbone to
+    # cheekbone): cloth inside it pushed straight out from its middle to its
+    # rim, so the rim is a smooth oval, not sheared sideways at the brow (a
+    # notch, with the hood's inside turned out).
+    ez, ax, az = eye.z - 0.05, half, 0.088
     for v in bm.verts:
         p = ow @ v.co
-        dx = p.x - eye.x
-        if abs(dx) < half and eye.z - 0.14 < p.z < eye.z + 0.035 and p.y < eye.y + 0.02:
-            # To the side the nearer way, at least to the outline; and back behind the face's plane.
-            sx = 1 if dx >= 0 else -1
-            disp[v.index] = Vector((sx * (half - abs(dx)) * 0.9, max(0.0, eye.y + 0.02 - p.y), 0))
+        dx, dz = p.x - eye.x, p.z - ez
+        e = math.sqrt((dx / ax) ** 2 + (dz / az) ** 2)
+        if e < 1.0 and p.y < eye.y + 0.02:
+            if e < 0.05:
+                dx, dz, e = 0.0, 0.05 * az, 0.05
+            k = 1.0 / e
+            disp[v.index] = Vector((dx * (k - 1), max(0.0, eye.y + 0.02 - p.y), dz * (k - 1)))
             fixed[v.index] = True
     nbr = [[e.other_vert(v).index for e in v.link_edges] for v in bm.verts]
     for _ in range(30):
@@ -310,4 +310,44 @@ def lift_hood(o, basemesh, above=0.045, slump_k=0.85):
     bm.to_mesh(o.data)
     bm.free()
     o.data.update()
-    return d
+    return float(d)
+
+
+def head_rigid(o, basemesh):
+    """A hood's crown and face opening move with the head: above the jaw its
+    skin weights are eased over to the head bone alone (the fitted ones mix
+    in the neck and spine, so as the head turns the rim lags and cuts the
+    brow). Returns the vertices changed."""
+    import headfit
+    co = headfit.mix_coords(basemesh)
+    eye = (headfit.group_centroid(basemesh, co, 'helper-l-eye') + headfit.group_centroid(basemesh, co, 'helper-r-eye')) / 2
+    if 'mixamorig:Head' not in o.vertex_groups:
+        o.vertex_groups.new(name='mixamorig:Head')
+    hg = o.vertex_groups['mixamorig:Head']
+    ow = o.matrix_world
+    n = 0
+    for v in o.data.vertices:
+        z = (ow @ v.co).z
+        t = min(1.0, max(0.0, (z - (eye.z - 0.11)) / 0.06))
+        k = t * t * (3 - 2 * t)
+        if k <= 0:
+            continue
+        tot = 0.0
+        for g in v.groups:
+            if g.group != hg.index:
+                g.weight *= (1 - k)
+            tot += g.weight
+        cur = next((g.weight for g in v.groups if g.group == hg.index), 0.0)
+        hg.add([v.index], cur + max(0.0, 1.0 - tot), 'REPLACE')
+        n += 1
+    return n
+
+
+def body_tree(basemesh):
+    """The body's surface as it now is, every shape key mixed (the scanned
+    head's fit, the neck's): the depsgraph's evaluated mesh can lag the keys
+    just added, leaving cloth fitted round MakeHuman's own smaller head."""
+    import headfit
+    from mathutils.bvhtree import BVHTree
+    co = headfit.mix_coords(basemesh)
+    return BVHTree.FromPolygons(co, [tuple(p.vertices) for p in basemesh.data.polygons])

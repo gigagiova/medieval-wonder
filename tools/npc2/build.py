@@ -96,7 +96,7 @@ for gid, g in GARMENTS.items():
         gspec[gid] = {'depth': int(zd[0]) if zd else 50, 'delete': 'Delete.' + os.path.basename(path)[:-6].replace(' ', '_')}
         if g.get('lift'):
             import derive as _d
-            log('hood lifted', gid, round(_d.lift_hood(o, basemesh), 3), 'pushed out', _d.relax(o, basemesh, 0, gap=0.008))
+            log('hood lifted', gid, round(_d.lift_hood(o, basemesh), 3), 'pushed out', _d.relax(o, basemesh, 0, gap=0.008), 'head-rigid', _d.head_rigid(o, basemesh))
         if g.get('relax'):
             import derive as _d
             log('relaxed', gid, _d.relax(o, basemesh, g['relax']))
@@ -120,6 +120,7 @@ for gid, g in GARMENTS.items():
 # Layer order by kind (the assets' own z_depth puts a tunic level with the hose under it).
 DEPTH = {'leg': 40, 'shoe': 45, 'tunic': 60, 'belt': 66, 'over': 70, 'head': 72}
 for gid in garments:
+    gspec[gid]['layer'] = GARMENTS[gid].get('layer')
     if 'drape' not in GARMENTS[gid]:
         gspec[gid]['depth'] = DEPTH.get(GARMENTS[gid].get('layer'), gspec[gid]['depth'])
 # Skirts follow the thighs only, never a knee or a foot (skirt.py).

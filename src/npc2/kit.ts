@@ -74,7 +74,7 @@ function prep(t: THREE.Object3D) {
       if (src.map) src.map.colorSpace = THREE.SRGBColorSpace;
       m.material = new THREE.MeshStandardMaterial({ map: src.map, color: 0xc8beb4, roughness: 0.18, metalness: 0 });
     }
-    if (m.userData.npc2 === 'garment') m.userData.garment = n.replace(/^G_/, '').replace(/_\d+$/, '');
+    if (m.userData.npc2 === 'garment') { m.userData.garment = n.replace(/^G_/, '').replace(/_\d+$/, ''); outward(m.geometry); }
     if (m.userData.npc2 === 'body') {
       // Skin: npc.ts tints it per person and gives it the soft wrapped light of skin (withAtmos).
       // The same skin shading as the scanned v1 bodies (src/npc/scan.ts): pores, wrapped light, matte.
@@ -86,6 +86,41 @@ function prep(t: THREE.Object3D) {
       m.material = skinMaterial(src);
     }
   });
+}
+
+/**
+ * A garment's faces turned to face out from the wearer (some of the
+ * artists' meshes are wound inside out): their inner side is shaded as the
+ * cloth's inside (dress.ts), so it must be the side towards the body.
+ * Judged by the vertex normals against the direction away from the body's
+ * vertical axis, over the whole garment; normals and winding flipped
+ * together.
+ */
+function outward(g: THREE.BufferGeometry) {
+  const P = g.attributes.position, N = g.attributes.normal;
+  if (!N || !g.index) return;
+  let cx = 0, cz = 0;
+  for (let i = 0; i < P.count; i++) { cx += P.getX(i); cz += P.getZ(i); }
+  cx /= P.count; cz /= P.count;
+  // Judged by the normals and by the winding: only a mesh wound and shaded
+  // inside out both ways is turned (a two-layered hood, its lining facing
+  // in, is shaded as modelled).
+  let s = 0;
+  for (let i = 0; i < P.count; i++) s += N.getX(i) * (P.getX(i) - cx) + N.getZ(i) * (P.getZ(i) - cz);
+  const I = g.index;
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  let w = 0;
+  for (let i = 0; i < I.count; i += 3) {
+    a.fromBufferAttribute(P, I.getX(i)); b.fromBufferAttribute(P, I.getX(i + 1)); c.fromBufferAttribute(P, I.getX(i + 2));
+    const mx = (a.x + b.x + c.x) / 3 - cx, mz = (a.z + b.z + c.z) / 3 - cz;
+    b.sub(a); c.sub(a); b.cross(c);
+    w += b.x * mx + b.z * mz;
+  }
+  g.userData.flipped = (s < 0 ? 'N' : '') + (w < 0 ? 'W' : '');
+  if (s >= 0 || w >= 0) return;
+  for (let i = 0; i < N.count; i++) N.setXYZ(i, -N.getX(i), -N.getY(i), -N.getZ(i));
+  for (let i = 0; i < I.count; i += 3) { const t = I.getX(i + 1); I.setX(i + 1, I.getX(i + 2)); I.setX(i + 2, t); }
+  N.needsUpdate = true; I.needsUpdate = true;
 }
 
 /** Head and joint measurements from the body alone. */
