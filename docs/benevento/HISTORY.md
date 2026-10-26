@@ -275,12 +275,15 @@ World coordinates in metres (x, z).
   where the room in front is shallow the front is brought forward (the house grows into the street);
   where it is deeper, a one-storey shop or workshop is built against the front (a walled-up portico, a
   *bottega*) or a walled yard (*curtis*, plot kind `cortis`: rubble walls with a coping, a gate with its leaf,
-  bread oven, woodpile, barrels and baskets) is set before the house; where a wide space is compact enough,
-  rows of small houses stand in it, turned to the lanes round it; the pockets left between become little
-  walled gardens and pens (plot kind `hortulus`, ~180 of them). Street space falls from 8.4 to 7.6 ha
-  (25% of the walled area), the lots from 5,962 to ~6,200, plus ~240 walled yards and gardens. (A first
-  version filled the pockets with ~1,000 small houses and sheds instead: the near chunks cost ~25% more
-  triangles, over the phone budget, so the cheap garden walls do that work now.) The fronts now measure their lanes (median 5 m, which gives
+  bread oven, woodpile, barrels and baskets) is set before the house; the pockets of street space left
+  between become little walled gardens and pens (plot kind `hortulus`: four walls a little over head
+  height, a gate on the lane, beds or a manger inside). Street space falls from 8.4 to 7.6 ha (25% of the
+  walled area); ~100 walled yards and ~290 walled gardens; the houses grow by ~60 shops and many fronts
+  brought forward, the lot count staying ~6,000. *Phone budget*: a first version also built islands of
+  small houses and sheds into the wide spaces (~1,200 more lots): +35% triangles in the near chunks, so
+  they are off (`ENCROACH.islands`); the yard and garden walls are plain untessellated boxes and cost almost
+  nothing. Near chunks now cost ~7% more triangles than before the pass (56k vs 52k per chunk, measured on
+  27 chunks round three street views with `buildChunk`). The fronts now measure their lanes (median 5 m, which gives
   the stairs, woodpiles, benches, jars, carts, ladders and scaffolds of `arch/dress.ts` their room), and the
   houses on the decumanus rise to two or three storeys (7.2–10.5 m).
 - **Why the outline differs from the plan's**: the plan draws the later medieval town. The circuit

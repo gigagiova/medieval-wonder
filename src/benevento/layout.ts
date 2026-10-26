@@ -85,6 +85,10 @@ export interface Layout {
 export let DEBUG_KEEP = false;
 let GREEDY = 0.1;
 export const setGreedy = (v: number) => { GREEDY = v; };
+/** Tools: switch parts of the street-narrowing pass off to measure their cost. */
+// (islands of row houses in the wide spaces are off since the phone-budget pass: they cost ~6% of the
+// near chunks' triangles; the walled gardens fill those spaces for a tenth of that.)
+export const ENCROACH = { forward: true, shops: true, islands: false };
 export const setDebugKeep = (v: boolean) => { DEBUG_KEEP = v; };
 export const KEEP_OPEN: { x: number; z: number; r: number }[] = [];
 
@@ -641,7 +645,7 @@ export function layoutTown(seed = 700): Layout {
       const eAll = Math.min(...es);
       const v = rand();
       const A2 = (d: number) => A.clone().addScaledVector(f.out, d), B2 = (d: number) => B.clone().addScaledVector(f.out, d);
-      if (eAll >= 1.5 && (v < 0.45 || eAll < 2.4)) {
+      if (!ENCROACH.forward) { /* measured off */ } else if (eAll >= 1.5 && (v < 0.45 || eAll < 2.4)) {
         // The front brought forward: the house grows into the street.
         const d = Math.min(eAll, R(1.5, 4.5));
         const near = (P: V2) => l.c.findIndex((q) => q.distanceTo(P) < 0.05);
@@ -665,7 +669,7 @@ export function layoutTown(seed = 700): Layout {
         if (u1 - u0 < 2.4) continue;
         const P = A.clone().addScaledVector(dir, u0), Q = A.clone().addScaledVector(dir, u1);
         const P2 = (d: number) => P.clone().addScaledVector(f.out, d), Q2 = (d: number) => Q.clone().addScaledVector(f.out, d);
-        if (rand() < 0.68) {
+        if (rand() < 0.35 && ENCROACH.shops) {
           // A shop or workshop of one storey built against the front (a walled-up portico, a bottega).
           const d = Math.min(m, R(2.4, 4.5));
           const c = [P2(d), Q2(d), Q.clone(), P.clone()];
@@ -747,7 +751,7 @@ export function layoutTown(seed = 700): Layout {
           }
           // The island's houses in rows show a street front to their lane; the small pieces filled in
           // after them are back buildings (walls with a few openings, a coarser build: phone budget).
-          if (withFront && best >= 0 && bw >= 1.0 && placed[best].distanceTo(placed[(best + 1) % 4]) >= 2.4) {
+          if (withFront && best >= 0 && bw >= 2.5 && placed[best].distanceTo(placed[(best + 1) % 4]) >= 2.4) {
             const c = [0, 1, 2, 3].map((q) => placed[(best + q) % 4]);
             const e2 = c[1].clone().sub(c[0]).normalize(), o = V(e2.y, -e2.x);
             if (o.dot(c[0].clone().sub(c[3])) < 0) o.negate();
@@ -756,8 +760,8 @@ export function layoutTown(seed = 700): Layout {
         };
         // Rows of houses on the island's grain where it is wide (not across a straggling network of
         // strips, whose bounds are mostly something else)...
-        const compact = (u1 - u0) * (w1 - w0) < cells.length * r.res * r.res * 3;
-        if (compact) for (let w = w0 + 0.3; w < w1 - 1.5; ) {
+        const compact = cells.length * r.res * r.res > 120 && (u1 - u0) * (w1 - w0) < cells.length * r.res * r.res * 3;
+        if (compact && ENCROACH.islands) for (let w = w0 + 0.3; w < w1 - 1.5; ) {
           const dw = R(3.6, 7);
           for (let u = u0 + 0.3; u < u1 - 1.5; ) {
             const du = R(3.6, 7);
@@ -807,7 +811,7 @@ export function layoutTown(seed = 700): Layout {
       const m = l.front.a.clone().add(l.front.b).multiplyScalar(0.5);
       l.street = backed.has(l.id) ? 1.5 : yards.has(l.id) ? yards.get(l.id)! : Math.max(1.5, widthAt(m, l.front.out));
       const k = r.idx(m.x + l.front.out.x * 2, m.y + l.front.out.y * 2);
-      if (k >= 0 && r.main[k] > 0 && !backed.has(l.id) && l.h < 7.2) l.h = R(7.2, 10.5);
+      if (k >= 0 && r.main[k] > 0 && !backed.has(l.id) && l.h < 7.2 && rand() < 0.45) l.h = R(7.2, 10.5);
     }
   }
 

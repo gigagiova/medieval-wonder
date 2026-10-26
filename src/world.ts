@@ -627,9 +627,7 @@ function townProps(scene: THREE.Scene) {
     else if (u < 0.4) P(u < 0.3 ? 'planter_pot_clay' : 'ceramic_pot', x, z, u * 9, 1.5);
     else if (u < 0.52) P('wicker_basket_02', x, z, u * 7, 1);
     else if (u < 0.6) P('wooden_bucket_01', x, z, u * 5, 1);
-    else if (u < 0.66) P('wooden_barrels_01', x, z, u * 17, 0.9);
-    else if (u < 0.71) P('folding_wooden_stool', x, z, u * 23, 1);
-    else if (u < 0.76) P('dry_branches_medium_01', x, z, u * 29, 1);
+    else if (u < 0.7) P('wine_barrel_01', x, z, u * 17, 0.8);
     else if (u < 0.8) P('street_rat', x, z, u * 11, 1);
     else P(u < 0.9 ? 'weed_plant_02' : 'nettle_plant', x, z, u * 13, 3);
   }
@@ -642,7 +640,7 @@ function townProps(scene: THREE.Scene) {
       if (!inPoly(x, z, p.pts)) continue;
       const u = rand01(i * 5.3 + p.seed % 101);
       if (p.kind === 'hortulus') continue;
-      const id: PropId = p.kind === 'cortis' ? (['wooden_barrels_01', 'wicker_basket_02', 'wooden_bucket_01', 'dry_branches_medium_01', 'ceramic_pot', 'folding_wooden_stool', 'weed_plant_02'] as PropId[])[Math.floor(u * 7)] : p.kind === 'orto' ? (u < 0.5 ? 'weed_plant_02' : 'grass_medium_02') : p.kind === 'ruina' ? (u < 0.4 ? 'nettle_plant' : u < 0.7 ? 'rock_moss_set_02' : 'fern_02') : (u < 0.5 ? 'grass_medium_02' : u < 0.8 ? 'weed_plant_02' : 'shrub_02');
+      const id: PropId = p.kind === 'cortis' ? (['wine_barrel_01', 'wicker_basket_02', 'wooden_bucket_01', 'planter_pot_clay', 'ceramic_pot', 'weed_plant_02'] as PropId[])[Math.floor(u * 6)] : p.kind === 'orto' ? (u < 0.5 ? 'weed_plant_02' : 'grass_medium_02') : p.kind === 'ruina' ? (u < 0.4 ? 'nettle_plant' : u < 0.7 ? 'rock_moss_set_02' : 'fern_02') : (u < 0.5 ? 'grass_medium_02' : u < 0.8 ? 'weed_plant_02' : 'shrub_02');
       if (p.kind === 'cortis') { P(id, x, z, u * 30, id === 'weed_plant_02' ? 3 : id === 'ceramic_pot' ? 1.5 : 1); continue; }
       P(id, x, z, u * 30, id === 'rock_moss_set_02' ? 0.6 : id === 'shrub_02' ? 0.7 : id.startsWith('grass') ? 0.9 : 3.2);
     }
