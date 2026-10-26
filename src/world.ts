@@ -615,7 +615,7 @@ function townProps(scene: THREE.Scene) {
     }
   }
   for (const l of lay.lots) {
-    if (!l.front || (k++ % 4) !== 0) continue;
+    if (!l.front || (k++ % 2) !== 0) continue;
     const f = l.front, t = rand01(l.id * 1.7);
     // Not where the house already has its stair, woodpile, bench or cart (arch/dress.ts).
     { const fp = plans.get(l.id); if (fp && (fp.stair || fp.items.length)) continue; }
