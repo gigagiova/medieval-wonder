@@ -348,13 +348,6 @@ export function dressWall(acc: Acc, d: WallDress, seed: number) {
       }
     }
   }
-  // Joist heads where the upper floor rests (no jetty: they stop at the face).
-  if (!d.oneMass || d.h > 4.5) {
-    const v = (d.oneMass ? Math.min(3.2, d.h * 0.48) : d.lowTop) + 0.12;
-    if (v < d.h - 0.6 && r() < 0.6) for (const [a, b] of runs(v - 0.1, v + 0.1, 0.25, d.L - 0.25)) {
-      for (let u = a + R(0, 0.2); u < b; u += R(0.5, 0.7)) box(acc, 'wood', d.f, u, v, 0.0, 0.06, 0.07, 0.05, 0.01);
-    }
-  }
 }
 
 /** A ragged patch of render on a wall: front face fanned from its centre, a thin rim. */
@@ -516,11 +509,7 @@ export function sideFace(acc: Acc, fr: FrontLine, street: number, h: number, h1:
       if (lit && r() < 0.25) lamps(f.p(c, v0 + 0.3, 0.6));
     }
   }
-  // Putlog holes in rows, the wall's dressing.
-  for (let v = 1.4 + R(-0.2, 0.2); v < h - 0.6; v += R(1.3, 1.8)) for (let u = R(0.4, 1.2); u < L - 0.4; u += R(1.2, 2.2)) {
-    if (r() < 0.5 || !clear(u - 0.1, u + 0.1, v)) continue;
-    box(acc, 'iron', f, u, v, 0.004, 0.06, 0.06, 0.006, 0, true);
-  }
+  // The wall's dressing (no putlog holes: this wall is not cut, and squares stuck on it read as tiles).
   dressWall(acc, { f, L, lower: m, upper: m, lowTop: h1, h, upFace: 0, oneMass: true, holes }, seed + 3);
   // Washing out of an upper window over a narrow lane.
   const up = holes.filter((o) => o.v0 > 2.5);
