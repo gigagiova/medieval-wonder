@@ -114,14 +114,15 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
   // A workshop front: a wide arch with a masonry counter, its shutter
   // propped up as an awning (the bottega of every later Italian town).
   let shop: Opening | null = null;
-  if (s.street >= 2.2 && L >= 4.2 && chance(0.3)) {
+  if (s.street >= 2.2 && L >= 4.2 && chance(0.4)) {
     const sw = R(1.5, Math.min(2.3, L * 0.45)), su = R(0.4, L - 0.4 - sw);
     const o: Opening = { u0: su, u1: su + sw, v0: 0, v1: R(1.5, 1.75), arch: true };
     if (free(o.u0, o.u1) && !(st && o.u1 > st.s0 - 0.3 && o.u0 < st.s1 + 0.3) && o.v1 + sw / 2 < s.h1 - 0.25) { ops.push(o); shop = o; }
   }
   if (chance(0.45) && free(slit.u0, slit.u1) && !(st && slit.u1 > st.s0 - 0.2 && slit.u0 < st.s1 + 0.2)) ops.push(slit);
   const lowTop = Math.min(s.h, s.h1 + (s.upper === s.lower ? 0 : 0));
-  let jetty = s.upper !== s.lower && (s.upper === 'wood' || s.upper === 'plaster') && chance(0.55) ? R(0.3, 0.55) : 0;
+  // Upper floors jut over the lane on joists (timber) or on corbelled beams (masonry): the sky narrows to a strip.
+  let jetty = s.upper !== s.lower && chance((s.upper === 'wood' || s.upper === 'plaster') ? 0.8 : 0.45) ? R(0.3, s.street > 2.6 ? 0.8 : 0.5) : 0;
   if (st) jetty = 0;
   const oneMass = s.upper === s.lower && jetty === 0;
 
@@ -129,11 +130,11 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
   const up: Opening[] = [];
   const floors: number[] = [];
   for (let y = s.h1 + R(0.75, 1.15); y < s.h - 1.0; y += R(2.4, 3.0)) floors.push(y);
-  const balcony = floors.length > 0 && jetty === 0 && chance(0.2) && L > 2.6 && !st && s.street > 1.9;
+  const balcony = floors.length > 0 && jetty === 0 && chance(0.28) && L > 2.6 && !st && s.street > 1.9;
   for (const fy of floors) {
-    const n = Math.max(1, Math.round(L / R(2.3, 3.6)));
+    const n = Math.max(1, Math.round(L / R(1.8, 2.8)));
     for (let i = 0; i < n; i++) {
-      if (chance(0.22)) continue;
+      if (chance(0.15)) continue;
       const ww = R(0.42, 0.68), wh = R(0.6, 0.92);
       const u0 = R(0.45, L - 0.45 - ww);
       const o: Opening = { u0, u1: u0 + ww, v0: fy, v1: fy + wh, arch: chance(0.5) };
@@ -302,7 +303,7 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
   }
 
   // ---- pentice over the street door
-  if (ops.includes(door) && !balcony && chance(0.22) && s.street > 1.5) {
+  if (ops.includes(door) && !balcony && chance(0.4) && s.street > 1.5) {
     const c = (door.u0 + door.u1) / 2, run = Math.min(0.85, s.street * 0.4);
     const pc = f.p(c, 0, run / 2);
     const yTop = doorTop + R(0.5, 0.7);
@@ -380,7 +381,7 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
       dressWall(acc, { f, L, lower: s.lower, upper: s.upper, lowTop, h: s.h, upFace, oneMass, holes: [...ops, ...up, ...(st ? [{ u0: st.s0, u1: st.s1, v0: 0, v1: st.hL + 1 }] : [])] }, seed);
       const r = rng(seed * 5 + 2);
       const wins = up.filter((o) => o !== stairDoor && o.v1 - o.v0 < 1.4);
-      if (wins.length && r() < (s.street < 3.2 ? 0.32 : 0.18)) {
+      if (wins.length && r() < (s.street < 3.2 ? 0.45 : 0.28)) {
         const o = wins[Math.floor(r() * wins.length)];
         washing(acc, f, (o.u0 + o.u1) / 2, o.v0 + 0.05, upFace + 0.02, s.street, r);
       }

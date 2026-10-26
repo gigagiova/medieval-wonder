@@ -178,13 +178,13 @@ export class Frame {
 }
 
 /** A box in a frame: centre (u,v,w), half sizes, optional skew so nothing is square. */
-export function box(acc: Acc, m: MatName, f: Frame, u: number, v: number, w: number, hu: number, hv: number, hw: number, jit = 0) {
+export function box(acc: Acc, m: MatName, f: Frame, u: number, v: number, w: number, hu: number, hv: number, hw: number, jit = 0, flat = false) {
   const J = () => (jit ? R(-jit, jit) : 0);
   const c: V3[] = [];
   for (const dv of [-1, 1]) for (const [du, dw] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
     c.push(f.p(u + du * hu + J(), v + dv * hv + J(), w + dw * hw + J()));
   }
-  acc.hexa(m, c);
+  acc.hexa(m, c, false, flat);
 }
 
 /**

@@ -26,6 +26,7 @@ const KIND: Record<string, FabricKind> = { tabby: 'tabby', twill: 'twill', felt:
 export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
   const meshes: THREE.Object3D[] = [];
   const kinds = new Map(outfit.garments.map((g) => [g.id, g]));
+  if (outfit.id === 'monkBare') tonsure(body, outfit);
   body.traverse((o) => {
     const m = o as THREE.SkinnedMesh;
     if (!m.isSkinnedMesh || o.userData.npc2 !== 'garment') return;
@@ -67,4 +68,37 @@ function detailMap(m: THREE.MeshStandardMaterial) {
       #endif`);
   };
   m.customProgramCacheKey = () => key + '-detail';
+}
+
+/**
+ * A monk's tonsure (the Roman, St Peter's): the crown shaven in a round,
+ * painted on the head's skin in the shader — a disc about the top of the
+ * skull, in the bind pose, in the tone of the forehead's skin.
+ */
+function tonsure(body: THREE.Object3D, o: OutfitV2) {
+  const M = o.m, eyes = M.bone('LeftEye').add(M.bone('RightEye')).multiplyScalar(0.5), hb = M.bone('Head');
+  const u = { value: new THREE.Vector4(hb.x, eyes.y + 0.075, eyes.z - 0.085, 0.058) };
+  body.traverse((x) => {
+    const m = x as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh || x.userData.npc2 !== 'body') return;
+    const mats = Array.isArray(m.material) ? m.material : [m.material];
+    m.material = mats.map((mat) => {
+      const c = mat.clone();
+      const prev = mat.onBeforeCompile, key = mat.customProgramCacheKey();
+      c.onBeforeCompile = (sh, r) => {
+        prev.call(c, sh, r);
+        sh.uniforms.uTons = u;
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vTons;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvTons = position;');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vTons; uniform vec4 uTons;').replace('#include <map_fragment>', `#include <map_fragment>
+          {
+            float td = length(vTons.xz - uTons.xz);
+            float tk = smoothstep(uTons.w, uTons.w - 0.012, td) * smoothstep(uTons.y - 0.01, uTons.y + 0.01, vTons.y);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.36, 0.17, 0.12) * diffuse * (0.92 + 0.08 * fract(sin(dot(vTons.xz, vec2(127.1, 311.7)) * 9.0) * 43758.5)), tk);
+          }`);
+      };
+      c.customProgramCacheKey = () => key + '-tonsure';
+      return c;
+    });
+    if (!Array.isArray(m.material) || m.material.length === 1) m.material = (m.material as THREE.Material[])[0];
+  });
 }
