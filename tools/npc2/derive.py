@@ -222,7 +222,7 @@ def relax(o, basemesh, iters, gap=0.006):
     return moved
 
 
-def lift_hood(o, basemesh, above=0.045):
+def lift_hood(o, basemesh, above=0.045, slump_k=0.85):
     """A hood fitted over a scanned head (fuller than MakeHuman's, with its
     hair) falls over the eyes: its front is raised (and drawn back a little)
     until the opening's top edge clears the brows by `above`."""
@@ -249,6 +249,32 @@ def lift_hood(o, basemesh, above=0.045):
         w = ss(eye.y + 0.14, eye.y - 0.01, p.y) * ss(eye.z - 0.09, eye.z - 0.02, p.z)
         if w > 0:
             v.co = owi @ (p + Vector((0, 0, d * w)))
+    # Slumped: a woollen hood lies on the skull rather than standing up as a
+    # peak. Over the brow, each vertex's distance from the head is cut to a
+    # quarter (plus 1 cm), along the head's normal, so the cloth's layers keep
+    # their order; easing in over the forehead.
+    from mathutils.bvhtree import BVHTree
+    dg = bpy.context.evaluated_depsgraph_get()
+    be = basemesh.evaluated_get(dg)
+    bme = be.to_mesh()
+    bw = basemesh.matrix_world
+    head = BVHTree.FromPolygons([bw @ v.co for v in bme.vertices], [tuple(p.vertices) for p in bme.polygons])
+    be.to_mesh_clear()
+    slump = 0
+    for v in bm.verts:
+        p = ow @ v.co
+        k = ss(eye.z - 0.04, eye.z + 0.03, p.z)
+        if k <= 0:
+            continue
+        loc, nrm, _, dist = head.find_nearest(p, 0.4)
+        if loc is None:
+            continue
+        side = (p - loc).dot(nrm)
+        want = 0.01 + 0.25 * max(0.0, side)
+        q = loc + nrm * want
+        v.co = owi @ p.lerp(q, k * slump_k)
+        slump += 1
+
     # The face's opening kept clear, without cutting the cloth: hood cloth in
     # front of the face (chin to brow, cheekbone to cheekbone) is drawn back
     # and aside to the face's outline, the cloth round it following smoothly

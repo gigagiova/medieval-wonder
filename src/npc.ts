@@ -93,7 +93,7 @@ let weave: THREE.Texture | null = null;
 let loading: Promise<void> | null = null;
 
 /** Dev switches and numbers (test page). */
-export const npcDebug = { beard: null as number | null, prof: { anim: 0, logic: 0, frames: 0 }, cloth: clothStats, maxSim: 3, simDist: 15, people: [] as Person[], buildMs: {} as Record<string, number> };
+export const npcDebug = { beard: null as number | null, prof: { anim: 0, logic: 0, frames: 0, springs: 0, springPeople: 0 }, springDist: 15, cloth: clothStats, maxSim: 3, simDist: 15, people: [] as Person[], buildMs: {} as Record<string, number> };
 
 // ------------------------------------------------------------------ loading
 
@@ -416,7 +416,7 @@ export class Person {
   }
   walkSpeed = 1.2;
   /** v2: the cloth bones' spring update (src/npc2/springs.ts), and the time it steps. */
-  private springs: ((dt: number) => void) | null = null;
+  private springs: ReturnType<typeof makeSprings> = null;
   private springDt = 0;
   /** Half the width of a bucket or basket a peasant carries (0: none). */
   carryHalf = 0;
@@ -797,7 +797,12 @@ export class Person {
     if (this.load.jar || this.load.basket) this.poseLoad();
     if (this.carryHalf && this.role === 'peasant') this.holdOut();
     this.swing?.();
-    this.springs?.(this.springDt);
+    if (this.springs) {
+      // Cloth bones swing only near the camera (npcDebug.springDist); further off they hang still.
+      const t0 = performance.now();
+      if (this.dist < npcDebug.springDist) { this.springs.update(this.springDt); npcDebug.prof.springPeople++; } else this.springs.rest();
+      npcDebug.prof.springs += performance.now() - t0;
+    }
     return true;
   }
 

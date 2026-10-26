@@ -158,9 +158,40 @@ def smoothstep(a, b, x):
     return t * t * (3 - 2 * t)
 
 
+def shorten_neck(basemesh, scan, co):
+    """MakeHuman's neck against the scanned person's: the height of the eyes
+    over the shoulder joints, in eye spacings. Where the body's is longer,
+    the head and the top of the neck are lowered by the difference (a shape
+    key, eased in up the neck), so the scanned face doesn't sit on a stalk."""
+    if not scan.arm:
+        return 0.0
+    eyeL = group_centroid(basemesh, co, 'helper-l-eye')
+    eyeR = group_centroid(basemesh, co, 'helper-r-eye')
+    em = (eyeL + eyeR) / 2
+    shb = (group_centroid(basemesh, co, 'joint-l-shoulder').z + group_centroid(basemesh, co, 'joint-r-shoulder').z) / 2
+    shs = sum(((scan.arm.matrix_world @ scan.arm.data.bones['%sArm' % S].head_local).z for S in ('Left', 'Right'))) / 2
+    rb = (em.z - shb) / (eyeL - eyeR).length
+    rs = ((scan.eyeL + scan.eyeR).z / 2 - shs) / (scan.eyeL - scan.eyeR).length
+    ex = (rb - rs) * (eyeL - eyeR).length
+    log('neck: eyes over shoulders / eye spacing: body', round(rb, 2), 'scan', round(rs, 2), 'excess m', round(ex, 3))
+    if ex < 0.008:
+        return 0.0
+    z0, z1 = shb + 0.03, em.z - 0.09  # base of the neck .. under the jaw
+    key = basemesh.shape_key_add(name='neckfit', from_mix=False)
+    basis = basemesh.data.shape_keys.key_blocks[0]
+    mwi = basemesh.matrix_world.inverted().to_3x3()
+    for i, p in enumerate(co):
+        k = smoothstep(z0, z1, p.z)
+        key.data[i].co = basis.data[i].co + mwi @ Vector((0, 0, -ex * k))
+    key.value = 1.0
+    return ex
+
+
 def fit(basemesh, spec):
     scan = Scan(spec['scan'])
     co = mix_coords(basemesh)
+    if shorten_neck(basemesh, scan, co) > 0:
+        co = mix_coords(basemesh)
     eyeL = group_centroid(basemesh, co, 'helper-l-eye')
     eyeR = group_centroid(basemesh, co, 'helper-r-eye')
     neck = group_centroid(basemesh, co, 'joint-neck')

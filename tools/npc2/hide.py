@@ -153,6 +153,29 @@ def mark(basemesh, garments, outfits, specs, knee=None):
                         for v in o.data.vertices:
                             if any(x.group == gi and x.weight > 0.5 for x in v.groups):
                                 m[v.index] = True
+            if k == 'body':
+                # Kept within 4 cm of any edge of the cloth over it — collars,
+                # cuffs, hems and the slits of the artists' seams — so a
+                # gap opening there as the cloth moves shows skin, never a
+                # hole (no floating hands at the cuffs, no void at a seam).
+                from mathutils.kdtree import KDTree
+                edge = []
+                for g in over:
+                    go = garments[g]
+                    gm = go.matrix_world
+                    import bmesh as _bm
+                    t = _bm.new()
+                    t.from_mesh(go.data)
+                    edge += [gm @ v.co for v in t.verts if v.is_boundary]
+                    t.free()
+                if edge:
+                    kd = KDTree(len(edge))
+                    for j, q in enumerate(edge):
+                        kd.insert(q, j)
+                    kd.balance()
+                    for i in range(len(m)):
+                        if m[i] and kd.find(pos[i])[2] < 0.04:
+                            m[i] = False
             if k == 'body' and knee is not None and any(specs[g].get('long') for g in over):
                 # Below the knee a long skirt doesn't follow the legs (skirt.py): a
                 # striding shin and foot come out from under it, so they are kept,

@@ -52,9 +52,27 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
       src.map.colorSpace = g.map === 'detail' ? THREE.NoColorSpace : THREE.SRGBColorSpace;
       if (g.map === 'detail') detailMap(mat);
     }
+    inside(mat);
     m.material = mat;
   });
   return new ClothingV2(meshes);
+}
+
+/**
+ * The cloth's inner face (seen up a hem or a sleeve, the material being
+ * two-sided) is the same cloth in its own shadow: darkened and without the
+ * sheen, not a bright lining. (The usual cloth-shading treatment: an
+ * occlusion term for back faces, e.g. Unreal's two-sided foliage/cloth.)
+ */
+function inside(m: THREE.MeshStandardMaterial) {
+  const prev = m.onBeforeCompile, key = m.customProgramCacheKey();
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
+      if (!gl_FrontFacing) outgoingLight *= 0.32;
+      #include <opaque_fragment>`);
+  };
+  m.customProgramCacheKey = () => key + '-in';
 }
 
 /** The map is a grey detail (mean 0.5): the dye times twice it. */

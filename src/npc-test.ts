@@ -161,7 +161,7 @@ const f = Math.max(1, npcDebug.prof.frames || n);
 const c = npcDebug.cloth;
 Object.assign(stats.__stats, {
   frames: n, msPerFrame: +(simMs / Math.max(1, n)).toFixed(2),
-  town: { logic: +(npcDebug.prof.logic / f).toFixed(3), anim: +(npcDebug.prof.anim / f).toFixed(3) },
+  town: { logic: +(npcDebug.prof.logic / f).toFixed(3), anim: +(npcDebug.prof.anim / f).toFixed(3), springs: +(npcDebug.prof.springs / f).toFixed(3), springPeoplePerFrame: +(npcDebug.prof.springPeople / f).toFixed(1) },
   clothPerSim: c.frames ? { skin: +(c.skin / c.frames).toFixed(3), sim: +(c.sim / c.frames).toFixed(3), normals: +(c.normals / c.frames).toFixed(3) } : null,
   people: npcDebug.people.length, calls: renderer.info.render.calls, tris: renderer.info.render.triangles,
   speeds: npcDebug.people.slice(0, 1).map((p) => p.walkSpeed),

@@ -18,7 +18,7 @@ interface Ring { chains: Chain[]; closed: boolean; stiff: number; drag: number; 
 interface Cap { a: THREE.Object3D; b: THREE.Object3D; r: number; pa: THREE.Vector3; pb: THREE.Vector3 }
 
 const SETS: Record<string, { stiff: number; drag: number; closed: boolean }> = {
-  long: { stiff: 0.12, drag: 0.25, closed: true }, short: { stiff: 0.2, drag: 0.3, closed: true }, cape: { stiff: 0.08, drag: 0.2, closed: false },
+  long: { stiff: 0.12, drag: 0.25, closed: true }, short: { stiff: 0.2, drag: 0.3, closed: true }, cape: { stiff: 0.05, drag: 0.22, closed: false },
 };
 
 const _d = new THREE.Vector3(), _e = new THREE.Vector3(), _v = new THREE.Vector3(), _w = new THREE.Vector3();
@@ -80,9 +80,17 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
     cap('LeftArm', 'LeftForeArm', 0.07), cap('RightArm', 'RightForeArm', 0.07),
     cap('LeftForeArm', 'LeftHand', 0.05), cap('RightForeArm', 'RightHand', 0.05),
   ];
-  let fresh = true;
+  let fresh = true, resting = false;
   const g = new THREE.Vector3(0, -9.8, 0);
-  return (dt: number) => {
+  /** Back to the plain hang (far from the camera), once. */
+  const rest = () => {
+    if (resting) return;
+    resting = true;
+    fresh = true;
+    for (const R of rings) for (const c of R.chains) for (const L of c.links) L.bone.quaternion.copy(L.rest);
+  };
+  const update = (dt: number) => {
+    resting = false;
     dt = Math.min(Math.max(dt, 1e-3), 1 / 15);
     body.updateMatrixWorld(true);
     for (const c of caps) { c.a.getWorldPosition(c.pa); c.b.getWorldPosition(c.pb); }
@@ -138,6 +146,7 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
     }
     fresh = false;
   };
+  return { update, rest };
 }
 
 function pushOut(p: THREE.Vector3, c: Cap, r: number) {
