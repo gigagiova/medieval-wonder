@@ -13,7 +13,7 @@ import { skinMaterial } from '../npc/scan';
 // from the `_hide` bits baked into each vertex (tools/npc2/hide.py), so
 // nothing under the cloth can poke through it.
 //
-// Switch: ?npc=v2 (src/npc.ts).
+// The default townsfolk; ?npc=v1 for the older ones (src/npc.ts).
 
 export type Sex = 'man' | 'woman';
 export interface BodyMeta {

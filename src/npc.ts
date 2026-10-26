@@ -16,8 +16,8 @@ import { loadV2, kitsV2, bodiesV2, outfitV2, type OutfitV2 } from './npc2/kit';
 import { dressV2 } from './npc2/dress';
 import { makeSprings } from './npc2/springs';
 
-/** Townsfolk v2 (src/npc2): MakeHuman bodies in modelled garments. `?npc=v1|v2`. */
-export const NPC_V2 = typeof location !== 'undefined' && new URLSearchParams(location.search).get('npc') === 'v2';
+/** Townsfolk v2 (src/npc2): MakeHuman bodies in modelled garments, the default; `?npc=v1` for the older bodies. */
+export const NPC_V2 = typeof location !== 'undefined' && new URLSearchParams(location.search).get('npc') !== 'v1';
 
 // Townsfolk: monks, peasant men and women, and Lombard soldiers (arimanni)
 // walking the streets, standing in talking groups and keeping the gates.

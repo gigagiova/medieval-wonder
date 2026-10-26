@@ -23,7 +23,18 @@ const SETS: Record<string, { stiff: number; drag: number; closed: boolean }> = {
 
 const _d = new THREE.Vector3(), _e = new THREE.Vector3(), _v = new THREE.Vector3(), _w = new THREE.Vector3();
 const _q = new THREE.Quaternion(), _qp = new THREE.Quaternion(), _qw = new THREE.Quaternion();
-const _ab = new THREE.Vector3(), _ap = new THREE.Vector3();
+const _ab = new THREE.Vector3(), _ap = new THREE.Vector3(), _p = new THREE.Vector3(), _sc = new THREE.Vector3();
+
+/**
+ * A bone's own world matrix from its parent's (already current), without
+ * the recursive updates of three's helpers: down a chain level by level
+ * that would redo every bone below each link (quadratic in its length).
+ * The renderer's own scene update brings the rest of the tree up to date.
+ */
+function own(b: THREE.Object3D) {
+  b.updateMatrix();
+  b.matrixWorld.multiplyMatrices(b.parent!.matrixWorld, b.matrix);
+}
 
 /**
  * The spring update for a person's cloth bones (null if their outfit has
@@ -93,7 +104,7 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
     resting = false;
     dt = Math.min(Math.max(dt, 1e-3), 1 / 15);
     body.updateMatrixWorld(true);
-    for (const c of caps) { c.a.getWorldPosition(c.pa); c.b.getWorldPosition(c.pb); }
+    for (const c of caps) { c.pa.setFromMatrixPosition(c.a.matrixWorld); c.pb.setFromMatrixPosition(c.b.matrixWorld); }
     const s = body.getWorldScale(_v).x || scale;
     const grav = _e.copy(g).multiplyScalar(s * dt * dt * 0.3);
     for (const R of rings) {
@@ -102,10 +113,10 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
         const lv = R.chains.map((c) => c.links[j]).filter(Boolean);
         for (const L of lv) {
           L.bone.quaternion.copy(L.rest);
-          L.bone.updateMatrixWorld(true);
-          L.bone.getWorldPosition(L.h);
+          own(L.bone);
+          L.h.setFromMatrixPosition(L.bone.matrixWorld);
           L.tq.copy(L.t);
-          L.child.getWorldPosition(L.t);
+          L.t.copy(L.child.position).applyMatrix4(L.bone.matrixWorld);
           if (fresh || L.p.distanceToSquared(L.t) > 1) { L.p.copy(L.t); L.q.copy(L.t); L.tq.copy(L.t); }
           // Velocity relative to the hang's own motion, damped.
           _d.copy(L.p).sub(L.q).sub(_w.copy(L.t).sub(L.tq)).multiplyScalar(1 - R.drag);
@@ -137,10 +148,11 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
           _v.copy(L.t).sub(L.h).normalize();
           _d.normalize();
           _q.setFromUnitVectors(_v, _d);
-          L.bone.getWorldQuaternion(_qw).premultiply(_q);
-          L.bone.parent!.getWorldQuaternion(_qp).invert();
-          L.bone.quaternion.copy(_qp.multiply(_qw));
-          L.bone.updateMatrixWorld(true);
+          L.bone.matrixWorld.decompose(_p, _qw, _sc);
+          _qw.premultiply(_q);
+          L.bone.parent!.matrixWorld.decompose(_p, _qp, _sc);
+          L.bone.quaternion.copy(_qp.invert().multiply(_qw));
+          own(L.bone);
         }
       }
     }

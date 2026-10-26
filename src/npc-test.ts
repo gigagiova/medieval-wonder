@@ -10,6 +10,7 @@ import type { Lamp } from './builder';
 //   ?view=town    a little street plan full of people (&t=s simulated seconds)
 //   ?view=talk    walk up to someone and speak (&t=s)
 const params = new URLSearchParams(location.search);
+if (params.get('springDist')) npcDebug.springDist = Number(params.get('springDist'));
 const view = params.get('view') ?? 'lineup';
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
