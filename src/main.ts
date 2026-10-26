@@ -86,22 +86,20 @@ function gpuUpload(meshes: THREE.Mesh[]) {
 gpuUpload(cells.flatMap((c) => c.meshes as THREE.Mesh[]));
 stream.uploader = gpuUpload;
 
-// Moonlight and a faint sky fill.
-// Overcast dusk: the sun is just down; light comes from the whole sky,
-// a little warmer from the west. No hard shadows.
+// The key light: the bright, low part of the overcast in the west (~19°),
+// shadowed by the town through the light field (lightfield.ts) rather than
+// a shadow map, so it costs two texture fetches and no extra pass.
 const moon = new THREE.DirectionalLight(0xd2cec6, 1.6);
 moon.castShadow = false;
-moon.shadow.mapSize.set(2048, 2048);
-Object.assign(moon.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 300 });
-moon.shadow.bias = -0.0006;
-moon.shadow.normalBias = 0.04;
 scene.add(moon, moon.target);
 // Image-based lighting from a real overcast sky over a medieval street (Poly
 // Haven 'cobblestone_parish_road', baked to an RGBE PNG): light arrives from
 // every direction with the sky's real distribution, walls get bounce from the
 // street, and every material gets matching soft reflections. This replaces the
 // flat hemisphere light, which lit everything evenly and looked like plastic.
-// A dim hemisphere stays only as a fallback until the sky has loaded.
+// Now that the light field occludes the sky, a hemisphere (sky above, dark
+// earth below) carries most of the sky light again: it lights relief from
+// above; the image keeps only a little diffuse and the reflections.
 const hemi = new THREE.HemisphereLight(0xb4bcc6, 0x2a2723, 1.2);
 scene.add(hemi);
 let envReady = false;
