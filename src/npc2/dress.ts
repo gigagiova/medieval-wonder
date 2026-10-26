@@ -94,7 +94,7 @@ function tonsure(body: THREE.Object3D, o: OutfitV2) {
           {
             float td = length(vTons.xz - uTons.xz);
             float tk = smoothstep(uTons.w, uTons.w - 0.012, td) * smoothstep(uTons.y - 0.01, uTons.y + 0.01, vTons.y);
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.36, 0.17, 0.12) * diffuse * (0.92 + 0.08 * fract(sin(dot(vTons.xz, vec2(127.1, 311.7)) * 9.0) * 43758.5)), tk);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.30, 0.19, 0.15) * diffuse * (0.92 + 0.08 * fract(sin(dot(vTons.xz, vec2(127.1, 311.7)) * 9.0) * 43758.5)), tk);
           }`);
       };
       c.customProgramCacheKey = () => key + '-tonsure';

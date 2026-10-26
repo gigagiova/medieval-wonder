@@ -74,8 +74,8 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
   const B = (n: string) => bone(n)!;
   const cap = (a: string, b: string, r: number): Cap => ({ a: B(a), b: B(b), r, pa: new THREE.Vector3(), pb: new THREE.Vector3() });
   const caps: Cap[] = [
-    cap('LeftUpLeg', 'LeftLeg', 0.09), cap('RightUpLeg', 'RightLeg', 0.09),
-    cap('LeftLeg', 'LeftFoot', 0.065), cap('RightLeg', 'RightFoot', 0.065),
+    cap('LeftUpLeg', 'LeftLeg', 0.1), cap('RightUpLeg', 'RightLeg', 0.1),
+    cap('LeftLeg', 'LeftFoot', 0.08), cap('RightLeg', 'RightFoot', 0.08),
     cap('LeftUpLeg', 'RightUpLeg', 0.1), cap('Hips', 'Spine1', 0.13), cap('Spine1', 'Neck', 0.13),
     cap('LeftArm', 'LeftForeArm', 0.07), cap('RightArm', 'RightForeArm', 0.07),
     cap('LeftForeArm', 'LeftHand', 0.05), cap('RightForeArm', 'RightHand', 0.05),

@@ -188,7 +188,7 @@ for g in sorted(garments, key=lambda g: -gspec[g]['depth']):
 log('clearance body', clearance(basemesh, [world_bvh(garments[g]) for g in body_layers]))
 for gid in garments:
     gspec[gid]['long'] = GARMENTS[gid].get('skirt', {}).get('hem', 1) < 0.6 and GARMENTS[gid].get('layer') == 'tunic'
-knee_z = (rig.matrix_world @ rig.data.bones['mixamorig:LeftLeg'].head_local).z - 0.12
+knee_z = (rig.matrix_world @ rig.data.bones['mixamorig:LeftFoot'].head_local).z + 0.06
 stats = hide.mark(basemesh, garments, myoutfits, gspec, knee_z)
 for k, v in stats.items():
     log('hidden', k, v)
