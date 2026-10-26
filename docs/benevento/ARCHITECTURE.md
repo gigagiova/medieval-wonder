@@ -169,6 +169,28 @@ still matches the full one piece for piece.
   doors, shutters, ladders and the rest stay procedural, built to each
   opening's size.
 
+### 3b. Cost
+
+Measured with `chunkstat` (45 full chunks round five quarters, built in
+Node with the worker's settings) and in the built game (phone portrait,
+390×844, street level, `__stats()`):
+
+| | before | after |
+|---|---|---|
+| full chunk, average triangles | 63.6k | 63.3k |
+| middle chunk, average triangles | 13.7k | 14.0k |
+| materials per chunk | 19 | 19 (no new ones) |
+
+To pay for the new detail without raising the budget, detail nobody sees
+was cut: back buildings' walls are bent on a 1.6 m grid instead of 0.8 m
+(they are seen across yards and over roofs, never at arm's length); back
+roofs and the slope of a front roof that faces away from the street get
+2-facet coppi in longer courses; rafter ends only along the street eave;
+shingles and woodpiles are drawn as the faces that show. Washing, jars and
+the ovens use materials every chunk already draws (linen in the pale
+stone and render materials, jars in the coppi's terracotta), so no view
+gains a draw call from them; the cart adds one while in range.
+
 ## 4. Not done / next
 
 - No thatch or moss material (the shaders and materials belong to the
