@@ -488,7 +488,12 @@ def fill_non_skin(img, mask, bg=None):
     alpha = np.clip((m - 0.45) / 0.25, 0, 1)
     alpha[a.sum(-1) < 0.02] = 0  # unbaked background
     if bg is not None:
-        flat = np.abs(a - np.array(bg, np.float32)[None, None, :]).max(-1) < 0.035
+        # Exactly the padding's colour, and flat round about (skin of a
+        # similar tone has texture; the padding has none).
+        flat = np.abs(a - np.array(bg, np.float32)[None, None, :]).max(-1) < 0.012
+        p = np.pad(a, ((2, 2), (2, 2), (0, 0)), mode='edge')
+        var = sum(np.abs(p[2 + dy:2 + dy + n, 2 + dx:2 + dx + n] - a).max(-1) for dy in (-2, 0, 2) for dx in (-2, 0, 2))
+        flat &= var < 0.03
         alpha[flat] = 0
         log('atlas padding masked', int(flat.sum()), 'px')
     # Pyramid of premultiplied colour and weight.
