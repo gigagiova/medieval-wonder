@@ -21,6 +21,10 @@ export interface RoofOpts {
   shingle?: boolean;
   /** Extra sag of the ridge (old, tired roofs). */
   sag?: number;
+  /** Facets per cover tile (3 near the lanes, 2 on the back roofs). */
+  seg?: number;
+  /** World x/z direction of the street: the slope facing away from it is tiled cheaply (nobody sees it). */
+  street?: [number, number];
 }
 
 /**
@@ -63,33 +67,41 @@ export function tiledGable(b: Builder, acc: Acc, w: number, d: number, hr: numbe
     if (o.shingle) {
       // Shingles: courses of split boards lapping down the slope, each course
       // a run of boards of uneven length with a ragged butt edge.
-      const crs = 0.3;
+      const crs = 0.36;
       const nCr = Math.max(2, Math.round(run / crs));
       for (let k = 0; k < nCr; k++) {
         const z0 = s * (run * k) / nCr, z1 = s * Math.min(run, (run * (k + 1)) / nCr + 0.08);
         for (let lx = -W / 2; lx < W / 2 - 0.05;) {
-          const bw = Math.min(W / 2 - lx, R(0.5, 1.4));
+          const bw = Math.min(W / 2 - lx, R(0.7, 1.8));
           const a = lx + 0.01, c = lx + bw - 0.01;
           const dz = s * R(-0.04, 0.03);
           const ya = (x: number, z: number) => top(x, z) - 0.05;
-          if (!DETAIL.mid) acc.hexa('wood', [P(a, ya(a, z0), z0), P(c, ya(c, z0), z0), P(c, ya(c, z1 + dz) , z1 + dz), P(a, ya(a, z1 + dz), z1 + dz),
-            P(a, ya(a, z0) + 0.025, z0), P(c, ya(c, z0) + 0.025, z0), P(c, ya(c, z1 + dz) + 0.045, z1 + dz), P(a, ya(a, z1 + dz) + 0.045, z1 + dz)], true);
+          if (!DETAIL.mid) {
+            // Only what shows: the board's face and its butt end.
+            const t0 = P(a, ya(a, z0) + 0.025, z0), t1 = P(c, ya(c, z0) + 0.025, z0), t2 = P(c, ya(c, z1 + dz) + 0.045, z1 + dz), t3 = P(a, ya(a, z1 + dz) + 0.045, z1 + dz);
+            const b2 = P(c, ya(c, z1 + dz) - 0.01, z1 + dz), b3 = P(a, ya(a, z1 + dz) - 0.01, z1 + dz);
+            const below = P((a + c) / 2, ya((a + c) / 2, (z0 + z1) / 2) - 3, (z0 + z1) / 2);
+            acc.quad('wood', t0, t1, t2, t3, below);
+            acc.quad('wood', t3, t2, b2, b3, P((a + c) / 2, ya((a + c) / 2, z0), z0 - s * 0.5));
+          }
           lx += bw;
         }
       }
     }
     // Cover tiles, row by row.
     const up = v3(), side = X;
-    for (let lx = -W / 2 + R(0.1, 0.25); lx < W / 2 - 0.1 && !o.shingle; lx += pitch + R(-0.02, 0.02)) {
+    const hidden = !!o.street && (Z.x * o.street[0] + Z.z * o.street[1]) * s < -0.3;
+    const pS = hidden ? Math.max(pitch, 0.55) : pitch, cS = hidden ? Math.max(course, 1.0) : course, sg = hidden ? 2 : o.seg ?? 3;
+    for (let lx = -W / 2 + R(0.1, 0.25); lx < W / 2 - 0.1 && !o.shingle; lx += pS + R(-0.02, 0.02)) {
       const len = run + R(-0.1, 0.05);
-      const nC = Math.max(1, Math.round(Math.hypot(len, len * tanA) / course));
+      const nC = Math.max(1, Math.round(Math.hypot(len, len * tanA) / cS));
       for (let k = 0; k < nC; k++) {
         if (chance(0.025)) continue;
         const z0 = s * (len * k) / nC - s * 0.03, z1 = s * (len * (k + 1)) / nC;
         const lift = 0.025;
         const p0 = P(lx, top(lx, z0) + lift, z0), p1 = P(lx, top(lx, z1) + 0.005, z1);
         up.set(0, 1, 0).addScaledVector(Z, s * tanA).normalize();
-        coppo(acc, 'roof', p0, p1, up, side, 0.088, 0.072);
+        coppo(acc, 'roof', p0, p1, up, side, 0.088, 0.072, sg);
       }
     }
     // Rafter ends under the eave.
