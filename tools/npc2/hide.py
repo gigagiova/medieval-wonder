@@ -127,6 +127,9 @@ def mark(basemesh, garments, outfits, specs, knee=None):
     nbs = {k: neighbours(o) for k, o in meshes.items()}
     bits = {k: [0] * len(o.data.vertices) for k, o in meshes.items()}
     stats = {}
+    import headfit as _hf0
+    _co = _hf0.mix_coords(basemesh)
+    waist = (_hf0.group_centroid(basemesh, _co, 'joint-neck').z + (knee if knee is not None else 0.5)) / 2
     for bit, (oid, of) in enumerate(outfits.items()):
         gs = [g for g in of['garments'] if g in garments]
         for k, o in meshes.items():
@@ -136,13 +139,25 @@ def mark(basemesh, garments, outfits, specs, knee=None):
             depth = specs[k]['depth'] if k != 'body' else -1
             # (Not under a cloak or shawl: open and swinging, it uncovers what it hangs over.)
             over = [g for g in gs if g != k and specs[g]['depth'] > depth and not specs[g].get('open')]
-            if not over:
+            cloaks = [g for g in gs if g != k and specs[g]['depth'] > depth and specs[g].get('open')]
+            if not over and not (k != 'body' and cloaks):
                 continue
             pos, nrm = rest[k]
             # The body: covered all round (rays out along its normal and tilted 25°
             # about it). A garment under another: wherever the one over it lies
             # straight out from it (a cloak's shoulders over a tunic's).
-            m = covered(pos, nrm, [bvh[g] for g in over], math.radians(25) if k == 'body' else 0.0)
+            m = covered(pos, nrm, [bvh[g] for g in over], math.radians(25) if k == 'body' else 0.0) if over else [False] * len(pos)
+            if k != 'body' and cloaks:
+                # Under a cloak: the back of the shoulders, upper back and upper
+                # arms, which the cloak hangs over in every pose (the sleeves
+                # and shoulders came through it as the arms swung). Only faces
+                # not turned to the front (the face looks -y in Blender's
+                # frame) and above the waist, where the cloak lies straight out.
+                back = [i for i in range(len(pos)) if not m[i] and nrm[i].y > -0.2 and pos[i].z > waist]
+                cov = covered([pos[i] for i in back], [nrm[i] for i in back], [bvh[g] for g in cloaks], 0.0)
+                for i, c in zip(back, cov):
+                    if c:
+                        m[i] = True
             m = erode(m, nbs[k], 1)
             if k == 'body':
                 # The artists' own delete groups (for whole-garment coverage such as hose under boots).

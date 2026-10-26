@@ -88,8 +88,9 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
     cap('LeftUpLeg', 'LeftLeg', 0.1), cap('RightUpLeg', 'RightLeg', 0.1),
     cap('LeftLeg', 'LeftFoot', 0.08), cap('RightLeg', 'RightFoot', 0.08),
     cap('LeftUpLeg', 'RightUpLeg', 0.1), cap('Hips', 'Spine1', 0.13), cap('Spine1', 'Neck', 0.13),
-    cap('LeftArm', 'LeftForeArm', 0.07), cap('RightArm', 'RightForeArm', 0.07),
-    cap('LeftForeArm', 'LeftHand', 0.05), cap('RightForeArm', 'RightHand', 0.05),
+    cap('LeftShoulder', 'LeftArm', 0.08), cap('RightShoulder', 'RightArm', 0.08),
+    cap('LeftArm', 'LeftForeArm', 0.1), cap('RightArm', 'RightForeArm', 0.1),
+    cap('LeftForeArm', 'LeftHand', 0.08), cap('RightForeArm', 'RightHand', 0.08),
   ];
   let fresh = true, resting = false;
   const g = new THREE.Vector3(0, -9.8, 0);

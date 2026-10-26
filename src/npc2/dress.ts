@@ -53,6 +53,8 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
       if (g.map === 'detail') detailMap(mat);
     }
     inside(mat);
+    // Hood and cowl: closed shells wound outwards (tools/npc2/derive.py), drawn one-sided.
+    if (g.id === 'hood' || g.id === 'cowl') mat.side = THREE.FrontSide;
     m.material = mat;
   });
   return new ClothingV2(meshes);

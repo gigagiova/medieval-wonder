@@ -222,6 +222,7 @@ def lift_hood(o, basemesh, above=0.045, slump_k=0.7):
     bm = bmesh.new()
     bm.from_mesh(o.data)
     ow, owi = o.matrix_world, o.matrix_world.inverted()
+    print('NPC2 hood shell', o.name, shell_outward(bm), flush=True)
     # The opening's top edge: the lowest of the hood in front of the face's middle, above the eyes' line.
     front = [ow @ v.co for v in bm.verts if abs((ow @ v.co).x - eye.x) < 0.035 and (ow @ v.co).y < eye.y + 0.02 and (ow @ v.co).z > eye.z - 0.03]
     if not front:
@@ -351,3 +352,15 @@ def body_tree(basemesh):
     from mathutils.bvhtree import BVHTree
     co = headfit.mix_coords(basemesh)
     return BVHTree.FromPolygons(co, [tuple(p.vertices) for p in basemesh.data.polygons])
+
+
+def shell_outward(bm):
+    """The hood assets are modelled as a closed, thickened shell (an outer
+    face and a lining joined round the rim), wound inconsistently. Turned
+    consistently outwards, the shell is drawn one-sided (src/npc2/dress.ts):
+    from outside only the outer face is seen, and where the lining crosses
+    through it as the head turns, the lining's faces look inwards and are
+    culled; looking into the hood, the lining is seen as it should be.
+    (Drawn two-sided, the crossings showed as dark shards.)"""
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    return len(bm.faces)

@@ -68,7 +68,7 @@ GARMENTS = {
     'shoes': {'sex': ['man', 'woman'], 'mhclo': 'punkduck_medieval_boots/punkduck_medieval_boots.mhclo', 'fabric': 'leather', 'layer': 'shoe', 'map': 'color'},
     # Modelled here (drape.py): a Lombard cloak of fulled wool fastened at
     # the right shoulder, to the calf; a woman's shawl round the shoulders.
-    'cloak': {'sex': ['man'], 'drape': {'from': 165, 'to': 375, 'length': 1.05, 'over': ['shirt'], 'frames': 1, 'gap': 0.03, 'folds': 0.05, 'nfolds': 13}, 'fabric': 'felt', 'layer': 'over', 'depth': 80, 'skirt': {'top': 0.5, 'hem': 0.3}, 'chains': {'set': 'cape', 'around': 'neck', 'n': 13, 'bones': 6, 'arc': (165, 375), 'parent': 'Spine2', 'top': -0.08}},
+    'cloak': {'sex': ['man'], 'drape': {'from': 165, 'to': 375, 'length': 1.05, 'over': ['shirt'], 'frames': 1, 'gap': 0.045, 'folds': 0.05, 'nfolds': 13, 'arm_follow': 0.5, 'arm_top': 0.9}, 'fabric': 'felt', 'layer': 'over', 'depth': 80, 'skirt': {'top': 0.5, 'hem': 0.3}, 'chains': {'set': 'cape', 'around': 'neck', 'n': 13, 'bones': 6, 'arc': (165, 375), 'parent': 'Spine2', 'top': -0.08}},
     'gown': {'sex': ['woman'], 'mhclo': 'punkduck_medieval_dress/punkduck_medieval_dress.mhclo', 'fabric': 'twill', 'layer': 'tunic', 'nrm': 0.4, 'skirt': {'top': 0.85, 'hem': 0.55}, 'chains': {'set': 'long', 'around': 'hips', 'n': 12, 'bones': 5, 'parent': 'Hips', 'top': 0.0}},
     'veil': {'sex': ['woman'], 'mhclo': 'elvs_charity_veil1/elvs_charity_veil1.mhclo', 'fabric': 'linen', 'layer': 'head', 'relax': 30},
 }
