@@ -617,7 +617,7 @@ function townProps(scene: THREE.Scene) {
     }
   }
   for (const l of lay.lots) {
-    if (!l.front || (k++ % 4) !== 0) continue;
+    if (!l.front || (k++ % 2) !== 0) continue;
     const f = l.front, t = rand01(l.id * 1.7);
     // Not where the house already has its stair, woodpile, bench or cart (arch/dress.ts).
     { const fp = plans.get(l.id); if (fp && (fp.stair || fp.items.length)) continue; }
@@ -626,9 +626,12 @@ function townProps(scene: THREE.Scene) {
     if (u < 0.22) P('wine_barrel_01', x, z, u * 20, 0.85);
     else if (u < 0.4) P(u < 0.3 ? 'planter_pot_clay' : 'ceramic_pot', x, z, u * 9, 1.5);
     else if (u < 0.52) P('wicker_basket_02', x, z, u * 7, 1);
-    else if (u < 0.62) P('wooden_bucket_01', x, z, u * 5, 1);
-    else if (u < 0.7) P('street_rat', x, z, u * 11, 1);
-    else P(u < 0.85 ? 'weed_plant_02' : 'nettle_plant', x, z, u * 13, 3);
+    else if (u < 0.6) P('wooden_bucket_01', x, z, u * 5, 1);
+    else if (u < 0.66) P('wooden_barrels_01', x, z, u * 17, 0.9);
+    else if (u < 0.71) P('folding_wooden_stool', x, z, u * 23, 1);
+    else if (u < 0.76) P('dry_branches_medium_01', x, z, u * 29, 1);
+    else if (u < 0.8) P('street_rat', x, z, u * 11, 1);
+    else P(u < 0.9 ? 'weed_plant_02' : 'nettle_plant', x, z, u * 13, 3);
   }
   for (const p of lay.plots) {
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;

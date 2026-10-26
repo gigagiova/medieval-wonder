@@ -724,7 +724,7 @@ export function layoutTown(seed = 700): Layout {
         const at = (u: number, w: number) => V(ex.x * u + ez.x * w, ex.y * u + ez.y * w);
         const inComp = (c: V2[]) => {
           const [c0, c1, c2, c3] = c;
-          for (let a = 0.06; a < 1; a += 0.11) for (let b2 = 0.06; b2 < 1; b2 += 0.11) {
+          for (let a = 0.05; a < 1; a += 0.15) for (let b2 = 0.05; b2 < 1; b2 += 0.15) {
             const p = c0.clone().lerp(c1, a).lerp(c3.clone().lerp(c2, a), b2);
             const k = r.idx(p.x, p.y);
             if (k < 0 || comp[k] !== ci || r.grid[k] !== STREET) return false;
@@ -750,8 +750,10 @@ export function layoutTown(seed = 700): Layout {
             lay.lots.push({ id: lotId++, c, front: { a: c[0], b: c[1], out: o }, h: shed ? R(3.0, 4.2) : R(4.2, 7.8), parcel: 0 });
           } else lay.lots.push({ id: lotId++, c: placed, h: shed ? R(2.6, 3.6) : R(3.6, 6.5), parcel: 0 });
         };
-        // Rows of houses on the island's grain where it is wide...
-        for (let w = w0 + 0.3; w < w1 - 1.5; ) {
+        // Rows of houses on the island's grain where it is wide (not across a straggling network of
+        // strips, whose bounds are mostly something else)...
+        const compact = (u1 - u0) * (w1 - w0) < cells.length * r.res * r.res * 3;
+        if (compact) for (let w = w0 + 0.3; w < w1 - 1.5; ) {
           const dw = R(3.6, 7);
           for (let u = u0 + 0.3; u < u1 - 1.5; ) {
             const du = R(3.6, 7);
@@ -769,7 +771,7 @@ export function layoutTown(seed = 700): Layout {
         let tries = 0;
         for (const k of order) {
           if (r.grid[k] !== STREET) continue;
-          if (++tries > cells.length / 4) break;
+          if (++tries > cells.length / 6) break;
           const x = cxOf(k), z = czOf(k), u = x * ex.x + z * ex.y, w = x * ez.x + z * ez.y;
           let done = false;
           for (const [lo, hi, shed] of [[3.4, 5.5, false], [2.0, 3.4, true]] as [number, number, boolean][]) {

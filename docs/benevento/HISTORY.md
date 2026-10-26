@@ -250,10 +250,37 @@ World coordinates in metres (x, z).
   drawing and it leaked into the lane network, the parts wider than 9.2 m were cut back out as blocks
   (morphological opening, `plan_classify.py`). Result: 679 blocks/open spaces inside the circuit, lanes
   as drawn (median width ~5 m). The ink line between a block and a lane is shared half and half; a line
-  between two blocks is their party wall. **Houses stand only inside the plan's blocks**, their fronts on
-  the block edge where it meets a lane; nothing is built in the street space. Medieval narrowness shows
-  in jetties, pontili, stalls and the worn band along the fronts; the middle of the wider street spaces
-  is left as trodden grass.
+  between two blocks is their party wall. The plan's blocks are built as drawn; its **street spaces are
+  narrowed** the way the Roman streets were by 700 (next point).
+- **The street spaces narrowed (2026).** *Diagnosis* of "the town inside the walls looks too empty": of the
+  30.6 ha inside the circuit, 8.4 ha was open street space (1.6 ha of it more than 3 m from any lane's
+  centre line: plazas of bare ground 10–25 m across), and a bug made every house front measure its lane
+  as 1.5 m wide (the count started inside the block's strip of the plan's ink line), so no front ever got
+  an outside stair, a woodpile, a bench, jars or a cart; from the middle of those spaces the nearest
+  fronts stood 10–15 m off, the farther ones were grey stand-in prisms in the fog. *History*: in the
+  excavated towns of the period the Roman street survives as a right of way but not at its width:
+  porticoes are walled up into shops and rooms, fronts come forward, lean-tos, stalls, sheds and yard walls
+  are set into the roadway, so that a street of 6–10 m becomes a lane of 2–4 m (Naples: P. Arthur, *Naples,
+  from Roman town to city-state*, 2002, on the decumani surviving as lines while the insulae and porticoes
+  were built over; Rome: R. Santangeli Valenzani on the *domus terrinee/solarate* with their courts and
+  gardens set among ruins and in the old roadways; northern Italy: G. P. Brogiolo and S. Gelichi, *La città
+  nell'alto medioevo italiano*, 1998; Lombard Benevento: Bertelli 1992 on *casae fabritae solariatae* with
+  outside masonry stairs, *terraneae*, wooden houses also with an upper floor, *cellarii* and *casaleni*, and
+  pontili allowed over the lanes only "with the obligation to keep the street public space"; Rotili 1986 on
+  the gradual occupation of ground freed by collapse). Gardens and *curtes* lie behind and between the houses, not in
+  the streets. *What the game does* (`layout.ts` §7b): every lane of the plan keeps a clear way down its
+  middle (the decumanus 5.6 m, the plan's lanes their drawn width up to 3.5 m, the arch-gate ways 4.8 m), and
+  the gates (14 m), the wells, the forum, the square Ad Caballum, the landmarks' frontages (6 m) and a 1.5 m
+  passage before every street door are kept; the rest of the street space is taken, as found per house:
+  where the room in front is shallow the front is brought forward (the house grows into the street);
+  where it is deeper, a one-storey shop or workshop is built against the front (a walled-up portico, a
+  *bottega*) or a walled yard (*curtis*, plot kind `cortis`: rubble walls with a coping, a gate with its leaf,
+  bread oven, woodpile, barrels and baskets) is set before the house; what is left of a wide space becomes
+  an island of small houses and sheds turned to the lanes round it. Street space falls from 8.4 to 7.0 ha
+  (23% of the walled area; the lanes kept clear are 4.9 ha), the lots from 5,962 to ~7,300 (most of the
+  new ones small: shops, sheds, island houses). The fronts now measure their lanes (median 5 m, which gives
+  the stairs, woodpiles, benches, jars, carts, ladders and scaffolds of `arch/dress.ts` their room), and the
+  houses on the decumanus rise to two or three storeys (7.2–10.5 m).
 - **Why the outline differs from the plan's**: the plan draws the later medieval town. The circuit
   standing in 700 (red on the maps) leaves out the Civitas nova of Arechis II (SW, after 758) and the
   annex towards the later Porta Somma (SE, 10th c.). Those parts of the plan exist in the game as ground,
@@ -271,7 +298,7 @@ World coordinates in metres (x, z).
   it. Cells too big for one house (blocks drawn without inner lines, over ~420 m²) are built up wall to
   wall: houses along every lane edge, back ranges behind them, then the rest tiled with buildings on the
   block's grain. Only the plan's green open spaces are gardens (*orti*), vines, pens (*stabula*),
-  meadows and ruins; its street spaces stay open (with pontili and arches over the narrow lanes). The
+  meadows and ruins; its street spaces are lanes, narrowed as above (with pontili and arches over them). The
   exceptions are blocks taken by a landmark the game builds (the curtis, the episcopium and the Iseum
   before it, the forum's precinct) and the 3–4 m band kept clear inside the curtain. An earlier version
   thinned the plan's blocks into gardens by a "density" field following the *città ad isole* model
