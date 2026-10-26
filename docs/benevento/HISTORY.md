@@ -40,7 +40,10 @@ Primary and scholarly (consulted directly or through the encyclopaedic syntheses
 | Curtis ducis in the Roman praetorium (*planum curiae*, Piano di Corte) | since 6th c. | **yes** |
 | S. Marciano on the Calore (reused temple) | attested 724 | no (excluded; may already exist) |
 | S. Sofia a Ponticello (Romuald II) | 706–731 | **no** |
-| S. Benedetto ad Caballum with xenodochium | attested 742 | **no** |
+| Roman equestrian statue at the later Piazza Piano di Corte (*Caballus*) | Roman | **yes** (§5 "Ad Caballum") |
+| S. Pietro ad Caballum (hall, one apse, two domes in a row) | undated; its type is S. Ilario's (late 7th/early 8th c.) | **yes (inferred)** |
+| S. Benedetto ad Caballum with xenodochium | first documented Sept. 742 | **no** (named in a readable) |
+| S. Angelo de Caballo | undated | no |
 | S. Sofia (Arechis II, 758–760) and its nunnery | 758–768 | **no** — its site is the dukes' orchard |
 | Civitas nova of Arechis II (theatre, baths recovered) | after 758, by 774 | **no** — theatre and baths outside |
 | Sacrum Palatium of Arechis II | 758–787 | **no** — the older curtis stands |
@@ -124,23 +127,47 @@ World coordinates in metres (x, z).
   The church "of the Forty" in it is medieval but undated: shown only as a chapel.
 - **Torre della Catena** (−517, −27): the 7th-c. fort (today isolated by 1943 bombing); enterable.
 - **S. Ilario a Port'Aurea** (429, −285): the little church with two domes in line on the Via Traiana.
-- **Ponte Leproso** (axis from (−736.8, −143.4) to (−788.5, −61.4), OSM way 59431406): the Appia over
-  the Sabato, "pons marmoreus quod dicitur de Leprosis" in a charter of 1077, named Leproso first in
-  830. Built after Meomartini's survey (1889; summarised in it.wikipedia "Ponte Leproso", which cites
-  Meomartini, Galliazzo, Quilici, Rotili 1986 and *NSc* 1891): five equal semicircular arches of 8.70 m
-  on four piers 5 m thick and 7.50 m through (the roadway's width), a triangular cutwater upstream only,
-  the arches springing from a projecting cornice 60 cm high, all in pseudisodomic work of big, roughly
-  bossed limestone blocks (whence "marmoreus"), the rings of great wedge-shaped voussoirs; a level
-  roadway on the bridge reached by ramps between embankment walls of the same bossed blocks; tuff
-  footings. Restored under Valentinian, Valens and Gratian (367–375), whose names were on the parapet
-  (a readable; the wording after the names is reconstruction). Left out as later: Nauclerio's four
-  southern arches (1712), the widened mill pier and the mills (after 1077), the hospice (830). In the
-  game the classical span is 63.5 m (abutments at 20 and 83.5 m from the town end), the springing 1 m
-  above the Sabato's mean level, the roadway ~6 m above the water, ramps of 9–10% about 50 m long each
-  side; the river (OSM course) runs under the two southern arches, the northern ones stand half silted
-  over gravel; one downstream ring relaid in brick stands for the late-antique repair. The Appia and
-  the lane from the town now run to the ramp feet; trees are kept off the bridge, the ramps and the
-  meadow upstream on the town bank (the view from the lane). **Pons S. Onuphrii** (−86, −372) over the
+- **Ponte Leproso** (axis from (−736.8, −143.4) to (−788.5, −61.4), OSM way 59431406, 97 m: the whole
+  modern bridge with its 18th-c. additions and approaches): the Appia over the Sabato, "pons marmoreus quod
+  dicitur de Leprosis" in a charter of 1077, named Leproso first in 830. **Size, re-checked (2026)** against
+  the only survey, A. Meomartini, *I monumenti…* (1889), pp. 277–283 and Tav. XL–XLI (Wikisource, pages
+  djvu/303–308), and it.wikipedia "Ponte Leproso" (which summarises him and notes that Galliazzo's entry has
+  "svariate imprecisioni"):
+
+  | | Meomartini (measured) | game before | game now |
+  |---|---|---|---|
+  | arches | 5 equal, radius 4.35 (span 8.70) | 5 × 8.70 | 5 × 8.70 |
+  | arch centre | on the **lower** line of the impost band | on its upper line (+0.60 m) | lower line |
+  | impost band | 0.60 high, standing out 0.32 | 0.60 / 0.25 | 0.60 / 0.32 |
+  | piers | 5.00 thick, 7.50 long (= width of the bridge) | 5.00 × 7.50 | same |
+  | cutwater | triangular, upstream only, stands out 2.50 | 2.90 | 2.50 |
+  | voussoirs of the face rings | 1.20 long | 0.95 | 1.20 |
+  | pier above the footing (platea) | 4 courses, 2.58 m visible (more buried) | 4.4 m, but buried by the silt | ~0.25 m above the gravel bed + band |
+  | bridge between abutments | 5 × 8.70 + 4 × 5.00 = **63.5 m** | 63.5 m | 63.5 m |
+  | roadway | level over the bridge | 7.0 m above the water | **6.4 m** above the water (crown extrados + 0.35 m of fill and paving) |
+  | approach, town side | walls of bossed blocks ~62 m long, the road falling steeply, then gently, then level | 45 m at 9–10 % | 62 m, 55 % of the fall in the first 22 m, the rest by 50 m, level after |
+  | approach, far side | not known | 51 m walled ramp at 10 % | the same fall; bossed walls only to 12 m past the abutment, then an earth bank (agger) |
+  | ground under the bridge | (1889: the river pushed to the left bank by the mills, three arches silted) | the 1889 state: three arches silted to 0.4–0.6 m *above* their springing | a gravel bed at 12.75 (water 12.5) under all five arches (see below) |
+
+  So the arch module was right (and the world scale is: equirectangular metres from OSM, checked); what made
+  the bridge read as "way too big" was the way it sat in the land: the modern (DEM) ground, raised by the
+  silt the mills caused after 1077, buried the three northern arches above their springing, so from the
+  meadow one saw a solid wall ~5.5 m high and ~170 m long (ramp foot to ramp foot) with only the tops of
+  the openings showing; the deck was 0.6 m too high (arch centre on the wrong line of the band); the far
+  ramp was walled in bossed blocks for its whole invented length. Now the ground under the bridge is cut
+  down to the Sabato's own gravel bed of 700 (`sites.ts`, a "cut" terrace that only lowers the DEM), so the
+  five arches stand open on their piers as Roman bridges do, the river in the southern two; the deck is at
+  the surveyed height; only the town approach has its attested walls. Why the real bridge looks smaller
+  today: only one Roman pier and parts of two Roman arches survive, both narrowed (to ~8 m and 4.55 m) and
+  hidden by the mills; the other three openings are Nauclerio's lower segmental brick arches of 8.30–8.36 m
+  (1712); the platea and the banks have risen. Other features after Meomartini: the arches spring from the
+  band, all in pseudisodomic work of big, roughly bossed limestone blocks (whence "marmoreus"), the rings of
+  great wedge-shaped voussoirs; tuff footings. Restored under Valentinian, Valens and Gratian (367–375),
+  whose names were on the parapet (a readable; the wording after the names is reconstruction). Left out as
+  later: Nauclerio's four southern arches (1712), the widened mill pier and the mills (after 1077), the
+  hospice (830). One downstream ring relaid in brick stands for the late-antique repair. The Appia and the
+  lane from the town run to the ramp feet; trees are kept off the bridge, the ramps and the meadow upstream
+  on the town bank (the view from the lane). **Pons S. Onuphrii** (−86, −372) over the
   Calore at Porta Gloriosa (today's Ponte Vanvitelli, medieval core).
 - **S. Pietro extra muros** (−858, −6): Theodorada's nunnery across the Sabato on the Appia.
 - **Iseum** (−33, −73): Domitian's temple of Isis (AD 88/89), its remains in the square before the
@@ -160,6 +187,38 @@ World coordinates in metres (x, z).
   San Lorenzo; findspot unknown) sunk at the corner of the square. **Reconstruction** of the
   arrangement; the location is a scholarly hypothesis, not proven. Earlier versions of the game put
   it outside the east gate; that was wrong (a temple of the colony stood inside its walls).
+- **Ad Caballum** (499, −108; teleport "Ad Caballum"): the little square before the curtis gate.
+  Treccani's *Enciclopedia dell'Arte Medievale* ("Benevento", G. Bertelli Buquicchio 1992): "near the
+  palatium stood churches with a singular dedication: S. Angelo de Caballo, S. Benedetto ad Caballum,
+  documented for the first time with an annexed xenodochium in September 742, and S. Pietro ad Caballum, a
+  hall with one apse later turned into a dwelling"; with S. Ilario a Port'Aurea it is "one of the southern
+  prototypes of the church with domes in a row". Rotili's topography puts S. Benedetto ad Caballum and its
+  xenodochium by the *platea loco Caballi nomine* ("the square of the place called the Horse"); later
+  sources place S. Pietro ad Caballum in the *area caballi* where an equestrian statue stood; the parish of
+  S. Pietro a Caballo, by then gone, was joined to SS. Salvatore in 1661 (it.wikipedia "Chiesa del
+  Santissimo Salvatore (Benevento)"). Two fragments of an equestrian monument were found **in Piazza Piano
+  di Corte in 1920** (Museo del Sannio, kept in the depot yard; *Il Mattino* and the Province's museum
+  project, 2023–24), i.e. on the *planum curiae*, the old praetorium where the dukes' curtis stood. So the
+  "Horse" was a Roman equestrian statue by the ducal residence, and the churches took their name from it.
+  The user remembered a "chiesa ad Caballum in the city centre": that is right in substance (Piano di Corte
+  is in the middle of the town of 700), but there were three, and none is dated before 700. **Shown**:
+  the statue still on its pedestal (marble, over life size, the rider broken off at the waist; the
+  material of the 1920 fragments was not checked; the pose, walking with a foreleg raised, is the type's;
+  readable `caballus`, the base's words reconstruction), in a small square of old paving, and on its east
+  side **S. Petrus ad Caballum** as a household church of the curtis quarter: rubble and brick, one apse,
+  two little domes on square drums in a row, a Roman lintel and column drums at the door, a churchyard
+  with graves and a reused sarcophagus (readable `petrusCaballi`, text invented). Its existence in 700 is
+  an **inference** from its type (S. Ilario's date); S. Benedetto ad Caballum (742) and S. Angelo de Caballo
+  (undated) are left out and named in the readable. Positions: the square is placed in front of the curtis
+  gate where the OSM Piazza Piano di Corte lies; exact sites of the churches are not known.
+- **Churches standing in 700, checked (2026).** Documented by 700 and built: the cathedral of S. Maria (600),
+  S. Pietro extra muros (before 687), S. Ilario a Port'Aurea (by its masonry), the chapel in the Santi
+  Quaranta. Undated churches of the early town that may already have stood (not built, for lack of any
+  date or site): S. Cosma by the Ponte Leproso on the town bank, S. Lorenzo on the Appia (the gate's name),
+  S. Benedetto a Pantano on the Calore, S. Pietro *de monachabus* in the forum area, S. Angelo de Caballo.
+  The earliest dated after 700: S. Sofia a Ponticello (706–731), S. Marciano on the Calore (existing in 724;
+  the most likely of all to have stood already), S. Benedetto ad Caballum (742), S. Sofia (758–760). No
+  church documented before 700 is missing.
 - **Lombard cemetery** (238, 286): the necropolis excavated south of the town (Rotili 1977); poles with
   wooden doves (perticae, Paul the Deacon HL V 34).
 - **The walnut** (−330, 478): legend only. The *Vita Barbati* tells of the sacred tree; the later
@@ -191,10 +250,42 @@ World coordinates in metres (x, z).
   drawing and it leaked into the lane network, the parts wider than 9.2 m were cut back out as blocks
   (morphological opening, `plan_classify.py`). Result: 679 blocks/open spaces inside the circuit, lanes
   as drawn (median width ~5 m). The ink line between a block and a lane is shared half and half; a line
-  between two blocks is their party wall. **Houses stand only inside the plan's blocks**, their fronts on
-  the block edge where it meets a lane; nothing is built in the street space. Medieval narrowness shows
-  in jetties, pontili, stalls and the worn band along the fronts; the middle of the wider street spaces
-  is left as trodden grass.
+  between two blocks is their party wall. The plan's blocks are built as drawn; its **street spaces are
+  narrowed** the way the Roman streets were by 700 (next point).
+- **The street spaces narrowed (2026).** *Diagnosis* of "the town inside the walls looks too empty": of the
+  30.6 ha inside the circuit, 8.4 ha was open street space (1.6 ha of it more than 3 m from any lane's
+  centre line: plazas of bare ground 10–25 m across), and a bug made every house front measure its lane
+  as 1.5 m wide (the count started inside the block's strip of the plan's ink line), so no front ever got
+  an outside stair, a woodpile, a bench, jars or a cart; from the middle of those spaces the nearest
+  fronts stood 10–15 m off, the farther ones were grey stand-in prisms in the fog. *History*: in the
+  excavated towns of the period the Roman street survives as a right of way but not at its width:
+  porticoes are walled up into shops and rooms, fronts come forward, lean-tos, stalls, sheds and yard walls
+  are set into the roadway, so that a street of 6–10 m becomes a lane of 2–4 m (Naples: P. Arthur, *Naples,
+  from Roman town to city-state*, 2002, on the decumani surviving as lines while the insulae and porticoes
+  were built over; Rome: R. Santangeli Valenzani on the *domus terrinee/solarate* with their courts and
+  gardens set among ruins and in the old roadways; northern Italy: G. P. Brogiolo and S. Gelichi, *La città
+  nell'alto medioevo italiano*, 1998; Lombard Benevento: Bertelli 1992 on *casae fabritae solariatae* with
+  outside masonry stairs, *terraneae*, wooden houses also with an upper floor, *cellarii* and *casaleni*, and
+  pontili allowed over the lanes only "with the obligation to keep the street public space"; Rotili 1986 on
+  the gradual occupation of ground freed by collapse). Gardens and *curtes* lie behind and between the houses, not in
+  the streets. *What the game does* (`layout.ts` §7b): every lane of the plan keeps a clear way down its
+  middle (the decumanus 5.6 m, the plan's lanes their drawn width up to 3.5 m, the arch-gate ways 4.8 m), and
+  the gates (14 m), the wells, the forum, the square Ad Caballum, the landmarks' frontages (6 m) and a 1.5 m
+  passage before every street door are kept; the rest of the street space is taken, as found per house:
+  where the room in front is shallow the front is brought forward (the house grows into the street);
+  where it is deeper, a one-storey shop or workshop is built against the front (a walled-up portico, a
+  *bottega*) or a walled yard (*curtis*, plot kind `cortis`: rubble walls with a coping, a gate with its leaf,
+  bread oven, woodpile, barrels and baskets) is set before the house; the pockets of street space left
+  between become little walled gardens and pens (plot kind `hortulus`: four walls a little over head
+  height, a gate on the lane, beds or a manger inside). Street space falls from 8.4 to 7.6 ha (25% of the
+  walled area); ~100 walled yards and ~290 walled gardens; the houses grow by ~60 shops and many fronts
+  brought forward, the lot count staying ~6,000. *Phone budget*: a first version also built islands of
+  small houses and sheds into the wide spaces (~1,200 more lots): +35% triangles in the near chunks, so
+  they are off (`ENCROACH.islands`); the yard and garden walls are plain untessellated boxes and cost almost
+  nothing. Near chunks now cost ~7% more triangles than before the pass (56k vs 52k per chunk, measured on
+  27 chunks round three street views with `buildChunk`). The fronts now measure their lanes (median 5 m, which gives
+  the stairs, woodpiles, benches, jars, carts, ladders and scaffolds of `arch/dress.ts` their room), and the
+  houses on the decumanus rise to two or three storeys (7.2–10.5 m).
 - **Why the outline differs from the plan's**: the plan draws the later medieval town. The circuit
   standing in 700 (red on the maps) leaves out the Civitas nova of Arechis II (SW, after 758) and the
   annex towards the later Porta Somma (SE, 10th c.). Those parts of the plan exist in the game as ground,
@@ -212,7 +303,7 @@ World coordinates in metres (x, z).
   it. Cells too big for one house (blocks drawn without inner lines, over ~420 m²) are built up wall to
   wall: houses along every lane edge, back ranges behind them, then the rest tiled with buildings on the
   block's grain. Only the plan's green open spaces are gardens (*orti*), vines, pens (*stabula*),
-  meadows and ruins; its street spaces stay open (with pontili and arches over the narrow lanes). The
+  meadows and ruins; its street spaces are lanes, narrowed as above (with pontili and arches over them). The
   exceptions are blocks taken by a landmark the game builds (the curtis, the episcopium and the Iseum
   before it, the forum's precinct) and the 3–4 m band kept clear inside the curtain. An earlier version
   thinned the plan's blocks into gardens by a "density" field following the *città ad isole* model

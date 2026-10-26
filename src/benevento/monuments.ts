@@ -576,3 +576,128 @@ export function castellumAquae(b: Builder) {
 }
 
 export { wellHead, placeProp, SITE, toLocalXZ, toWorldXZ, tiledGable, Acc };
+
+// ---------------------------------------------------------------- ad Caballum
+/**
+ * The place "ad Caballum" before the dukes' curtis: a small square named after a Roman equestrian
+ * statue still on its base (two fragments of an equestrian monument came out of Piazza Piano di
+ * Corte in 1920 and are in the Museo del Sannio's depot), and on its east side the little church of
+ * S. Petrus ad Caballum: a hall with one apse under two domes in a row, the type of S. Ilario a
+ * Port'Aurea, of which Bertelli (1992) calls the two the southern prototypes; later turned into a
+ * house. Graves round it. See docs/benevento/HISTORY.md §5 "Ad Caballum".
+ * Local frame: x east, z south; the statue at (-4, -2), the church's west door at x = 1.4.
+ */
+export const CABALLUM = { statue: [-4, -2] as [number, number], church: { x: 7.4, z: 3.0, L: 12.0, W: 7.0 } };
+
+/** A limb from p to q (local, y above the ground), radius r0 at p and r1 at q. */
+function limb(b: Builder, m: MatName, p: THREE.Vector3, q: THREE.Vector3, r0: number, r1: number, seg = 10, collide = false) {
+  const d = q.clone().sub(p), L = d.length();
+  const g = new THREE.CylinderGeometry(r1, r0, L, seg, 1);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), d.clone().normalize()));
+  const c = p.clone().add(q).multiplyScalar(0.5);
+  b.geo(m, g, c.x, c.y, c.z, 0, collide);
+}
+/** An ellipsoid with semi-axes (a, bb, c) at p, turned by ry about y and rz about z. */
+function blob(b: Builder, m: MatName, p: THREE.Vector3, a: number, bb: number, c: number, rz = 0, ry = 0, seg = 14) {
+  const g = new THREE.SphereGeometry(1, seg, Math.max(6, Math.round(seg * 0.6)));
+  g.scale(a, bb, c);
+  b.geo(m, g, p.x, p.y, p.z, ry, false, 0, rz);
+}
+
+export function adCaballum(b: Builder) {
+  seed(742);
+  const [sx, sz] = CABALLUM.statue;
+  // ---- the statue: a Roman horse with its rider broken off at the waist, on a pedestal of reused
+  // blocks. Over life size, as these monuments were (horse ~2.4 m long).
+  const m: MatName = 'marble';
+  // Pedestal: footing, die, crowning moulding; the die's face once carried the dedication.
+  b.box('bigstone', 3.6, 0.45, 2.0, sx, -0.25, sz, 0);
+  b.box(m, 3.1, 1.55, 1.5, sx, 0.2, sz, 0);
+  b.box(m, 3.4, 0.28, 1.75, sx, 1.75, sz, 0);
+  b.box('slab', 1.6, 0.6, 0.06, sx, 0.65, sz + 0.77, 0, false);
+  const top = 2.03;
+  const P = (x: number, y: number, z = 0) => V3(sx + x, top + y, sz + z);
+  // Horse, walking to the east (+x), the near foreleg lifted, as the classic equestrian statue.
+  blob(b, m, P(0, 1.38), 1.05, 0.48, 0.42, 0, 0, 18);           // barrel
+  blob(b, m, P(0.78, 1.45), 0.48, 0.5, 0.4, 0.2);                // chest and shoulders
+  blob(b, m, P(-0.78, 1.42), 0.5, 0.48, 0.41, -0.1);             // haunches
+  limb(b, m, P(0.95, 1.6), P(1.38, 2.3), 0.3, 0.19, 12);          // neck
+  blob(b, m, P(1.32, 2.33), 0.2, 0.17, 0.12, 0.6);               // crest/poll
+  limb(b, m, P(1.4, 2.32), P(1.82, 1.98), 0.15, 0.09, 10);        // head, muzzle down
+  for (const s of [-1, 1]) limb(b, m, P(1.42, 2.42, s * 0.07), P(1.4, 2.6, s * 0.08), 0.04, 0.01, 5); // ears
+  // Legs: hind pair and the far foreleg on the plinth; the near foreleg raised and broken at the knee.
+  const leg = (x: number, z: number, kneeDx: number) => {
+    limb(b, m, P(x, 1.12, z), P(x + kneeDx, 0.55, z), 0.13, 0.09, 8);
+    limb(b, m, P(x + kneeDx, 0.55, z), P(x + kneeDx * 0.6, 0.05, z), 0.08, 0.07, 8);
+    blob(b, m, P(x + kneeDx * 0.6, 0.06, z), 0.1, 0.07, 0.09);
+  };
+  leg(-0.9, 0.2, -0.08); leg(-0.85, -0.2, 0.05); leg(0.85, -0.2, 0.04);
+  limb(b, m, P(0.88, 1.15, 0.2), P(1.18, 0.75, 0.2), 0.13, 0.09, 8);  // the lifted near foreleg, stump
+  limb(b, m, P(-1.05, 1.5), P(-1.25, 0.75, 0.04), 0.11, 0.05, 8);     // tail
+  // The rider: thighs along the flanks and the hips; above the waist only a rough break.
+  for (const s of [-1, 1]) limb(b, m, P(0.05, 1.86, s * 0.3), P(0.35, 1.3, s * 0.43), 0.13, 0.09, 8);
+  blob(b, m, P(-0.02, 2.0), 0.32, 0.26, 0.3);
+  b.geo('rubble', new THREE.DodecahedronGeometry(0.24, 0), sx - 0.02, top + 2.2, sz, 0.4, false);
+  // A cloak's edge falling over the horse's quarters.
+  b.box(m, 0.55, 0.06, 0.7, sx - 0.5, top + 1.86, sz, 0, false, 0, 0.35);
+  // The pieces that have fallen: the rider's arm and a hoof in the weeds by the base.
+  fallenDrum(b, sx + 2.4, sz + 1.4, 0.12, 0.8, 0.7);
+  b.box(m, 0.35, 0.22, 0.3, sx - 2.1, -0.1, sz + 1.3, 0.4, false);
+  markReadable('caballus', sx, 1.2, sz + 1.1);
+  // Old paving slabs round the base, many lifted.
+  for (let i = 0; i < 26; i++) {
+    const x = sx + R(-5, 5), z = sz + R(-4, 4);
+    if (Math.abs(x - sx) < 2.0 && Math.abs(z - sz) < 1.2) continue;
+    b.box('slab', R(0.9, 1.5), 0.14, R(0.6, 1.1), x, -0.1, z, R(-0.15, 0.15), false, R(-0.03, 0.03), R(-0.03, 0.03));
+  }
+
+  // ---- S. Petrus ad Caballum: a small hall with one apse under two domes in a row, of the town's
+  // walling (rubble and river stones with Roman brick), Roman stones built in.
+  const { x: cx, z: cz, L, W } = CABALLUM.church, T = 0.8, H = 5.4;
+  const rub: MatName = 'rubble';
+  b.geo(rub, arcadeGeo(W, H, T, 1, 1.0, 2.4), cx - L / 2 + T / 2, -0.3, cz, Math.PI / 2);
+  archRings(b, 'brick', cx - L / 2 + T / 2, -0.3, cz, Math.PI / 2, T, 1.0, 2.4, 0.36, 0.075);
+  b.box(rub, L, H, T, cx, -0.3, cz - W / 2 + T / 2);
+  b.box(rub, L, H, T, cx, -0.3, cz + W / 2 - T / 2);
+  b.geo(rub, arcadeGeo(W, H, T, 1, 3.0, 3.0), cx + L / 2 - T / 2, -0.3, cz, Math.PI / 2);
+  // A Roman inscription reused upside down as the lintel stone over the door, a column drum each side.
+  b.box('marble', 1.7, 0.42, 0.25, cx - L / 2 - 0.05, 2.75, cz, Math.PI / 2, false);
+  for (const s of [-1, 1]) column(b, cx - L / 2 - 0.45, -0.2, cz + s * 1.15, 1.9, 0.2);
+  // Apse.
+  for (let i = 0; i <= 8; i++) {
+    const a = -Math.PI / 2 + (i / 8) * Math.PI;
+    b.box('brick', 0.95, 4.4, 0.65, cx + L / 2 + Math.cos(a) * 2.0, -0.3, cz + Math.sin(a) * 2.0, -a + Math.PI / 2);
+  }
+  b.geo('roof', new THREE.ConeGeometry(2.7, 1.3, 14, 1, false, 0, Math.PI), cx + L / 2, 4.75, cz, Math.PI / 2, false);
+  // Two bays, domes inside, square drums (tiburia) with pyramid roofs outside, the east one higher.
+  for (const [dx, th] of [[-2.9, 2.6], [2.9, 3.3]] as const) {
+    const g = new THREE.SphereGeometry(2.7, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+    b.geo('plaster', inward(g), cx + dx, H - 0.6, cz, 0, false);
+    b.box(rub, 6.0, th, 6.0, cx + dx, H - 0.3, cz, 0);
+    pyramidRoof(b, 6.5, 1.7, cx + dx, H - 0.3 + th, cz);
+    // A slit window in each free side of the drum.
+    for (const s of [-1, 1]) b.box('iron', 0.3, 0.8, 0.25, cx + dx, H + th * 0.35, cz + s * 3.0, 0, false);
+  }
+  // The transverse arch between the bays, on pilasters.
+  b.box(rub, 0.8, 1.1, W - 2 * T, cx, H - 0.6, cz, 0, false);
+  b.box(rub, 0.8, H - 0.6, 0.6, cx, -0.3, cz - W / 2 + T + 0.3);
+  b.box(rub, 0.8, H - 0.6, 0.6, cx, -0.3, cz + W / 2 - T - 0.3);
+  // Altar of a Roman altar stone, candles; a lamp at the door.
+  b.box('marble', 1.2, 0.95, 0.75, cx + L / 2 - 1.0, -0.2, cz);
+  candle(b, cx + L / 2 - 1.0, 0.75, cz - 0.28, 0.38); candle(b, cx + L / 2 - 1.0, 0.75, cz + 0.25, 0.33);
+  lucerna(b, cx - L / 2 + 1.3, 1.4, cz + W / 2 - T - 0.1, Math.PI);
+  markReadable('petrusCaballi', cx + L / 2 - 1.0, 1.1, cz);
+  // The little cemetery on the church's north and south sides: earth mounds, slabs, a Roman sarcophagus.
+  for (let i = 0; i < 12; i++) {
+    const x = R(cx - L / 2, cx + L / 2 + 1.5), z = cz + (rand() < 0.5 ? -1 : 1) * R(W / 2 + 1.0, W / 2 + 4.2);
+    if (rand() < 0.5) b.box('ground', 0.8, 0.28, 1.9, x, -0.1, z, R(-0.25, 0.25) + Math.PI / 2);
+    else b.box('stone', 0.7, 0.15, 1.8, x, -0.05, z, R(-0.25, 0.25) + Math.PI / 2, true, R(-0.05, 0.05));
+  }
+  b.box('marble', 2.1, 0.75, 0.8, cx + 2.5, -0.1, cz - W / 2 - 1.6, 0.05);
+  b.box('marble', 2.2, 0.2, 0.9, cx + 2.5, 0.62, cz - W / 2 - 1.6, 0.08, false);
+  // A low wall of the churchyard on the square's side, with a gap.
+  for (const [z0, z1] of [[cz - W / 2 - 4.6, cz - 1.6], [cz + 1.6, cz + W / 2 + 4.6]]) b.box(rub, 0.5, 1.0, z1 - z0, cx - L / 2 - 1.6, -0.2, (z0 + z1) / 2, 0);
+  placeProp(null, 'nettle_plant', cx - L / 2 - 1.3, 0, cz - W / 2 - 2, 0.4, 3);
+  placeProp(null, 'weed_plant_02', sx + 1.4, 0, sz - 1.2, 1.1, 3);
+  placeProp(null, 'weed_plant_02', sx - 1.6, 0, sz + 1.0, 2.1, 2.6);
+}

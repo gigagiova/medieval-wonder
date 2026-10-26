@@ -91,13 +91,14 @@ export function getTeleports(): Teleport[] {
   at('Sancti Quadraginta', S.quadraginta, -36, -46, -36, -56);
   at('Turris Catenae', S.turrisCatenae, -10, 0, 0, 0);
   {
-    // On the lane along the town bank, upstream: the cutwaters, the five arches, the Sabato under the last two.
-    const [x, z] = PONS.at(24, 15), [lx, lz] = PONS.at(PONS.arch(2), 0);
+    // In the meadow on the town bank upstream, 40 m off: the whole bridge, cutwaters, five arches, the Sabato under the last two.
+    const [x, z] = PONS.at(6, 42), [lx, lz] = PONS.at(PONS.arch(2), 0);
     out.push(tp('Pons Leprosus', x, z, lx, lz));
   }
   at('Sanctus Petrus', S.sanctusPetrus, -15.5, -31, -17, -45);
   at('Sanctus Hilarius', S.sanctusHilarius, -13, 0, 0, 0);
   at('Iseum', S.iseum, -6, -8, -15.5, -26);
+  at('Ad Caballum', S.caballus, -11, 9, 5, 0);
   at('Coemeterium Langobardorum', S.necropolis, 0, 11, 0, 0);
   at('Nux Sacra', S.nux, 0, 9, 0, 0);
   at('Molendinum', S.molendinum, 0.8, -7, 0.8, 0);
@@ -480,6 +481,7 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
   await at('Under the Torre della Catena', 0.63, S.turrisCatenae, () => M.turrisCatenae(b));
   await at('At S. Ilario', 0.65, S.sanctusHilarius, () => M.sanctusHilarius(b));
   await at('Among the ruins of the Iseum', 0.67, S.iseum, () => M.iseum(b));
+  await at('By the old horse', 0.675, S.caballus, () => M.adCaballum(b));
   await at('Among the Lombard graves', 0.69, S.necropolis, () => M.necropolis(b));
   await at('By the old walnut', 0.7, S.nux, () => M.nux(b));
   await at('At the mill', 0.71, S.molendinum, () => M.molendinum(b));
@@ -624,19 +626,22 @@ function townProps(scene: THREE.Scene) {
     if (u < 0.22) P('wine_barrel_01', x, z, u * 20, 0.85);
     else if (u < 0.4) P(u < 0.3 ? 'planter_pot_clay' : 'ceramic_pot', x, z, u * 9, 1.5);
     else if (u < 0.52) P('wicker_basket_02', x, z, u * 7, 1);
-    else if (u < 0.62) P('wooden_bucket_01', x, z, u * 5, 1);
-    else if (u < 0.7) P('street_rat', x, z, u * 11, 1);
-    else P(u < 0.85 ? 'weed_plant_02' : 'nettle_plant', x, z, u * 13, 3);
+    else if (u < 0.6) P('wooden_bucket_01', x, z, u * 5, 1);
+    else if (u < 0.7) P('wine_barrel_01', x, z, u * 17, 0.8);
+    else if (u < 0.8) P('street_rat', x, z, u * 11, 1);
+    else P(u < 0.9 ? 'weed_plant_02' : 'nettle_plant', x, z, u * 13, 3);
   }
   for (const p of lay.plots) {
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const [x, z] of p.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
-    const n = Math.min(40, Math.round(((x1 - x0) * (z1 - z0)) / (p.kind === 'pratum' ? 18 : 30)));
+    const n = Math.min(40, Math.round(((x1 - x0) * (z1 - z0)) / (p.kind === 'pratum' ? 18 : p.kind === 'cortis' ? 7 : 30)));
     for (let i = 0; i < n; i++) {
       const x = x0 + (x1 - x0) * rand01(p.seed % 9973 + i * 1.31), z = z0 + (z1 - z0) * rand01(p.seed % 7919 + i * 2.17);
       if (!inPoly(x, z, p.pts)) continue;
       const u = rand01(i * 5.3 + p.seed % 101);
-      const id: PropId = p.kind === 'orto' ? (u < 0.5 ? 'weed_plant_02' : 'grass_medium_02') : p.kind === 'ruina' ? (u < 0.4 ? 'nettle_plant' : u < 0.7 ? 'rock_moss_set_02' : 'fern_02') : (u < 0.5 ? 'grass_medium_02' : u < 0.8 ? 'weed_plant_02' : 'shrub_02');
+      if (p.kind === 'hortulus') continue;
+      const id: PropId = p.kind === 'cortis' ? (['wine_barrel_01', 'wicker_basket_02', 'wooden_bucket_01', 'planter_pot_clay', 'ceramic_pot', 'weed_plant_02'] as PropId[])[Math.floor(u * 6)] : p.kind === 'orto' ? (u < 0.5 ? 'weed_plant_02' : 'grass_medium_02') : p.kind === 'ruina' ? (u < 0.4 ? 'nettle_plant' : u < 0.7 ? 'rock_moss_set_02' : 'fern_02') : (u < 0.5 ? 'grass_medium_02' : u < 0.8 ? 'weed_plant_02' : 'shrub_02');
+      if (p.kind === 'cortis') { P(id, x, z, u * 30, id === 'weed_plant_02' ? 3 : id === 'ceramic_pot' ? 1.5 : 1); continue; }
       P(id, x, z, u * 30, id === 'rock_moss_set_02' ? 0.6 : id === 'shrub_02' ? 0.7 : id.startsWith('grass') ? 0.9 : 3.2);
     }
   }
@@ -655,7 +660,8 @@ function townTexture(L: Layout): THREE.DataTexture {
     const k = r.idx(x, z);
     if (k < 0) continue;
     data[o] = r.main[k];
-    data[o + 1] = r.grid[k] === STREET ? (r.trod[k] ? 255 : 40) : 0;
+    // (yards walled off the street keep its trodden earth)
+    data[o + 1] = r.grid[k] === STREET ? (r.trod[k] ? 255 : 40) : r.trod[k] ? 200 : 0;
   }
   // Roads outside the walls: beaten earth, the Appia and the Traiana still paved in places.
   for (const rd of ROADS) {
@@ -694,7 +700,7 @@ export function regionName(p: THREE.Vector3): string {
     return 'Catacumbae Sanctorum Quadraginta';
   }
   for (const g of GATES) if (Math.hypot(p.x - g.at[0], p.z - g.at[1]) < 8) return g.name;
-  const named: [SiteDef, number][] = [[S.iseum, 13], [S.curtis, 26], [S.episcopium, 30], [S.forum, 18], [S.theatrum, 50], [S.thermae, 28], [S.amphitheatrum, 55], [S.quadraginta, 48],
+  const named: [SiteDef, number][] = [[S.iseum, 13], [S.caballus, 15], [S.curtis, 26], [S.episcopium, 30], [S.forum, 18], [S.theatrum, 50], [S.thermae, 28], [S.amphitheatrum, 55], [S.quadraginta, 48],
     [S.turrisCatenae, 14], [S.sanctusHilarius, 16], [S.sanctusPetrus, 32], [S.necropolis, 28], [S.nux, 14], [S.molendinum, 14], [S.hortusSophiae, 16], [S.castellumAquae, 26], [S.pontesLeprosus, 50], [S.pontesOnuphrii, 45]];
   for (const [s, r] of named) if (near(s, r)) return s.name;
   if (inPons(p.x, p.z)) return PONS_FRATTO.name;
