@@ -61,7 +61,9 @@ export const DETAIL = { mid: false };
 
 /** Masonry never has knife edges: these materials get rounded, weathered arrises. */
 const WORN: Partial<Record<MatName, number>> = { stone: 1, block: 1, bigstone: 1.3, rubble: 1.2, brick: 0.8, marble: 0.9, slab: 0.7, plaster: 1.1, rock: 1.4, ground: 1.4, clay: 0.6 };
-import { mat, type MatName } from './materials';
+import { mat, MAT, SMALL, type MatName } from './materials';
+import { sortByCluster, newClusters, addClustered, type Clusters } from './clusters';
+import type { PoolEntry } from './benevento/pool';
 import { tessellate, displace, displacePositions, field, TESS, SITE, toWorldXZ, liftGeometry, fastTerrain } from './displace';
 
 // Point features (lamps, flames, props) move with the same field as the walls
@@ -103,7 +105,7 @@ export type PropKind = 'skull' | 'femur' | 'humerus' | 'tibia';
 export interface Prop { kind: PropKind; matrix: THREE.Matrix4; under: boolean }
 
 /** A spatial cell of merged geometry, used for frustum, zone and occlusion culling. */
-export interface Cell { key: string; under: boolean; box: THREE.Box3; meshes: THREE.Mesh[]; visible: boolean; occluded: number; /** Draw distance (default 120 m). */ range?: number; /** A far stand-in (never ray-tested). */ lod?: boolean; /** Behind the houses in the occlusion buffer this frame. */ behind?: boolean }
+export interface Cell { key: string; under: boolean; box: THREE.Box3; meshes: THREE.Mesh[]; visible: boolean; occluded: number; /** Draw distance (default 120 m). */ range?: number; /** Its meshes drawn by cluster (see clusters.ts). */ clusters?: Clusters; /** Drawn from the town's shared buffers (see benevento/pool.ts). */ pool?: PoolEntry; /** A far stand-in (never ray-tested). */ lod?: boolean; /** Behind the houses in the occlusion buffer this frame. */ behind?: boolean }
 export const CELL_SIZE = 36;
 export interface Lamp {
   pos: THREE.Vector3;
@@ -333,7 +335,16 @@ export class Builder {
     this.parts.clear();
     const cells: Cell[] = [];
     for (const [key, b] of buckets) {
-      const cell: Cell = { key, under: key[0] === 'u', box: new THREE.Box3(), meshes: [], visible: true, occluded: 0 };
+      const cell: Cell = { key, under: key[0] === 'u', box: new THREE.Box3(), meshes: [], visible: true, occluded: 0, clusters: newClusters() };
+      const [, ci, cj] = key.split('|').map(Number);
+      // The small untextured materials share one draw ('misc', the material per vertex).
+      for (const [m, geos] of [...b]) {
+        if (!SMALL[m]) continue;
+        for (const g of geos) g.setAttribute('matId', new THREE.BufferAttribute(new Uint8Array(g.attributes.position.count).fill(MAT[m]), 1));
+        if (!b.has('misc')) b.set('misc', []);
+        b.get('misc')!.push(...geos);
+        b.delete(m);
+      }
       for (const [m, geos] of b) {
         // Shading is all in world space: no texture coordinates are needed.
         for (const g of geos) g.deleteAttribute('uv');
@@ -347,10 +358,16 @@ export class Builder {
           for (let i = 0; i < N.length; i++) n8[i] = Math.max(-127, Math.min(127, Math.round(N[i] * 127)));
           merged.setAttribute('normal', new THREE.BufferAttribute(n8, 3, true));
         }
+        // Triangles sorted by cluster, drawn only where in view (see clusters.ts).
+        const srt = sortByCluster(merged.attributes.position.array as Float32Array, merged.attributes.normal.array as Int8Array, ci * CELL_SIZE, cj * CELL_SIZE, CELL_SIZE, merged.attributes.matId?.array as Uint8Array | undefined);
+        merged.setAttribute('position', new THREE.BufferAttribute(srt.pos, 3));
+        merged.setAttribute('normal', new THREE.BufferAttribute(srt.nor, 3, true));
+        if (srt.ids) merged.setAttribute('matId', new THREE.BufferAttribute(srt.ids, 1));
         // Keep no CPU copy once the GPU has it.
         for (const a of Object.values(merged.attributes)) (a as THREE.BufferAttribute).onUpload(function (this: THREE.BufferAttribute) { (this as unknown as { array: unknown }).array = null; });
         cell.box.union(merged.boundingBox!);
         const mesh = new THREE.Mesh(merged, mat(m));
+        addClustered(cell.clusters!, mesh, srt);
         mesh.castShadow = !['window', 'ember', 'horn'].includes(m) && !cell.under;
         mesh.receiveShadow = true;
         mesh.matrixAutoUpdate = false;

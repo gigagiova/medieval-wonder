@@ -1,9 +1,11 @@
 import * as THREE from 'three';
-import { mat, type MatName } from '../materials';
+import type { MatName } from '../materials';
 import { makeFire } from '../fire';
 import type { Cell, Lamp } from '../builder';
 import { field, fastTerrain } from '../displace';
 import { BOUNDS } from './geo';
+import { newClusters, addBoxes, sortByCluster } from '../clusters';
+import { poolAdd } from './pool';
 import { CHUNK, lodChunk, type Baked, type ChunkItems, type ChunkResult, type Hole } from './fabric';
 
 // Streams the town around the player. Every chunk always has a cheap
@@ -32,8 +34,6 @@ interface Super { key: number; si: number; sj: number; members: number[]; dirty:
 export class FabricStream {
   chunks = new Map<number, ChunkState>();
   supers = new Map<number, Super>();
-  /** Sends new meshes to the GPU straight away (so their CPU arrays can be freed). */
-  uploader?: (meshes: THREE.Mesh[]) => void;
   private workers: { w: Worker; busy: number | null }[] = [];
   private queue: number[] = [];
   private midQueue: number[] = [];
@@ -129,7 +129,7 @@ export class FabricStream {
       if (c.midStatus === 'ready' && rectDist(c.it, cam.x, cam.z) > R_MID_OUT) {
         const shown = c.midShown;
         this.hideMid(c);
-        for (const m of c.midCell!.meshes) { this.scene.remove(m); m.geometry.dispose(); }
+        c.midCell!.pool!.free();
         c.midCell = undefined; c.midStatus = 'none'; this.stats.mid--;
         if (shown) this.markSuper(c); // its blocks come back
       }
@@ -168,24 +168,10 @@ export class FabricStream {
     if (!c) return;
     this.stats.built++; this.stats.ms += r.ms;
     if (c.status !== 'building') return; // dropped while building
-    const cell: Cell = { key: 'f' + r.key, under: false, box: new THREE.Box3(), meshes: [], visible: true, occluded: 0 };
     let tris = 0;
-    for (const bk of r.baked) {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.BufferAttribute(bk.pos, 3));
-      g.setAttribute('normal', new THREE.BufferAttribute(bk.nor, 3, true));
-      g.computeBoundingBox(); g.computeBoundingSphere();
-      cell.box.union(g.boundingBox!);
-      // Free the CPU copy once it is on the GPU.
-      for (const a of Object.values(g.attributes)) (a as THREE.BufferAttribute).onUpload(function (this: THREE.BufferAttribute) { (this as unknown as { array: unknown }).array = null; });
-      const mesh = new THREE.Mesh(g, mat(bk.m));
-      mesh.matrixAutoUpdate = false;
-      this.scene.add(mesh);
-      cell.meshes.push(mesh);
-      tris += bk.pos.length / 9;
-    }
+    for (const bk of r.baked) tris += bk.pos.length / 9;
+    const cell = this.makeCell('f' + r.key, r.baked);
     this.stats.tris += tris;
-    this.uploader?.(cell.meshes as THREE.Mesh[]);
     c.cell = cell;
     this.cells.push(cell);
     c.lamps = r.lamps.map((l, i) => ({ pos: new THREE.Vector3(...l.p), color: new THREE.Color(l.c[0], l.c[1], l.c[2]), intensity: l.i, under: l.under, seed: (r.key % 97) + i * 7.3 }));
@@ -212,22 +198,12 @@ export class FabricStream {
     // Shown by its super-chunk's next rebuild (which drops the blocks it replaces).
     if (c.status !== 'ready') this.markSuper(c);
   }
+  /** A chunk's geometry, into the town's shared buffers (see pool.ts); its clusters' boxes for the culling. */
   private makeCell(key: string, baked: Baked[]): Cell {
-    const cell: Cell = { key, under: false, box: new THREE.Box3(), meshes: [], visible: true, occluded: 0 };
-    for (const bk of baked) {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.BufferAttribute(bk.pos, 3));
-      g.setAttribute('normal', new THREE.BufferAttribute(bk.nor, 3, true));
-      g.computeBoundingBox(); g.computeBoundingSphere();
-      cell.box.union(g.boundingBox!);
-      for (const a of Object.values(g.attributes)) (a as THREE.BufferAttribute).onUpload(function (this: THREE.BufferAttribute) { (this as unknown as { array: unknown }).array = null; });
-      const mesh = new THREE.Mesh(g, mat(bk.m));
-      mesh.matrixAutoUpdate = false;
-      mesh.visible = false;
-      this.scene.add(mesh);
-      cell.meshes.push(mesh);
-    }
-    this.uploader?.(cell.meshes as THREE.Mesh[]);
+    const cell: Cell = { key, under: false, box: new THREE.Box3(), meshes: [], visible: true, occluded: 0, clusters: newClusters() };
+    for (const bk of baked) addBoxes(cell.clusters!, bk.box);
+    for (const b of cell.clusters!.boxes) if (b) cell.box.union(b);
+    cell.pool = poolAdd(baked);
     return cell;
   }
   private showMid(c: ChunkState) {
@@ -241,12 +217,12 @@ export class FabricStream {
     c.midShown = false;
     const i = this.cells.indexOf(c.midCell);
     if (i >= 0) this.cells.splice(i, 1);
-    for (const m of c.midCell.meshes) m.visible = false;
+    c.midCell.pool!.show(0);
   }
 
   private unload(c: ChunkState) {
     if (c.cell) {
-      for (const m of c.cell.meshes) { this.scene.remove(m); m.geometry.dispose(); }
+      c.cell.pool!.free();
       const i = this.cells.indexOf(c.cell);
       if (i >= 0) this.cells.splice(i, 1);
       c.cell = undefined;
@@ -274,7 +250,7 @@ export class FabricStream {
     s.dirty = false;
     this.stats.lodRebuilds++;
     if (s.cell) {
-      for (const m of s.cell.meshes) { this.scene.remove(m); m.geometry.dispose(); }
+      s.cell.pool!.free();
       const i = this.cells.indexOf(s.cell);
       if (i >= 0) this.cells.splice(i, 1);
       s.cell = undefined;
@@ -309,22 +285,27 @@ export class FabricStream {
       const a = H[j * (N + 1) + i], b = H[j * (N + 1) + i + 1], c = H[(j + 1) * (N + 1) + i], d = H[(j + 1) * (N + 1) + i + 1];
       gp.push(x, a, z, x, c, z + ST, x + ST, b, z, x + ST, b, z, x, c, z + ST, x + ST, d, z + ST);
     }
-    const cell: Cell = { key: 's' + s.key, under: false, box: new THREE.Box3(), meshes: [], visible: true, occluded: 0, range: 420, lod: true };
+    // Into the town's shared buffers too (no draw calls of its own), by 32 m cluster.
+    const cell: Cell = { key: 's' + s.key, under: false, box: new THREE.Box3(), meshes: [], visible: true, occluded: 0, range: 420, lod: true, clusters: newClusters() };
+    const baked: Baked[] = [];
     const add = (pos: number[], m: MatName) => {
       if (!pos.length) return;
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       g.computeVertexNormals();
-      g.computeBoundingBox(); g.computeBoundingSphere();
-      cell.box.union(g.boundingBox!);
-      for (const a of Object.values(g.attributes)) (a as THREE.BufferAttribute).onUpload(function (this: THREE.BufferAttribute) { (this as unknown as { array: unknown }).array = null; });
-      const mesh = new THREE.Mesh(g, mat(m));
-      mesh.matrixAutoUpdate = false;
-      this.scene.add(mesh);
-      cell.meshes.push(mesh);
+      const N = g.attributes.normal.array as Float32Array, nor = new Int8Array(N.length);
+      for (let i = 0; i < N.length; i++) nor[i] = Math.max(-127, Math.min(127, Math.round(N[i] * 127)));
+      const srt = sortByCluster(g.attributes.position.array as Float32Array, nor, x0, z0, SUPER * CHUNK);
+      baked.push({ m, pos: srt.pos, nor: srt.nor as Int8Array, start: srt.start, count: srt.count, box: srt.box });
+      addBoxes(cell.clusters!, srt.box);
     };
     add(walls, 'rubble'); add(roofs, 'roof'); add(gp, 'ground');
-    if (cell.meshes.length) { this.uploader?.(cell.meshes as THREE.Mesh[]); s.cell = cell; this.cells.push(cell); }
+    if (baked.length) {
+      for (const b of cell.clusters!.boxes) if (b) cell.box.union(b);
+      cell.pool = poolAdd(baked);
+      s.cell = cell;
+      this.cells.push(cell);
+    }
     for (const c of showing) this.showMid(c);
     this.stats.superMs += performance.now() - t0;
   }

@@ -27,6 +27,8 @@ import { registerPopulationOutfits, populationDirector, popDebug } from './npc/p
 Object.assign(window, { __npc: npcDebug });
 import type { Lamp, Cell, PropKind } from './builder';
 import { fogHides } from './fogcull';
+import { clusterFrustum, clusterMask, setClusterMask } from './clusters';
+import { setPoolTarget, poolFlush } from './benevento/pool';
 import { R_IN } from './benevento/stream';
 import { OcclusionBuffer, chunkPrisms, indexLotsFrom, OCC_RANGE } from './occlusion';
 import { setKtx2Renderer } from './ktx2';
@@ -45,6 +47,7 @@ document.body.appendChild(renderer.domElement);
 setKtx2Renderer(renderer);
 
 const scene = new THREE.Scene();
+setPoolTarget(renderer, scene);
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 900);
 const sky = makeSky();
 scene.add(sky);
@@ -85,7 +88,6 @@ function gpuUpload(meshes: THREE.Mesh[]) {
   meshes.forEach((m, i) => { upScene.remove(m); st[i].p?.add(m); m.visible = st[i].v; m.frustumCulled = st[i].f; });
 }
 gpuUpload(cells.flatMap((c) => c.meshes as THREE.Mesh[]));
-stream.uploader = gpuUpload;
 
 // The key light: the bright, low part of the overcast in the west (~19°),
 // shadowed by the town through the light field (lightfield.ts) rather than
@@ -519,13 +521,23 @@ function cull(isUnder: boolean, camLocal: number) {
     const c = live[(rr++) % live.length];
     c.occluded = occluded(c) ? c.occluded + 1 : 0;
   }
+  // Inside the cells drawn: only their clusters in view (see clusters.ts).
+  clusterFrustum(camera);
+  const fogBase = shared.uFogBase.value, fogUnder = shared.uUnder.value;
   let vis = 0, occ = 0;
   for (const c of cells) {
     const show = c.visible && c.occluded < 2 && !c.behind;
     if (c.visible && !show) occ++;
     if (show) vis++;
-    for (const m of c.meshes) m.visible = show;
+    const cl = c.clusters;
+    const mask = show && cl ? clusterMask(cl, c.under ? null : (b) => (!isUnder && occBuf.hidden(b)) || fogHides(b, eye, fogBase, fogUnder)) : 0;
+    if (c.pool) c.pool.show(mask);
+    else if (show && cl) {
+      setClusterMask(cl, mask);
+      for (const p of cl.parts) p.mesh.visible = p.shown > 0;
+    } else for (const m of c.meshes) m.visible = show;
   }
+  poolFlush();
   cullStats.visible = vis;
   cullStats.occluded = occ;
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Builder, rng, DETAIL, type Lamp } from '../builder';
-import type { MatName } from '../materials';
+import { MAT, SMALL, type MatName } from '../materials';
 import type { FireSource } from '../fire';
 import { buildHouse, buildBridge, reseedTown, type BridgeSpec, type Lot } from '../town';
 import { reseedKit } from '../arch/kit';
@@ -13,6 +13,7 @@ import { WALL700, BOUNDS, insideness, type P2 } from './geo';
 import { GATES, SITES, siteToWorld } from './sites';
 import type { Layout, Plot, PlotKind } from './layout';
 import { buildInterior, interiorCollider } from './interiors';
+import { sortByCluster } from '../clusters';
 
 // The streamed fabric of the town: houses, lanes' bridges, garden plots,
 // the curtain wall with its towers and gates, and the ground itself, cut
@@ -526,16 +527,33 @@ export function buildChunk(b: Builder, it: ChunkItems) {
 }
 
 /** Merge a render-mode Builder into one interleaved array per material (for transfer). */
-export interface Baked { m: MatName; pos: Float32Array; nor: Int8Array }
-export function bake(b: Builder): Baked[] {
+export interface Baked { m: MatName; pos: Float32Array; nor: Int8Array;
+  /** For 'misc': each vertex's own material (see SMALL in materials.ts). */
+  ids?: Uint8Array;
+  /** Triangles sorted by cluster of the chunk (see clusters.ts): each cluster's first vertex, vertex count and box. */
+  start: Uint32Array; count: Uint32Array; box: Float32Array }
+export function bake(b: Builder, it: { i: number; j: number }): Baked[] {
   const out: Baked[] = [];
+  const small: { pos: Float32Array; nor: Int8Array; id: number }[] = [];
   for (const [m, geos] of b.parts) {
     if (!geos.length) continue;
     const g = geos.length === 1 ? geos[0] : mergeGeometries(geos.map((x) => { for (const k of Object.keys(x.attributes)) if (k !== 'position' && k !== 'normal') x.deleteAttribute(k); return x; }), false)!;
     const P = g.attributes.position.array as Float32Array, N = g.attributes.normal.array as Float32Array;
     const nor = new Int8Array(N.length);
     for (let i = 0; i < N.length; i++) nor[i] = Math.max(-127, Math.min(127, Math.round(N[i] * 127)));
-    out.push({ m, pos: P instanceof Float32Array ? P : new Float32Array(P), nor });
+    const pos = P instanceof Float32Array ? P : new Float32Array(P);
+    // The small untextured materials share one draw.
+    if (SMALL[m]) { small.push({ pos, nor, id: MAT[m] }); continue; }
+    const s = sortByCluster(pos, nor, it.i * CHUNK, it.j * CHUNK, CHUNK);
+    out.push({ m, pos: s.pos, nor: s.nor as Int8Array, start: s.start, count: s.count, box: s.box });
+  }
+  if (small.length) {
+    const n = small.reduce((a, q) => a + q.pos.length, 0);
+    const pos = new Float32Array(n), nor = new Int8Array(n), ids = new Uint8Array(n / 3);
+    let o = 0;
+    for (const q of small) { pos.set(q.pos, o); nor.set(q.nor, o); ids.fill(q.id, o / 3, (o + q.pos.length) / 3); o += q.pos.length; }
+    const s = sortByCluster(pos, nor, it.i * CHUNK, it.j * CHUNK, CHUNK, ids);
+    out.push({ m: 'misc', pos: s.pos, nor: s.nor as Int8Array, ids: s.ids, start: s.start, count: s.count, box: s.box });
   }
   return out;
 }

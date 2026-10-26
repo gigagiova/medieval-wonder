@@ -7,6 +7,7 @@ import { field, SITE, fastTerrain } from './displace';
 import { placeWorld } from './builder';
 import { shared } from './materials';
 import { noiseGLSL, atmosGLSL } from './shaders';
+import { MeshoptSimplifier } from 'meshoptimizer/simplifier';
 
 // Photo-scanned CC0 props from Poly Haven (see tools/fetch-props.ts and
 // public/models/props/CREDITS.md). Load them once with loadProps(), place them
@@ -42,8 +43,44 @@ const RANGE: Partial<Record<PropId, number>> = {
 };
 const DEFAULT_RANGE = 45;
 
-/** One piece of a model, with transforms baked in: base centred in x/z, resting on y = 0. */
-interface Part { geometry: THREE.BufferGeometry; material: THREE.Material }
+/**
+ * One piece of a model, with transforms baked in: base centred in x/z, resting
+ * on y = 0. `far`: the same piece simplified (meshoptimizer, error ~1 % of its
+ * size, normals and texture coordinates kept), drawn beyond LOD_K radii away.
+ */
+interface Part { geometry: THREE.BufferGeometry; material: THREE.Material; far?: THREE.BufferGeometry }
+
+/**
+ * Level of detail. The scans run to 2-22k triangles each (the chest alone
+ * 22k), and a lane holds dozens: beyond LOD_K times its bounding radius (a
+ * barrel: ~3 m) a prop is drawn simplified, where the simplification error
+ * (1.2 % of the size) is under a pixel on a phone. Pieces under LOD_MIN
+ * triangles are not worth an extra draw and keep one level.
+ */
+const LOD_K = 6, LOD_NEAR = 3, LOD_MIN = 1200, LOD_ERR = 0.012;
+function simplified(g: THREE.BufferGeometry): THREE.BufferGeometry | undefined {
+  if (!MeshoptSimplifier.supported || !g.index) return undefined;
+  const idx = g.index.array, n = idx.length / 3;
+  if (n < LOD_MIN) return undefined;
+  // Plain arrays (the loader's attributes may be interleaved or quantised).
+  const P = g.attributes.position, nv = P.count, Nm = g.attributes.normal, U = g.attributes.uv;
+  const pos = new Float32Array(nv * 3), attr = new Float32Array(nv * 5);
+  for (let v = 0; v < nv; v++) {
+    pos[v * 3] = P.getX(v); pos[v * 3 + 1] = P.getY(v); pos[v * 3 + 2] = P.getZ(v);
+    if (Nm) { attr[v * 5] = Nm.getX(v); attr[v * 5 + 1] = Nm.getY(v); attr[v * 5 + 2] = Nm.getZ(v); }
+    if (U) { attr[v * 5 + 3] = U.getX(v); attr[v * 5 + 4] = U.getY(v); }
+  }
+  let out: Uint32Array;
+  try {
+    [out] = MeshoptSimplifier.simplifyWithAttributes(Uint32Array.from(idx), pos, 3, attr, 5, [0.25, 0.25, 0.25, 1, 1], null, 0, LOD_ERR);
+  } catch (e) { console.warn('prop simplification failed', e); return undefined; }
+  if (out.length / 3 > n * 0.8) return undefined; // not worth a second level
+  const f = new THREE.BufferGeometry();
+  for (const [k, a] of Object.entries(g.attributes)) f.setAttribute(k, a);
+  f.setIndex(new THREE.BufferAttribute(nv > 65535 ? out : new Uint16Array(out), 1));
+  f.boundingSphere = g.boundingSphere;
+  return f;
+}
 interface Variant { parts: Part[]; box: THREE.Box3 }
 const variants = new Map<PropId, Variant[]>();
 
@@ -120,6 +157,7 @@ function bake(root: THREE.Object3D, rootInv: THREE.Matrix4): Variant {
   const shift = new THREE.Matrix4().makeTranslation(-c.x, -box.min.y, -c.z);
   for (const p of parts) { p.geometry.applyMatrix4(shift); p.geometry.computeBoundingSphere(); }
   box.applyMatrix4(shift);
+  for (const p of parts) p.far = simplified(p.geometry);
   return { parts, box };
 }
 
@@ -130,6 +168,7 @@ export function loadProps(ids: readonly PropId[] = PROP_IDS): Promise<void> {
   const todo = ids.filter((id) => !variants.has(id));
   const p = Promise.all(todo.map(async (id) => {
     try {
+      await MeshoptSimplifier.ready.catch(() => {});
       const gltf = await loadGltf(`models/props/${id}.json`, loader);
       const scene = gltf.scene;
       scene.updateMatrixWorld(true);
@@ -224,6 +263,8 @@ interface Kind {
   variant: Variant; range2: number; under: boolean;
   n: number; mat: Float32Array; pos: Float32Array; rad: Float32Array;
   buckets: Map<number, number[]>; meshes: THREE.InstancedMesh[]; cap: number;
+  /** The far level, one per part (the part's own geometry where it has none); empty when no part has one. */
+  far: THREE.InstancedMesh[];
 }
 const kinds = new Map<string, Kind>();
 const PBK = 24; // bucket size (m) for finding placements near the camera
@@ -253,7 +294,7 @@ export function commitProps(scene: THREE.Object3D) {
       // The old per-patch culling kept a patch while its centre was within range + 0.6 patch:
       // the same distance per prop shows about as many, fading in one by one instead of by patch.
       const r = (RANGE[pl.id] ?? DEFAULT_RANGE) + chunkOf(pl.id) * 0.6;
-      k = { variant: v, range2: r * r, under: pl.under, n: 0, mat: new Float32Array(16 * 8), pos: new Float32Array(3 * 8), rad: new Float32Array(8), buckets: new Map(), meshes: [], cap: 0 };
+      k = { variant: v, range2: r * r, under: pl.under, n: 0, mat: new Float32Array(16 * 8), pos: new Float32Array(3 * 8), rad: new Float32Array(8), buckets: new Map(), meshes: [], cap: 0, far: [] };
       kinds.set(key, k);
     }
     const i = k.n++;
@@ -275,10 +316,10 @@ export function commitProps(scene: THREE.Object3D) {
   for (const k of touched) {
     if (k.cap >= k.n) continue;
     // (Re)allocate the meshes with room for every placement of this kind.
-    for (const m of k.meshes) { m.removeFromParent(); m.dispose(); }
+    for (const m of [...k.meshes, ...k.far]) { m.removeFromParent(); m.dispose(); }
     k.cap = k.n;
-    k.meshes = k.variant.parts.map((part) => {
-      const im = new THREE.InstancedMesh(part.geometry, part.material, k.cap);
+    const make = (geometry: THREE.BufferGeometry, material: THREE.Material) => {
+      const im = new THREE.InstancedMesh(geometry, material, k.cap);
       im.count = 0;
       im.visible = false;
       im.frustumCulled = false; // culled per instance in refill()
@@ -287,7 +328,9 @@ export function commitProps(scene: THREE.Object3D) {
       im.matrixAutoUpdate = false;
       scene.add(im);
       return im;
-    });
+    };
+    k.meshes = k.variant.parts.map((part) => make(part.geometry, part.material));
+    k.far = k.variant.parts.some((part) => part.far) ? k.variant.parts.map((part) => make(part.far ?? part.geometry, part.material)) : [];
   }
   if (!ticker) {
     // A tiny invisible mesh whose onBeforeRender refills the instances from
@@ -323,14 +366,19 @@ function refill(camera: THREE.Camera) {
     const r2 = k.under === camUnder ? k.range2 : 36;
     const r = Math.sqrt(r2);
     const bx0 = Math.floor((cp.x - r) / PBK), bx1 = Math.floor((cp.x + r) / PBK), bz0 = Math.floor((cp.z - r) / PBK), bz1 = Math.floor((cp.z + r) / PBK);
-    let n = 0;
+    let n = 0, nf = 0;
     const dst = k.meshes[0].instanceMatrix.array as Float32Array;
+    const dstF = k.far.length ? k.far[0].instanceMatrix.array as Float32Array : null;
     const walk = (i: number) => {
       const x = k.pos[i * 3] - cp.x, y = k.pos[i * 3 + 1] - cp.y, z = k.pos[i * 3 + 2] - cp.z;
-      if (x * x + y * y + z * z > r2) return;
+      const d2 = x * x + y * y + z * z;
+      if (d2 > r2) return;
       sph.center.set(k.pos[i * 3], k.pos[i * 3 + 1], k.pos[i * 3 + 2]);
       sph.radius = k.rad[i];
       if (!frustum.intersectsSphere(sph)) return;
+      // rad is the box's half-diagonal: about twice the radius of the prop itself.
+      const near = Math.max(LOD_NEAR, LOD_K * 0.5 * k.rad[i]);
+      if (dstF && d2 > near * near) { dstF.set(k.mat.subarray(i * 16, i * 16 + 16), nf * 16); nf++; return; }
       dst.set(k.mat.subarray(i * 16, i * 16 + 16), n * 16);
       n++;
     };
@@ -341,8 +389,8 @@ function refill(camera: THREE.Camera) {
         if (list) for (const i of list) walk(i);
       }
     } else for (let i = 0; i < k.n; i++) walk(i);
-    k.meshes.forEach((im, j) => {
-      if (j > 0 && n) (im.instanceMatrix.array as Float32Array).set(dst.subarray(0, n * 16));
+    const fill = (list: THREE.InstancedMesh[], src: Float32Array, n: number) => list.forEach((im, j) => {
+      if (j > 0 && n) (im.instanceMatrix.array as Float32Array).set(src.subarray(0, n * 16));
       im.count = n;
       im.visible = n > 0;
       if (n) {
@@ -351,12 +399,14 @@ function refill(camera: THREE.Camera) {
         im.instanceMatrix.needsUpdate = true;
       }
     });
+    fill(k.meshes, dst, n);
+    if (dstF) fill(k.far, dstF, nf);
   }
 }
 /** How many prop kinds, placements and drawn instances there are (debug). */
 export function propStats() {
   let kindsN = 0, inst = 0, drawn = 0;
-  for (const k of kinds.values()) { kindsN++; inst += k.n; drawn += k.meshes[0]?.count ?? 0; }
+  for (const k of kinds.values()) { kindsN++; inst += k.n; drawn += (k.meshes[0]?.count ?? 0) + (k.far[0]?.count ?? 0); }
   return { kinds: kindsN, instances: inst, drawn };
 }
 
