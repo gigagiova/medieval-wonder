@@ -52,7 +52,10 @@ npm run build    # static site in dist/
 - **Culling:** the world is merged into 36 m cells per material and per zone. Each frame, cells are
   culled by zone (underground vs. street level, which handles the biggest occluder, the earth itself),
   by fog distance, and by occlusion: rays from the eye to each cell's bounds against the collision
-  BVH, with hysteresis. Three.js frustum-culls what remains.
+  BVH, with hysteresis. Inside a cell, triangles are sorted into 8-9 m clusters and an index buffer
+  lists only the clusters in the frustum, out of the fog and not behind the houses of a small software
+  depth buffer (`src/clusters.ts`). The streamed town shares one vertex buffer per material, so all
+  its chunks are one draw call per material (`src/benevento/pool.ts`); props get a simplified far level.
 - **Sound:** fully synthesized with WebAudio: wind, a chant drone near the church, bells, footsteps,
   echo in the catacombs.
 

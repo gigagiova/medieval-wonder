@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { clustersWhole, type Clusters } from './clusters';
+import { poolAll, poolRestore, type PoolEntry } from './benevento/pool';
 import { shared } from './materials';
 import type { Cell } from './builder';
 
@@ -175,9 +177,13 @@ export class LightField {
     const box = new THREE.Box3(new THREE.Vector3(cx - SIZE / 2, -1e3, cz - SIZE / 2), new THREE.Vector3(cx + SIZE / 2, 1e3, cz + SIZE / 2));
     // Everything above ground in the square is drawn, culled or not.
     const restore: [THREE.Object3D, boolean][] = [];
+    const whole: Clusters[] = [];
+    const pooled = new Set<PoolEntry>();
     for (const c of this.cells) {
       const want = !c.under && c.box.intersectsBox(box);
+      if (c.pool) { if (want) pooled.add(c.pool); continue; }
       for (const m of c.meshes) if (m.visible !== want) { restore.push([m, m.visible]); m.visible = want; }
+      if (want && c.clusters) { clustersWhole(c.clusters, true); whole.push(c.clusters); }
     }
     this.scene.traverse((o) => {
       const skin = (o as THREE.SkinnedMesh).isSkinnedMesh;
@@ -187,6 +193,7 @@ export class LightField {
         || skin || (mat && (mat.transparent || mat.userData?.foliage || (mat as THREE.ShaderMaterial).isShaderMaterial));
       if ((odd || this.skip.includes(o)) && o.visible) { restore.push([o, true]); o.visible = false; }
     });
+    poolAll((e) => pooled.has(e));
     this.cam.position.set(cx, 300, cz);
     this.cam.updateMatrixWorld();
     const prevOverride = this.scene.overrideMaterial, prevBg = this.scene.background, prevTarget = r.getRenderTarget();
@@ -203,6 +210,8 @@ export class LightField {
       this.scene.overrideMaterial = prevOverride;
       this.scene.background = prevBg;
       for (const [o, v] of restore) o.visible = v;
+      for (const cl of whole) clustersWhole(cl, false);
+      poolRestore();
     }
     r.setRenderTarget(prevTarget);
     r.setClearColor(prevClear, prevAlpha);

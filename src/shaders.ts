@@ -159,6 +159,8 @@ float underAt(vec3 p){ return step(p.y, terrainY(p.xz) - 2.5); }
 // plastic, so keep only a trace of specular (metals and glazes keep theirs).
 #if MAT == 7 || MAT == 8 || MAT == 16 || MAT == 18 || MAT == 15
   #define SPEC_K 1.0
+#elif MAT == 20
+  #define SPEC_K ((abs(vMat - 6.0) < 0.5 || abs(vMat - 11.0) < 0.5 || abs(vMat - 17.0) < 0.5) ? 0.1 : 1.0)
 #else
   #define SPEC_K 0.1
 #endif
@@ -293,6 +295,49 @@ void weather(inout Surf s, vec3 p, vec3 n, float mossAmt){
 
 vec3 tintTex(vec3 c, vec3 tint, float k){ return c * mix(vec3(1.0), tint, k); }
 
+// The small untextured materials (iron, horn, embers, shutters...): one function,
+// so that a single draw can carry all of them (MAT 20, the id per vertex).
+#if MAT == 6 || MAT == 7 || MAT == 8 || MAT == 11 || MAT == 15 || MAT == 16 || MAT == 17 || MAT == 18 || MAT == 20
+void smallSurf(int id, vec3 p, vec3 n, inout Surf s){
+  if (id == 6) {
+    float g = vnoise(p*40.);
+    s.alb = vec3(0.42,0.37,0.27)*(0.75+0.3*g); s.rough = 0.8;
+  } else if (id == 7) {
+    s.alb = vec3(0.03,0.027,0.024)*(0.8+0.4*vnoise(p*12.)); s.rough = 0.75;
+  } else if (id == 8) {
+    // Closed shutters: firelight leaks through the cracks between boards.
+    vec2 uv = abs(n.x) > abs(n.z) ? p.zy : p.xy;
+    float bd = floor(uv.x/0.12); float fx = fract(uv.x/0.12);
+    float crack = (1.-smoothstep(0.0,0.08,fx)) + (1.-smoothstep(1.0,0.92,fx));
+    crack *= 0.6 + 0.4*vnoise(vec3(uv*vec2(3.,9.), bd));
+    float seed = hash13(floor(p*0.5));
+    float fl = 0.7 + 0.3*vnoise(vec3(uTime*2.2+seed*40., seed, 0.));
+    s.alb = vec3(0.07,0.045,0.025)*(0.7+0.5*vnoise(vec3(uv.x*50., uv.y*1.5, bd)));
+    s.emi = mix(vec3(1.0,0.35,0.08), vec3(1.0,0.55,0.2), seed) * crack * fl * 3.0;
+    s.rough = 0.9;
+  } else if (id == 11) {
+    s.alb = vec3(0.05,0.035,0.025)*(0.75+0.4*vnoise(p*vec3(25.,6.,25.))); s.rough = 1.0;
+  } else if (id == 15) {
+    vec3 v = voronoi(p.xz*14.);
+    float hot = smoothstep(0.1,0.0,v.x-0.05) + 0.5*(1.-smoothstep(0.0,0.25,v.y-v.x));
+    float fl = 0.6+0.4*vnoise(vec3(p.xz*6., uTime*1.5));
+    s.alb = vec3(0.02);
+    s.emi = mix(vec3(0.9,0.12,0.02), vec3(1.0,0.45,0.1), v.z) * (1.-hot*0.8) * fl * 3.0;
+    s.rough = 1.0;
+  } else if (id == 16) {
+    float m = vnoise(p*vec3(30.,8.,30.));
+    float fl = 0.75+0.25*vnoise(vec3(uTime*3.+p.x*20., p.z, 0.));
+    s.alb = vec3(0.1,0.06,0.02);
+    s.emi = vec3(1.0,0.48,0.14)*(0.4+0.8*m)*fl*1.6;
+    s.rough = 0.6;
+  } else if (id == 17) {
+    s.alb = vec3(0.24,0.12,0.07)*(0.7+0.4*vnoise(p*30.)); s.rough = 0.9;
+  } else if (id == 18) {
+    s.alb = mix(vec3(0.09,0.06,0.03), vec3(0.06,0.09,0.07), smoothstep(0.4,0.7,vnoise(p*12.)));
+    s.rough = 0.7;
+  }
+}
+#endif
 Surf surface(vec3 p, vec3 n){
   Surf s; s.emi = vec3(0.); s.rough = 0.9; s.ao = 1.0; s.nrm = n; s.alb = vec3(0.2); s.h = 0.5; s.wet = 0.0;
 #if defined(TILE) && MAT != 1 && MAT != 4
@@ -396,42 +441,10 @@ Surf surface(vec3 p, vec3 n){
   s.nrm = normalize(mix(s.nrm, n, smoothstep(0.5, 1.0, wet) * 0.8));
   s.wet = wet;
   s.alb *= 0.88 + 0.24*nz.b;
-#elif MAT == 6
-  float g = vnoise(p*40.);
-  s.alb = vec3(0.42,0.37,0.27)*(0.75+0.3*g); s.rough = 0.8;
-#elif MAT == 7
-  s.alb = vec3(0.03,0.027,0.024)*(0.8+0.4*vnoise(p*12.)); s.rough = 0.75;
-#elif MAT == 8
-  // Closed shutters: firelight leaks through the cracks between boards.
-  vec2 uv = abs(n.x) > abs(n.z) ? p.zy : p.xy;
-  float id = floor(uv.x/0.12); float fx = fract(uv.x/0.12);
-  float crack = (1.-smoothstep(0.0,0.08,fx)) + (1.-smoothstep(1.0,0.92,fx));
-  crack *= 0.6 + 0.4*vnoise(vec3(uv*vec2(3.,9.), id));
-  float seed = hash13(floor(p*0.5));
-  float fl = 0.7 + 0.3*vnoise(vec3(uTime*2.2+seed*40., seed, 0.));
-  s.alb = vec3(0.07,0.045,0.025)*(0.7+0.5*vnoise(vec3(uv.x*50., uv.y*1.5, id)));
-  s.emi = mix(vec3(1.0,0.35,0.08), vec3(1.0,0.55,0.2), seed) * crack * fl * 3.0;
-  s.rough = 0.9;
-#elif MAT == 11
-  s.alb = vec3(0.05,0.035,0.025)*(0.75+0.4*vnoise(p*vec3(25.,6.,25.))); s.rough = 1.0;
-#elif MAT == 15
-  vec3 v = voronoi(p.xz*14.);
-  float hot = smoothstep(0.1,0.0,v.x-0.05) + 0.5*(1.-smoothstep(0.0,0.25,v.y-v.x));
-  float fl = 0.6+0.4*vnoise(vec3(p.xz*6., uTime*1.5));
-  s.alb = vec3(0.02);
-  s.emi = mix(vec3(0.9,0.12,0.02), vec3(1.0,0.45,0.1), v.z) * (1.-hot*0.8) * fl * 3.0;
-  s.rough = 1.0;
-#elif MAT == 16
-  float m = vnoise(p*vec3(30.,8.,30.));
-  float fl = 0.75+0.25*vnoise(vec3(uTime*3.+p.x*20., p.z, 0.));
-  s.alb = vec3(0.1,0.06,0.02);
-  s.emi = vec3(1.0,0.48,0.14)*(0.4+0.8*m)*fl*1.6;
-  s.rough = 0.6;
-#elif MAT == 17
-  s.alb = vec3(0.24,0.12,0.07)*(0.7+0.4*vnoise(p*30.)); s.rough = 0.9;
-#elif MAT == 18
-  s.alb = mix(vec3(0.09,0.06,0.03), vec3(0.06,0.09,0.07), smoothstep(0.4,0.7,vnoise(p*12.)));
-  s.rough = 0.7;
+#elif MAT == 6 || MAT == 7 || MAT == 8 || MAT == 11 || MAT == 15 || MAT == 16 || MAT == 17 || MAT == 18
+  smallSurf(MAT, p, n, s);
+#elif MAT == 20
+  smallSurf(int(vMat + 0.5), p, n, s);
 #endif
   return s;
 }

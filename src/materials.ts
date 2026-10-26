@@ -67,8 +67,12 @@ export const MAT = {
   iron: 7, window: 8, bigstone: 9, slab: 10, cloth: 11,
   brick: 12, rubble: 13, marble: 14, ember: 15, horn: 16, clay: 17, bronze: 18,
   block: 19,
+  /** The small untextured materials of a cell in one draw: the material per vertex (attribute matId, see SMALL). */
+  misc: 20,
 } as const;
 export type MatName = keyof typeof MAT;
+/** Materials merged into 'misc' in town chunks and landmark cells (their shading needs no textures). */
+export const SMALL: Partial<Record<MatName, true>> = { bone: true, iron: true, window: true, cloth: true, ember: true, horn: true, clay: true, bronze: true };
 
 /**
  * Per material: which texture set, metres per repeat, and gains. ALB scales
@@ -124,11 +128,12 @@ export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
   m.customProgramCacheKey = () => 'surf3-' + id;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, shared, uniforms);
+    const misc = id === MAT.misc;
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;')
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;' + (misc ? '\nattribute float matId;\nvarying float vMat;' : ''))
       .replace(
         '#include <project_vertex>',
-        `#include <project_vertex>
+        `#include <project_vertex>${misc ? '\nvMat = matId;' : ''}
         #ifdef USE_INSTANCING
           vWPos = (modelMatrix * instanceMatrix * vec4(transformed,1.0)).xyz;
           vWNrm = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * objectNormal);
@@ -140,7 +145,7 @@ export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
     sh.fragmentShader = sh.fragmentShader
       .replace(
         '#include <common>',
-        `#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;\n${noiseGLSL}\n${atmosGLSL}\n${surfaceGLSL}`,
+        `#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;${misc ? '\nvarying float vMat;' : ''}\n${noiseGLSL}\n${atmosGLSL}\n${surfaceGLSL}`,
       )
       .replace(
         '#include <map_fragment>',
