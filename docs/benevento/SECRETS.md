@@ -76,6 +76,8 @@ Underground and high places:
 | calcaria | Amphitheatre | The lime-burner's tally: the monument is going into the kiln | style |
 | catena | Turris Catenae | The watch roll | style |
 | hilarius | S. Ilario ad Portam Auream | The altar | style |
+| caballus | Ad Caballum, the pedestal of the equestrian statue before the curtis gate | The Roman horse that named the place; the churches "ad Caballum" (742 and undated) | paraphrase |
+| petrusCaballi | S. Petrus ad Caballum, the altar | A household church of the domed type of S. Ilario | style |
 | obeliscus, apis, isisVipera | Iseum, before the bishop's church | The fallen obelisk, the Apis bull, the serpent-crowned Isis; granite sphinxes guard the atrium gate | paraphrase / attested |
 | perticae | Lombard cemetery | Paul the Deacon HL V 34: poles topped with wooden doves | attested |
 | nux | The sacred walnut stump | Vita Barbati (viper trail 1) | legend |

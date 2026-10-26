@@ -68,6 +68,18 @@ const L: Lore[] = [
     source: 'Dating by masonry to the late 7th/early 8th c.: Bertelli Buquicchio (1992). Text invented.',
   },
   {
+    id: 'caballus', title: 'The old horse', kind: 'inscription', status: 'paraphrase', range: 6,
+    latin: '… · EQVO · PVBLICO · … · ORDO · BENEVENTANORVM · …',
+    english: 'A horse of marble, bigger than life, still walks east on its pedestal before the dukes\' gate; its rider has lost everything above the waist, and the letters on the base are worn past reading but for a few words of the town council of the Roman colony. Everyone calls the place by the horse: ad Caballum. The little church on the square is St Peter\'s "at the Horse"; later charters will name a St Benedict "at the Horse" with a hostel for travellers (742) and a St Michael "of the Horse" too.',
+    source: 'Churches "ad Caballum"/"de Caballo" near the palatium: S. Benedetto ad Caballum with its xenodochium first documented Sept. 742, S. Angelo de Caballo, S. Pietro ad Caballum (Bertelli Buquicchio, Enciclopedia dell\'Arte Medievale, "Benevento", 1992; M. Rotili). Two fragments of an equestrian monument found in Piazza Piano di Corte in 1920 (Museo del Sannio). The words on the base are reconstruction.',
+  },
+  {
+    id: 'petrusCaballi', title: 'The altar of St Peter at the Horse', kind: 'inscription', status: 'style',
+    latin: '+ HIC REQVIESCVNT RELIQVIAE BEATI PETRI APOSTOLI · ORATE PRO FVNDATORE',
+    english: '"Here rest relics of the blessed Peter the Apostle. Pray for the founder." A household church of the kind the Lombard families of the curtis quarter are building: one hall, one apse, two little domes in a row, like St Hilary\'s by the Golden Gate. One day it will be a house again.',
+    source: 'S. Pietro ad Caballum, a hall with one apse later turned into a dwelling, with S. Ilario one of the southern prototypes of the church with domes in a row (Bertelli Buquicchio 1992). Its date is not documented; shown as standing in 700 by its type (S. Ilario: late 7th/early 8th c.). Text invented.',
+  },
+  {
     id: 'obeliscus', title: 'Signs of Egypt', kind: 'inscription', status: 'paraphrase', range: 6,
     latin: '[ an owl · a reed · the throne-sign of Isis · a seated woman · a coiled serpent · a falcon on a standard · … ]',
     english: 'No one in Beneventum can read these signs. Scholars twelve centuries later will: the obelisk was set up for Isis, the Great, Lady of Beneventum, by one Rutilius Lupus, for the health and safe return of the emperor Domitian. Its broken brothers lie in the mud of the goddess\'s temple.',

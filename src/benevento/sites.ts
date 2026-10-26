@@ -7,7 +7,9 @@ import { baseHeight, WALL700, type P2 } from './geo';
 
 /** A landmark's frame: module code authored at (lx, lz) in its own coordinates lands at (x, z), turned by rot. */
 export interface Frame2 { x: number; z: number; rot: number; lx?: number; lz?: number }
-export interface Plateau { x: number; z: number; r0: number; r1: number; h: number; ex?: number; ez?: number; ca: number; sa: number }
+export interface Plateau { x: number; z: number; r0: number; r1: number; h: number; ex?: number; ez?: number; ca: number; sa: number;
+  /** Only lower the ground to h (a cut), never raise it. */
+  cut?: boolean }
 
 /** The Roman grid of the eastern town (decumanus along the later Via Magistrale, ~21.5° south of east). */
 export const GRID_ROT = -0.375;
@@ -30,6 +32,10 @@ export interface SiteDef extends Frame2 {
   clear?: number;
   /** Polygon in the site's local frame to keep free of houses (default: clear radius). */
   reserve?: P2[];
+  /** The cleared ground is an open square (paved, trodden) rather than a precinct. */
+  square?: boolean;
+  /** Polygons in the site's local frame where the module lays its own floor: the town's ground is not drawn there. */
+  floors?: P2[][];
 }
 
 // ---------------------------------------------------------------- the sites
@@ -39,13 +45,16 @@ export const SITES: Record<string, SiteDef> = {
   curtis: { id: 'curtis', name: 'Curtis Ducis', x: 506, z: -140, rot: GRID_ROT, lx: 40, lz: -23, flat: [24, 40], clear: 22 },
   // The cathedral of S. Maria (consecrated 15 Dec 600) with its atrium; the bishop's house and books.
   episcopium: { id: 'episcopium', name: 'Episcopium', x: -14, z: -98, rot: -0.618, lx: -14, lz: -48, flat: [26, 44], clear: 24,
-    reserve: [[-24, -70], [-3, -70], [-3, -27], [-24, -27]] },
+    reserve: [[-24, -70], [-3, -70], [-3, -27], [-24, -27]],
+    // S. Maria (nave, aisle, apse) and the bishop's library beside it have their own slab floors.
+    floors: [[[-22.2, -68], [-5.3, -68], [-5.3, -40.4], [-22.2, -40.4]]] },
   // The Roman complex of the Santi Quaranta (cryptoporticus) outside the walls: hypogea, ossuary, memoria.
   quadraginta: { id: 'quadraginta', name: 'Sancti Quadraginta', x: -548, z: -392, rot: 0.32, lx: -37, lz: -70, flat: [44, 70] },
   // Baths between the later Porta S. Lorenzo and Port'Arsa, outside the circuit of 700.
   thermae: { id: 'thermae', name: 'Thermae', x: -419, z: -140, rot: 0.38, lx: -33, lz: 24, flat: [24, 42] },
   // Nunnery of St Peter outside the walls, founded by Theuderada (wife of Romuald I) beyond the Sabato on the Appia.
-  sanctusPetrus: { id: 'sanctusPetrus', name: 'Sanctus Petrus extra muros', x: -858, z: -6, rot: -0.9, lx: -16, lz: -50, flat: [30, 50] },
+  sanctusPetrus: { id: 'sanctusPetrus', name: 'Sanctus Petrus extra muros', x: -858, z: -6, rot: -0.9, lx: -16, lz: -50, flat: [30, 50],
+    floors: [[[-22.2, -68], [-9.4, -68], [-9.4, -40.4], [-22.2, -40.4]]] },
   theatrum: { id: 'theatrum', name: 'Theatrum', x: -229, z: -8, rot: 0, flat: [52, 74] },
   amphitheatrum: { id: 'amphitheatrum', name: 'Amphitheatrum', x: -593, z: -214, rot: 0.5, flat: [56, 80] },
   arcusTraiani: { id: 'arcusTraiani', name: 'Porta Aurea', x: 389, z: -224, rot: 0, flat: [9, 22] },
@@ -66,10 +75,28 @@ export const SITES: Record<string, SiteDef> = {
   // (OSM: the Rocca at 41.1290 N, 14.7820 E); the aqueduct comes in from the east-south-east.
   castellumAquae: { id: 'castellumAquae', name: 'Castellum Aquae', x: 622, z: 160, rot: 2.64, flat: [14, 30] },
   hortusSophiae: { id: 'hortusSophiae', name: 'Hortus Curtis', x: 566, z: -16, rot: GRID_ROT, clear: 20 },
+  // The little square before the curtis gate named after a Roman equestrian statue (Piazza Piano di
+  // Corte: two fragments of an equestrian monument found there in 1920), with the church of
+  // S. Petrus ad Caballum on its east side (HISTORY.md §5 "Ad Caballum"). Kept open as a square.
+  caballus: { id: 'caballus', name: 'Ad Caballum', x: 499, z: -108, rot: 0, flat: [10, 19], clear: 13, square: true,
+    reserve: [[-12, -10], [16.5, -10], [16.5, 10], [-12, 10]] },
 };
 
 // Terraces for the sites that need level footing.
 for (const s of Object.values(SITES)) if (s.flat) plateau(s.x, s.z, s.flat[0], s.flat[1]);
+// The Sabato's gravel bed under the Ponte Leproso in 700. The modern ground (the DEM) has the
+// river pushed against the left bank and the three northern arches silted to above their
+// springing: that is the work of the mills Dacomarius was allowed to build in 1077 (Meomartini
+// 1889, p. 277). Before them the river spread its bed under the whole bridge: the ground under
+// and beside it is cut down to a gravel bed a hand above the water (12.5 here), the channel
+// itself left as it is. Axis of the bridge (OSM way 59431406, as in pons.ts): from (-736.8,
+// -143.4) to (-788.5, -61.4); the five arches between 20 and 83.5 m from the town end.
+{
+  const A = [-736.8, -143.4], B = [-788.5, -61.4], L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+  const D = [(B[0] - A[0]) / L, (B[1] - A[1]) / L], sm = (20 + 83.5) / 2;
+  const p = plateau(A[0] + D[0] * sm, A[1] + D[1] * sm, 1, 8, 0, { ex: 33, ez: 20, rot: Math.atan2(D[1], D[0]) });
+  p.h = 12.75; p.cut = true;
+}
 
 // Spatial hash so the terrain does not scan every terrace per vertex.
 const HC = 64;
@@ -136,10 +163,10 @@ const g = (id: string) => GATES.find((x) => x.id === id)!.at;
 export const ROADS: Road[] = [
   // The Appia: Ponte Leproso, north past the amphitheatre and the Santi Quaranta, to Porta S. Lorenzo.
   // Over the bridge it runs from ramp foot to ramp foot (pons.ts: the bridge's axis is OSM's).
-  { name: 'Via Appia', w: 3.4, pts: [[-1120, 40], [-990, 18], [-900, -10], [-845, -30], [-811.5, -25.0], [-720.3, -169.6], [-700, -184], [-664, -246], [-630, -294], [-590, -326], [-520, -347], [-460, -345], g('laurentii')] },
+  { name: 'Via Appia', w: 3.4, pts: [[-1120, 40], [-990, 18], [-900, -10], [-845, -30], [-808.0, -30.5], [-714.4, -178.9], [-700, -184], [-664, -246], [-630, -294], [-590, -326], [-520, -347], [-460, -345], g('laurentii')] },
   // From the Arcus Sacramenti down past the theatre and Torre della Catena to the Sabato, along its
   // bank upstream of the bridge, and up to the bridge's town-side ramp.
-  { name: 'Via ad Pontem Leprosum', w: 2.8, pts: [[-82, -52], [-120, -38], [-168, -30], [-205, -52], [-262, -70], [-330, -60], [-400, -48], [-470, -40], [-517, -14], [-570, -30], [-640, -70], [-690, -98], [-736.9, -115.1], [-720.3, -169.6]] },
+  { name: 'Via ad Pontem Leprosum', w: 2.8, pts: [[-82, -52], [-120, -38], [-168, -30], [-205, -52], [-262, -70], [-330, -60], [-400, -48], [-470, -40], [-517, -14], [-570, -30], [-640, -70], [-690, -98], [-736.9, -115.1], [-714.4, -178.9]] },
   // The Traiana: through the Arch of Trajan, past S. Ilario, down to the Calore and on to Apulia.
   { name: 'Via Traiana', w: 3.2, pts: [[392, -228], [416, -246], [452, -268], [500, -300], [560, -342], [622, -390], [690, -444], [770, -500], [900, -530]] },
   // Porta Gloriosa down to the bridge of S. Onofrio and the road north (the old Latina).

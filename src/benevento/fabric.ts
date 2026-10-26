@@ -10,7 +10,7 @@ import { reseedShapes, ruin, arcadeGeo, archRings, quoinBox, pyramidRoof, wellHe
 import { fastTerrain } from '../displace';
 import { torch, brazier } from '../lights';
 import { WALL700, BOUNDS, insideness, type P2 } from './geo';
-import { GATES, SITES } from './sites';
+import { GATES, SITES, siteToWorld } from './sites';
 import type { Layout, Plot, PlotKind } from './layout';
 import { buildInterior, interiorCollider } from './interiors';
 
@@ -90,6 +90,8 @@ export interface ChunkItems {
   holes: Hole[];
   /** House footprint mask for the ground (CHUNK/0.5 square, 1 = under a house). */
   mask?: Uint8Array;
+  /** (while building the masks) landmark floors over this chunk. */
+  floors?: P2[][]; floorMask?: Uint8Array;
 }
 export const chunkKey = (i: number, j: number) => (i + 2048) * 4096 + (j + 2048);
 
@@ -251,6 +253,8 @@ function plot(b: Builder, p: PlotData) {
       if (gap > 0 && L > 3) { const gw = 1.4 / L; seg(0, gap - gw / 2); seg(gap + gw / 2, 1); } else seg(0, 1);
     }
   }
+  if (p.kind === 'cortis') { yardWalls(b, p); yardThings(b, p); }
+  if (p.kind === 'hortulus') { yardWalls(b, p, true); if (b.mode !== 'collide') hortulus(b, p); return; }
   if (p.kind === 'orto' || p.kind === 'stabulum') yardThings(b, p);
   if (b.mode === 'collide' && p.kind !== 'ruina') return;
   // Interior: rows of beds in the gardens, vine stakes, a shed in the pens,
@@ -309,6 +313,74 @@ function plot(b: Builder, p: PlotData) {
       const x = R(x0 + 2, x1 - 2), z = R(z0 + 2, z1 - 2);
       if (inside(x, z)) fallenDrum(b, x, z, R(0.3, 0.45), R(0.8, 2), R(0, 3));
     }
+  }
+}
+
+/** A plain box (12 triangles, not tessellated): the yard and garden walls are many and low. */
+function flat(b: Builder, m: MatName, w: number, h: number, d: number, x: number, y: number, z: number, ry = 0, collide = true, rx = 0, rz = 0) {
+  b.geo(m, new THREE.BoxGeometry(w, h, d), x, y + h / 2, z, ry, collide, rx, rz, true);
+}
+/**
+ * A walled yard in front of a house, taken out of the old street (layout.ts §7b): pts are
+ * [street-left, street-right, house-right, house-left]. Rubble walls a little over head height on
+ * the street and the two sides, the gate in the street wall (a plank leaf standing open, now and
+ * then a tiled coping over it); the house's own front closes the fourth side.
+ */
+function yardWalls(b: Builder, p: PlotData, all = false) {
+  const r = rng(p.seed * 7 + 3);
+  const P = p.pts, T = 0.45;
+  const h = 1.9 + r() * 0.7;
+  let cx = 0, cz = 0;
+  for (const [x, z] of P) { cx += x / 4; cz += z / 4; }
+  for (const k of all ? [0, 1, 2, 3] : [0, 1, 3]) {
+    const a = P[k], c = P[(k + 1) % 4];
+    const L = Math.hypot(c[0] - a[0], c[1] - a[1]);
+    if (L < 0.6) continue;
+    const ry = Math.atan2(c[0] - a[0], c[1] - a[1]) - Math.PI / 2;
+    // Set the wall inside the yard's edge by half its thickness.
+    const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2, il = Math.hypot(cx - mx, cz - mz) || 1;
+    const ox = ((cx - mx) / il) * T / 2, oz = ((cz - mz) / il) * T / 2;
+    const seg = (t0: number, t1: number) => {
+      if (t1 - t0 < 0.05) return;
+      const tm = (t0 + t1) / 2;
+      const hh = h * (k === 0 ? 1 : 0.92);
+      flat(b, 'rubble', (t1 - t0) * L, hh, T, a[0] + (c[0] - a[0]) * tm + ox, -0.3, a[1] + (c[1] - a[1]) * tm + oz, ry);
+      if (b.mode === 'collide') return;
+      // A coping of flat stones.
+      flat(b, 'slab', (t1 - t0) * L + 0.05, 0.08, T + 0.1, a[0] + (c[0] - a[0]) * tm + ox, hh - 0.3, a[1] + (c[1] - a[1]) * tm + oz, ry, false);
+    };
+    if (k === 0 && L > 2.2) {
+      // The gate: 1.2 m, somewhere along the street wall.
+      const g = 1.2 / L, t = g / 2 + 0.1 / L + r() * Math.max(0, 1 - g - 0.2 / L);
+      seg(0, t - g / 2); seg(t + g / 2, 1);
+      if (b.mode === 'collide') continue;
+      // One leaf standing open into the yard.
+      const hx = a[0] + (c[0] - a[0]) * (t - g / 2), hz = a[1] + (c[1] - a[1]) * (t - g / 2);
+      flat(b, 'wood', 1.15, 1.75, 0.07, hx + ox * 2 + (cx - mx) / il * 0.5, -0.2, hz + oz * 2 + (cz - mz) / il * 0.5, ry + Math.PI / 2 - 0.3 + r() * 0.3, false);
+    } else seg(0, 1);
+  }
+}
+
+/**
+ * Inside a little walled garden taken out of a wide street (layout.ts §7b): beds of greens, or a
+ * pen's trodden floor with a manger; boxes only.
+ */
+function hortulus(b: Builder, p: PlotData) {
+  const r = rng(p.seed * 3 + 11);
+  const [a, c, , d] = p.pts;
+  const ex = [c[0] - a[0], c[1] - a[1]], ez = [d[0] - a[0], d[1] - a[1]];
+  const L = Math.hypot(ex[0], ex[1]), W = Math.hypot(ez[0], ez[1]);
+  const ry = Math.atan2(ex[0], ex[1]) - Math.PI / 2;
+  const at = (u: number, w: number): P2 => [a[0] + (ex[0] * u) / L + (ez[0] * w) / W, a[1] + (ex[1] * u) / L + (ez[1] * w) / W];
+  if (r() < 0.65) {
+    for (let w = 1.2; w < W - 0.8; w += 1.1) {
+      const [x, z] = at(L / 2, w);
+      flat(b, 'ground', Math.max(0.5, L - 1.6), 0.16, 0.7, x, -0.08, z, ry, false);
+    }
+  } else {
+    const [x, z] = at(L * 0.3, W - 0.9);
+    flat(b, 'wood', 1.6, 0.5, 0.5, x, 0.1, z, ry, false);
+    flat(b, 'wood', 0.08, 0.6, 0.08, x - 0.7, -0.1, z, ry, false);
   }
 }
 
@@ -513,6 +585,33 @@ export function makeChunks(lay: Layout, holes: Hole[]): Map<number, ChunkItems> 
   }
   // Ground mask under houses (wells and holes stay open).
   const r = lay.r;
+  // Landmarks with their own floors (a church's slabs lie a little below grade): no town ground over them.
+  const floors: P2[][] = [];
+  for (const s of Object.values(SITES)) for (const f of s.floors ?? []) floors.push(f.map(([lx, lz]) => siteToWorld(s, lx, lz)));
+  for (const P of floors) {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const [x, z] of P) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    for (let i = Math.floor(x0 / CHUNK); i <= Math.floor(x1 / CHUNK); i++) for (let j = Math.floor(z0 / CHUNK); j <= Math.floor(z1 / CHUNK); j++) {
+      const c = map.get(chunkKey(i, j));
+      if (!c) continue;
+      (c.floors ??= []).push(P);
+    }
+  }
+  for (const c of map.values()) {
+    if (c.floors) {
+      const MR = CHUNK / 0.5, m = new Uint8Array(MR * MR);
+      for (let j = 0; j < MR; j++) for (let i = 0; i < MR; i++) {
+        const x = c.i * CHUNK + (i + 0.5) * 0.5, z = c.j * CHUNK + (j + 0.5) * 0.5;
+        // A margin of a cell round the floor, so the ground's quads clear it.
+        for (const P of c.floors) for (const [dx, dz] of [[0, 0], [0.6, 0], [-0.6, 0], [0, 0.6], [0, -0.6]]) {
+          let ins = false;
+          for (let a = 0, q = P.length - 1; a < P.length; q = a++) if ((P[a][1] > z + dz) !== (P[q][1] > z + dz) && x + dx < ((P[q][0] - P[a][0]) * (z + dz - P[a][1])) / (P[q][1] - P[a][1]) + P[a][0]) ins = !ins;
+          if (ins) { m[j * MR + i] = 1; break; }
+        }
+      }
+      c.floorMask = m;
+    }
+  }
   for (const c of map.values()) {
     if (!c.lots.length) continue;
     const MR = CHUNK / 0.5, m = new Uint8Array(MR * MR);
@@ -531,6 +630,11 @@ export function makeChunks(lay: Layout, holes: Hole[]): Map<number, ChunkItems> 
       }
     }
     c.mask = m;
+  }
+  for (const c of map.values()) if (c.floorMask) {
+    if (!c.mask) c.mask = c.floorMask;
+    else for (let k = 0; k < c.mask.length; k++) c.mask[k] |= c.floorMask[k];
+    delete c.floorMask; delete c.floors;
   }
   void WALL700;
   return map;

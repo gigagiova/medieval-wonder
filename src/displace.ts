@@ -77,7 +77,8 @@ export function worldTerrain(x: number, z: number) {
     const d = p.ex ? Math.max(Math.abs((x - p.x) * p.ca + (z - p.z) * p.sa) / p.ex, Math.abs(-(x - p.x) * p.sa + (z - p.z) * p.ca) / p.ez!) * p.r0 : Math.hypot(x - p.x, z - p.z);
     if (d >= p.r1) continue;
     const t = d <= p.r0 ? 0 : THREE.MathUtils.smoothstep(d, p.r0, p.r1);
-    h = p.h + (h - p.h) * t;
+    const ph = p.cut ? Math.min(h, p.h) : p.h;
+    h = ph + (h - ph) * t;
   }
   return h;
 }
