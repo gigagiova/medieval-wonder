@@ -117,6 +117,12 @@ for gid, g in GARMENTS.items():
     if sex in g['sex'] and 'drape' in g:
         garments[gid] = drape.make(gid, g, garments, basemesh, rig)
         gspec[gid] = {'depth': g.get('depth', 80), 'delete': None}
+# Skirts follow the thighs only, never a knee or a foot (skirt.py).
+import skirt  # noqa: E402
+for gid, o in garments.items():
+    sk = GARMENTS[gid].get('skirt')
+    if sk:
+        log('skirt', gid, skirt.fix(o, rig, **sk))
 # Sources only used to derive others are not exported.
 for gid in list(garments):
     if GARMENTS[gid].get('only_source'):
