@@ -19,7 +19,7 @@ const OUT = 'public/models/npc2';
 /** Triangles kept per mesh (by node name prefix). */
 const BUDGET: [RegExp, number][] = [
   [/body$/, 9000],
-  [/^G_robe$/, 4200], [/^G_tunic$/, 2600], [/^G_shirt$/, 2600], [/^G_belt$/, 500], [/^G_rope$/, 500], [/^G_cowl$/, 3000], [/^G_hood$/, 3000], [/^G_cloak/, 1800], [/^G_shawl/, 1400],
+  [/^G_robe$/, 5500], [/^G_longrobe$/, 5500], [/^G_tunic$/, 2600], [/^G_shirt$/, 2600], [/^G_belt$/, 500], [/^G_rope$/, 500], [/^G_cowl$/, 3000], [/^G_hood$/, 3000], [/^G_cloak/, 1800], [/^G_shawl/, 1400],
   [/^G_hose$/, 900], [/^G_boots$/, 1300], [/^G_shoes$/, 900],
   [/^G_gown$/, 3600], [/^G_veil$/, 1600],
   [/eye/i, 200], [/./, 1500],

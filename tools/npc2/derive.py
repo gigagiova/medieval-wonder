@@ -50,6 +50,26 @@ def make(gid, g, garments, basemesh, rig):
         for k, vs in named.items():
             if k in d.get('drop', []) or (keep and k not in keep):
                 kill += vs
+        # The shoulder cape lies on the shoulders: it takes little of the
+        # arms' swing (MakeHuman gave it the upper arms' weights, which tear
+        # its hem into points when the arms rise).
+        if 'capelet' not in d.get('drop', []) and (not keep or 'capelet' in keep):
+            dl = bm.verts.layers.deform.active
+            gi = {g.name: g.index for g in o.vertex_groups}
+            for S in ('Left', 'Right'):
+                for nm in ('mixamorig:%sShoulder' % S, 'mixamorig:Spine2'):
+                    if nm not in gi:
+                        gi[nm] = o.vertex_groups.new(name=nm).index
+            arm = {gi[n]: n for n in gi if any(n == 'mixamorig:%s%s' % (S, b) for S in ('Left', 'Right') for b in ('Arm', 'ForeArm', 'Hand'))}
+            for v in named['capelet']:
+                w = v[dl]
+                for g, n in list(arm.items()):
+                    if g in w and w[g] > 0:
+                        x = w[g] * 0.75
+                        w[g] -= x
+                        S = 'Left' if 'Left' in n else 'Right'
+                        w[gi['mixamorig:%sShoulder' % S]] = w.get(gi['mixamorig:%sShoulder' % S], 0) + x * 0.6
+                        w[gi['mixamorig:Spine2']] = w.get(gi['mixamorig:Spine2'], 0) + x * 0.4
     if d['from'] == 'vtunic_src':
         # RehmanPolanski's viking tunic: the tunic, its belt, the buckle.
         assert len(parts) == 3, [len(p) for p in parts]
