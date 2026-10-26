@@ -43,6 +43,10 @@ Plastic is rarely specular in this game (world specular is already ~0):
 | Cavity darkening of albedo from the scanned height | joints and pores read deep | free | — | adopted |
 | Per-stone / per-patch tone and roughness variation at several scales | uniform "painted" surfaces | 0–1 fetch (existing noise texture) | polycount advice above | adopted |
 | Stronger normals for stone near the camera | relief responds to the key light | free | — | adopted |
+| Wet only where water lies (gutters, puddles in low spots, film between cobbles, damp wall bases): low roughness and full specular there, matte elsewhere | the "wet street" read of A Plague Tale / TLOU2 without plastic dry stone | free (mask from existing height + town maps) | — | adopted |
+| Decaying lime render over rubble (height-blended patches with a dark lip) | smooth plaster read as clay | +1 planar sample set on plaster only | — | adopted |
+| Less metre-scale geometric displacement on masonry (bulge/lean kept) | smooth-normal dents read as moulded clay | free (load-time) | — | adopted |
+| River: two-fetch drifting ripples, mud-coloured shallows (no shoreline seam), Fresnel (Schlick F0 0.02) reflection of our own sky | invisible / plastic water | 2 fetches | — | adopted |
 | Skin: wrapped diffuse with a red-shifted terminator (cheap pre-integrated SSS) | waxy/plastic faces | a few ALU | NVIDIA [GPU Gems ch.16](https://developer.nvidia.com/gpugems/gpugems/part-iii-materials/chapter-16-real-time-approximations-subsurface-scattering); Penner, [Pre-Integrated Skin Shading](https://www.slideshare.net/slideshow/penner-preintegrated-skin-rendering-siggraph-2011-advances-in-realtime-rendering-course/13966747) | already in `src/npc/scan.ts`; tuned |
 | Cloth: no GGX lobe, fibre sheen (Charlie) only at grazing, cavity AO from the weave | satin/plastic clothes | a few ALU | Estevez & Kulla "Production Friendly Microfacet Sheen BRDF"; Filament cloth model; three.js `MeshPhysicalMaterial.sheen` ([discourse](https://discourse.threejs.org/t/what-is-the-best-material-in-threejs-for-clothing/3088)) | adopted (cheap form inside the fabric shader) |
 
@@ -55,6 +59,12 @@ Plastic is rarely specular in this game (world specular is already ~0):
 | Analytic lamp halos (1/(h²+t²) integrated in closed form) | warm pools in the cold mist | per lamp ALU, skipped for dark lamps | kept |
 | Mist dimmed by sky visibility | interiors not filled with outdoor haze | 1 fetch | adopted |
 
+## Sky
+
+- Domain-warped cloud deck from the shared noise texture (3 fetches), with
+  dense dark bellies against a paler deck and a grey (not warm) glow in the
+  west; swept side by side for value structure (bright sky vs dark streets).
+
 ## Tone and grade
 
 - **AgX** instead of ACES: no hue skew in lamps, greyer highlights, better for
@@ -64,3 +74,6 @@ Plastic is rarely specular in this game (world specular is already ~0):
 - No film grain or chromatic fringe (they read as an old filter); a dither
   below one 8-bit step only.
 - FXAA in the grade pass (the scene target is single-sampled).
+- Film-still grade: S-curve, split toning (cold shadows, faint warm
+  highlights), colour muted except warm firelight, vignette; bloom only
+  above 0.95 (lamps, fire).

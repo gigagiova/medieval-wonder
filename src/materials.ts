@@ -44,7 +44,7 @@ export const shared = {
   uTime: { value: 0 },
   uLampPos: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3(0, -999, 0)) },
   uLampCol: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3()) },
-  uFogCol: { value: new THREE.Color(0.15, 0.155, 0.165) },
+  uFogCol: { value: new THREE.Color(0.105, 0.11, 0.118) },
   uUnder: { value: 0 },
   // The key light: the bright part of the overcast in the west, low (~19°).
   uMoonDir: { value: new THREE.Vector3(-0.86, 0.33, 0.36).normalize() },
@@ -56,7 +56,7 @@ export const shared = {
   // Light field (see lightfield.ts): baked sun shadow height + mean town heights.
   uLF: { value: new THREE.DataTexture(new Uint8Array(4), 1, 1) as THREE.Texture },
   uLFBox: { value: new THREE.Vector4(0, 0, 1, 0) },
-  uFogK: { value: new THREE.Vector4(0.009, 0.055, 0.12, 60) },
+  uFogK: { value: new THREE.Vector4(0.007, 0.038, 0.12, 60) },
   uSkyGlow: { value: 0.45 },
   uSkyK: { value: new THREE.Vector4(0.75, 0.55, 1.25, 0.11) },
 };
