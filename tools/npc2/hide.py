@@ -169,6 +169,13 @@ def mark(basemesh, garments, outfits, specs, knee=None):
                 for i in range(len(m)):
                     if pos[i].z < knee:
                         m[i] = m2[i]
+            if k != 'body' and knee is not None and any(specs[g].get('long') for g in over):
+                # (A shoe under a robe's hem shows as the foot strides out.)
+                rest_over = [g for g in over if not specs[g].get('long')]
+                m2 = covered(pos, nrm, [bvh[g] for g in rest_over], 0.0) if rest_over else [False] * len(pos)
+                for i in range(len(m)):
+                    if pos[i].z < knee:
+                        m[i] = m[i] and m2[i]
             n = 0
             for i, h in enumerate(m):
                 if h:
