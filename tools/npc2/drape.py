@@ -190,7 +190,7 @@ def make(gid, g, garments, basemesh, rig):
     for v in o.data.vertices:
         ws = {o.vertex_groups[gr.group].name: gr.weight for gr in v.groups}
         # Over the shoulder the cloth goes with the arm's top (or the sleeve under it comes through).
-        kf = kf0 + (0.85 - kf0) * max(0.0, min(1.0, 1 - (shz - v.co.z) / 0.15))
+        kf = kf0 + (d.get('arm_top', 0.6) - kf0) * max(0.0, min(1.0, 1 - (shz - v.co.z) / 0.15))
         for S in ('Left', 'Right'):
             arm = [n for n in ws if re.match(r'mixamorig:%s(Arm|ForeArm|Hand)' % S, n)]
             tot = sum(ws[n] for n in arm)

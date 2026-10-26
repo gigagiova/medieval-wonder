@@ -38,7 +38,7 @@ export interface FrontPlan { stair: StairPlan | null; items: FrontItem[] }
  * What stands in the street in front of a house (pure: same answer on every
  * thread). `street` is the width of the lane in front.
  */
-export function planFront(fr: FrontLine, street: number, h: number, seed: number): FrontPlan {
+export function planFront(fr: FrontLine, street: number, h: number, seed: number, sideWall = false): FrontPlan {
   const r = rng(seed * 13 + 5);
   const R = (a: number, b: number) => a + (b - a) * r();
   const L = fr.a.distanceTo(fr.b);
@@ -48,15 +48,15 @@ export function planFront(fr: FrontLine, street: number, h: number, seed: number
   const run = hL / 0.235 * 0.27 + 0.1;
   const land = R(1.05, 1.3);
   // A two-storey house on a lane wide enough to keep the stair out of the way.
-  if (pStair < 0.3 && street >= 2.7 && h > hL + 2.0 && L > run + land + 1.6) {
+  if (!sideWall && pStair < 0.35 && street >= 2.7 && h > hL + 2.0 && L > run + land + 1.6) {
     const end = side ? fr.a.clone() : fr.b.clone();
     const dir = side ? e : e.clone().negate();
     stair = { end: end.clone().addScaledVector(dir, 0.15), foot: end.clone().addScaledVector(dir, 0.15 + land + run), land, run, depth, hL };
   }
   const items: FrontItem[] = [];
   // Woodpiles, a stone bench, jars by the door, now and then a handcart, on lanes that have room.
-  if (street >= 2.2) {
-    const n = Math.floor(R(0, 2.6));
+  if (street >= 1.8) {
+    const n = Math.floor(R(0.6, 3.4));
     const taken: [number, number][] = [];
     if (stair) {
       const su = [stair.foot, stair.end].map((p) => p.clone().sub(fr.a).dot(e));
@@ -67,7 +67,8 @@ export function planFront(fr: FrontLine, street: number, h: number, seed: number
       const kind: FrontItem['kind'] = k < 0.42 ? 'wood' : k < 0.68 ? 'bench' : k < 0.9 ? 'jars' : 'cart';
       const len = kind === 'wood' ? R(1.0, 2.2) : kind === 'bench' ? R(1.1, 1.8) : kind === 'jars' ? R(0.5, 0.9) : 1.9;
       const depthI = kind === 'wood' ? R(0.38, 0.5) : kind === 'bench' ? 0.38 : kind === 'jars' ? 0.42 : 1.15;
-      if (kind === 'cart' && street < 3.4) continue;
+      if (kind === 'cart' && (street < 3.4 || sideWall)) continue;
+      if (street < 2.2 && kind !== 'jars' && kind !== 'wood') continue;
       const u = R(0.3, Math.max(0.31, L - 0.3 - len));
       if (u + len > L - 0.2) continue;
       if (taken.some(([t0, t1]) => u < t1 && u + len > t0)) continue;
@@ -83,7 +84,7 @@ export function planFront(fr: FrontLine, street: number, h: number, seed: number
   if (street >= 1.9 && pS < 0.05 && L > 3.5 && h > 4.5) {
     const len = Math.min(L - 0.4, 3 + uS * 4), u = 0.2 + (L - 0.4 - len) * hS;
     if (freeAt(u, u + len)) items.push({ kind: 'scaffold', u, len, depth: 1.05, h: Math.min(h - 0.6, 3 + hS * 4) });
-  } else if (street >= 1.9 && pL < 0.14) {
+  } else if (street >= 1.9 && pL < 0.22) {
     const u = 0.4 + (L - 1.2) * uL;
     if (L > 2 && freeAt(u, u + 0.5)) items.push({ kind: 'ladder', u, len: 0.45, depth: 0.9, h: Math.min(h - 0.2, 2.6 + hS * 2.2) });
   }
@@ -347,13 +348,6 @@ export function dressWall(acc: Acc, d: WallDress, seed: number) {
       }
     }
   }
-  // Joist heads where the upper floor rests (no jetty: they stop at the face).
-  if (!d.oneMass || d.h > 4.5) {
-    const v = (d.oneMass ? Math.min(3.2, d.h * 0.48) : d.lowTop) + 0.12;
-    if (v < d.h - 0.6 && r() < 0.6) for (const [a, b] of runs(v - 0.1, v + 0.1, 0.25, d.L - 0.25)) {
-      for (let u = a + R(0, 0.2); u < b; u += R(0.5, 0.7)) box(acc, 'wood', d.f, u, v, 0.0, 0.06, 0.07, 0.05, 0.01);
-    }
-  }
 }
 
 /** A ragged patch of render on a wall: front face fanned from its centre, a thin rim. */
@@ -425,4 +419,100 @@ function pole(acc: Acc, p: THREE.Vector3, q: THREE.Vector3, rad: number) {
   const s1 = v3().crossVectors(d, a).normalize().multiplyScalar(rad), s2 = v3().crossVectors(d, s1).normalize().multiplyScalar(rad);
   const c = (o: THREE.Vector3, i: number) => o.clone().addScaledVector(s1, i === 0 || i === 3 ? -1 : 1).addScaledVector(s2, i < 2 ? -1 : 1);
   acc.hexa('wood', [c(p, 0), c(p, 1), c(p, 2), c(p, 3), c(q, 0), c(q, 1), c(q, 2), c(q, 3)], true);
+}
+
+/** The wall k of a footprint as a front line (out = away from the footprint's middle). */
+export function sideLine(c: (V2 | [number, number])[], k: number): FrontLine {
+  const P = c.map((p) => (Array.isArray(p) ? new THREE.Vector2(p[0], p[1]) : p));
+  let cx = 0, cz = 0;
+  for (const p of P) { cx += p.x / P.length; cz += p.y / P.length; }
+  const a = P[k].clone(), b = P[(k + 1) % P.length].clone();
+  const e = b.clone().sub(a).normalize();
+  let out = new THREE.Vector2(-e.y, e.x);
+  if (out.x * ((a.x + b.x) / 2 - cx) + out.y * ((a.y + b.y) / 2 - cz) < 0) out = out.negate();
+  return { a, b, out };
+}
+
+/**
+ * A wall on a lane that is not the house's front (a side or back wall the plan
+ * puts on a street): small windows with shutters, now and then a side door
+ * (flush on the wall: the wall itself is not cut), a pentice, the wall's
+ * dressing, and the same street things as a front. All on its own stream.
+ */
+export function sideFace(acc: Acc, fr: FrontLine, street: number, h: number, h1: number, m: MatName, seed: number, lamps: (p: THREE.Vector3) => void) {
+  const r = rng(seed * 19 + 7);
+  const R = (a: number, b: number) => a + (b - a) * r();
+  const L = fr.a.distanceTo(fr.b);
+  const e = fr.b.clone().sub(fr.a).normalize();
+  // (A finger's breadth out: the wall under it is a bent grid, not a plane.)
+  const f = Frame.facade(fr.a.x + fr.out.x * 0.025, fr.a.y + fr.out.y * 0.025, e.x, e.y, fr.out.x, fr.out.y);
+  const holes: { u0: number; u1: number; v0: number; v1: number }[] = [];
+  const plan = planFront(fr, street, h, seed, true);
+  const taken = plan.items.map((it) => [it.u - 0.2, it.u + it.len + 0.2] as [number, number]);
+  const clear = (u0: number, u1: number, v0: number) => holes.every((o) => u1 < o.u0 - 0.5 || u0 > o.u1 + 0.5 || v0 > o.v1 + 0.6 || v0 < o.v0 - 2) && u0 > 0.35 && u1 < L - 0.35;
+  const stone: MatName = m === 'brick' ? 'brick' : 'block';
+  // A side door at street level.
+  if (L > 3.2 && r() < 0.4) {
+    const dw = R(0.85, 1.05), u0 = R(0.5, L - 0.5 - dw), top = R(1.8, 2.05);
+    if (taken.every(([a, b]) => u0 + dw < a || u0 > b)) {
+      holes.push({ u0, u1: u0 + dw, v0: 0, v1: top });
+      const c = u0 + dw / 2;
+      box(acc, 'iron', f, c, top / 2, 0.004, dw / 2, top / 2, 0.006, 0, true);
+      // Planks (one leaf with its joints as shallow battens), frame, lintel, threshold.
+      box(acc, 'wood', f, c, top / 2 - 0.02, 0.02, dw / 2 - 0.05, top / 2 - 0.03, 0.02, 0, true);
+      for (let u = u0 + 0.16; u < u0 + dw - 0.1; u += R(0.15, 0.2)) box(acc, 'wood', f, u, top / 2, 0.042, 0.008, top / 2 - 0.06, 0.006, 0, true);
+      for (const t of [0.22, 0.78]) box(acc, 'iron', f, c - 0.05, top * t, 0.05, dw * 0.38, 0.022, 0.006, 0, true);
+      for (const s of [-1, 1]) box(acc, 'wood', f, c + s * (dw / 2 - 0.02), top / 2, 0.035, 0.05, top / 2, 0.04, 0.005);
+      box(acc, r() < 0.5 ? 'wood' : stone, f, c, top + 0.1, 0.05, dw / 2 + R(0.18, 0.3), 0.1, 0.07, 0.01);
+      box(acc, 'slab', f, c, -0.04, 0.12, dw / 2 + 0.08, 0.06, 0.16, 0.01);
+      if (street > 1.8 && r() < 0.45) {
+        // A pentice of boards on two brackets over it.
+        const run = Math.min(0.75, street * 0.35), y = top + 0.45;
+        const q = (u: number, v: number, w: number) => f.p(u, v, w);
+        acc.hexa('wood', [q(u0 - 0.35, y, 0.02), q(u0 + dw + 0.35, y, 0.02), q(u0 + dw + 0.35, y - 0.28, run), q(u0 - 0.35, y - 0.28, run),
+          q(u0 - 0.35, y + 0.05, 0.02), q(u0 + dw + 0.35, y + 0.05, 0.02), q(u0 + dw + 0.35, y - 0.23, run), q(u0 - 0.35, y - 0.23, run)], true);
+        for (const s of [-1, 1]) {
+          const u = c + s * (dw / 2 + 0.2);
+          acc.hexa('wood', [q(u - 0.03, y - 0.65, 0), q(u + 0.03, y - 0.65, 0), q(u + 0.03, y - 0.3, run - 0.1), q(u - 0.03, y - 0.3, run - 0.1),
+            q(u - 0.03, y - 0.58, 0), q(u + 0.03, y - 0.58, 0), q(u + 0.03, y - 0.23, run - 0.1), q(u - 0.03, y - 0.23, run - 0.1)], true);
+        }
+      }
+    }
+  }
+  // Windows: small and high on the ground floor, larger above; shutters open or shut, some lit.
+  const rows: [number, number, number][] = [[R(1.45, 1.75), 0.3, 0.45]];
+  for (let y = h1 + R(0.8, 1.1); y < h - 1.0; y += R(2.4, 2.9)) rows.push([y, 0.5, 0.75]);
+  for (const [v0, wMin, hMax] of rows) {
+    const n = Math.max(1, Math.round(L / R(2.2, 3.2)));
+    for (let i = 0; i < n; i++) {
+      if (r() < 0.25) continue;
+      const ww = R(wMin, wMin + 0.2), wh = R(hMax * 0.75, hMax);
+      const u0 = (L * (i + 0.5)) / n - ww / 2 + R(-0.4, 0.4);
+      if (!clear(u0, u0 + ww, v0)) continue;
+      if (v0 < 2 && taken.some(([a, b]) => u0 + ww > a && u0 < b)) continue;
+      holes.push({ u0, u1: u0 + ww, v0, v1: v0 + wh });
+      const c = u0 + ww / 2, lit = r() < 0.28;
+      box(acc, lit ? 'window' : 'iron', f, c, v0 + wh / 2, 0.004, ww / 2, wh / 2, 0.008, 0, true);
+      box(acc, r() < 0.6 ? 'wood' : stone, f, c, v0 + wh + 0.07, 0.03, ww / 2 + R(0.1, 0.2), 0.07, 0.05, 0.008);
+      box(acc, stone, f, c, v0 - 0.05, 0.05, ww / 2 + 0.07, 0.045, 0.07, 0.008);
+      const s = r();
+      if (s < 0.4) {
+        // Shut: two leaves over the opening.
+        for (const sd of [-1, 1]) box(acc, 'wood', f, c + sd * ww / 4, v0 + wh / 2, 0.035, ww / 4 - 0.008, wh / 2 + 0.02, 0.018, 0.004, true);
+      } else if (s < 0.8) {
+        // Open: the leaves folded back flat against the wall.
+        for (const sd of [-1, 1]) box(acc, 'wood', f, c + sd * (ww / 2 + ww / 4 + 0.03), v0 + wh / 2, 0.025, ww / 4, wh / 2 + 0.02, 0.016, 0.004, true);
+      } else {
+        // A wooden grille.
+        for (let u = u0 + 0.08; u < u0 + ww - 0.05; u += 0.11) box(acc, 'wood', f, u, v0 + wh / 2, 0.02, 0.015, wh / 2, 0.015, 0, true);
+      }
+      if (lit && r() < 0.25) lamps(f.p(c, v0 + 0.3, 0.6));
+    }
+  }
+  // The wall's dressing (no putlog holes: this wall is not cut, and squares stuck on it read as tiles).
+  dressWall(acc, { f, L, lower: m, upper: m, lowTop: h1, h, upFace: 0, oneMass: true, holes }, seed + 3);
+  // Washing out of an upper window over a narrow lane.
+  const up = holes.filter((o) => o.v0 > 2.5);
+  if (up.length && r() < (street < 3.2 ? 0.35 : 0.2)) { const o = up[Math.floor(r() * up.length)]; washing(acc, f, (o.u0 + o.u1) / 2, o.v0 + 0.05, 0.02, street, r); }
+  buildFront(acc, fr, plan, stone, seed);
 }

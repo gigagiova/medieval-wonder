@@ -337,7 +337,7 @@ World coordinates in metres (x, z).
   `tools/benevento/*.py` (see each script's header); `sites.ts` (landmark frames, gates, roads,
   districts, explorable targets); `layout.ts` (the 0.5 m town raster: blocks, lanes, lots, plots,
   pontili); `fabric.ts` + `fabric.worker.ts` + `stream.ts` (32 m chunks built in workers, 128 m LOD
-  super-chunks of plain prisms beyond 48–68 m); `monuments.ts`, `interiors.ts`, `lore.ts`, `secrets.ts`.
+  super-chunks of plain prisms beyond 40–56 m (middle detail between, to 80–96 m)); `monuments.ts`, `interiors.ts`, `lore.ts`, `secrets.ts`.
 - `theatrum.ts` builds the theatre's cavea block by block (seat blocks are 12–14-triangle shells
   showing tread, riser, worn nose, ends and, where the row behind is gone, the back; a stepped core
   shows where blocks are missing; collision is a smooth ramp through the treads). `pons.ts` builds the
@@ -355,7 +355,7 @@ World coordinates in metres (x, z).
   `main.ts` `cull()`: zones, draw distance, cells wholly inside the fog (`src/fogcull.ts`, a CPU twin of
   the shader's height fog: keep its constants in step), and above ground a conservative software
   occlusion buffer of the nearby houses (`src/occlusion.ts`). The stream keeps three details: full
-  chunks within 48–68 m, middle chunks within 88–104 m (the same houses built with `DETAIL.mid`
+  chunks within 40–56 m, middle chunks within 80–96 m (the same houses built with `DETAIL.mid`
   in `builder.ts`: no small pieces, tiles or bevels, coarse tessellation, about a fifth of the
   triangles), plain blocks beyond. Props are one InstancedMesh per kind and part, refilled per
   instance by range and frustum (`commitProps`). World textures ship as KTX2 (`*.ktx2.wasm`,

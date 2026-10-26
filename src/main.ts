@@ -27,6 +27,7 @@ import { registerPopulationOutfits, populationDirector, popDebug } from './npc/p
 Object.assign(window, { __npc: npcDebug });
 import type { Lamp, Cell, PropKind } from './builder';
 import { fogHides } from './fogcull';
+import { R_IN } from './benevento/stream';
 import { OcclusionBuffer, chunkPrisms, indexLotsFrom, OCC_RANGE } from './occlusion';
 import { setKtx2Renderer } from './ktx2';
 import { perfT, perfAdd, perfFrame, perfStats, initHud, gpuBegin, gpuEnd } from './perf';
@@ -387,7 +388,7 @@ await progress('Building the lanes about you', 0.9);
   const at = named ? [named.x, 0, named.z] : params.has('shot') ? params.get('shot')!.split(',').map(Number) : [SPAWN.x, 0, SPAWN.z];
   stream.update(new THREE.Vector3(at[0], 0, at[2]));
   const pump = setInterval(() => stream.update(new THREE.Vector3(at[0], 0, at[2])), 100);
-  await stream.ready(at[0], at[2], params.has('shot') ? 44 : 36, (f) => { enterEl.textContent = `Building the lanes about you… ${Math.round(f * 100)}%`; });
+  await stream.ready(at[0], at[2], Math.min(params.has('shot') ? 44 : 36, R_IN - 4), (f) => { enterEl.textContent = `Building the lanes about you… ${Math.round(f * 100)}%`; });
   clearInterval(pump);
 }
 await progress('Mixing the pigments', 0.94);
@@ -450,14 +451,16 @@ if (params.has('shot') && !params.has('at')) {
 // 3. Occlusion: (a) above ground, the houses and town walls near the eye are
 //    drawn into a small software depth buffer every frame and a cell is hidden
 //    when its whole box is behind them (conservative, see occlusion.ts);
-//    (b) for landmark and full town cells, rays from the eye to the cell's
-//    bounds against the collision BVH (it knows the monuments and the earth);
-//    a cell whose every ray is blocked twice in a row is hidden.
+//    (b) for landmark cells (and for town chunks seen from underground), 28
+//    rays from the eye to a lattice over the cell's box against the collision
+//    BVH (it knows the monuments and the earth); a cell whose every ray is
+//    blocked twice in a row is hidden. Not conservative: kept for the
+//    monuments as before, with a denser lattice.
 // Three.js frustum-culls each cell's meshes on top of this.
 const occBuf = new OcclusionBuffer();
 indexLotsFrom([...stream.chunks.values()].flatMap((c) => c.it.lots));
 const ray = new THREE.Ray();
-const pts: THREE.Vector3[] = Array.from({ length: 10 }, () => new THREE.Vector3());
+const pts: THREE.Vector3[] = Array.from({ length: 28 }, () => new THREE.Vector3());
 const cen = new THREE.Vector3(), hit = new THREE.Vector3(), eye = new THREE.Vector3();
 let rr = 0;
 const cullStats = { visible: 0, occluded: 0, total: cells.length };
@@ -466,9 +469,12 @@ function occluded(c: Cell): boolean {
   const b = c.box;
   b.getCenter(cen);
   let k = 0;
-  for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) pts[k++].set(x, y, z).lerp(cen, 0.08);
-  pts[8].copy(cen);
-  pts[9].set(cen.x, b.max.y - 0.3, cen.z);
+  // A 3x3x3 lattice over the box (corners, edge and face middles, centre),
+  // pulled 8 % in, plus the top centre: a cell seen through a gap between
+  // the corner rays (a lane, an open door) keeps at least one clear ray.
+  for (const fx of [0, 0.5, 1]) for (const fy of [0, 0.5, 1]) for (const fz of [0, 0.5, 1])
+    pts[k++].set(b.min.x + (b.max.x - b.min.x) * fx, b.min.y + (b.max.y - b.min.y) * fy, b.min.z + (b.max.z - b.min.z) * fz).lerp(cen, 0.08);
+  pts[27].set(cen.x, b.max.y - 0.3, cen.z);
   for (const p of pts) {
     ray.origin.copy(eye);
     ray.direction.subVectors(p, eye).normalize();
@@ -492,8 +498,11 @@ function cull(isUnder: boolean, camLocal: number) {
     const zoneOk = c.under ? showUnder : showAbove;
     // Past its draw distance, or wholly inside the fog (see fogcull.ts).
     const near = c.box.distanceToPoint(eye) < (c.range ?? 120) && !(zoneOk && !c.under && fogHides(c.box, eye, shared.uFogBase.value, shared.uUnder.value));
-    // The ray test (as before) for landmark and full town cells; middle chunks only get the buffer.
-    if (zoneOk && near && !c.lod && c.key[0] !== 'm') live.push(c);
+    // The ray test: landmark cells always; town chunks only from underground
+    // (above ground they get the conservative buffer alone: the rays can miss
+    // a lane seen between two houses and hide a chunk that shows).
+    const town = c.key[0] === 'f' || c.key[0] === 'm';
+    if (zoneOk && near && !c.lod && (!town || isUnder)) live.push(c);
     else c.occluded = 0;
     c.visible = zoneOk && near;
     c.behind = false;

@@ -178,13 +178,13 @@ export class Frame {
 }
 
 /** A box in a frame: centre (u,v,w), half sizes, optional skew so nothing is square. */
-export function box(acc: Acc, m: MatName, f: Frame, u: number, v: number, w: number, hu: number, hv: number, hw: number, jit = 0) {
+export function box(acc: Acc, m: MatName, f: Frame, u: number, v: number, w: number, hu: number, hv: number, hw: number, jit = 0, flat = false) {
   const J = () => (jit ? R(-jit, jit) : 0);
   const c: V3[] = [];
   for (const dv of [-1, 1]) for (const [du, dw] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
     c.push(f.p(u + du * hu + J(), v + dv * hv + J(), w + dw * hw + J()));
   }
-  acc.hexa(m, c);
+  acc.hexa(m, c, false, flat);
 }
 
 /**
@@ -276,10 +276,99 @@ export function coppo(acc: Acc, m: MatName, p0: V3, p1: V3, up: V3, side: V3, r0
  * Add a plain-surfaced piece (wall panel, vault): subdivided like everything
  * else, bent by the world field with a per-corner cache, original normals kept.
  */
+/**
+ * tessellate() splits every triangle on its own (n from its longest edge), so
+ * two neighbours split their shared edge differently: the finer one's points
+ * sit on the coarser one's edge (T-junctions). Bent by the field, those points
+ * leave the straight edge and open hairline cracks: the dark dashed lines that
+ * ran down the house fronts above every opening (the shape triangulation of a
+ * wall with holes is all long slivers from the holes' corners). Here every
+ * triangle with points of its neighbours on its edges is re-made as a fan from
+ * its centroid through those points, so the mesh is watertight before it bends.
+ */
+export function closeTJunctions(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const P = g.attributes.position.array as ArrayLike<number>;
+  const N = g.attributes.normal?.array as ArrayLike<number> | undefined;
+  const nv = P.length / 3;
+  const C = 0.5, cell = (x: number) => Math.floor(x / C);
+  const grid = new Map<string, number[]>();
+  const seen = new Set<string>();
+  for (let i = 0; i < nv; i++) {
+    const k = `${Math.round(P[i * 3] * 2000)},${Math.round(P[i * 3 + 1] * 2000)},${Math.round(P[i * 3 + 2] * 2000)}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const gk = `${cell(P[i * 3])},${cell(P[i * 3 + 1])},${cell(P[i * 3 + 2])}`;
+    let l = grid.get(gk);
+    if (!l) grid.set(gk, (l = []));
+    l.push(i);
+  }
+  const eps = 6e-4;
+  /** Vertices strictly inside segment a-b (as [t, index]), sorted by t. */
+  const onEdge = (a: number, b: number) => {
+    const ax = P[a * 3], ay = P[a * 3 + 1], az = P[a * 3 + 2], dx = P[b * 3] - ax, dy = P[b * 3 + 1] - ay, dz = P[b * 3 + 2] - az;
+    const L2 = dx * dx + dy * dy + dz * dz;
+    if (L2 < 1e-8) return [];
+    const out: [number, number][] = [];
+    const x0 = cell(Math.min(ax, ax + dx) - eps), x1 = cell(Math.max(ax, ax + dx) + eps);
+    const y0 = cell(Math.min(ay, ay + dy) - eps), y1 = cell(Math.max(ay, ay + dy) + eps);
+    const z0 = cell(Math.min(az, az + dz) - eps), z1 = cell(Math.max(az, az + dz) + eps);
+    for (let i = x0; i <= x1; i++) for (let j = y0; j <= y1; j++) for (let k = z0; k <= z1; k++) {
+      const l = grid.get(`${i},${j},${k}`);
+      if (!l) continue;
+      for (const v of l) {
+        const px = P[v * 3] - ax, py = P[v * 3 + 1] - ay, pz = P[v * 3 + 2] - az;
+        const t = (px * dx + py * dy + pz * dz) / L2;
+        if (t <= 1e-4 || t >= 1 - 1e-4) continue;
+        const ex = px - dx * t, ey = py - dy * t, ez = pz - dz * t;
+        if (ex * ex + ey * ey + ez * ez < eps * eps) out.push([t, v]);
+      }
+    }
+    return out.sort((p, q) => p[0] - q[0]);
+  };
+  const pos: number[] = [], nor: number[] = [];
+  const push = (i: number) => { pos.push(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]); nor.push(N ? N[i * 3] : 0, N ? N[i * 3 + 1] : 0, N ? N[i * 3 + 2] : 0); };
+  let fixed = 0;
+  for (let t = 0; t < nv; t += 3) {
+    const ring: number[] = [];
+    const extra: number[][] = [];
+    for (let e = 0; e < 3; e++) {
+      const a = t + e, b = t + ((e + 1) % 3);
+      ring.push(a);
+      const on = onEdge(a, b).map(([, v]) => v);
+      extra.push(on);
+      ring.push(...on);
+    }
+    if (ring.length === 3) { push(t); push(t + 1); push(t + 2); continue; }
+    fixed++;
+    const withPts = extra.filter((x) => x.length).length;
+    if (withPts === 1) {
+      // Points on one edge only: fan from the opposite corner.
+      const e = extra.findIndex((x) => x.length);
+      const a = t + e, b = t + ((e + 1) % 3), c = t + ((e + 2) % 3);
+      const chain = [a, ...extra[e], b];
+      for (let i = 0; i + 1 < chain.length; i++) { push(c); push(chain[i]); push(chain[i + 1]); }
+      continue;
+    }
+    // Fan from the centroid (all points are on the triangle's boundary, so no sliver is degenerate).
+    const cx = (P[t * 3] + P[t * 3 + 3] + P[t * 3 + 6]) / 3, cy = (P[t * 3 + 1] + P[t * 3 + 4] + P[t * 3 + 7]) / 3, cz = (P[t * 3 + 2] + P[t * 3 + 5] + P[t * 3 + 8]) / 3;
+    const cn = N ? [(N[t * 3] + N[t * 3 + 3] + N[t * 3 + 6]) / 3, (N[t * 3 + 1] + N[t * 3 + 4] + N[t * 3 + 7]) / 3, (N[t * 3 + 2] + N[t * 3 + 5] + N[t * 3 + 8]) / 3] : [0, 0, 0];
+    for (let i = 0; i < ring.length; i++) {
+      pos.push(cx, cy, cz); nor.push(cn[0], cn[1], cn[2]);
+      push(ring[i]); push(ring[(i + 1) % ring.length]);
+    }
+  }
+  if (!fixed) return g;
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  out.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
+  return out;
+}
+
 export function addBent(b: Builder, g: THREE.BufferGeometry, m: MatName, M?: THREE.Matrix4) {
   let geo = g.index ? g.toNonIndexed() : g;
   if (M) geo.applyMatrix4(M);
-  geo = tessellate(geo, m);
+  geo = closeTJunctions(tessellate(geo, m));
   const a = geo.attributes.position.array as Float32Array;
   keyOrigin(a);
   const cache = new Map<number, number[]>();

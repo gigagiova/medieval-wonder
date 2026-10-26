@@ -53,17 +53,28 @@ vec2 worldLight(vec3 p, vec3 n){
   vec2 e = min(uv, 1.0 - uv);
   float inside = smoothstep(0.0, 0.1, min(e.x, e.y));
   uv.y = 1.0 - uv.y;
-  vec2 nd = vec2(n.x, -n.z) * uLFBox.z;
-  vec4 a = texture2D(uLF, uv + nd * 0.6);
-  float sun = smoothstep(a.r - 0.15, a.r + 0.9, p.y + 0.2);
-  // Under a roof, a vault or an arch (the town within ~1 m is well above):
-  // the sky only gets in sideways, through doors and windows.
-  float cover = smoothstep(0.8, 3.0, a.g - p.y);
-  vec3 hb = texture2D(uLF, uv + nd * 2.5).gba;
+  // Normal offset (the standard cure for height-field self-shadowing): a
+  // wall must not read the height of its own building, so its lookups step
+  // out along the (unperturbed) normal, far enough that the mip footprint
+  // clears the wall: 1.2 m for the shadow and cover, 3 m for the open sky.
+  // Up-facing surfaces read their own column.
+  float side = 1.0 - abs(n.y);
+  vec2 nh = vec2(n.x, -n.z) * uLFBox.z;
+  vec4 a = texture2D(uLF, uv + nh * 1.2 * side);
+  // Soft edge, wider with height above the street (a penumbra from a roof
+  // line several metres away), plus a slope bias.
+  float sun = smoothstep(a.r - 0.3, a.r + 1.4, p.y + 0.25 + 0.3 * side);
+  // Under a roof, a vault or an arch (the town just beside the point is
+  // well above it): the sky only gets in sideways, through doors and windows.
+  float cover = smoothstep(1.2, 3.5, a.g - p.y);
+  vec3 hb = texture2D(uLF, uv + nh * 3.0 * side).gba;
   vec3 occ = max(hb - p.y, 0.0);
   vec3 v = vec3(1.0, 5.0, 14.0);
   v = v / (v + occ * 1.6);
-  float sky = dot(v, vec3(0.25, 0.35, 0.4)) * (1.0 - 0.75 * cover);
+  float sky = dot(v, vec3(0.25, 0.35, 0.4));
+  // An exposed surface can never go black: a wall on an open street still
+  // sees the sky above the houses opposite and the light they bounce.
+  sky = max(sky, 0.3) * (1.0 - 0.8 * cover);
   return mix(vec2(1.0), vec2(sun, sky), inside);
 }
 

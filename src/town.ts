@@ -7,7 +7,7 @@ import { brazier } from './lights';
 import { Acc, Frame, box as kbox, voussoirs, coppo } from './arch/kit';
 import { tiledGable, tiledLeanTo } from './arch/roof';
 import { facade } from './arch/facade';
-import { planFront, buildFront } from './arch/dress';
+import { planFront, buildFront, sideFace, sideLine } from './arch/dress';
 import { withStream } from './arch/kit';
 
 // ART DIRECTION. Early-medieval Lombard Italy built from the bones of a
@@ -33,7 +33,7 @@ type V2 = THREE.Vector2;
 const V = (x: number, z: number) => new THREE.Vector2(x, z);
 
 /** A house plot: footprint quad (front edge c[0]→c[1] on the street when `front`), eaves height, street width in front. */
-export interface Lot { c: V2[]; front?: { a: V2; b: V2; out: V2 }; h: number; street?: number; seed?: number; form?: 'tower' | 'ruin' }
+export interface Lot { c: V2[]; front?: { a: V2; b: V2; out: V2 }; h: number; street?: number; seed?: number; form?: 'tower' | 'ruin'; side?: [number, number][] }
 
 const ryOf = (e: V2) => Math.atan2(-e.y, e.x); // local +x → e
 
@@ -137,7 +137,7 @@ export function buildHouse(b: Builder, lot: Lot) {
   // One plain prism is the whole house as far as collision goes. The street
   // front is a separate thick panel with real openings (see facade()).
   // Back buildings are seen across yards and over roofs, never at arm's length: a coarser grid.
-  const step = DETAIL.mid ? 3.2 : front ? WALL_STEP : 1.6;
+  const step = DETAIL.mid ? 3.2 : front || lot.side ? WALL_STEP : 1.6;
   b.add(prismWalls(c, base, h1 - base, step, front ? 0 : -1), lower, undefined, true, true, false, prismWalls(c, base, h - base, 1e9));
   if (h > h1 + 0.5) b.add(prismWalls(c, h1, h - h1, step, front ? 0 : -1), upper, undefined, false, true);
   let jetty = 0;
@@ -148,6 +148,10 @@ export function buildHouse(b: Builder, lot: Lot) {
     if (jetty > 0) c = c.map((p, i) => (i < 2 ? p.clone().addScaledVector(front.out, jetty) : p));
   } else {
     backWindows(acc, c, base, h, lower);
+  }
+  // Side and back walls that stand on a lane: windows, doors and street things there too.
+  for (const [k, w] of lot.side ?? []) {
+    withStream(seed * 13 + k * 7 + 1, () => sideFace(acc, sideLine(lot.c, k), w, h, h1, lower, seed + k * 101, (p) => b.lamp('window', p)));
   }
   // A footprint drawn on the plan that is no quad gets a hipped roof that follows it
   // (and so does a tower: a low four-sided roof).
@@ -394,8 +398,8 @@ function backWindows(acc: Acc, c: V2[], base: number, h: number, m: MatName) {
     for (let i = 0; i < Math.max(1, Math.floor(L / 3)); i++) {
       if (rand() < 0.4) continue;
       const u = R(0.5, L - 0.5), v = R(1.4, Math.max(1.5, h - 1.2));
-      kbox(acc, 'iron', f, u, v, 0.006, R(0.18, 0.3), R(0.25, 0.4), 0.01);
-      kbox(acc, m === 'brick' ? 'block' : 'wood', f, u, v + 0.3, 0.03, 0.4, 0.07, 0.04, 0.01);
+      kbox(acc, 'iron', f, u, v, 0.02, R(0.18, 0.3), R(0.25, 0.4), 0.02);
+      kbox(acc, m === 'brick' ? 'block' : 'wood', f, u, v + 0.3, 0.05, 0.4, 0.07, 0.05, 0.01);
     }
     void base;
   }

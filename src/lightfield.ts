@@ -33,7 +33,7 @@ const OFS = 20;         // heights are stored + OFS so the clear value (0) means
     'vec3 geometryClearcoatNormal = vec3( 0.0 );',
     `vec3 geometryClearcoatNormal = vec3( 0.0 );
 #ifdef WORLDLIGHT
-	vec2 wl = worldLight( cameraPosition - vViewPosition * mat3( viewMatrix ), normalize( geometryNormal * mat3( viewMatrix ) ) );
+	vec2 wl = worldLight( cameraPosition - vViewPosition * mat3( viewMatrix ), normalize( nonPerturbedNormal * mat3( viewMatrix ) ) );
 #endif`,
   ).replace(
     'getDirectionalLightInfo( directionalLight, directLight );',
@@ -132,7 +132,7 @@ export class LightField {
             t += dt; dt *= 1.1;
           }
           // Mean town height around the point at three scales (mips).
-          float h1 = H(vUv, log2(1.0 / TEXEL));
+          float h1 = H(vUv, log2(0.5 / TEXEL));
           float h2 = H(vUv, log2(9.0 / TEXEL));
           float h3 = H(vUv, log2(24.0 / TEXEL));
           gl_FragColor = vec4(S, h1, h2, h3);

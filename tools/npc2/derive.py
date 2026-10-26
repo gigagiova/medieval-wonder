@@ -50,6 +50,26 @@ def make(gid, g, garments, basemesh, rig):
         for k, vs in named.items():
             if k in d.get('drop', []) or (keep and k not in keep):
                 kill += vs
+        # The shoulder cape lies on the shoulders: it takes little of the
+        # arms' swing (MakeHuman gave it the upper arms' weights, which tear
+        # its hem into points when the arms rise).
+        if 'capelet' not in d.get('drop', []) and (not keep or 'capelet' in keep):
+            dl = bm.verts.layers.deform.active
+            gi = {g.name: g.index for g in o.vertex_groups}
+            for S in ('Left', 'Right'):
+                for nm in ('mixamorig:%sShoulder' % S, 'mixamorig:Spine2'):
+                    if nm not in gi:
+                        gi[nm] = o.vertex_groups.new(name=nm).index
+            arm = {gi[n]: n for n in gi if any(n == 'mixamorig:%s%s' % (S, b) for S in ('Left', 'Right') for b in ('Arm', 'ForeArm', 'Hand'))}
+            for v in named['capelet']:
+                w = v[dl]
+                for g, n in list(arm.items()):
+                    if g in w and w[g] > 0:
+                        x = w[g] * 0.75
+                        w[g] -= x
+                        S = 'Left' if 'Left' in n else 'Right'
+                        w[gi['mixamorig:%sShoulder' % S]] = w.get(gi['mixamorig:%sShoulder' % S], 0) + x * 0.6
+                        w[gi['mixamorig:Spine2']] = w.get(gi['mixamorig:Spine2'], 0) + x * 0.4
     if d['from'] == 'vtunic_src':
         # RehmanPolanski's viking tunic: the tunic, its belt, the buckle.
         assert len(parts) == 3, [len(p) for p in parts]
@@ -219,9 +239,8 @@ def lift_hood(o, basemesh, above=0.045):
         return 0.0
     top = min(p.z for p in front)
     d = eye.z + above - top
-    if d <= 0:
-        bm.free()
-        return 0.0
+    # (Raising the hood made it a tall hat: the opening is cut instead, below.)
+    d = 0.0
     def ss(a, b, x):
         t = min(1.0, max(0.0, (x - a) / (b - a)))
         return t * t * (3 - 2 * t)
@@ -230,6 +249,16 @@ def lift_hood(o, basemesh, above=0.045):
         w = ss(eye.y + 0.14, eye.y - 0.01, p.y) * ss(eye.z - 0.09, eye.z - 0.02, p.z)
         if w > 0:
             v.co = owi @ (p + Vector((0, 0, d * w)))
+    # The face's opening kept clear: hood cloth in front of the face (from
+    # chin to brow, between the cheekbones, before the ears) is cut away.
+    eL = headfit.group_centroid(basemesh, co, 'helper-l-eye')
+    eR = headfit.group_centroid(basemesh, co, 'helper-r-eye')
+    half = abs(eL.x - eR.x) / 2 + 0.042
+    cut = [v for v in bm.verts if abs((ow @ v.co).x - eye.x) < half and eye.z - 0.13 < (ow @ v.co).z < eye.z + 0.03 and (ow @ v.co).y < eye.y + 0.015]
+    bmesh.ops.delete(bm, geom=cut, context='VERTS')
+    # (and the loose shards a cut can leave)
+    parts = loose_parts(bm)
+    bmesh.ops.delete(bm, geom=[v for p in parts[1:] if len(p) < 60 for v in p], context='VERTS')
     bm.to_mesh(o.data)
     bm.free()
     o.data.update()

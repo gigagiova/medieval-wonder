@@ -116,7 +116,18 @@ import drape  # noqa: E402
 for gid, g in GARMENTS.items():
     if sex in g['sex'] and 'drape' in g:
         garments[gid] = drape.make(gid, g, garments, basemesh, rig)
-        gspec[gid] = {'depth': g.get('depth', 80), 'delete': None}
+        gspec[gid] = {'depth': g.get('depth', 80), 'delete': None, 'open': True}
+# Layer order by kind (the assets' own z_depth puts a tunic level with the hose under it).
+DEPTH = {'leg': 40, 'shoe': 45, 'tunic': 60, 'belt': 66, 'over': 70, 'head': 72}
+for gid in garments:
+    if 'drape' not in GARMENTS[gid]:
+        gspec[gid]['depth'] = DEPTH.get(GARMENTS[gid].get('layer'), gspec[gid]['depth'])
+# Skirts follow the thighs only, never a knee or a foot (skirt.py).
+import skirt  # noqa: E402
+for gid, o in garments.items():
+    sk = GARMENTS[gid].get('skirt')
+    if sk:
+        log('skirt', gid, skirt.fix(o, rig, **sk))
 # Sources only used to derive others are not exported.
 for gid in list(garments):
     if GARMENTS[gid].get('only_source'):
@@ -159,10 +170,7 @@ if 'prebake' in OPTS:
     sys.exit(0)
 if spec.get('scan') and 'nohead' not in OPTS:
     headfit.bake(basemesh, spec, os.path.dirname(OUT))
-    # The scan's eyes are in its skin now.
-    for o in list(bpy.data.objects):
-        if o.type == 'MESH' and o.name.endswith('low-poly'):
-            bpy.data.objects.remove(o)
+    # (MakeHuman's eyeballs stay, in the sockets behind the scanned lids.)
 
 # ------------------------------------------------------------------ hidden surfaces
 import hide  # noqa: E402
@@ -178,7 +186,10 @@ for g in sorted(garments, key=lambda g: -gspec[g]['depth']):
     if over:
         log('clearance', g, clearance(garments[g], [world_bvh(garments[h]) for h in over]))
 log('clearance body', clearance(basemesh, [world_bvh(garments[g]) for g in body_layers]))
-stats = hide.mark(basemesh, garments, myoutfits, gspec)
+for gid in garments:
+    gspec[gid]['long'] = GARMENTS[gid].get('skirt', {}).get('hem', 1) < 0.6 and GARMENTS[gid].get('layer') == 'tunic'
+knee_z = (rig.matrix_world @ rig.data.bones['mixamorig:LeftLeg'].head_local).z - 0.12
+stats = hide.mark(basemesh, garments, myoutfits, gspec, knee_z)
 for k, v in stats.items():
     log('hidden', k, v)
 log('pokes', hide.poke_report(basemesh, garments, myoutfits, gspec))
@@ -195,12 +206,18 @@ for S in ('Left', 'Right'):
     e = eb.new('mixamorig:%sToe_End' % S); e.head = t.tail.copy(); e.tail = t.tail + (t.tail - t.head).normalized() * 0.03; e.parent = t
 bpy.ops.object.mode_set(mode='OBJECT')
 
+# ------------------------------------------------------------------ cloth bones
+import cloth_bones  # noqa: E402
+for gid, o in garments.items():
+    if GARMENTS[gid].get('chains'):
+        cloth_bones.add(gid, o, rig, GARMENTS[gid])
+
 # ------------------------------------------------------------------ export
 import exportprep  # noqa: E402
 exportprep.prepare(basemesh, garments, rig, spec)
 meta = {
     'body': BODY, 'sex': sex, 'height': spec['height'],
-    'garments': {gid: {**{k: v for k, v in GARMENTS[gid].items() if k in ('fabric', 'layer', 'map')}, 'depth': gspec[gid]['depth']} for gid in garments},
+    'garments': {gid: {**{k: v for k, v in GARMENTS[gid].items() if k in ('fabric', 'layer', 'map', 'chains')}, 'depth': gspec[gid]['depth']} for gid in garments},
     'outfits': {k: {'garments': v['garments'], 'bit': i} for i, (k, v) in enumerate(myoutfits.items())},
 }
 bpy.context.scene['npc2'] = json.dumps(meta)

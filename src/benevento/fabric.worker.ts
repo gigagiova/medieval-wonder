@@ -14,7 +14,7 @@ setTessScale(1.9);
 self.onmessage = (e: MessageEvent<{ items: ChunkItems; mid?: boolean }>) => {
   const it = e.data.items, mid = !!e.data.mid;
   const t0 = performance.now();
-  // Middle detail (seen from 48-112 m): see DETAIL in builder.ts.
+  // Middle detail (seen from 40-96 m): see DETAIL in builder.ts.
   DETAIL.mid = mid;
   setTessScale(mid ? 5 : 1.9);
   const b = new Builder();

@@ -14,6 +14,7 @@ import { fabric, type FabricKind } from './npc/fabric';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
 import { loadV2, kitsV2, bodiesV2, outfitV2, type OutfitV2 } from './npc2/kit';
 import { dressV2 } from './npc2/dress';
+import { makeSprings } from './npc2/springs';
 
 /** Townsfolk v2 (src/npc2): MakeHuman bodies in modelled garments. `?npc=v1|v2`. */
 export const NPC_V2 = typeof location !== 'undefined' && new URLSearchParams(location.search).get('npc') === 'v2';
@@ -391,6 +392,7 @@ export class Person {
     this.cloth = v2
       ? dressV2(this.body, outfit as unknown as OutfitV2, { tunic, over, head, belt, leg: dye(pick(rnd, [...DYES.undyed, ...DYES.woad]), 0.3), shoe: new THREE.Color(0x8a7a6a).multiplyScalar(0.8 + rnd() * 0.3), kinds: lc?.kinds, role }) as unknown as Clothing
       : new Clothing(scene, outfit.garment, skel, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
+    if (v2) this.springs = makeSprings(this.body, outfit as unknown as OutfitV2, this.scale, (n) => this.bones.get(n));
 
     // Motion.
     this.mixer = new THREE.AnimationMixer(this.body);
@@ -413,6 +415,9 @@ export class Person {
     this.equip(gear);
   }
   walkSpeed = 1.2;
+  /** v2: the cloth bones' spring update (src/npc2/springs.ts), and the time it steps. */
+  private springs: ((dt: number) => void) | null = null;
+  private springDt = 0;
   /** Half the width of a bucket or basket a peasant carries (0: none). */
   carryHalf = 0;
   private walkStart = 0;
@@ -758,6 +763,7 @@ export class Person {
     if (++this.tick % every !== 0) return false;
     this.mixer.update(this.animAcc);
     this.plant(this.animAcc, ground);
+    this.springDt = this.animAcc;
     this.animAcc = 0;
     // Skirt bones: the thighs' swing (relative to the pelvis), without their twist.
     for (const k of this.strideBones) {
@@ -791,6 +797,7 @@ export class Person {
     if (this.load.jar || this.load.basket) this.poseLoad();
     if (this.carryHalf && this.role === 'peasant') this.holdOut();
     this.swing?.();
+    this.springs?.(this.springDt);
     return true;
   }
 
