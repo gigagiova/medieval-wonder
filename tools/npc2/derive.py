@@ -259,6 +259,13 @@ def lift_hood(o, basemesh, above=0.045):
     # (and the loose shards a cut can leave)
     parts = loose_parts(bm)
     bmesh.ops.delete(bm, geom=[v for p in parts[1:] if len(p) < 60 for v in p], context='VERTS')
+    # The cut's ragged rim smoothed into an even curve (its first rings with it).
+    rim = [v for v in bm.verts if v.is_boundary and abs((ow @ v.co).x - eye.x) < half + 0.03 and (ow @ v.co).z > eye.z - 0.16 and (ow @ v.co).y < eye.y + 0.05]
+    ring = {w for v in rim for e in v.link_edges for w in e.verts} - set(rim)
+    for _ in range(25):
+        bmesh.ops.smooth_vert(bm, verts=rim, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    for _ in range(5):
+        bmesh.ops.smooth_vert(bm, verts=list(ring), factor=0.4, use_axis_x=True, use_axis_y=True, use_axis_z=True)
     bm.to_mesh(o.data)
     bm.free()
     o.data.update()
