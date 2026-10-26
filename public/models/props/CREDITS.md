@@ -43,5 +43,5 @@ Fetched and packed by `tools/fetch-props.ts`.
 
 - `medieval_cart`: "Medieval wooden cart" by rakutin,
   https://sketchfab.com/3d-models/medieval-wooden-cart-c4ee19920e9b45aaa6ebe37839b1ad2a,
-  licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Simplified to ~5.6k
+  licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Simplified to ~2.4k
   triangles, textures re-encoded as 1024 px webp (packed like the Poly Haven props).

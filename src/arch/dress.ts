@@ -392,7 +392,8 @@ export function washing(acc: Acc, f: Frame, u: number, v: number, wFace: number,
     const t = R(0.15, 0.9), q = p0.clone().lerp(p1, t);
     if (across) q.y -= Math.sin(Math.PI * t) * 0.18;
     const wc = R(0.28, 0.55), hc = R(0.3, 0.65);
-    const cm: MatName = r() < 0.65 ? 'marble' : 'cloth'; // bleached linen, or brown wool
+    // Bleached linen or unbleached (materials every chunk already draws: no extra draw call).
+    const cm: MatName = r() < 0.6 ? 'marble' : 'plaster';
     const along = dir.clone().setY(0).normalize();
     const side = v3(-along.z, 0, along.x);
     // The cloth hangs folded over the pole: two sheets in a shallow V with a ragged hem.

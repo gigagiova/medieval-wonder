@@ -159,11 +159,11 @@ still matches the full one piece for piece.
 ### 3a. Assets
 
 - `medieval_cart` (`public/models/props/`): "Medieval wooden cart" by
-  rakutin on Sketchfab, CC BY 4.0, 11.4k → 5.6k triangles, three 1024 px
-  webp maps (~0.94 MB on disk with the JSON). Packed as JSON glTF + webp
+  rakutin on Sketchfab, CC BY 4.0, 11.4k → 2.4k triangles, three 1024 px
+  webp maps (~0.73 MB on disk with the JSON). Packed as JSON glTF + webp
   like the Poly Haven props (the static host serves no .glb/.bin), drawn by
   the instanced prop system (one draw call per part while any is in range,
-  50 m).
+  40 m).
 - Poly Haven was searched for doors, shutters, ladders, carts and tools:
   what it has is modern (step ladders, a push broom, painted furniture), so
   doors, shutters, ladders and the rest stay procedural, built to each
