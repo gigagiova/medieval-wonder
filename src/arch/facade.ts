@@ -121,7 +121,8 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
   }
   if (chance(0.45) && free(slit.u0, slit.u1) && !(st && slit.u1 > st.s0 - 0.2 && slit.u0 < st.s1 + 0.2)) ops.push(slit);
   const lowTop = Math.min(s.h, s.h1 + (s.upper === s.lower ? 0 : 0));
-  let jetty = s.upper !== s.lower && (s.upper === 'wood' || s.upper === 'plaster') && chance(0.55) ? R(0.3, 0.55) : 0;
+  // Upper floors jut over the lane on joists (timber) or on corbelled beams (masonry): the sky narrows to a strip.
+  let jetty = s.upper !== s.lower && chance((s.upper === 'wood' || s.upper === 'plaster') ? 0.8 : 0.45) ? R(0.3, s.street > 2.6 ? 0.8 : 0.5) : 0;
   if (st) jetty = 0;
   const oneMass = s.upper === s.lower && jetty === 0;
 
