@@ -4,6 +4,8 @@ import { makeFire } from '../fire';
 import type { Cell, Lamp } from '../builder';
 import { field, fastTerrain } from '../displace';
 import { BOUNDS } from './geo';
+import { newClusters, addBoxes } from '../clusters';
+import { poolAdd } from './pool';
 import { CHUNK, lodChunk, type Baked, type ChunkItems, type ChunkResult, type Hole } from './fabric';
 
 // Streams the town around the player. Every chunk always has a cheap
@@ -129,7 +131,7 @@ export class FabricStream {
       if (c.midStatus === 'ready' && rectDist(c.it, cam.x, cam.z) > R_MID_OUT) {
         const shown = c.midShown;
         this.hideMid(c);
-        for (const m of c.midCell!.meshes) { this.scene.remove(m); m.geometry.dispose(); }
+        c.midCell!.pool!.free();
         c.midCell = undefined; c.midStatus = 'none'; this.stats.mid--;
         if (shown) this.markSuper(c); // its blocks come back
       }
@@ -168,24 +170,10 @@ export class FabricStream {
     if (!c) return;
     this.stats.built++; this.stats.ms += r.ms;
     if (c.status !== 'building') return; // dropped while building
-    const cell: Cell = { key: 'f' + r.key, under: false, box: new THREE.Box3(), meshes: [], visible: true, occluded: 0 };
     let tris = 0;
-    for (const bk of r.baked) {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.BufferAttribute(bk.pos, 3));
-      g.setAttribute('normal', new THREE.BufferAttribute(bk.nor, 3, true));
-      g.computeBoundingBox(); g.computeBoundingSphere();
-      cell.box.union(g.boundingBox!);
-      // Free the CPU copy once it is on the GPU.
-      for (const a of Object.values(g.attributes)) (a as THREE.BufferAttribute).onUpload(function (this: THREE.BufferAttribute) { (this as unknown as { array: unknown }).array = null; });
-      const mesh = new THREE.Mesh(g, mat(bk.m));
-      mesh.matrixAutoUpdate = false;
-      this.scene.add(mesh);
-      cell.meshes.push(mesh);
-      tris += bk.pos.length / 9;
-    }
+    for (const bk of r.baked) tris += bk.pos.length / 9;
+    const cell = this.makeCell('f' + r.key, r.baked);
     this.stats.tris += tris;
-    this.uploader?.(cell.meshes as THREE.Mesh[]);
     c.cell = cell;
     this.cells.push(cell);
     c.lamps = r.lamps.map((l, i) => ({ pos: new THREE.Vector3(...l.p), color: new THREE.Color(l.c[0], l.c[1], l.c[2]), intensity: l.i, under: l.under, seed: (r.key % 97) + i * 7.3 }));
@@ -212,22 +200,12 @@ export class FabricStream {
     // Shown by its super-chunk's next rebuild (which drops the blocks it replaces).
     if (c.status !== 'ready') this.markSuper(c);
   }
+  /** A chunk's geometry, into the town's shared buffers (see pool.ts); its clusters' boxes for the culling. */
   private makeCell(key: string, baked: Baked[]): Cell {
-    const cell: Cell = { key, under: false, box: new THREE.Box3(), meshes: [], visible: true, occluded: 0 };
-    for (const bk of baked) {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.BufferAttribute(bk.pos, 3));
-      g.setAttribute('normal', new THREE.BufferAttribute(bk.nor, 3, true));
-      g.computeBoundingBox(); g.computeBoundingSphere();
-      cell.box.union(g.boundingBox!);
-      for (const a of Object.values(g.attributes)) (a as THREE.BufferAttribute).onUpload(function (this: THREE.BufferAttribute) { (this as unknown as { array: unknown }).array = null; });
-      const mesh = new THREE.Mesh(g, mat(bk.m));
-      mesh.matrixAutoUpdate = false;
-      mesh.visible = false;
-      this.scene.add(mesh);
-      cell.meshes.push(mesh);
-    }
-    this.uploader?.(cell.meshes as THREE.Mesh[]);
+    const cell: Cell = { key, under: false, box: new THREE.Box3(), meshes: [], visible: true, occluded: 0, clusters: newClusters() };
+    for (const bk of baked) addBoxes(cell.clusters!, bk.box);
+    for (const b of cell.clusters!.boxes) if (b) cell.box.union(b);
+    cell.pool = poolAdd(baked);
     return cell;
   }
   private showMid(c: ChunkState) {
@@ -241,12 +219,12 @@ export class FabricStream {
     c.midShown = false;
     const i = this.cells.indexOf(c.midCell);
     if (i >= 0) this.cells.splice(i, 1);
-    for (const m of c.midCell.meshes) m.visible = false;
+    c.midCell.pool!.show(0);
   }
 
   private unload(c: ChunkState) {
     if (c.cell) {
-      for (const m of c.cell.meshes) { this.scene.remove(m); m.geometry.dispose(); }
+      c.cell.pool!.free();
       const i = this.cells.indexOf(c.cell);
       if (i >= 0) this.cells.splice(i, 1);
       c.cell = undefined;

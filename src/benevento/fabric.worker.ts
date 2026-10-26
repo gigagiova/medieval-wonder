@@ -22,7 +22,7 @@ self.onmessage = (e: MessageEvent<{ items: ChunkItems; mid?: boolean }>) => {
   let res: ChunkResult;
   try {
     buildChunk(b, it);
-    const baked = bake(b);
+    const baked = bake(b, it);
     const { lamps, flames } = packLights(b.lamps, b.flames);
     res = { key: it.key, baked, lamps: mid ? [] : lamps, flames: mid ? [] : flames, ms: performance.now() - t0 };
   } catch (err) {
@@ -30,6 +30,6 @@ self.onmessage = (e: MessageEvent<{ items: ChunkItems; mid?: boolean }>) => {
     res = { key: it.key, baked: [], lamps: [], flames: [], ms: performance.now() - t0 };
   }
   const transfer: Transferable[] = [];
-  for (const x of res.baked) transfer.push(x.pos.buffer, x.nor.buffer);
+  for (const x of res.baked) { transfer.push(x.pos.buffer, x.nor.buffer, x.start.buffer, x.count.buffer, x.box.buffer); if (x.ids) transfer.push(x.ids.buffer); }
   (self as unknown as Worker).postMessage({ ...res, mid }, transfer);
 };

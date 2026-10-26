@@ -265,6 +265,14 @@ const camPos = new THREE.Vector3(), camDir = new THREE.Vector3(), tmp = new THRE
 export function updateLibrary(camera: THREE.Camera) {
   if (!btn) return;
   camera.getWorldPosition(camPos);
+  // The room is closed but for its door from the church's aisle (its windows
+  // are shuttered): its hundred-odd meshes (a draw call each) are drawn only
+  // from inside it or from inside the church.
+  if (room) {
+    const inHall = camPos.x > X0 - 0.5 && camPos.x < X1 + 0.5 && camPos.z > Z0 - 0.5 && camPos.z < Z1 + 0.5;
+    const inChurch = camPos.x > -21.6 && camPos.x < X0 + 0.5 && camPos.z > -64.6 && camPos.z < -40.4;
+    room.visible = inHall || inChurch;
+  }
   camera.getWorldDirection(camDir);
   let best: Readable | null = null, bestScore = Infinity;
   for (const r of readables) {
@@ -302,6 +310,7 @@ export function updateLibrary(camera: THREE.Camera) {
 }
 
 let examine = false;
+let room: THREE.Group | null = null;
 function activate() {
   if (examine) { secret.target = secret.target === 0 ? OPEN_ANGLE : 0; return; }
   if (target) openCodex(target.text, target.page, target.seed);
@@ -315,6 +324,7 @@ export function buildLibrary(b: Builder, scene: THREE.Scene) {
   const books: BookInst[] = [];
   const group = new THREE.Group();
   group.name = 'library';
+  room = group;
   const off = new THREE.Vector3();
   // Furniture is rigid; it moves with the world's displacement field at its
   // own base, like the walls and floor around it.
