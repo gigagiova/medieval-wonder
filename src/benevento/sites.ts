@@ -32,6 +32,8 @@ export interface SiteDef extends Frame2 {
   clear?: number;
   /** Polygon in the site's local frame to keep free of houses (default: clear radius). */
   reserve?: P2[];
+  /** The cleared ground is an open square (paved, trodden) rather than a precinct. */
+  square?: boolean;
 }
 
 // ---------------------------------------------------------------- the sites
@@ -68,6 +70,11 @@ export const SITES: Record<string, SiteDef> = {
   // (OSM: the Rocca at 41.1290 N, 14.7820 E); the aqueduct comes in from the east-south-east.
   castellumAquae: { id: 'castellumAquae', name: 'Castellum Aquae', x: 622, z: 160, rot: 2.64, flat: [14, 30] },
   hortusSophiae: { id: 'hortusSophiae', name: 'Hortus Curtis', x: 566, z: -16, rot: GRID_ROT, clear: 20 },
+  // The little square before the curtis gate named after a Roman equestrian statue (Piazza Piano di
+  // Corte: two fragments of an equestrian monument found there in 1920), with the church of
+  // S. Petrus ad Caballum on its east side (HISTORY.md §5 "Ad Caballum"). Kept open as a square.
+  caballus: { id: 'caballus', name: 'Ad Caballum', x: 499, z: -108, rot: 0, flat: [10, 19], clear: 13, square: true,
+    reserve: [[-12, -10], [16.5, -10], [16.5, 10], [-12, 10]] },
 };
 
 // Terraces for the sites that need level footing.

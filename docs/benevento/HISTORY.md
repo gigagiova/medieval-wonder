@@ -40,7 +40,10 @@ Primary and scholarly (consulted directly or through the encyclopaedic syntheses
 | Curtis ducis in the Roman praetorium (*planum curiae*, Piano di Corte) | since 6th c. | **yes** |
 | S. Marciano on the Calore (reused temple) | attested 724 | no (excluded; may already exist) |
 | S. Sofia a Ponticello (Romuald II) | 706–731 | **no** |
-| S. Benedetto ad Caballum with xenodochium | attested 742 | **no** |
+| Roman equestrian statue at the later Piazza Piano di Corte (*Caballus*) | Roman | **yes** (§5 "Ad Caballum") |
+| S. Pietro ad Caballum (hall, one apse, two domes in a row) | undated; its type is S. Ilario's (late 7th/early 8th c.) | **yes (inferred)** |
+| S. Benedetto ad Caballum with xenodochium | first documented Sept. 742 | **no** (named in a readable) |
+| S. Angelo de Caballo | undated | no |
 | S. Sofia (Arechis II, 758–760) and its nunnery | 758–768 | **no** — its site is the dukes' orchard |
 | Civitas nova of Arechis II (theatre, baths recovered) | after 758, by 774 | **no** — theatre and baths outside |
 | Sacrum Palatium of Arechis II | 758–787 | **no** — the older curtis stands |
@@ -184,6 +187,38 @@ World coordinates in metres (x, z).
   San Lorenzo; findspot unknown) sunk at the corner of the square. **Reconstruction** of the
   arrangement; the location is a scholarly hypothesis, not proven. Earlier versions of the game put
   it outside the east gate; that was wrong (a temple of the colony stood inside its walls).
+- **Ad Caballum** (499, −108; teleport "Ad Caballum"): the little square before the curtis gate.
+  Treccani's *Enciclopedia dell'Arte Medievale* ("Benevento", G. Bertelli Buquicchio 1992): "near the
+  palatium stood churches with a singular dedication: S. Angelo de Caballo, S. Benedetto ad Caballum,
+  documented for the first time with an annexed xenodochium in September 742, and S. Pietro ad Caballum, a
+  hall with one apse later turned into a dwelling"; with S. Ilario a Port'Aurea it is "one of the southern
+  prototypes of the church with domes in a row". Rotili's topography puts S. Benedetto ad Caballum and its
+  xenodochium by the *platea loco Caballi nomine* ("the square of the place called the Horse"); later
+  sources place S. Pietro ad Caballum in the *area caballi* where an equestrian statue stood; the parish of
+  S. Pietro a Caballo, by then gone, was joined to SS. Salvatore in 1661 (it.wikipedia "Chiesa del
+  Santissimo Salvatore (Benevento)"). Two fragments of an equestrian monument were found **in Piazza Piano
+  di Corte in 1920** (Museo del Sannio, kept in the depot yard; *Il Mattino* and the Province's museum
+  project, 2023–24), i.e. on the *planum curiae*, the old praetorium where the dukes' curtis stood. So the
+  "Horse" was a Roman equestrian statue by the ducal residence, and the churches took their name from it.
+  The user remembered a "chiesa ad Caballum in the city centre": that is right in substance (Piano di Corte
+  is in the middle of the town of 700), but there were three, and none is dated before 700. **Shown**:
+  the statue still on its pedestal (marble, over life size, the rider broken off at the waist; the
+  material of the 1920 fragments was not checked; the pose, walking with a foreleg raised, is the type's;
+  readable `caballus`, the base's words reconstruction), in a small square of old paving, and on its east
+  side **S. Petrus ad Caballum** as a household church of the curtis quarter: rubble and brick, one apse,
+  two little domes on square drums in a row, a Roman lintel and column drums at the door, a churchyard
+  with graves and a reused sarcophagus (readable `petrusCaballi`, text invented). Its existence in 700 is
+  an **inference** from its type (S. Ilario's date); S. Benedetto ad Caballum (742) and S. Angelo de Caballo
+  (undated) are left out and named in the readable. Positions: the square is placed in front of the curtis
+  gate where the OSM Piazza Piano di Corte lies; exact sites of the churches are not known.
+- **Churches standing in 700, checked (2026).** Documented by 700 and built: the cathedral of S. Maria (600),
+  S. Pietro extra muros (before 687), S. Ilario a Port'Aurea (by its masonry), the chapel in the Santi
+  Quaranta. Undated churches of the early town that may already have stood (not built, for lack of any
+  date or site): S. Cosma by the Ponte Leproso on the town bank, S. Lorenzo on the Appia (the gate's name),
+  S. Benedetto a Pantano on the Calore, S. Pietro *de monachabus* in the forum area, S. Angelo de Caballo.
+  The earliest dated after 700: S. Sofia a Ponticello (706–731), S. Marciano on the Calore (existing in 724;
+  the most likely of all to have stood already), S. Benedetto ad Caballum (742), S. Sofia (758–760). No
+  church documented before 700 is missing.
 - **Lombard cemetery** (238, 286): the necropolis excavated south of the town (Rotili 1977); poles with
   wooden doves (perticae, Paul the Deacon HL V 34).
 - **The walnut** (−330, 478): legend only. The *Vita Barbati* tells of the sacred tree; the later

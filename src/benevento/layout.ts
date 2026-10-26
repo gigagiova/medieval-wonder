@@ -200,7 +200,7 @@ export function layoutTown(seed = 700): Layout {
   // 3. Landmark precincts are kept clear (their modules build them); the forum is an open square.
   for (const s of Object.values(SITES)) {
     if (!s.clear && !s.reserve) continue;
-    const square = s.id === 'forum';
+    const square = s.id === 'forum' || !!s.square;
     const poly: P2[] = s.reserve ? s.reserve.map(([lx, lz]) => siteToWorld(s, lx, lz))
       : Array.from({ length: 20 }, (_, i) => [s.x + Math.cos((i / 20) * Math.PI * 2) * s.clear!, s.z + Math.sin((i / 20) * Math.PI * 2) * s.clear!] as P2);
     r.fill(poly, (k) => { if (r.grid[k] !== OUTSIDE) r.grid[k] = square ? STREET : RESERVED; });
@@ -826,6 +826,8 @@ export function layoutTown(seed = 700): Layout {
   // 9. Wells in the open places and at some crossings of the busier quarters.
   for (const q of lay.squares) {
     if (q.r < 4 || density(q.x, q.z) < 0.3 || lay.wells.some((w) => Math.hypot(w.x - q.x, w.z - q.z) < 55)) continue;
+    // Not in a landmark's square (the statue and the church stand there).
+    if (Object.values(SITES).some((s) => s.square && Math.hypot(s.x - q.x, s.z - q.z) < (s.clear ?? 0) + 4)) continue;
     lay.wells.push({ x: q.x + R(-1.5, 1.5), z: q.z + R(-1.5, 1.5) });
   }
 

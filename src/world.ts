@@ -98,6 +98,7 @@ export function getTeleports(): Teleport[] {
   at('Sanctus Petrus', S.sanctusPetrus, -15.5, -31, -17, -45);
   at('Sanctus Hilarius', S.sanctusHilarius, -13, 0, 0, 0);
   at('Iseum', S.iseum, -6, -8, -15.5, -26);
+  at('Ad Caballum', S.caballus, -9, 6, -1, -3);
   at('Coemeterium Langobardorum', S.necropolis, 0, 11, 0, 0);
   at('Nux Sacra', S.nux, 0, 9, 0, 0);
   at('Molendinum', S.molendinum, 0.8, -7, 0.8, 0);
@@ -480,6 +481,7 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
   await at('Under the Torre della Catena', 0.63, S.turrisCatenae, () => M.turrisCatenae(b));
   await at('At S. Ilario', 0.65, S.sanctusHilarius, () => M.sanctusHilarius(b));
   await at('Among the ruins of the Iseum', 0.67, S.iseum, () => M.iseum(b));
+  await at('By the old horse', 0.675, S.caballus, () => M.adCaballum(b));
   await at('Among the Lombard graves', 0.69, S.necropolis, () => M.necropolis(b));
   await at('By the old walnut', 0.7, S.nux, () => M.nux(b));
   await at('At the mill', 0.71, S.molendinum, () => M.molendinum(b));
@@ -696,7 +698,7 @@ export function regionName(p: THREE.Vector3): string {
     return 'Catacumbae Sanctorum Quadraginta';
   }
   for (const g of GATES) if (Math.hypot(p.x - g.at[0], p.z - g.at[1]) < 8) return g.name;
-  const named: [SiteDef, number][] = [[S.iseum, 13], [S.curtis, 26], [S.episcopium, 30], [S.forum, 18], [S.theatrum, 50], [S.thermae, 28], [S.amphitheatrum, 55], [S.quadraginta, 48],
+  const named: [SiteDef, number][] = [[S.iseum, 13], [S.caballus, 15], [S.curtis, 26], [S.episcopium, 30], [S.forum, 18], [S.theatrum, 50], [S.thermae, 28], [S.amphitheatrum, 55], [S.quadraginta, 48],
     [S.turrisCatenae, 14], [S.sanctusHilarius, 16], [S.sanctusPetrus, 32], [S.necropolis, 28], [S.nux, 14], [S.molendinum, 14], [S.hortusSophiae, 16], [S.castellumAquae, 26], [S.pontesLeprosus, 50], [S.pontesOnuphrii, 45]];
   for (const [s, r] of named) if (near(s, r)) return s.name;
   if (inPons(p.x, p.z)) return PONS_FRATTO.name;
