@@ -226,8 +226,8 @@ export function facade(b: Builder, acc: Acc, s: FacadeSpec): number {
     // The dark shop behind (firelit now and then).
     box(acc, chance(0.25) ? 'window' : 'iron', f, c, (o.v1 + 0.95 + w / 2) / 2, -T + 0.03, w / 2 + 0.02, (o.v1 + w / 2 - 0.95) / 2 + 0.02, 0.01);
     // The shutter, hinged at the springing, propped out over the street on two poles.
-    const reach = Math.min(R(0.75, 1.0), s.street * 0.38), drop = R(0.15, 0.3);
-    const yH = o.v1 + 0.02;
+    const reach = Math.min(R(0.7, 0.95), s.street * 0.35), drop = R(0.3, 0.45);
+    const yH = Math.min(o.v1 + w / 2 + 0.38, s.h1 - 0.1);
     const q = (u: number, v: number, ww: number) => f.p(u, v, ww);
     acc.hexa('wood', [q(o.u0 - 0.05, yH - 0.04, 0.03), q(o.u1 + 0.05, yH - 0.04, 0.03), q(o.u1 + 0.05, yH - drop - 0.04, reach), q(o.u0 - 0.05, yH - drop - 0.04, reach),
       q(o.u0 - 0.05, yH, 0.03), q(o.u1 + 0.05, yH, 0.03), q(o.u1 + 0.05, yH - drop, reach), q(o.u0 - 0.05, yH - drop, reach)], true);

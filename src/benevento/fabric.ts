@@ -311,7 +311,7 @@ function yardThings(b: Builder, p: PlotData) {
   if (b.mode === 'collide') return;
   const dome = new THREE.SphereGeometry(w * 0.48, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
   dome.scale(1, 0.8, 1);
-  b.geo(r() < 0.6 ? 'rubble' : 'clay', dome, x, 0.5, z, ry, false);
+  b.geo('rubble', dome, x, 0.5, z, ry, false);
   // The mouth: a soot-black arch on the front, a slab before it.
   const fx = Math.sin(ry), fz = Math.cos(ry);
   b.box('iron', 0.42, 0.42, 0.06, x + fx * (w * 0.47), 0.48, z + fz * (w * 0.47), ry, false);

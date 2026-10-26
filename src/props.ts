@@ -38,7 +38,7 @@ const RANGE: Partial<Record<PropId, number>> = {
   // Household things: mostly indoors or at doorsteps, and dense scans.
   treasure_chest: 22, wine_barrel_01: 34, wooden_barrels_01: 38, wooden_bucket_01: 26, wooden_bucket_02: 26, ceramic_pot: 28,
   planter_pot_clay: 28, wicker_basket_02: 28, wooden_bowl_01: 16, carved_wooden_plate: 16, folding_wooden_stool: 22,
-  WoodenTable_01: 26, medieval_cart: 50, wooden_cutting_board: 16, wooden_axe: 18, wooden_axe_02: 18, cross_pein_hammer: 16, stone_fire_pit: 34,
+  WoodenTable_01: 26, medieval_cart: 40, wooden_cutting_board: 16, wooden_axe: 18, wooden_axe_02: 18, cross_pein_hammer: 16, stone_fire_pit: 34,
 };
 const DEFAULT_RANGE = 45;
 
@@ -250,9 +250,9 @@ export function commitProps(scene: THREE.Object3D) {
     let k = kinds.get(key);
     if (!k) {
       const v = variants.get(pl.id)![pl.variant];
-      // Out to the farthest the old per-patch culling could show one (patch centre within range
-      // + 0.6 patch, the prop up to ~0.7 patch from that centre): never fewer props than before.
-      const r = (RANGE[pl.id] ?? DEFAULT_RANGE) + chunkOf(pl.id) * 1.3;
+      // The old per-patch culling kept a patch while its centre was within range + 0.6 patch:
+      // the same distance per prop shows about as many, fading in one by one instead of by patch.
+      const r = (RANGE[pl.id] ?? DEFAULT_RANGE) + chunkOf(pl.id) * 0.6;
       k = { variant: v, range2: r * r, under: pl.under, n: 0, mat: new Float32Array(16 * 8), pos: new Float32Array(3 * 8), rad: new Float32Array(8), buckets: new Map(), meshes: [], cap: 0 };
       kinds.set(key, k);
     }

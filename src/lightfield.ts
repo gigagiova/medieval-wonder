@@ -124,12 +124,12 @@ export class LightField {
           float tanE = uSun.y / length(uSun.xz);
           float S = -1e4;
           float t = 0.2, dt = 0.18;
-          for (int i = 0; i < 44; i++) {
+          for (int i = 0; i < 36; i++) {
             vec2 uv = vUv + d * (t / SIZE);
             if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) break;
             float lod = clamp(log2(dt / TEXEL) - 1.0, 0.0, 4.0);
             S = max(S, H(uv, lod) - t * tanE);
-            t += dt; dt *= 1.09;
+            t += dt; dt *= 1.1;
           }
           // Mean town height around the point at three scales (mips).
           float h1 = H(vUv, log2(1.0 / TEXEL));
@@ -150,12 +150,20 @@ export class LightField {
     this.wait -= dt;
     const far = Math.max(Math.abs(eye.x - this.centre.x), Math.abs(eye.z - this.centre.y)) > MOVE;
     const fresh = readyChunks !== this.lastReady && this.wait <= 0;
+    // The bake is split over two frames (heights, then the field) so neither
+    // frame carries both; a new chunk triggers it at most every 4 s.
+    if (this.pending) {
+      const p = this.pending; this.pending = null;
+      try { this.field(p.x, p.y); } catch (e) { console.warn('light field pass failed', e); this.renderer.setRenderTarget(null); }
+      return;
+    }
     if (!(far || fresh || force)) return;
     this.lastReady = readyChunks;
-    this.wait = 1.5;
+    this.wait = 4;
     // A failed bake must never stop the frame loop: keep the last field.
     try { this.bake(eye.x, eye.z); } catch (e) { console.warn('light field bake failed', e); this.scene.overrideMaterial = null; this.renderer.setRenderTarget(null); }
   }
+  private pending: THREE.Vector2 | null = null;
 
   bake(cx: number, cz: number) {
     const t0 = performance.now();
@@ -196,16 +204,24 @@ export class LightField {
       this.scene.background = prevBg;
       for (const [o, v] of restore) o.visible = v;
     }
-    // Mips come from the render target's automatic generation on unbind.
+    r.setRenderTarget(prevTarget);
+    r.setClearColor(prevClear, prevAlpha);
+    r.shadowMap.autoUpdate = prevAuto;
+    this.pending = new THREE.Vector2(cx, cz);
+    this.ms = performance.now() - t0;
+  }
+
+  /** Second half of a bake: the field from the height map (mips were made on unbind). */
+  private field(cx: number, cz: number) {
+    const t0 = performance.now();
+    const r = this.renderer, prevTarget = r.getRenderTarget();
     const q = this.quad.material as THREE.ShaderMaterial;
     q.uniforms.uSun.value.copy(shared.uMoonDir.value);
     r.setRenderTarget(this.rt);
     r.render(this.qScene, this.qCam);
     r.setRenderTarget(prevTarget);
-    r.setClearColor(prevClear, prevAlpha);
-    r.shadowMap.autoUpdate = prevAuto;
     shared.uLFBox.value.set(cx - SIZE / 2, cz - SIZE / 2, 1 / SIZE, 1);
     this.bakes++;
-    this.ms = performance.now() - t0;
+    this.ms += performance.now() - t0;
   }
 }
