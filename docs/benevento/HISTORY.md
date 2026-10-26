@@ -124,23 +124,47 @@ World coordinates in metres (x, z).
   The church "of the Forty" in it is medieval but undated: shown only as a chapel.
 - **Torre della Catena** (−517, −27): the 7th-c. fort (today isolated by 1943 bombing); enterable.
 - **S. Ilario a Port'Aurea** (429, −285): the little church with two domes in line on the Via Traiana.
-- **Ponte Leproso** (axis from (−736.8, −143.4) to (−788.5, −61.4), OSM way 59431406): the Appia over
-  the Sabato, "pons marmoreus quod dicitur de Leprosis" in a charter of 1077, named Leproso first in
-  830. Built after Meomartini's survey (1889; summarised in it.wikipedia "Ponte Leproso", which cites
-  Meomartini, Galliazzo, Quilici, Rotili 1986 and *NSc* 1891): five equal semicircular arches of 8.70 m
-  on four piers 5 m thick and 7.50 m through (the roadway's width), a triangular cutwater upstream only,
-  the arches springing from a projecting cornice 60 cm high, all in pseudisodomic work of big, roughly
-  bossed limestone blocks (whence "marmoreus"), the rings of great wedge-shaped voussoirs; a level
-  roadway on the bridge reached by ramps between embankment walls of the same bossed blocks; tuff
-  footings. Restored under Valentinian, Valens and Gratian (367–375), whose names were on the parapet
-  (a readable; the wording after the names is reconstruction). Left out as later: Nauclerio's four
-  southern arches (1712), the widened mill pier and the mills (after 1077), the hospice (830). In the
-  game the classical span is 63.5 m (abutments at 20 and 83.5 m from the town end), the springing 1 m
-  above the Sabato's mean level, the roadway ~6 m above the water, ramps of 9–10% about 50 m long each
-  side; the river (OSM course) runs under the two southern arches, the northern ones stand half silted
-  over gravel; one downstream ring relaid in brick stands for the late-antique repair. The Appia and
-  the lane from the town now run to the ramp feet; trees are kept off the bridge, the ramps and the
-  meadow upstream on the town bank (the view from the lane). **Pons S. Onuphrii** (−86, −372) over the
+- **Ponte Leproso** (axis from (−736.8, −143.4) to (−788.5, −61.4), OSM way 59431406, 97 m: the whole
+  modern bridge with its 18th-c. additions and approaches): the Appia over the Sabato, "pons marmoreus quod
+  dicitur de Leprosis" in a charter of 1077, named Leproso first in 830. **Size, re-checked (2026)** against
+  the only survey, A. Meomartini, *I monumenti…* (1889), pp. 277–283 and Tav. XL–XLI (Wikisource, pages
+  djvu/303–308), and it.wikipedia "Ponte Leproso" (which summarises him and notes that Galliazzo's entry has
+  "svariate imprecisioni"):
+
+  | | Meomartini (measured) | game before | game now |
+  |---|---|---|---|
+  | arches | 5 equal, radius 4.35 (span 8.70) | 5 × 8.70 | 5 × 8.70 |
+  | arch centre | on the **lower** line of the impost band | on its upper line (+0.60 m) | lower line |
+  | impost band | 0.60 high, standing out 0.32 | 0.60 / 0.25 | 0.60 / 0.32 |
+  | piers | 5.00 thick, 7.50 long (= width of the bridge) | 5.00 × 7.50 | same |
+  | cutwater | triangular, upstream only, stands out 2.50 | 2.90 | 2.50 |
+  | voussoirs of the face rings | 1.20 long | 0.95 | 1.20 |
+  | pier above the footing (platea) | 4 courses, 2.58 m visible (more buried) | 4.4 m, but buried by the silt | ~0.25 m above the gravel bed + band |
+  | bridge between abutments | 5 × 8.70 + 4 × 5.00 = **63.5 m** | 63.5 m | 63.5 m |
+  | roadway | level over the bridge | 7.0 m above the water | **6.4 m** above the water (crown extrados + 0.35 m of fill and paving) |
+  | approach, town side | walls of bossed blocks ~62 m long, the road falling steeply, then gently, then level | 45 m at 9–10 % | 62 m, 55 % of the fall in the first 22 m, the rest by 50 m, level after |
+  | approach, far side | not known | 51 m walled ramp at 10 % | the same fall; bossed walls only to 12 m past the abutment, then an earth bank (agger) |
+  | ground under the bridge | (1889: the river pushed to the left bank by the mills, three arches silted) | the 1889 state: three arches silted to 0.4–0.6 m *above* their springing | a gravel bed at 12.75 (water 12.5) under all five arches (see below) |
+
+  So the arch module was right (and the world scale is: equirectangular metres from OSM, checked); what made
+  the bridge read as "way too big" was the way it sat in the land: the modern (DEM) ground, raised by the
+  silt the mills caused after 1077, buried the three northern arches above their springing, so from the
+  meadow one saw a solid wall ~5.5 m high and ~170 m long (ramp foot to ramp foot) with only the tops of
+  the openings showing; the deck was 0.6 m too high (arch centre on the wrong line of the band); the far
+  ramp was walled in bossed blocks for its whole invented length. Now the ground under the bridge is cut
+  down to the Sabato's own gravel bed of 700 (`sites.ts`, a "cut" terrace that only lowers the DEM), so the
+  five arches stand open on their piers as Roman bridges do, the river in the southern two; the deck is at
+  the surveyed height; only the town approach has its attested walls. Why the real bridge looks smaller
+  today: only one Roman pier and parts of two Roman arches survive, both narrowed (to ~8 m and 4.55 m) and
+  hidden by the mills; the other three openings are Nauclerio's lower segmental brick arches of 8.30–8.36 m
+  (1712); the platea and the banks have risen. Other features after Meomartini: the arches spring from the
+  band, all in pseudisodomic work of big, roughly bossed limestone blocks (whence "marmoreus"), the rings of
+  great wedge-shaped voussoirs; tuff footings. Restored under Valentinian, Valens and Gratian (367–375),
+  whose names were on the parapet (a readable; the wording after the names is reconstruction). Left out as
+  later: Nauclerio's four southern arches (1712), the widened mill pier and the mills (after 1077), the
+  hospice (830). One downstream ring relaid in brick stands for the late-antique repair. The Appia and the
+  lane from the town run to the ramp feet; trees are kept off the bridge, the ramps and the meadow upstream
+  on the town bank (the view from the lane). **Pons S. Onuphrii** (−86, −372) over the
   Calore at Porta Gloriosa (today's Ponte Vanvitelli, medieval core).
 - **S. Pietro extra muros** (−858, −6): Theodorada's nunnery across the Sabato on the Appia.
 - **Iseum** (−33, −73): Domitian's temple of Isis (AD 88/89), its remains in the square before the

@@ -7,7 +7,9 @@ import { baseHeight, WALL700, type P2 } from './geo';
 
 /** A landmark's frame: module code authored at (lx, lz) in its own coordinates lands at (x, z), turned by rot. */
 export interface Frame2 { x: number; z: number; rot: number; lx?: number; lz?: number }
-export interface Plateau { x: number; z: number; r0: number; r1: number; h: number; ex?: number; ez?: number; ca: number; sa: number }
+export interface Plateau { x: number; z: number; r0: number; r1: number; h: number; ex?: number; ez?: number; ca: number; sa: number;
+  /** Only lower the ground to h (a cut), never raise it. */
+  cut?: boolean }
 
 /** The Roman grid of the eastern town (decumanus along the later Via Magistrale, ~21.5° south of east). */
 export const GRID_ROT = -0.375;
@@ -70,6 +72,19 @@ export const SITES: Record<string, SiteDef> = {
 
 // Terraces for the sites that need level footing.
 for (const s of Object.values(SITES)) if (s.flat) plateau(s.x, s.z, s.flat[0], s.flat[1]);
+// The Sabato's gravel bed under the Ponte Leproso in 700. The modern ground (the DEM) has the
+// river pushed against the left bank and the three northern arches silted to above their
+// springing: that is the work of the mills Dacomarius was allowed to build in 1077 (Meomartini
+// 1889, p. 277). Before them the river spread its bed under the whole bridge: the ground under
+// and beside it is cut down to a gravel bed a hand above the water (12.5 here), the channel
+// itself left as it is. Axis of the bridge (OSM way 59431406, as in pons.ts): from (-736.8,
+// -143.4) to (-788.5, -61.4); the five arches between 20 and 83.5 m from the town end.
+{
+  const A = [-736.8, -143.4], B = [-788.5, -61.4], L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+  const D = [(B[0] - A[0]) / L, (B[1] - A[1]) / L], sm = (20 + 83.5) / 2;
+  const p = plateau(A[0] + D[0] * sm, A[1] + D[1] * sm, 1, 8, 0, { ex: 33, ez: 20, rot: Math.atan2(D[1], D[0]) });
+  p.h = 12.75; p.cut = true;
+}
 
 // Spatial hash so the terrain does not scan every terrace per vertex.
 const HC = 64;
@@ -136,10 +151,10 @@ const g = (id: string) => GATES.find((x) => x.id === id)!.at;
 export const ROADS: Road[] = [
   // The Appia: Ponte Leproso, north past the amphitheatre and the Santi Quaranta, to Porta S. Lorenzo.
   // Over the bridge it runs from ramp foot to ramp foot (pons.ts: the bridge's axis is OSM's).
-  { name: 'Via Appia', w: 3.4, pts: [[-1120, 40], [-990, 18], [-900, -10], [-845, -30], [-811.5, -25.0], [-720.3, -169.6], [-700, -184], [-664, -246], [-630, -294], [-590, -326], [-520, -347], [-460, -345], g('laurentii')] },
+  { name: 'Via Appia', w: 3.4, pts: [[-1120, 40], [-990, 18], [-900, -10], [-845, -30], [-808.0, -30.5], [-714.4, -178.9], [-700, -184], [-664, -246], [-630, -294], [-590, -326], [-520, -347], [-460, -345], g('laurentii')] },
   // From the Arcus Sacramenti down past the theatre and Torre della Catena to the Sabato, along its
   // bank upstream of the bridge, and up to the bridge's town-side ramp.
-  { name: 'Via ad Pontem Leprosum', w: 2.8, pts: [[-82, -52], [-120, -38], [-168, -30], [-205, -52], [-262, -70], [-330, -60], [-400, -48], [-470, -40], [-517, -14], [-570, -30], [-640, -70], [-690, -98], [-736.9, -115.1], [-720.3, -169.6]] },
+  { name: 'Via ad Pontem Leprosum', w: 2.8, pts: [[-82, -52], [-120, -38], [-168, -30], [-205, -52], [-262, -70], [-330, -60], [-400, -48], [-470, -40], [-517, -14], [-570, -30], [-640, -70], [-690, -98], [-736.9, -115.1], [-714.4, -178.9]] },
   // The Traiana: through the Arch of Trajan, past S. Ilario, down to the Calore and on to Apulia.
   { name: 'Via Traiana', w: 3.2, pts: [[392, -228], [416, -246], [452, -268], [500, -300], [560, -342], [622, -390], [690, -444], [770, -500], [900, -530]] },
   // Porta Gloriosa down to the bridge of S. Onofrio and the road north (the old Latina).

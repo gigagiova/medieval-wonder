@@ -12,7 +12,7 @@ import { NLAMP } from './shaders';
 import { LightField } from './lightfield';
 import { ShaftPass } from './shafts';
 import { buildWorld, SPAWN, SPAWN_YAW, STAIR_ZONES, TOWN_TEX, siteGroups, regionName, getTeleports, getMapData, type Teleport } from './world';
-import { terrain, fastTerrain, field } from './displace';
+import { terrain, fastTerrain, worldTerrain, field } from './displace';
 import { SITES } from './benevento/sites';
 import { updateSecrets, isReadingSecret } from './benevento/secrets';
 import { Player } from './player';
@@ -244,6 +244,7 @@ Object.assign(window, {
   __teleports: getTeleports,
   __map: getMapData,
   __setPitch: (p: number) => { player.pitch = p; },
+  __groundY: (x: number, z: number) => worldTerrain(x, z),
 });
 /** First floor below (x, y, z) within `depth` m, or null. */
 const downRay = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));

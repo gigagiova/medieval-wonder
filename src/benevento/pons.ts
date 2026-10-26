@@ -21,8 +21,12 @@ import type { P2 } from './geo';
 // Restored under Valentinian, Valens and Gratian (367-375): their names were
 // on the parapet. The four southern arches are Nauclerio's rebuild of 1712,
 // and the mills and the widened pier date from after 1077, so none of that is
-// here. In 700 the Sabato runs under the two southern arches; the northern
-// ones stand over gravel, half silted.
+// here. In 700 the Sabato runs under the two southern arches and spreads
+// over a gravel bed under the rest at flood (the river was pushed off the
+// town bank only by the mills of 1077); sites.ts cuts the modern, silted
+// ground down to that bed. Dimensions are Meomartini's own measurements
+// (pp. 277-283); the in-game sizes are checked against them in
+// docs/benevento/HISTORY.md §5.
 //
 // Position from OpenStreetMap (way 59431406, "Via Ponte Leproso"): from
 // (-736.8, -143.4) at the town (north-east) end to (-788.5, -61.4).
@@ -41,20 +45,38 @@ const N: P2 = [-D[1], D[0]].map((v) => -v) as P2;
 const at = (s: number, w: number, y: number) => v3(A[0] + D[0] * s + N[0] * w, y, A[1] + D[1] * s + N[1] * w);
 const xz = (s: number, w: number): P2 => [A[0] + D[0] * s + N[0] * w, A[1] + D[1] * s + N[1] * w];
 
-const SPAN = 8.7, PIER = 5.0, RAD = SPAN / 2, RING = 0.95;
+// Meomartini's survey (pp. 278-281, Tav. XL-XLI): arches of radius 4.35 centred on the LOWER
+// line of the impost band; band 0.60 high, standing out 0.32; voussoirs 1.20 long on the face;
+// piers 5.00 thick and 7.50 long, the cutwater standing out 2.50 (half the pier).
+const SPAN = 8.7, PIER = 5.0, RAD = SPAN / 2, RING = 1.2, BAND = 0.32, CUT = 2.5;
 const HW = 3.75;
 const S0 = 20, S1 = S0 + 5 * SPAN + 4 * PIER;
-/** Springing (top of the cornice), roadway level, foundations (absolute heights, game metres). */
-const YS = 13.6, YD = 19.5, YF = 8.6, CORN = 0.6;
-const RAMP_NE = -31, RAMP_SW = S1 + 56.5;
+/**
+ * Arch centre = springing = bottom of the impost band; roadway (extrados of the crown plus the
+ * road's fill and paving); foundations; the gravel bed under the bridge in 700 (absolute heights,
+ * game metres; the Sabato runs at 12.5 here).
+ */
+const YS = 13.0, YD = YS + RAD + RING + 0.35, YF = 8.6, CORN = 0.6;
+/**
+ * The approaches. Town side: Meomartini dug out the bossed walls of the approach for about 62 m
+ * from the abutment, the road falling steeply at first, then more gently, then level. The far
+ * side is not known: the same fall, and beyond its walled head an earth bank (agger).
+ */
+const RAMP_NE = S0 - 62, RAMP_SW = S1 + 50, WALL_SW = S1 + 12;
 const arcCentre = (i: number) => S0 + RAD + i * (SPAN + PIER);
 
-/** Height of the roadway at s: ramps up from the banks, level over the bridge. */
+/** Height of the roadway at s: level over the bridge, falling to the banks in two slopes, then level. */
 export function ponsDeckY(s: number) {
   const gNE = fastTerrain(...xz(RAMP_NE, 0)) + 0.15, gSW = fastTerrain(...xz(RAMP_SW, 0)) + 0.15;
-  const e0 = S0 - 6, e1 = S1 + 6;
-  if (s <= e0) return gNE + (YD - gNE) * Math.max(0, (s - RAMP_NE) / (e0 - RAMP_NE));
-  if (s >= e1) return YD + (gSW - YD) * Math.min(1, (s - e1) / (RAMP_SW - e1));
+  const fall = (d: number, g: number) => {
+    // d metres from the abutment: 55% of the drop in the first 22 m, the rest by 50 m, then level.
+    const k = YD - g;
+    if (d <= 22) return YD - k * 0.55 * (d / 22);
+    if (d <= 50) return YD - k * (0.55 + 0.45 * ((d - 22) / 28));
+    return g;
+  };
+  if (s < S0) return fall(S0 - s, gNE);
+  if (s > S1) return fall(s - S1, gSW);
   return YD;
 }
 /** The road over the bridge, ramp foot to ramp foot (for roads, forest mask and teleports). */
@@ -158,21 +180,20 @@ export function ponsLeprosus(b: Builder) {
     for (let i = 0; i < 5; i++) {
       const c = arcCentre(i);
       let h = 0;
-      if (y < YS - CORN) h = RAD;
-      else if (y < YS) h = RAD + 0.25; // the cornice is its own band
+      if (y < YS) h = RAD;
       else if (y < YS + RAD + RING) h = Math.sqrt(Math.max(0, (RAD + RING) ** 2 - (y - YS) ** 2));
       if (h > 0.02) out.push({ a: c - h - (RAMP_NE), b: c + h - (RAMP_NE) });
     }
     return out;
   };
-  // The two long faces, ramp foot to ramp foot (u = s - RAMP_NE).
+  // The two long faces, from the town ramp's foot to the head of the far ramp (u = s - RAMP_NE).
   for (const side of [1, -1]) {
     const o = xz(RAMP_NE, side * HW), nr: P2 = [N[0] * side, N[1] * side];
-    const len = RAMP_SW - RAMP_NE;
+    const len = WALL_SW - RAMP_NE;
     face(acc, 'block', o, D, nr, len, YF, (u) => top(u + RAMP_NE), (y) => {
       const hs = holes(y);
       // Upstream, the cutwaters hide the piers' faces below the cornice.
-      if (side > 0 && y < YS - CORN) for (let i = 0; i < 4; i++) hs.push({ a: arcCentre(i) + RAD - RAMP_NE, b: arcCentre(i) + RAD + PIER - RAMP_NE });
+      if (side > 0 && y < YS) for (let i = 0; i < 4; i++) hs.push({ a: arcCentre(i) + RAD - RAMP_NE, b: arcCentre(i) + RAD + PIER - RAMP_NE });
       return hs;
     }, (u) => gr(u + RAMP_NE, side * HW));
   }
@@ -185,24 +206,25 @@ export function ponsLeprosus(b: Builder) {
       const nr: P2 = dir < 0 ? D : [-D[0], -D[1]];
       const U: P2 = [N[0] * -dir, N[1] * -dir];
       const o = xz(s, dir * HW);
-      face(acc, 'block', o, U, nr, 2 * HW, YF, () => YS - CORN, () => [], (u) => gr(s, dir * HW - dir * u));
-      // The cornice the arches spring from: a projecting band.
+      face(acc, 'block', o, U, nr, 2 * HW, YF, () => YS, () => [], (u) => gr(s, dir * HW - dir * u));
+      // The impost band the arches spring from, standing out into the opening (it carried the centring).
       for (let w0 = -HW; w0 < HW - 0.01; ) {
         const w1 = Math.min(HW, w0 + R(1.2, 2.0));
-        const sIn = s + (dir < 0 ? 1 : -1) * 0.25;
-        acc.hexa('block', [at(s, w0, YS - CORN), at(s, w1, YS - CORN), at(sIn, w1, YS - CORN), at(sIn, w0, YS - CORN),
-          at(s, w0, YS), at(s, w1, YS), at(sIn, w1, YS), at(sIn, w0, YS)]);
+        const sIn = s + (dir < 0 ? 1 : -1) * BAND;
+        acc.hexa('block', [at(s, w0, YS), at(s, w1, YS), at(sIn, w1, YS), at(sIn, w0, YS),
+          at(s, w0, YS + CORN), at(s, w1, YS + CORN), at(sIn, w1, YS + CORN), at(sIn, w0, YS + CORN)]);
         w0 = w1;
       }
     }
   }
   // The cornice on the long faces of the piers and abutments.
   for (const side of [1, -1]) for (let i = 0; i <= 5; i++) {
-    const s0 = i === 0 ? S0 - 6 : arcCentre(i - 1) + RAD - 0.25, s1 = i === 5 ? S1 + 6 : arcCentre(i) - RAD + 0.25;
+    const s0 = i === 0 ? S0 - 6 : arcCentre(i - 1) + RAD - 0.05, s1 = i === 5 ? S1 + 6 : arcCentre(i) - RAD + 0.05;
     for (let s = s0; s < s1 - 0.01; ) {
       const e = Math.min(s1, s + R(1.3, 2.2));
-      acc.hexa('block', [at(s, side * HW, YS - CORN), at(e, side * HW, YS - CORN), at(e, side * (HW + 0.25), YS - CORN), at(s, side * (HW + 0.25), YS - CORN),
-        at(s, side * HW, YS), at(e, side * HW, YS), at(e, side * (HW + 0.25), YS), at(s, side * (HW + 0.25), YS)]);
+      const y0 = YS, y1 = YS + CORN, wo = side * (HW + BAND);
+      acc.hexa('block', [at(s, side * HW, y0), at(e, side * HW, y0), at(e, wo, y0), at(s, wo, y0),
+        at(s, side * HW, y1), at(e, side * HW, y1), at(e, wo, y1), at(s, wo, y1)]);
       s = e;
     }
   }
@@ -231,9 +253,9 @@ export function ponsLeprosus(b: Builder) {
   }
   // Cutwaters on the upstream side: triangular, as high as the cornice, with a sloping cap.
   for (let i = 0; i < 4; i++) {
-    const p0 = arcCentre(i) + RAD, p1 = p0 + PIER, pm = (p0 + p1) / 2, tip = HW + 2.9;
+    const p0 = arcCentre(i) + RAD, p1 = p0 + PIER, pm = (p0 + p1) / 2, tip = HW + CUT;
     const P = (s: number, w: number): P2 => xz(s, w);
-    const ct = YS - CORN;
+    const ct = YS;
     for (const [a, c2] of [[[p0, HW], [pm, tip]], [[pm, tip], [p1, HW]]] as [number[], number[]][]) {
       const o = P(a[0], a[1]), e = P(c2[0], c2[1]);
       const len = Math.hypot(e[0] - o[0], e[1] - o[1]);
@@ -294,8 +316,8 @@ export function ponsLeprosus(b: Builder) {
         at(s, side * SW, y0 + 0.2), at(e, side * SW, y1 + 0.2), at(e, side * (HW - 0.45), y1 + 0.2), at(s, side * (HW - 0.45), y0 + 0.2)]);
       s = e;
     }
-    for (let s = RAMP_NE + 1; s < RAMP_SW - 0.5; ) {
-      const e = Math.min(RAMP_SW - 0.5, s + R(1.5, 2.6));
+    for (let s = RAMP_NE + 1; s < WALL_SW - 0.3; ) {
+      const e = Math.min(WALL_SW - 0.3, s + R(1.5, 2.6));
       const gone = rand() < 0.1;
       if (!gone) {
         const h = rand() < 0.15 ? R(0.45, 0.75) : R(0.95, 1.1);
@@ -304,6 +326,22 @@ export function ponsLeprosus(b: Builder) {
           at(s, side * (HW - 0.45), y0 + h), at(e, side * (HW - 0.45), y1 + h + R(-0.05, 0.05)), at(e, side * HW, y1 + h), at(s, side * HW, y0 + h + R(-0.05, 0.05))]);
       }
       s = e + 0.01;
+    }
+  }
+  // Beyond the walled head of the far ramp the road runs on an earth bank (agger), its sides
+  // sloping to the meadow, grassed over: the walls are attested only on the town side.
+  {
+    const slope = 1.5, below2 = v3(0, -100, 0);
+    for (let s = WALL_SW - 0.3; s < RAMP_SW - 0.01; ) {
+      const e = Math.min(RAMP_SW, s + 2.5);
+      for (const side of [1, -1]) {
+        const w = (q: number) => HW - 0.4 + Math.max(0.2, (deck(q) - gr(q, side * HW)) * slope);
+        const ga = gr(s, side * w(s)) - 0.3, gb = gr(e, side * w(e)) - 0.3;
+        const a = at(s, side * (HW - 0.4), deck(s) - 0.1), c = at(e, side * (HW - 0.4), deck(e) - 0.1);
+        const a1 = at(s, side * w(s), ga), c1 = at(e, side * w(e), gb);
+        acc.quad('ground', a, c, c1, a1, below2.clone().set(at(s, 0, 0).x, deck(s) - 30, at(s, 0, 0).z));
+      }
+      s = e;
     }
   }
   // The emperors' names on the parapet over the middle arch (upstream side).
@@ -335,6 +373,15 @@ export function ponsLeprosus(b: Builder) {
       // Side walls from the ground (or the foundations) to the parapet's top; over the arches only
       // from the crown of the opening up, so one can walk under them.
       const ai = inArch((s + e) / 2);
+      if ((s + e) / 2 > WALL_SW) {
+        // The earth bank: its sloping sides.
+        for (const side of [-1, 1]) {
+          const w = (q: number) => HW + Math.max(0.2, (deck(q) - gr(q, side * HW)) * 1.5);
+          push(at(s, side * HW, deck(s)), at(e, side * HW, deck(e)), at(e, side * w(e), gr(e, side * w(e)) - 0.4),
+            at(s, side * HW, deck(s)), at(e, side * w(e), gr(e, side * w(e)) - 0.4), at(s, side * w(s), gr(s, side * w(s)) - 0.4));
+        }
+        continue;
+      }
       for (const side of [-1, 1]) {
         const lo = (q: number) => ai < 0 ? Math.min(gr(q, side * HW), YF) - 0.5 : YS + Math.sqrt(Math.max(0, RAD * RAD - (q - arcCentre(ai)) ** 2)) - 0.2;
         const p0 = at(s, side * (HW - 0.3), lo(s)), p1 = at(e, side * (HW - 0.3), lo(e)), q1 = at(e, side * (HW - 0.3), deck(e) + 1.0), q0 = at(s, side * (HW - 0.3), deck(s) + 1.0);
@@ -349,8 +396,8 @@ export function ponsLeprosus(b: Builder) {
     }
     // The cutwaters.
     for (let i = 0; i < 4; i++) {
-      const p0 = arcCentre(i) + RAD, p1 = p0 + PIER, pm = (p0 + p1) / 2, lo = YF - 0.5, hi = YS - CORN + 0.6;
-      for (const [sa, wa, sb, wb] of [[p0, HW, pm, HW + 2.9], [pm, HW + 2.9, p1, HW]]) {
+      const p0 = arcCentre(i) + RAD, p1 = p0 + PIER, pm = (p0 + p1) / 2, lo = YF - 0.5, hi = YS + 0.6;
+      for (const [sa, wa, sb, wb] of [[p0, HW, pm, HW + CUT], [pm, HW + CUT, p1, HW]]) {
         const P0 = at(sa, wa, lo), P1 = at(sb, wb, lo), Q1 = at(sb, wb, hi), Q0 = at(sa, wa, hi);
         push(P0, P1, Q1, P0, Q1, Q0);
       }
