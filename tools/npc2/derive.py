@@ -67,6 +67,9 @@ def make(gid, g, garments, basemesh, rig):
         bmesh.ops.bisect_plane(bm, geom=geom, plane_co=Vector((0, 0, z)), plane_no=Vector((0, 0, 1)), clear_inner=True)
     if d.get('collar'):
         collar(bm, o, basemesh, rig, d['collar'])
+    # (Extrusions can come out wound the other way: faces turned consistently outwards.)
+    if d.get('lengthen') or d.get('collar'):
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
     bm.to_mesh(o.data)
     bm.free()
     o.data.update()
@@ -166,3 +169,68 @@ def lengthen(bm, o, rig, by, step=0.045, flare=0.22):
             v.co = owi @ p
         cur = [g for g in res['geom'] if isinstance(g, bmesh.types.BMEdge) and g.is_boundary]
     bm.normal_update()
+
+
+def relax(o, basemesh, iters, gap=0.006):
+    """Smooth away an asset's crumpled, sculpted folds (a veil's), then push
+    it back out of the body (it shrinks as it smooths) to `gap` over it."""
+    from mathutils.bvhtree import BVHTree
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    for _ in range(iters):
+        bmesh.ops.smooth_vert(bm, verts=[v for v in bm.verts if not v.is_boundary], factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    dg = bpy.context.evaluated_depsgraph_get()
+    be = basemesh.evaluated_get(dg)
+    me = be.to_mesh()
+    mw = basemesh.matrix_world
+    tree = BVHTree.FromPolygons([mw @ v.co for v in me.vertices], [tuple(p.vertices) for p in me.polygons])
+    be.to_mesh_clear()
+    ow, owi = o.matrix_world, o.matrix_world.inverted()
+    moved = 0
+    for v in bm.verts:
+        p = ow @ v.co
+        loc, nrm, _, d = tree.find_nearest(p, 0.1)
+        if loc is None:
+            continue
+        side = (p - loc).dot(nrm)
+        if side < gap:
+            v.co = owi @ (loc + nrm * gap)
+            moved += 1
+    bm.to_mesh(o.data)
+    bm.free()
+    o.data.update()
+    return moved
+
+
+def lift_hood(o, basemesh, above=0.045):
+    """A hood fitted over a scanned head (fuller than MakeHuman's, with its
+    hair) falls over the eyes: its front is raised (and drawn back a little)
+    until the opening's top edge clears the brows by `above`."""
+    import headfit
+    co = headfit.mix_coords(basemesh)
+    eye = (headfit.group_centroid(basemesh, co, 'helper-l-eye') + headfit.group_centroid(basemesh, co, 'helper-r-eye')) / 2
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    ow, owi = o.matrix_world, o.matrix_world.inverted()
+    # The opening's top edge: the lowest of the hood in front of the face's middle, above the eyes' line.
+    front = [ow @ v.co for v in bm.verts if abs((ow @ v.co).x - eye.x) < 0.035 and (ow @ v.co).y < eye.y + 0.02 and (ow @ v.co).z > eye.z - 0.03]
+    if not front:
+        bm.free()
+        return 0.0
+    top = min(p.z for p in front)
+    d = eye.z + above - top
+    if d <= 0:
+        bm.free()
+        return 0.0
+    def ss(a, b, x):
+        t = min(1.0, max(0.0, (x - a) / (b - a)))
+        return t * t * (3 - 2 * t)
+    for v in bm.verts:
+        p = ow @ v.co
+        w = ss(eye.y + 0.14, eye.y - 0.01, p.y) * ss(eye.z - 0.09, eye.z - 0.02, p.z)
+        if w > 0:
+            v.co = owi @ (p + Vector((0, 0, d * w)))
+    bm.to_mesh(o.data)
+    bm.free()
+    o.data.update()
+    return d

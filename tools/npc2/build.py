@@ -94,6 +94,12 @@ for gid, g in GARMENTS.items():
         garments[gid] = o
         zd = [l.split()[1] for l in open(path, encoding='utf-8', errors='replace') if l.startswith('z_depth')]
         gspec[gid] = {'depth': int(zd[0]) if zd else 50, 'delete': 'Delete.' + os.path.basename(path)[:-6].replace(' ', '_')}
+        if g.get('lift'):
+            import derive as _d
+            log('hood lifted', gid, round(_d.lift_hood(o, basemesh), 3), 'pushed out', _d.relax(o, basemesh, 0, gap=0.008))
+        if g.get('relax'):
+            import derive as _d
+            log('relaxed', gid, _d.relax(o, basemesh, g['relax']))
         log('garment', gid, len(o.data.vertices))
 
 # Derived garments (cut from others) after all the fitted ones exist.
@@ -167,7 +173,7 @@ myoutfits = {k: v for k, v in OUTFITS.items() if v['sex'] == sex}
 from hide import clearance, world_bvh  # noqa: E402
 body_layers = [g for g in garments if GARMENTS[g]['layer'] in ('tunic', 'leg', 'shoe')]
 for g in sorted(garments, key=lambda g: -gspec[g]['depth']):
-    over = [h for h in garments if gspec[h]['depth'] > gspec[g]['depth'] and GARMENTS[h]['layer'] != 'head'
+    over = [h for h in garments if gspec[h]['depth'] > gspec[g]['depth']
             and any(g in of['garments'] and h in of['garments'] for of in myoutfits.values())]
     if over:
         log('clearance', g, clearance(garments[g], [world_bvh(garments[h]) for h in over]))
