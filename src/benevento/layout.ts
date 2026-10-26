@@ -743,7 +743,8 @@ export function layoutTown(seed = 700): Layout {
             const ww = widthAt(m, o);
             if (ww > bw + 0.4) { bw = ww; best = q; }
           }
-          if (best >= 0 && bw >= 1.2 && placed[0].distanceTo(placed[1]) >= 2.4 && placed[1].distanceTo(placed[2]) >= 2.4) {
+          // Even a shed shows a door and a window to the lane it stands on.
+          if (best >= 0 && bw >= 1.0 && placed[best].distanceTo(placed[(best + 1) % 4]) >= 2.0) {
             const c = [0, 1, 2, 3].map((q) => placed[(best + q) % 4]);
             const e2 = c[1].clone().sub(c[0]).normalize(), o = V(e2.y, -e2.x);
             if (o.dot(c[0].clone().sub(c[3])) < 0) o.negate();
