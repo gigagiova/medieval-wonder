@@ -223,6 +223,7 @@ function plot(b: Builder, p: PlotData) {
     }
   }
   if (p.kind === 'cortis') { yardWalls(b, p); yardThings(b, p); }
+  if (p.kind === 'hortulus') { yardWalls(b, p, true); if (b.mode !== 'collide') hortulus(b, p); return; }
   if (p.kind === 'orto' || p.kind === 'stabulum') yardThings(b, p);
   if (b.mode === 'collide' && p.kind !== 'ruina') return;
   // Interior: rows of beds in the gardens, vine stakes, a shed in the pens,
@@ -284,19 +285,23 @@ function plot(b: Builder, p: PlotData) {
   }
 }
 
+/** A plain box (12 triangles, not tessellated): the yard and garden walls are many and low. */
+function flat(b: Builder, m: MatName, w: number, h: number, d: number, x: number, y: number, z: number, ry = 0, collide = true, rx = 0, rz = 0) {
+  b.geo(m, new THREE.BoxGeometry(w, h, d), x, y + h / 2, z, ry, collide, rx, rz, true);
+}
 /**
  * A walled yard in front of a house, taken out of the old street (layout.ts §7b): pts are
  * [street-left, street-right, house-right, house-left]. Rubble walls a little over head height on
  * the street and the two sides, the gate in the street wall (a plank leaf standing open, now and
  * then a tiled coping over it); the house's own front closes the fourth side.
  */
-function yardWalls(b: Builder, p: PlotData) {
+function yardWalls(b: Builder, p: PlotData, all = false) {
   const r = rng(p.seed * 7 + 3);
   const P = p.pts, T = 0.45;
   const h = 1.9 + r() * 0.7;
   let cx = 0, cz = 0;
   for (const [x, z] of P) { cx += x / 4; cz += z / 4; }
-  for (const k of [0, 1, 3]) {
+  for (const k of all ? [0, 1, 2, 3] : [0, 1, 3]) {
     const a = P[k], c = P[(k + 1) % 4];
     const L = Math.hypot(c[0] - a[0], c[1] - a[1]);
     if (L < 0.6) continue;
@@ -308,10 +313,10 @@ function yardWalls(b: Builder, p: PlotData) {
       if (t1 - t0 < 0.05) return;
       const tm = (t0 + t1) / 2;
       const hh = h * (k === 0 ? 1 : 0.92);
-      b.box('rubble', (t1 - t0) * L, hh, T, a[0] + (c[0] - a[0]) * tm + ox, -0.3, a[1] + (c[1] - a[1]) * tm + oz, ry);
+      flat(b, 'rubble', (t1 - t0) * L, hh, T, a[0] + (c[0] - a[0]) * tm + ox, -0.3, a[1] + (c[1] - a[1]) * tm + oz, ry);
       if (b.mode === 'collide') return;
       // A coping of flat stones.
-      b.box('slab', (t1 - t0) * L + 0.05, 0.08, T + 0.1, a[0] + (c[0] - a[0]) * tm + ox, hh - 0.3, a[1] + (c[1] - a[1]) * tm + oz, ry, false);
+      flat(b, 'slab', (t1 - t0) * L + 0.05, 0.08, T + 0.1, a[0] + (c[0] - a[0]) * tm + ox, hh - 0.3, a[1] + (c[1] - a[1]) * tm + oz, ry, false);
     };
     if (k === 0 && L > 2.2) {
       // The gate: 1.2 m, somewhere along the street wall.
@@ -320,8 +325,31 @@ function yardWalls(b: Builder, p: PlotData) {
       if (b.mode === 'collide') continue;
       // One leaf standing open into the yard.
       const hx = a[0] + (c[0] - a[0]) * (t - g / 2), hz = a[1] + (c[1] - a[1]) * (t - g / 2);
-      b.box('wood', 1.15, 1.75, 0.07, hx + ox * 2 + (cx - mx) / il * 0.5, -0.2, hz + oz * 2 + (cz - mz) / il * 0.5, ry + Math.PI / 2 - 0.3 + r() * 0.3, false);
+      flat(b, 'wood', 1.15, 1.75, 0.07, hx + ox * 2 + (cx - mx) / il * 0.5, -0.2, hz + oz * 2 + (cz - mz) / il * 0.5, ry + Math.PI / 2 - 0.3 + r() * 0.3, false);
     } else seg(0, 1);
+  }
+}
+
+/**
+ * Inside a little walled garden taken out of a wide street (layout.ts §7b): beds of greens, or a
+ * pen's trodden floor with a manger; boxes only.
+ */
+function hortulus(b: Builder, p: PlotData) {
+  const r = rng(p.seed * 3 + 11);
+  const [a, c, , d] = p.pts;
+  const ex = [c[0] - a[0], c[1] - a[1]], ez = [d[0] - a[0], d[1] - a[1]];
+  const L = Math.hypot(ex[0], ex[1]), W = Math.hypot(ez[0], ez[1]);
+  const ry = Math.atan2(ex[0], ex[1]) - Math.PI / 2;
+  const at = (u: number, w: number): P2 => [a[0] + (ex[0] * u) / L + (ez[0] * w) / W, a[1] + (ex[1] * u) / L + (ez[1] * w) / W];
+  if (r() < 0.65) {
+    for (let w = 1.2; w < W - 0.8; w += 1.1) {
+      const [x, z] = at(L / 2, w);
+      flat(b, 'ground', Math.max(0.5, L - 1.6), 0.16, 0.7, x, -0.08, z, ry, false);
+    }
+  } else {
+    const [x, z] = at(L * 0.3, W - 0.9);
+    flat(b, 'wood', 1.6, 0.5, 0.5, x, 0.1, z, ry, false);
+    flat(b, 'wood', 0.08, 0.6, 0.08, x - 0.7, -0.1, z, ry, false);
   }
 }
 

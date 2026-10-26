@@ -63,7 +63,7 @@ export class Raster {
 }
 
 export interface Street { pts: V2[]; w: number; main: boolean; kind: 'lane' | 'road'; /** One of the plan's lanes. */ plan?: boolean }
-export type PlotKind = 'orto' | 'vinea' | 'pratum' | 'ruina' | 'stabulum' | 'cortis';
+export type PlotKind = 'orto' | 'vinea' | 'pratum' | 'ruina' | 'stabulum' | 'cortis' | 'hortulus';
 export interface Plot { pts: P2[]; kind: PlotKind; seed: number; cx: number; cz: number }
 export interface TownLot extends Lot { id: number; explore?: { id: string; kind: ExploreKind }; parcel: number }
 export interface Well { x: number; z: number }
@@ -83,6 +83,8 @@ export interface Layout {
  */
 /** Tools (tools/benevento) may ask for the keep-open mask of the street-narrowing pass. */
 export let DEBUG_KEEP = false;
+let GREEDY = 0.1;
+export const setGreedy = (v: number) => { GREEDY = v; };
 export const setDebugKeep = (v: boolean) => { DEBUG_KEEP = v; };
 export const KEEP_OPEN: { x: number; z: number; r: number }[] = [];
 
@@ -731,7 +733,7 @@ export function layoutTown(seed = 700): Layout {
           }
           return true;
         };
-        const place = (placed: V2[], shed: boolean) => {
+        const place = (placed: V2[], shed: boolean, withFront: boolean) => {
           fill(placed, HOUSE, 0);
           const ctr = placed[0].clone().add(placed[2]).multiplyScalar(0.5);
           // The front: the side with the most street before it.
@@ -743,8 +745,9 @@ export function layoutTown(seed = 700): Layout {
             const ww = widthAt(m, o);
             if (ww > bw + 0.4) { bw = ww; best = q; }
           }
-          // Even a shed shows a door and a window to the lane it stands on.
-          if (best >= 0 && bw >= 1.0 && placed[best].distanceTo(placed[(best + 1) % 4]) >= 2.0) {
+          // The island's houses in rows show a street front to their lane; the small pieces filled in
+          // after them are back buildings (walls with a few openings, a coarser build: phone budget).
+          if (withFront && best >= 0 && bw >= 1.0 && placed[best].distanceTo(placed[(best + 1) % 4]) >= 2.4) {
             const c = [0, 1, 2, 3].map((q) => placed[(best + q) % 4]);
             const e2 = c[1].clone().sub(c[0]).normalize(), o = V(e2.y, -e2.x);
             if (o.dot(c[0].clone().sub(c[3])) < 0) o.negate();
@@ -760,28 +763,38 @@ export function layoutTown(seed = 700): Layout {
             const du = R(3.6, 7);
             for (const f of [1, 0.8, 0.6]) {
               const c = [at(u, w), at(u + du * f, w), at(u + du * f, w + dw * f), at(u, w + dw * f)];
-              if (du * f >= 2.2 && dw * f >= 2.2 && inComp(c)) { place(c, false); break; }
+              if (du * f >= 2.2 && dw * f >= 2.2 && inComp(c)) { place(c, false, true); break; }
             }
             u += du;
           }
           w += dw;
         }
-        // ...then whatever is left, piece by piece: small houses, then sheds, lean-tos and stalls.
+        // ...then the pockets left between: walled gardens and pens (a wall a little over head height
+        // round a plot of beds or a pen, its gate on the lane). Cheap to draw, they close the views as
+        // the houses do (an island of small houses here cost the phone too many triangles).
         const order = cells.slice();
         for (let q = order.length - 1; q > 0; q--) { const t = Math.floor(rand() * (q + 1)); [order[q], order[t]] = [order[t], order[q]]; }
         let tries = 0;
         for (const k of order) {
           if (r.grid[k] !== STREET) continue;
-          if (++tries > cells.length / 6) break;
+          if (++tries > cells.length * GREEDY) break;
           const x = cxOf(k), z = czOf(k), u = x * ex.x + z * ex.y, w = x * ez.x + z * ez.y;
-          let done = false;
-          for (const [lo, hi, shed] of [[3.4, 5.5, false], [2.0, 3.4, true]] as [number, number, boolean][]) {
-            if (done) break;
-            const du = R(lo, hi), dw = R(lo, hi);
-            for (const [su, sv] of [[0.5, 0.5], [0, 0], [1, 0], [0, 1], [1, 1]]) {
-              const c = [at(u - su * du, w - sv * dw), at(u + (1 - su) * du, w - sv * dw), at(u + (1 - su) * du, w + (1 - sv) * dw), at(u - su * du, w + (1 - sv) * dw)];
-              if (inComp(c)) { place(c, shed); done = true; break; }
+          const du = R(3.2, 6.5), dw = R(3.2, 6.5);
+          for (const [su, sv] of [[0.5, 0.5], [0, 0], [1, 0], [0, 1], [1, 1]]) {
+            const c = [at(u - su * du, w - sv * dw), at(u + (1 - su) * du, w - sv * dw), at(u + (1 - su) * du, w + (1 - sv) * dw), at(u - su * du, w + (1 - sv) * dw)];
+            if (!inComp(c)) continue;
+            // The gate on the side with the most street before it: that side first.
+            const ctr = c[0].clone().add(c[2]).multiplyScalar(0.5);
+            let best = 0, bw = -1;
+            for (let q = 0; q < 4; q++) {
+              const m = c[q].clone().add(c[(q + 1) % 4]).multiplyScalar(0.5), o = m.clone().sub(ctr).normalize();
+              const ww = widthAt(m, o);
+              if (ww > bw) { bw = ww; best = q; }
             }
+            const cc = [0, 1, 2, 3].map((q) => c[(best + q) % 4]);
+            fill(cc, PLOT, 0);
+            lay.plots.push({ pts: cc.map((p) => [p.x, p.y] as P2), kind: 'hortulus', seed: Math.floor(rand() * 1e9), cx: ctr.x, cz: ctr.y });
+            break;
           }
         }
       }
