@@ -98,7 +98,7 @@ export function getTeleports(): Teleport[] {
   at('Sanctus Petrus', S.sanctusPetrus, -15.5, -31, -17, -45);
   at('Sanctus Hilarius', S.sanctusHilarius, -13, 0, 0, 0);
   at('Iseum', S.iseum, -6, -8, -15.5, -26);
-  at('Ad Caballum', S.caballus, -9, 6, -1, -3);
+  at('Ad Caballum', S.caballus, -11, 9, 5, 0);
   at('Coemeterium Langobardorum', S.necropolis, 0, 11, 0, 0);
   at('Nux Sacra', S.nux, 0, 9, 0, 0);
   at('Molendinum', S.molendinum, 0.8, -7, 0.8, 0);
