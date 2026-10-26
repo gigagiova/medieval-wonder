@@ -219,7 +219,8 @@ def lift_hood(o, basemesh, above=0.045):
         return 0.0
     top = min(p.z for p in front)
     d = eye.z + above - top
-    d = max(d, 0.0)
+    # (Raising the hood made it a tall hat: the opening is cut instead, below.)
+    d = 0.0
     def ss(a, b, x):
         t = min(1.0, max(0.0, (x - a) / (b - a)))
         return t * t * (3 - 2 * t)

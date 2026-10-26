@@ -119,7 +119,7 @@ def erode(mask, nb, rings):
     return mask
 
 
-def mark(basemesh, garments, outfits, specs):
+def mark(basemesh, garments, outfits, specs, knee=None):
     """Write `_hide` on the body and every garment; returns stats."""
     bvh = {g: world_bvh(o) for g, o in garments.items()}
     meshes = {'body': basemesh, **garments}
@@ -134,7 +134,8 @@ def mark(basemesh, garments, outfits, specs):
                 continue
             # What lies over this mesh: every garment for the body; for a garment, those layered over it.
             depth = specs[k]['depth'] if k != 'body' else -1
-            over = [g for g in gs if g != k and specs[g]['depth'] > depth]
+            # (Not under a cloak or shawl: open and swinging, it uncovers what it hangs over.)
+            over = [g for g in gs if g != k and specs[g]['depth'] > depth and not specs[g].get('open')]
             if not over:
                 continue
             pos, nrm = rest[k]
@@ -152,6 +153,22 @@ def mark(basemesh, garments, outfits, specs):
                         for v in o.data.vertices:
                             if any(x.group == gi and x.weight > 0.5 for x in v.groups):
                                 m[v.index] = True
+            if k == 'body' and knee is not None and any(specs[g].get('long') for g in over):
+                # Below the knee a long skirt doesn't follow the legs (skirt.py): a
+                # striding shin and foot come out from under it, so they are kept,
+                # unless something else covers them (hose, boots).
+                rest_over = [g for g in over if not specs[g].get('long')]
+                m2 = covered(pos, nrm, [bvh[g] for g in rest_over], math.radians(25)) if rest_over else [False] * len(pos)
+                for g in rest_over:
+                    dg = specs[g].get('delete')
+                    if dg and dg in o.vertex_groups:
+                        gi = o.vertex_groups[dg].index
+                        for v in o.data.vertices:
+                            if any(x.group == gi and x.weight > 0.5 for x in v.groups):
+                                m2[v.index] = True
+                for i in range(len(m)):
+                    if pos[i].z < knee:
+                        m[i] = m2[i]
             n = 0
             for i, h in enumerate(m):
                 if h:

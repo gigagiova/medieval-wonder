@@ -116,7 +116,7 @@ import drape  # noqa: E402
 for gid, g in GARMENTS.items():
     if sex in g['sex'] and 'drape' in g:
         garments[gid] = drape.make(gid, g, garments, basemesh, rig)
-        gspec[gid] = {'depth': g.get('depth', 80), 'delete': None}
+        gspec[gid] = {'depth': g.get('depth', 80), 'delete': None, 'open': True}
 # Skirts follow the thighs only, never a knee or a foot (skirt.py).
 import skirt  # noqa: E402
 for gid, o in garments.items():
@@ -181,7 +181,10 @@ for g in sorted(garments, key=lambda g: -gspec[g]['depth']):
     if over:
         log('clearance', g, clearance(garments[g], [world_bvh(garments[h]) for h in over]))
 log('clearance body', clearance(basemesh, [world_bvh(garments[g]) for g in body_layers]))
-stats = hide.mark(basemesh, garments, myoutfits, gspec)
+for gid in garments:
+    gspec[gid]['long'] = GARMENTS[gid].get('skirt', {}).get('hem', 1) < 0.6 and GARMENTS[gid].get('layer') == 'tunic'
+knee_z = (rig.matrix_world @ rig.data.bones['mixamorig:LeftLeg'].head_local).z + 0.03
+stats = hide.mark(basemesh, garments, myoutfits, gspec, knee_z)
 for k, v in stats.items():
     log('hidden', k, v)
 log('pokes', hide.poke_report(basemesh, garments, myoutfits, gspec))
