@@ -38,7 +38,7 @@ const RANGE: Partial<Record<PropId, number>> = {
   // Household things: mostly indoors or at doorsteps, and dense scans.
   treasure_chest: 22, wine_barrel_01: 34, wooden_barrels_01: 38, wooden_bucket_01: 26, wooden_bucket_02: 26, ceramic_pot: 28,
   planter_pot_clay: 28, wicker_basket_02: 28, wooden_bowl_01: 16, carved_wooden_plate: 16, folding_wooden_stool: 22,
-  WoodenTable_01: 26, medieval_cart: 50, wooden_cutting_board: 16, wooden_axe: 18, wooden_axe_02: 18, cross_pein_hammer: 16, stone_fire_pit: 34,
+  WoodenTable_01: 26, medieval_cart: 40, wooden_cutting_board: 16, wooden_axe: 18, wooden_axe_02: 18, cross_pein_hammer: 16, stone_fire_pit: 34,
 };
 const DEFAULT_RANGE = 45;
 

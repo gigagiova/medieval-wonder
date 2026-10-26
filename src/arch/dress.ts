@@ -161,16 +161,12 @@ export function buildFront(acc: Acc, fr: FrontLine, p: FrontPlan, stoneM: MatNam
     const rise = s.hL / n, tread = (s.run - 0.1) / n;
     for (let i = 0; i < n; i++) {
       const y = s.hL - rise * (i + 1);
-      const u = uL + dir * (tread * (i + 0.5));
-      box(acc, stoneM === 'brick' ? 'block' : stoneM, f, u + R(-0.01, 0.01), y + rise - 0.06, D / 2 + R(-0.02, 0.02), tread / 2 + 0.03, 0.07, D / 2 + R(0, 0.04), 0.012);
-    }
-    // The sloping wall under the steps (a wedge of rubble), stepped in three blocks.
-    for (let k = 0; k < 3; k++) {
-      const t0 = k / 3, t1 = (k + 1) / 3;
-      const ua = uL + dir * s.run * t0, ub = uL + dir * s.run * t1;
-      const top = s.hL * (1 - t1) + 0.02;
-      if (top < 0.15) continue;
-      box(acc, 'rubble', f, (ua + ub) / 2, top / 2 - 0.15, D / 2 - 0.02, Math.abs(ub - ua) / 2, top / 2 + 0.15, D / 2 - 0.03, 0.02);
+      const ua = uL + dir * tread * i, ub = uL + dir * tread * (i + 1), u = (ua + ub) / 2;
+      // The mass of the flight under each step (one solid of rubble), then the step stone with its nosing.
+      const top = y + rise - 0.1;
+      const q = (uu: number, v: number, w: number) => f.p(uu, v, w);
+      acc.hexa('rubble', [q(ua, -0.2, 0), q(ub, -0.2, 0), q(ub, -0.2, D - 0.04), q(ua, -0.2, D - 0.04), q(ua, top, 0), q(ub, top, 0), q(ub, top, D - 0.04), q(ua, top, D - 0.04)], true, true);
+      box(acc, stoneM === 'brick' ? 'block' : stoneM, f, u + dir * 0.02 + R(-0.01, 0.01), top + 0.05, D / 2 + R(-0.01, 0.01), tread / 2 + 0.03, 0.05, D / 2 + R(0, 0.03), 0.01);
     }
     // A pole rail on the open side.
     const rails = [lu0 + 0.05, lu1 - 0.05];
@@ -181,12 +177,16 @@ export function buildFront(acc: Acc, fr: FrontLine, p: FrontPlan, stoneM: MatNam
     const u0 = it.u, u1 = it.u + it.len, D = it.depth;
     if (it.kind === 'wood') {
       // Split logs stacked against the wall, under a few boards.
+      // The stack (one block), the cut ends of the logs on its face.
+      box(acc, 'wood', f, (u0 + u1) / 2, it.h / 2, D / 2 - 0.03, (u1 - u0) / 2, it.h / 2, D / 2 - 0.03, 0.02);
       const rows = Math.max(2, Math.round(it.h / 0.15));
+      const back = f.p((u0 + u1) / 2, it.h / 2, -1);
       for (let k = 0; k < rows; k++) {
-        const y = k * (it.h / rows);
+        const y = k * (it.h / rows) + 0.01;
         for (let u = u0 + R(0, 0.06); u < u1 - 0.08; u += R(0.12, 0.17)) {
-          const rr = R(0.05, 0.075);
-          box(acc, 'wood', f, u + rr, y + rr, D / 2 + R(-0.04, 0.04), rr, rr, D / 2 + R(-0.05, 0.05), 0.015);
+          const rr = R(0.05, 0.075), w = D - 0.06 + R(-0.01, 0.04), j = R(-0.01, 0.01);
+          // Fresh-cut ends are pale against the grey bark.
+          acc.quad(r() < 0.7 ? 'marble' : 'wood', f.p(u, y + j, w), f.p(u + 2 * rr, y, w), f.p(u + 2 * rr + j, y + 2 * rr, w), f.p(u, y + 2 * rr, w), back);
         }
       }
       box(acc, 'wood', f, (u0 + u1) / 2, it.h + 0.03, D / 2 + 0.05, (u1 - u0) / 2 + 0.1, 0.02, D / 2 + 0.12, 0.02);
@@ -237,7 +237,7 @@ export function jar(acc: Acc, f: Frame, u: number, w: number, h: number, rad: nu
   const ctr = f.p(u, y0 + h * 0.5, w);
   for (let j = 0; j + 1 < rings.length; j++) for (let i = 0; i < seg; i++) {
     const a = rings[j][i], b = rings[j][(i + 1) % seg], c = rings[j + 1][(i + 1) % seg], d = rings[j + 1][i];
-    acc.quad('clay', a, b, c, d, ctr);
+    acc.quad('roof', a, b, c, d, ctr); // terracotta (the coppi's own material: no extra draw call)
   }
 }
 
@@ -351,7 +351,7 @@ export function dressWall(acc: Acc, d: WallDress, seed: number) {
   if (!d.oneMass || d.h > 4.5) {
     const v = (d.oneMass ? Math.min(3.2, d.h * 0.48) : d.lowTop) + 0.12;
     if (v < d.h - 0.6 && r() < 0.6) for (const [a, b] of runs(v - 0.1, v + 0.1, 0.25, d.L - 0.25)) {
-      for (let u = a + R(0, 0.2); u < b; u += R(0.5, 0.7)) box(acc, 'wood', d.f, u, v, d.upFace * 0 + 0.06, 0.07, 0.08, 0.08, 0.012);
+      for (let u = a + R(0, 0.2); u < b; u += R(0.5, 0.7)) box(acc, 'wood', d.f, u, v, 0.0, 0.06, 0.07, 0.05, 0.01);
     }
   }
 }
@@ -392,7 +392,9 @@ export function washing(acc: Acc, f: Frame, u: number, v: number, wFace: number,
   for (let i = 0; i < n; i++) {
     const t = R(0.15, 0.9), q = p0.clone().lerp(p1, t);
     if (across) q.y -= Math.sin(Math.PI * t) * 0.18;
-    const wc = R(0.35, 0.7), hc = R(0.4, 0.9);
+    const wc = R(0.28, 0.55), hc = R(0.3, 0.65);
+    // Bleached linen or unbleached (materials every chunk already draws: no extra draw call).
+    const cm: MatName = r() < 0.6 ? 'marble' : 'plaster';
     const along = dir.clone().setY(0).normalize();
     const side = v3(-along.z, 0, along.x);
     // The cloth hangs folded over the pole: two sheets in a shallow V with a ragged hem.
@@ -402,8 +404,8 @@ export function washing(acc: Acc, f: Frame, u: number, v: number, wFace: number,
       const bot1 = top1.clone().addScaledVector(side, s * 0.06).add(v3(0, -hc * R(0.85, 1.05), 0));
       const mid0 = top0.clone().lerp(bot0, 0.5).addScaledVector(side, s * 0.03), mid1 = top1.clone().lerp(bot1, 0.5).addScaledVector(side, s * 0.03);
       const ctr = q.clone().addScaledVector(side, -s * 1);
-      acc.quad('cloth', top0, top1, mid1, mid0, ctr);
-      acc.quad('cloth', mid0, mid1, bot1, bot0, ctr);
+      acc.quad(cm, top0, top1, mid1, mid0, ctr);
+      acc.quad(cm, mid0, mid1, bot1, bot0, ctr);
     };
     hang(1); hang(-1);
   }

@@ -136,8 +136,10 @@ export function buildHouse(b: Builder, lot: Lot) {
   if (fp?.stair) h1 = Math.min(h - 1.6, fp.stair.hL);
   // One plain prism is the whole house as far as collision goes. The street
   // front is a separate thick panel with real openings (see facade()).
-  b.add(prismWalls(c, base, h1 - base, DETAIL.mid ? 3.2 : WALL_STEP, front ? 0 : -1), lower, undefined, true, true, false, prismWalls(c, base, h - base, 1e9));
-  if (h > h1 + 0.5) b.add(prismWalls(c, h1, h - h1, DETAIL.mid ? 3.2 : WALL_STEP, front ? 0 : -1), upper, undefined, false, true);
+  // Back buildings are seen across yards and over roofs, never at arm's length: a coarser grid.
+  const step = DETAIL.mid ? 3.2 : front ? WALL_STEP : 1.6;
+  b.add(prismWalls(c, base, h1 - base, step, front ? 0 : -1), lower, undefined, true, true, false, prismWalls(c, base, h - base, 1e9));
+  if (h > h1 + 0.5) b.add(prismWalls(c, h1, h - h1, step, front ? 0 : -1), upper, undefined, false, true);
   let jetty = 0;
   if (front) {
     const width = lot.street ?? 2;
@@ -150,7 +152,7 @@ export function buildHouse(b: Builder, lot: Lot) {
   // A footprint drawn on the plan that is no quad gets a hipped roof that follows it
   // (and so does a tower: a low four-sided roof).
   if (c.length !== 4 || tower) {
-    polyRoof(b, c, h, front ? 0.42 : 0.5, R(0.3, 0.45), acc, front ? 0.37 : 0.5);
+    polyRoof(b, c, h, front ? 0.42 : 0.5, R(0.3, 0.45), acc, front ? 0.37 : 0.55, front ? 3 : 2, !!front);
     acc.flush(b);
     return;
   }
@@ -171,7 +173,7 @@ export function buildHouse(b: Builder, lot: Lot) {
   // old roofs sag more along the ridge.
   const shU = rand(), sagU = rand();
   const shingle = shU < (front ? 0.06 : h < 6 ? 0.3 : 0.12);
-  const opts = { pitch: front ? 0.37 : 0.55, course: front ? 0.52 : 1.0, smoke: rand() < 0.18, gableMat: gm, shingle, sag: sagU < 0.3 ? sagU * 0.5 : 0 };
+  const opts = { pitch: front ? 0.37 : 0.55, course: front ? 0.52 : 1.0, smoke: rand() < 0.18, gableMat: gm, shingle, sag: sagU < 0.3 ? sagU * 0.5 : 0, seg: front ? 3 : 2, street: front ? [front.out.x, front.out.y] as [number, number] : undefined };
   if (rand() < 0.16) {
     tiledLeanTo(acc, lenU + 0.5, lenV + 0.6, h + lenV * 0.28, h - 0.15, centre.x, centre.y, ryOf(e) + (rand() < 0.5 ? 0 : Math.PI), opts.pitch);
   } else if (lenU > lenV || rand() < 0.3) {
@@ -224,7 +226,7 @@ function ruinHouse(b: Builder, lot: Lot) {
  * axis, so irregular plots from the plan keep their drawn shape. Plain tile
  * surface, a low eave fascia; two triangles per wall.
  */
-export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: number, acc?: Acc, rowPitch = 0.4) {
+export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: number, acc?: Acc, rowPitch = 0.4, seg = 3, street = false) {
   const n = c.length;
   let area2 = 0, cx = 0, cz = 0;
   for (let k = 0; k < n; k++) { const a = c[k], q = c[(k + 1) % n]; const cr = a.x * q.y - q.x * a.y; area2 += cr; cx += (a.x + q.x) * cr; cz += (a.y + q.y) * cr; }
@@ -266,13 +268,15 @@ export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: nu
     tri(PA, PQ, RQ);
     if (ra.distanceTo(rq) > 0.02) tri(PA, RQ, RA);
     if (acc) {
-      polyFaceTiles(acc, A, Q, ra, rq, yE, ridgeH, e, out, rowPitch);
+      const seen = street && (k === 0 || k === 1 || k === n - 1);
+      polyFaceTiles(acc, A, Q, ra, rq, yE, ridgeH, e, out, seen ? rowPitch : 0.55, seen ? seg : 2, seen ? 0.5 : 1.0);
       // Boards under the overhang (seen from the lane), then the rafter ends
       // under them, from the wall head out to the fascia.
       const yS = (d: number) => h - d * pitch - 0.07;
       const P3 = (q: V2, y: number) => new THREE.Vector3(q.x, y, q.y);
       acc.quad('wood', P3(a.clone().addScaledVector(out, -0.12), yS(-0.12)), P3(q.clone().addScaledVector(out, -0.12), yS(-0.12)), P3(Q, yS(over)), P3(A, yS(over)), new THREE.Vector3((a.x + q.x) / 2, h + 3, (a.y + q.y) / 2));
-      for (let u = R(0.15, 0.35); u < L - 0.1; u += R(0.48, 0.62)) {
+      // (Only on the street front: elsewhere nobody stands under them.)
+      for (let u = R(0.15, 0.35); street && k === 0 && u < L - 0.1; u += R(0.48, 0.62)) {
         const w0 = a.clone().addScaledVector(e, u).addScaledVector(out, -0.1), w1 = a.clone().addScaledVector(e, u).addScaledVector(out, over - R(0.0, 0.08));
         const y0 = h + 0.1 * pitch - 0.08, y1 = h - (over - 0.04) * pitch - 0.08;
         const sx = e.x * 0.045, sz = e.y * 0.045;
@@ -294,10 +298,11 @@ export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: nu
     // The tiles ride the same bend as the boards under them: the underlay goes
     // through the kit too, cut fine enough to follow it.
     const P = (i: number) => new THREE.Vector3(pos[i], pos[i + 1], pos[i + 2]);
+    const lim = DETAIL.mid ? 5 : 1.6;
     const split = (p: THREE.Vector3, q: THREE.Vector3, r: THREE.Vector3, d: number): void => {
       const lpq = p.distanceToSquared(q), lqr = q.distanceToSquared(r), lrp = r.distanceToSquared(p);
       const mx = Math.max(lpq, lqr, lrp);
-      if (mx < 1.6 * 1.6 || d > 6) { acc.tri('roof', p, q, r); return; }
+      if (mx < lim * lim || d > 6) { acc.tri('roof', p, q, r); return; }
       if (mx === lpq) { const m = p.clone().add(q).multiplyScalar(0.5); split(p, m, r, d + 1); split(m, q, r, d + 1); }
       else if (mx === lqr) { const m = q.clone().add(r).multiplyScalar(0.5); split(p, q, m, d + 1); split(p, m, r, d + 1); }
       else { const m = r.clone().add(p).multiplyScalar(0.5); split(p, q, m, d + 1); split(m, q, r, d + 1); }
@@ -316,7 +321,7 @@ export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: nu
  * to Q, each running up the slope until it meets a hip or the ridge, in
  * lapped courses; a few tiles slipped or missing; hip tiles along both hips.
  */
-function polyFaceTiles(acc: Acc, A: V2, Q: V2, ra: V2, rq: V2, yE: number, yR: number, e: V2, out: V2, rowPitch: number) {
+function polyFaceTiles(acc: Acc, A: V2, Q: V2, ra: V2, rq: V2, yE: number, yR: number, e: V2, out: V2, rowPitch: number, seg = 3, course = 0.5) {
   const inw = out.clone().negate();
   // Plan distance from the eave line to the ridge points.
   const dA = ra.clone().sub(A).dot(inw), dQ = rq.clone().sub(A).dot(inw);
@@ -341,7 +346,6 @@ function polyFaceTiles(acc: Acc, A: V2, Q: V2, ra: V2, rq: V2, yE: number, yR: n
   // Tile 'up': the face normal, tilted towards the eave (downhill = out).
   const up3 = new THREE.Vector3(out.x * slopeK, 1, out.y * slopeK).normalize();
   const side = new THREE.Vector3(e.x, 0, e.y);
-  const course = 0.5;
   for (let u = R(0.08, 0.2); u < L - 0.08; u += rowPitch + R(-0.02, 0.02)) {
     const p = A.clone().addScaledVector(e, u);
     const sMax = exitS(p) - 0.06;
@@ -352,7 +356,7 @@ function polyFaceTiles(acc: Acc, A: V2, Q: V2, ra: V2, rq: V2, yE: number, yR: n
       const s0 = (sMax * k) / nC - (k ? 0.03 : 0), s1 = (sMax * (k + 1)) / nC;
       const q0 = p.clone().addScaledVector(inw, s0), q1 = p.clone().addScaledVector(inw, s1);
       const slip = rand() < 0.03 ? R(-0.12, 0.12) : 0;
-      coppo(acc, 'roof', new THREE.Vector3(q0.x + e.x * slip, yAt(q0) + 0.03, q0.y + e.y * slip), new THREE.Vector3(q1.x + e.x * slip, yAt(q1) + 0.01, q1.y + e.y * slip), up3, side, 0.085, 0.07);
+      coppo(acc, 'roof', new THREE.Vector3(q0.x + e.x * slip, yAt(q0) + 0.03, q0.y + e.y * slip), new THREE.Vector3(q1.x + e.x * slip, yAt(q1) + 0.01, q1.y + e.y * slip), up3, side, 0.085, 0.07, seg);
     }
   }
   // Hip / ridge tiles: bigger coppi along the hip from A to ra.

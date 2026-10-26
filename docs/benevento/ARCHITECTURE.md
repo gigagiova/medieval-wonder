@@ -123,14 +123,22 @@ still matches the full one piece for piece.
   the lot's seed by a pure function, so the collision pass builds the same
   ramp (walkable).
 - **Things in the street**: woodpiles of split logs under a board, stone
-  benches on two blocks or a column drum, storage jars, a handcart; also
-  planned purely and given simple collision boxes.
+  benches on two blocks or a column drum, storage jars, a two-wheeled cart,
+  a ladder of rough poles against the wall, now and then a front under
+  repair with a scaffold of poles, putlogs and boards; also planned purely
+  and given simple collision (boxes; poles only for the scaffold; none for
+  ladders and jars). The cart is a scanned model (see §3a), placed by
+  `townProps` (`src/world.ts`) from the same plan; the town's other
+  scanned props skip fronts that already have something planned.
 - **Workshop fronts**: a wide arch with a masonry counter and slab, the
   dark (now and then firelit) shop behind, the shutter propped out over the
   street on two poles, wares on the counter.
 - **Wall dressing**: lacing courses of reused brick in rubble walls
   (broken into lengths, cut by the openings), ragged patches of lime render
   left on rubble and brick, joist heads where the upper floor rests.
+- **Timber upper storeys**: on plastered upper floors a frame of posts,
+  sole and head plates, a mid rail and braces (wattle and daub between); on
+  boarded ones, battens over the board joints. Both keep clear of windows.
 - **Washing** on a pole out of an upper window or on a line across a
   narrow lane.
 - **Roofs**: the hipped roofs over the plan's irregular footprints (529 of
@@ -144,6 +152,22 @@ still matches the full one piece for piece.
   stand-ins follow: lower prism, no roof).
 - **Tower houses**: rare, near the curtis and on the main street; one mass
   of stone, 12.5-17 m, low hipped roof (**hypothesis**).
+- **Yards**: about two in five gardens and pens get a bread oven (a rubble
+  dome on a square base, a soot-black mouth, a slab before it) and a
+  woodpile beside it, against one side of the yard (collision: the base).
+
+### 3a. Assets
+
+- `medieval_cart` (`public/models/props/`): "Medieval wooden cart" by
+  rakutin on Sketchfab, CC BY 4.0, 11.4k → 2.4k triangles, three 1024 px
+  webp maps (~0.73 MB on disk with the JSON). Packed as JSON glTF + webp
+  like the Poly Haven props (the static host serves no .glb/.bin), drawn by
+  the instanced prop system (one draw call per part while any is in range,
+  40 m).
+- Poly Haven was searched for doors, shutters, ladders, carts and tools:
+  what it has is modern (step ladders, a push broom, painted furniture), so
+  doors, shutters, ladders and the rest stay procedural, built to each
+  opening's size.
 
 ## 4. Not done / next
 
@@ -151,7 +175,7 @@ still matches the full one piece for piece.
   visual work; a straw material would be the next addition).
 - Vertex-colour grime and drip stains need a vertex-colour path in the
   surface shader (not changed here).
-- Downloadable assets: the scanned Poly Haven props already in the game
-  (`src/props.ts`, barrels, baskets, buckets, stools) are placed by the
-  monuments and on the main thread; streamed chunks build in workers and
-  merge per material, so the house dressing above is procedural.
+- Hanging herbs, strings of garlic, baskets on hooks by the doors.
+- Streamed chunks build in workers and merge per material; scanned props
+  can only be placed on the main thread (as the cart is), so more scanned
+  dressing means planning it purely, as `planFront` does.
