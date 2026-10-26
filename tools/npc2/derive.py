@@ -249,23 +249,38 @@ def lift_hood(o, basemesh, above=0.045):
         w = ss(eye.y + 0.14, eye.y - 0.01, p.y) * ss(eye.z - 0.09, eye.z - 0.02, p.z)
         if w > 0:
             v.co = owi @ (p + Vector((0, 0, d * w)))
-    # The face's opening kept clear: hood cloth in front of the face (from
-    # chin to brow, between the cheekbones, before the ears) is cut away.
+    # The face's opening kept clear, without cutting the cloth: hood cloth in
+    # front of the face (chin to brow, cheekbone to cheekbone) is drawn back
+    # and aside to the face's outline, the cloth round it following smoothly
+    # (a displacement field, smoothed over the mesh), so the opening's rim
+    # stays the artist's folded hem.
     eL = headfit.group_centroid(basemesh, co, 'helper-l-eye')
     eR = headfit.group_centroid(basemesh, co, 'helper-r-eye')
-    half = abs(eL.x - eR.x) / 2 + 0.042
-    cut = [v for v in bm.verts if abs((ow @ v.co).x - eye.x) < half and eye.z - 0.13 < (ow @ v.co).z < eye.z + 0.03 and (ow @ v.co).y < eye.y + 0.015]
-    bmesh.ops.delete(bm, geom=cut, context='VERTS')
-    # (and the loose shards a cut can leave)
-    parts = loose_parts(bm)
-    bmesh.ops.delete(bm, geom=[v for p in parts[1:] if len(p) < 60 for v in p], context='VERTS')
-    # The cut's ragged rim smoothed into an even curve (its first rings with it).
-    rim = [v for v in bm.verts if v.is_boundary and abs((ow @ v.co).x - eye.x) < half + 0.03 and (ow @ v.co).z > eye.z - 0.16 and (ow @ v.co).y < eye.y + 0.05]
-    ring = {w for v in rim for e in v.link_edges for w in e.verts} - set(rim)
-    for _ in range(25):
-        bmesh.ops.smooth_vert(bm, verts=rim, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
-    for _ in range(5):
-        bmesh.ops.smooth_vert(bm, verts=list(ring), factor=0.4, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    half = abs(eL.x - eR.x) / 2 + 0.045
+    bm.verts.ensure_lookup_table()
+    disp = [Vector() for _ in bm.verts]
+    fixed = [False] * len(bm.verts)
+    for v in bm.verts:
+        p = ow @ v.co
+        dx = p.x - eye.x
+        if abs(dx) < half and eye.z - 0.14 < p.z < eye.z + 0.035 and p.y < eye.y + 0.02:
+            # To the side the nearer way, at least to the outline; and back behind the face's plane.
+            sx = 1 if dx >= 0 else -1
+            disp[v.index] = Vector((sx * (half - abs(dx)) * 0.9, max(0.0, eye.y + 0.02 - p.y), 0))
+            fixed[v.index] = True
+    nbr = [[e.other_vert(v).index for e in v.link_edges] for v in bm.verts]
+    for _ in range(30):
+        nd = list(disp)
+        for i in range(len(disp)):
+            if fixed[i] or not nbr[i]:
+                continue
+            acc = Vector()
+            for j in nbr[i]:
+                acc += disp[j]
+            nd[i] = acc / len(nbr[i]) * 0.97
+        disp = nd
+    for v in bm.verts:
+        v.co = owi @ ((ow @ v.co) + disp[v.index])
     bm.to_mesh(o.data)
     bm.free()
     o.data.update()
