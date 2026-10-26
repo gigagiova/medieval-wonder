@@ -130,6 +130,20 @@ still matches the full one piece for piece.
   ladders and jars). The cart is a scanned model (see §3a), placed by
   `townProps` (`src/world.ts`) from the same plan; the town's other
   scanned props skip fronts that already have something planned.
+- **Side and back walls on lanes** (`sideFace`): the plan puts many side
+  and back walls on lanes, and they were blank rubble. `makeChunks` finds
+  them from the layout raster (`LotData.side`: the wall and the lane's
+  width there); each gets small high windows on the ground floor and larger
+  ones above (shutters shut, folded open or a wooden grille; some firelit),
+  now and then a side door (flush planked leaf with battens and straps,
+  frame, lintel, threshold) under a board pentice on brackets, putlog
+  holes, the wall dressing, washing over narrow lanes, and the same planned
+  street things as fronts (with collision; no carts or stairs).
+- **Busier fronts**: more upper windows, pentices over doors (40%),
+  galleries (28%), workshop fronts (40%), washing; upper floors jut over
+  the lane far more often (timber on joists, masonry on beams), up to 0.8 m
+  on lanes wider than 2.6 m, so the sky narrows to a strip; the scanned
+  barrels, jars and baskets at every second front instead of every fourth.
 - **Workshop fronts**: a wide arch with a masonry counter and slab, the
   dark (now and then firelit) shop behind, the shutter propped out over the
   street on two poles, wares on the counter.
@@ -177,8 +191,8 @@ Node with the worker's settings) and in the built game (phone portrait,
 
 | | before | after |
 |---|---|---|
-| full chunk, average triangles | 63.6k | 63.3k |
-| middle chunk, average triangles | 13.7k | 14.0k |
+| full chunk, average triangles | 63.6k | 67.0k (63.3k before the side walls and busier fronts) |
+| middle chunk, average triangles | 13.7k | 15.1k |
 | materials per chunk | 19 | 19 (no new ones) |
 
 To pay for the new detail without raising the budget, detail nobody sees
