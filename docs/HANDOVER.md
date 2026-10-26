@@ -1,6 +1,6 @@
 # Handover: state of the game (26 October 2026)
 
-This is the state of `claude/medieval-town` at handover. Read `AGENTS.md` for the rules and the build commands.
+This is the state of `main` (fast-forwarded from `claude/medieval-town`) at handover. Read `AGENTS.md` for the rules and the build commands.
 
 ## What exists
 

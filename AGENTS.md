@@ -12,8 +12,8 @@ The README intro still describes the earlier "Abbatia Nebularum" prototype. The 
 
 ## Working branch
 
-- Work from `claude/medieval-town`. It holds all current work, and `main` is far behind it, so do not start from `main`.
-- Open pull requests against `claude/medieval-town`, or merge it into `main` first if the owner asks.
+- Work from `main`, the default branch. On 26 October 2026 it was fast-forwarded to `claude/medieval-town`, where all earlier work was done.
+- Open pull requests against `main`.
 
 ## Build and check
 
