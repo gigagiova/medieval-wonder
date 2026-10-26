@@ -159,10 +159,7 @@ if 'prebake' in OPTS:
     sys.exit(0)
 if spec.get('scan') and 'nohead' not in OPTS:
     headfit.bake(basemesh, spec, os.path.dirname(OUT))
-    # The scan's eyes are in its skin now.
-    for o in list(bpy.data.objects):
-        if o.type == 'MESH' and o.name.endswith('low-poly'):
-            bpy.data.objects.remove(o)
+    # (MakeHuman's eyeballs stay, in the sockets behind the scanned lids.)
 
 # ------------------------------------------------------------------ hidden surfaces
 import hide  # noqa: E402

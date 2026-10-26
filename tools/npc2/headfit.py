@@ -26,6 +26,10 @@ from mathutils.bvhtree import BVHTree
 from mathutils.kdtree import KDTree
 
 SCANS = os.environ.get('NPC2_SCANS', '')
+# scipy for Blender's Python (tools/npc2/README.md): Blender ignores PYTHONPATH.
+import sys as _sys
+if os.environ.get('NPC2_PYLIB'):
+    _sys.path.append(os.environ['NPC2_PYLIB'])
 # Face-only scans: their landmarks in their photograph (u, v from the top-left).
 SCAN_LANDMARKS = {
     'face_grandpa': {'eyeL': (0.69, 0.37), 'eyeR': (0.33, 0.37), 'mouthL': (0.585, 0.695), 'mouthR': (0.405, 0.695), 'nose': (0.5, 0.53)},
@@ -213,6 +217,12 @@ def fit(basemesh, spec):
             sock[i] = 1 - smoothstep(0.013, 0.026, de)
             if sock[i] > 0.5:
                 inner[i] = False
+    # The ears: the scans' are lumpy and half hidden by hair: MakeHuman's
+    # are kept, carried along by the head round them.
+    ear = [False] * len(co)
+    for i in range(len(co)):
+        if w[i] > 0 and abs(co[i].x - em.x) > 0.06 and co[i].y > eyeL.y + 0.045 and em.z - 0.08 < co[i].z < em.z + 0.035:
+            ear[i] = True
     log('inner', sum(inner), 'socket', sum(1 for x in sock if x > 0))
 
     # Landmarks: the mouth's corners and the nose's tip moved onto the
@@ -236,54 +246,15 @@ def fit(basemesh, spec):
             acc += d * g
             ws += g
         pos[i] = co[i] + acc / ws * w[i]
-    # The head drawn onto the scan's surface.
-    for it in range(3):
-        delta = [Vector() for _ in pos]
-        conf = [0.0] * len(pos)
-        for i in range(len(pos)):
-            if w[i] <= 0 or inner[i]:
-                continue
-            p, n = pos[i], nrm[i]
-            best = None
-            front = None
-            if sock[i] > 0:
-                h = scan.bvh.ray_cast(p + Vector((0, -0.06, 0)), Vector((0, 1, 0)), 0.1)
-                if h[0] is not None:
-                    front = h[0] - p
-                if sock[i] >= 1 and front is not None:
-                    delta[i] = front
-                    conf[i] = 1.0
-                    continue
-            for d in (n, -n):
-                h = scan.bvh.ray_cast(p, d, 0.04)
-                if h[0] is not None and (best is None or h[3] < best[3]):
-                    best = h
-            if best is None:
-                h = scan.bvh.find_nearest(p, 0.02)
-                if h[0] is not None:
-                    best = h
-            if best is not None:
-                delta[i] = best[0] - p
-                conf[i] = 1.0
-            if front is not None:
-                delta[i] = delta[i].lerp(front, sock[i]) if best is not None else front
-                conf[i] = 1.0
-        # Smooth the moves over the surface (outliers and misses filled in).
-        for _ in range(12 if it < 2 else 4):
-            nd = []
-            for i in range(len(pos)):
-                if w[i] <= 0:
-                    nd.append(delta[i])
-                    continue
-                acc, ws = delta[i] * (conf[i] * 2.0), conf[i] * 2.0
-                for j in nb[i]:
-                    acc += delta[j] * max(conf[j], 0.25)
-                    ws += max(conf[j], 0.25)
-                nd.append(acc / ws if ws > 0 else delta[i])
-            delta = nd
-        for i in range(len(pos)):
-            if w[i] > 0:
-                pos[i] = pos[i] + delta[i] * w[i]
+    # The head drawn onto the scan's surface, smoothly: a Laplacian surface
+    # deformation (Sorkine et al. 2004, "Laplacian Surface Editing") — the
+    # head keeps its own shape's differential coordinates (so it cannot fold
+    # or crease) while soft constraints pull each vertex towards the nearest
+    # point of the scan; constraints that disagree (too far, facing away)
+    # are dropped. Repeated a few times, the pull growing; the eye sockets
+    # are pulled to the scan from in front; inner surfaces (mouth, nostrils,
+    # ear canals) carry no constraint and follow.
+    pos = laplacian_fit(me, co, pos, w, inner, sock, nrm, nb, is_body, scan, ear)
     # Helpers in the head (eyes, teeth, joints) follow the nearest surface vertices.
     kd = KDTree(len(pos))
     for i in range(len(pos)):
@@ -300,6 +271,18 @@ def fit(basemesh, spec):
                     acc += (pos[j] - co[j]) * ww
                     ws += ww
                 pos[i] = co[i] + acc / ws
+    log('quality', quality(me, co, pos, [w[i] > 0 for i in range(len(co))]))
+    # where the flips are
+    where = {}
+    for f in me.polygons:
+        if not all(w[i] > 0 for i in f.vertices):
+            continue
+        a, b = poly_normal(co, f), poly_normal(pos, f)
+        if a.length > 1e-12 and b.length > 1e-12 and a.dot(b) < 0:
+            c = sum((co[i] for i in f.vertices), Vector()) / len(f.vertices)
+            k = 'eye' if min((c - eyeL).length, (c - eyeR).length) < 0.03 else 'mouth' if (c - (mL + mR) / 2).length < 0.035 else 'ear' if abs(c.x - em.x) > 0.06 else 'nose' if (c - nose).length < 0.03 else 'inner' if any(inner[i] for i in f.vertices) else 'other'
+            where[k] = where.get(k, 0) + 1
+    log('flips by place', where)
     key = basemesh.shape_key_add(name='scanfit', from_mix=False)
     mwi = basemesh.matrix_world.inverted()
     basis = basemesh.data.shape_keys.key_blocks[0]
@@ -796,3 +779,154 @@ def under_scan(basemesh, hidx, body_img, head_img, alpha):
     out[..., 3] = 1
     head_img.pixels[:] = out.ravel()
     log('painted skin under the scan where it has none:', round(float((alpha < 0.5).mean()), 3))
+
+
+def poly_normal(P, f):
+    n = Vector()
+    vs = [P[i] for i in f.vertices]
+    for i in range(len(vs)):
+        n += vs[i].cross(vs[(i + 1) % len(vs)])
+    return n
+
+
+def quality(me, A, B, sel):
+    """Fit quality: faces flipped, area ratio percentiles, new creases (> 60° between neighbours, < 35° before)."""
+    nA, nB, st, flips = {}, {}, [], 0
+    for f in me.polygons:
+        if not all(sel[i] for i in f.vertices):
+            continue
+        a, b = poly_normal(A, f), poly_normal(B, f)
+        if a.length < 1e-12 or b.length < 1e-12:
+            continue
+        flips += a.dot(b) < 0
+        st.append(b.length / a.length)
+        nA[f.index], nB[f.index] = a.normalized(), b.normalized()
+    cre = 0
+    for e in me.edges:
+        pass
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    for e in bm.edges:
+        fs = [f.index for f in e.link_faces if f.index in nB]
+        if len(fs) == 2 and nB[fs[0]].dot(nB[fs[1]]) < 0.5 and nA[fs[0]].dot(nA[fs[1]]) > 0.82:
+            cre += 1
+    bm.free()
+    st.sort()
+    q = lambda p: round(st[int(p * (len(st) - 1))], 2) if st else None
+    return {'faces': len(st), 'flips': int(flips), 'creases': cre, 'area p1': q(0.01), 'p50': q(0.5), 'p99': q(0.99), 'max': q(1.0)}
+
+
+def laplacian_fit(me, co, pos, w, inner, sock, nrm, nb, is_body, scan, ear):
+    import numpy as np
+    import scipy.sparse as sp
+    import scipy.sparse.linalg as sla
+    free = [i for i in range(len(co)) if w[i] > 0]
+    idx = {v: k for k, v in enumerate(free)}
+    n = len(free)
+    X0 = np.array([[co[i].x, co[i].y, co[i].z] for i in range(len(co))])
+    # Uniform Laplacian over the body's own edges (helpers excluded).
+    rows, cols, vals = [], [], []
+    for k, i in enumerate(free):
+        ns = list(nb[i])
+        if not ns:
+            rows.append(k); cols.append(k); vals.append(1.0)
+            continue
+        rows.append(k); cols.append(k); vals.append(1.0)
+        for j in ns:
+            if j in idx:
+                rows.append(k); cols.append(idx[j]); vals.append(-1.0 / len(ns))
+    L = sp.csr_matrix((vals, (rows, cols)), shape=(n, n))
+    # Differential coordinates of the original head (neighbours outside the region are constants).
+    delta = np.zeros((n, 3))
+    const = np.zeros((n, 3))
+    for k, i in enumerate(free):
+        ns = list(nb[i])
+        if not ns:
+            continue
+        delta[k] = X0[i] - X0[ns].mean(0)
+        for j in ns:
+            if j not in idx:
+                const[k] += X0[j] / len(ns)
+    rhsL = delta + const
+    P = np.array([[pos[i].x, pos[i].y, pos[i].z] for i in free])
+    fwd = Vector((0, 1, 0))
+    eyeY = min(co[i].y for i in free if sock[i] > 0.9) if any(sock[i] > 0.9 for i in free) else 0.0
+    eyeY = (eyeY + sorted(co[i].y for i in free if sock[i] > 0.9)[len([1 for i in free if sock[i] > 0.9]) // 2]) / 2 if eyeY else 0.0
+    banned = set()
+    face_only = scan.arm is None
+    polys = [f for f in me.polygons if all(w[i] > 0 for i in f.vertices)]
+    sched = [0.3, 0.6, 1.0, 1.5, 2.5, 2.5, 2.5, 2.5]
+    for it, lam in enumerate(sched):
+        cw = np.zeros(n)
+        T = np.zeros((n, 3))
+        # The ears move as a whole with the head round them (per side: the
+        # mean move of the non-ear vertices within 5 cm of the ear).
+        for side in (1, -1):
+            es = [i for i in free if ear[i] and (co[i].x > 0) == (side > 0)]
+            if not es:
+                continue
+            ec = sum((co[i] for i in es), Vector()) / len(es)
+            ring = [idx[i] for i in free if not ear[i] and (co[i] - ec).length < 0.05]
+            D = (P[ring] - np.array([[co[free[k]].x, co[free[k]].y, co[free[k]].z] for k in ring])).mean(0) if ring else np.zeros(3)
+            for i in es:
+                T[idx[i]] = X0[i] + D
+                cw[idx[i]] = lam
+        for k, i in enumerate(free):
+            if inner[i] or i in banned or ear[i]:
+                continue
+            # (A face-only scan has nothing behind the ears.)
+            if face_only and co[i].y > eyeY + 0.06:
+                continue
+            p = Vector(P[k])
+            t = None
+            if sock[i] > 0.3:
+                # Round the eyes only the outer lids, facing forwards, are
+                # laid on the scan (from in front); the socket behind them
+                # follows, and MakeHuman's eyeballs sit in it.
+                if nrm[i].y < -0.5 and co[i].y < eyeY - 0.004:
+                    h = scan.bvh.ray_cast(p - fwd * 0.06, fwd, 0.1)
+                    t = h[0]
+            else:
+                loc, nr, _, d = scan.bvh.find_nearest(p, 0.03)
+                if loc is not None and nr.dot(nrm[i]) > 0.5:
+                    t = loc
+            if t is None:
+                continue
+            T[k] = t
+            cw[k] = lam * w[i]
+        C = sp.diags(cw)
+        A = (L.T @ L + C.T @ C).tocsc()
+        solve = sla.factorized(A)
+        rhs = L.T @ rhsL + (C.T @ C) @ T
+        P = np.stack([solve(rhs[:, c]) for c in range(3)], 1)
+        # Where a face has turned over, the pull there is let go (two rings round it) and the pass redone.
+        if it >= 4:
+            cur = {i: Vector(P[idx[i]]) for i in free}
+            get = lambda i: cur.get(i, co[i])
+            bad = set()
+            for f in polys:
+                a = poly_normal(co, f)
+                b = poly_normal([None] * 0 or _Proxy(get), f)
+                if a.length > 1e-12 and b.length > 1e-12 and a.dot(b) < 0:
+                    bad.update(f.vertices)
+            for _ in range(2):
+                bad |= {j for i in list(bad) for j in nb[i]}
+            new_b = bad - banned
+            banned |= bad
+            log('laplacian pass', it, 'constrained', int((cw > 0).sum()), 'of', n, 'flipped verts released', len(new_b))
+            if not new_b and it > 4:
+                break
+        else:
+            log('laplacian pass', it, 'constrained', int((cw > 0).sum()), 'of', n)
+    out = list(pos)
+    for k, i in enumerate(free):
+        out[i] = Vector(P[k])
+    return out
+
+
+class _Proxy:
+    """Index -> position, for poly_normal over a dict-backed shape."""
+    def __init__(self, f):
+        self.f = f
+    def __getitem__(self, i):
+        return self.f(i)
