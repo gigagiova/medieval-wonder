@@ -1,0 +1,136 @@
+{
+  "control-front-left": {
+    "frame": 2,
+    "calls": 2,
+    "triangles": 972,
+    "points": 0,
+    "lines": 0,
+    "mode": "control",
+    "view": "front",
+    "light": "left",
+    "depthRangeMetres": 0.18
+  },
+  "flat-front-left": {
+    "frame": 3,
+    "calls": 2,
+    "triangles": 10252,
+    "points": 0,
+    "lines": 0,
+    "mode": "flat",
+    "view": "front",
+    "light": "left",
+    "depthRangeMetres": 0.18
+  },
+  "depth-front-left": {
+    "frame": 4,
+    "calls": 2,
+    "triangles": 10252,
+    "points": 0,
+    "lines": 0,
+    "mode": "depth",
+    "view": "front",
+    "light": "left",
+    "depthRangeMetres": 0.18
+  },
+  "low-front-left": {
+    "frame": 5,
+    "calls": 2,
+    "triangles": 2572,
+    "points": 0,
+    "lines": 0,
+    "mode": "low",
+    "view": "front",
+    "light": "left",
+    "depthRangeMetres": 0.18
+  },
+  "control-oblique-left": {
+    "frame": 6,
+    "calls": 2,
+    "triangles": 972,
+    "points": 0,
+    "lines": 0,
+    "mode": "control",
+    "view": "oblique",
+    "light": "left",
+    "depthRangeMetres": 0.18
+  },
+  "flat-oblique-left": {
+    "frame": 7,
+    "calls": 2,
+    "triangles": 10252,
+    "points": 0,
+    "lines": 0,
+    "mode": "flat",
+    "view": "oblique",
+    "light": "left",
+    "depthRangeMetres": 0.18
+  },
+  "depth-oblique-left": {
+    "frame": 8,
+    "calls": 2,
+    "triangles": 10252,
+    "points": 0,
+    "lines": 0,
+    "mode": "depth",
+    "view": "oblique",
+    "light": "left",
+    "depthRangeMetres": 0.18
+  },
+  "low-oblique-left": {
+    "frame": 9,
+    "calls": 2,
+    "triangles": 2572,
+    "points": 0,
+    "lines": 0,
+    "mode": "low",
+    "view": "oblique",
+    "light": "left",
+    "depthRangeMetres": 0.18
+  },
+  "control-oblique-right": {
+    "frame": 10,
+    "calls": 2,
+    "triangles": 972,
+    "points": 0,
+    "lines": 0,
+    "mode": "control",
+    "view": "oblique",
+    "light": "right",
+    "depthRangeMetres": 0.18
+  },
+  "flat-oblique-right": {
+    "frame": 11,
+    "calls": 2,
+    "triangles": 10252,
+    "points": 0,
+    "lines": 0,
+    "mode": "flat",
+    "view": "oblique",
+    "light": "right",
+    "depthRangeMetres": 0.18
+  },
+  "depth-oblique-right": {
+    "frame": 12,
+    "calls": 2,
+    "triangles": 10252,
+    "points": 0,
+    "lines": 0,
+    "mode": "depth",
+    "view": "oblique",
+    "light": "right",
+    "depthRangeMetres": 0.18
+  },
+  "low-oblique-right": {
+    "frame": 13,
+    "calls": 2,
+    "triangles": 2572,
+    "points": 0,
+    "lines": 0,
+    "mode": "low",
+    "view": "oblique",
+    "light": "right",
+    "depthRangeMetres": 0.18
+  },
+  "errors": [],
+  "valid": true
+}

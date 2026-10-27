@@ -24,6 +24,7 @@ import { PLACED, markReadable, markReadableWorld } from './benevento/readables';
 import { LORE, explorableLore } from './benevento/lore';
 import { buildPonteFratto, ponsTeleport, inPons, PONS as PONS_FRATTO, PONS_LANDMARK } from './benevento/pontefratto';
 import { buildSpolia } from './benevento/spolia';
+import { addTrajanReliefs } from './benevento/trajan-reliefs';
 import { planFront } from './arch/dress';
 import { buildTriggioBurials, TRIGGIO_BURIALS, triggioBurialHole, triggioBurialDatum } from './benevento/triggio-burials';
 
@@ -442,6 +443,7 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
   await at('In the old baths', 0.4, S.thermae, (g) => buildBaths(b, g as unknown as THREE.Scene));
   await at('At the nuns of St Peter', 0.45, S.sanctusPetrus, () => { church(b); nunnery(b); });
   await at('Under the Arch of Trajan', 0.5, S.arcusTraiani, () => M.arcusTraiani(b));
+  await addTrajanReliefs(siteGroups.arcusTraiani);
   await at('At the forum', 0.52, S.arcusSacramenti, () => M.arcusSacramenti(b));
   await at('At the forum', 0.53, { ...S.forum, x: S.forum.x - 9, z: S.forum.z - 7, lx: 21, lz: 6 }, () => temple(b));
   await at('At the forum', 0.54, S.forum, () => M.forumMarket(b));

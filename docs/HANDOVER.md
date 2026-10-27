@@ -49,6 +49,11 @@ checks are recorded in [gate-validation](benevento/gate-validation/README.md),
 and production screenshots in [gate-world-validation](benevento/gate-world-validation/README.md).
 The production build passes; passage/barrier checks pass and all 6,019 generated
 lot footprints, IDs and explorable selections remain unchanged.
+The main narrative decorations now use 14 distinct licensed photographs of the
+actual monument on shallow relief geometry, replacing the primitive figures.
+One compressed atlas and distance LOD keep the combined release gate view at
+136,009 triangles / 81 draws. Capitals and minor motifs remain simplified.
+See `docs/benevento/TRAJAN-RELIEF-CANDIDATE.md` and the source credits for limits.
 San Lorenzo is connected in the current geometry and all three inspected
 full-world approach views; the reported separate gap was not reproduced.
 

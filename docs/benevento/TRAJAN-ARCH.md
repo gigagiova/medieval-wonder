@@ -102,3 +102,11 @@ All three final views were visually inspected. Relief figures remain visibly
 schematic at close range; this is an architectural reconstruction, not a scan
 of the surviving sculptures. The figure groups and capitals now occupy their
 architectural fields without the previous oversized material pitting.
+
+## Subsequent sculptural correction
+
+The primitive narrative figures described above were rejected by the owner.
+Their replacement uses 14 distinct licensed exact-monument fields with shallow
+inferred geometry and a shared photographic atlas. See
+`TRAJAN-RELIEF-CANDIDATE.md`, `TRAJAN-RELIEF-ASSETS.md` and
+`trajan-relief-integration/` for the later implementation, comparisons and limits.

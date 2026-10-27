@@ -1,0 +1,55 @@
+[
+  {
+    "camera": [
+      413.00174096175056,
+      44.8138444669465,
+      -242.00164549934672
+    ],
+    "rotation": [
+      0.16,
+      2.214297435588181,
+      0,
+      "YXZ"
+    ],
+    "stats": "build 46290ms, 122541 tris drawn, 57 calls, cells 66/398 visible, 2 occluded, chunks ready 12 (built 12, avg 586 ms), geo 513, tex 77",
+    "render": {
+      "frame": 206,
+      "calls": 57,
+      "triangles": 122541,
+      "points": 2807,
+      "lines": 0
+    },
+    "memory": {
+      "geometries": 513,
+      "textures": 77
+    },
+    "captureError": null,
+    "cull": {
+      "visible": 66,
+      "occluded": 2,
+      "total": 398
+    },
+    "relief": {
+      "compressed": true,
+      "width": 1024,
+      "lod": 0,
+      "triangles": 28672
+    },
+    "afterCapture": {
+      "stats": "build 46290ms, 136009 tris drawn, 81 calls, cells 66/398 visible, 2 occluded, chunks ready 12 (built 12, avg 586 ms), geo 537, tex 92",
+      "render": {
+        "frame": 230,
+        "calls": 81,
+        "triangles": 136009,
+        "points": 2807,
+        "lines": 0
+      },
+      "memory": {
+        "geometries": 537,
+        "textures": 92
+      }
+    },
+    "name": "aurea30",
+    "errors": []
+  }
+]

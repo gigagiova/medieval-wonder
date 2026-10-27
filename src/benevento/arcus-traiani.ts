@@ -32,30 +32,15 @@ export function arcusTraiani(b: Builder) {
   };
   add(arcadeGeo(W, 10.65, D, 1, OW, SP), 0, 0, 0, 0, 0, 0, 'carvedMarble', true);
 
-  // Panel borders sit in front of a shallow recessed field. Figures are a
-  // restrained low-poly relief approximation, not a claim to copy every scene.
-  const panel = (cx: number, y: number, z: number, w: number, h: number, face: number, figures = 4) => {
+  // Panel borders surround recessed fields; the licensed photographic relief
+  // attachment supplies narrative scenes without primitive figure stand-ins.
+  const panel = (cx: number, y: number, z: number, w: number, h: number, face: number) => {
     box(w, h, 0.035, cx, y, z, false);
     for (const x of [cx - w / 2, cx + w / 2]) box(0.09, h + 0.12, 0.13, x, y - 0.06, z + face * 0.055);
     for (const yy of [y - 0.06, y + h]) box(w + 0.08, 0.09, 0.13, cx, yy, z + face * 0.055);
-    // Narrative relief groups overlap in depth; spacing must not shrink them
-    // into isolated dolls in the lower half of the architectural register.
-    const scale = h / 1.72;
-    for (let i = 0; i < figures; i++) {
-      const x = cx + ((i + 0.5) / figures - 0.5) * (w - 0.34), yy = y + 0.07;
-      const zz = z + face * (i % 2 ? 0.095 : 0.06), s = scale * (i === Math.floor(figures / 2) ? 1.0 : 0.96);
-      // Draped torsos, heads, hems and separated lower legs create real shallow
-      // occlusion under raking light instead of blank rectangular plaques.
-      ellipsoid(x + (i % 2 ? 0.035 : -0.035) * s, yy + 1.38 * s, zz, 0.115 * s, 0.16 * s, 0.09 * s);
-      const torso = new THREE.CylinderGeometry(0.17 * s, 0.25 * s, 0.82 * s, 6, 1);
-      torso.scale(1, 1, 0.36); add(torso, x, yy + 0.83 * s, zz);
-      ellipsoid(x - 0.025 * s, yy + 0.87 * s, zz + face * 0.06, 0.15 * s, 0.35 * s, 0.032 * s, (i % 2 ? -1 : 1) * 0.35);
-      for (const side of [-1, 1]) {
-        ellipsoid(x + side * 0.09 * s, yy + 0.24 * s, zz, 0.062 * s, 0.24 * s, 0.058 * s, side * 0.08);
-        const raised = (i + figures) % 3 === 0 && side === 1;
-        ellipsoid(x + side * 0.22 * s, yy + (raised ? 1.08 : 0.91) * s, zz + face * 0.02, 0.06 * s, 0.27 * s, 0.07 * s, raised ? -0.95 : side * (i % 2 ? 0.42 : -0.26));
-      }
-    }
+    // Narrative sculpture is supplied by the single photographic relief
+    // attachment; keep these authored architectural frames in the world batch.
+
   };
 
   for (const face of [-1, 1]) {
@@ -69,7 +54,7 @@ export function arcusTraiani(b: Builder) {
       panel(cx, 2.42, z + face * 0.08, 2.24, 2.58, face);
       panel(cx, 6.02, z + face * 0.08, 2.24, 2.65, face);
       // Narrow intermediate register aligns with the impost of the arch.
-      panel(cx, 5.23, z + face * 0.08, 2.24, 0.48, face, 5);
+      panel(cx, 5.23, z + face * 0.08, 2.24, 0.48, face);
       for (const x of [side * 2.96, side * 5.89]) {
         box(0.68, 0.16, 0.48, x, 2.08, z);
         box(0.57, 6.76, 0.25, x, 2.24, z + face * 0.06);
@@ -99,8 +84,8 @@ export function arcusTraiani(b: Builder) {
     }
     box(0.45, 0.58, 0.25, 0, SP + OW / 2 - 0.10, z + face * 0.10);
     // Attic: broad central inscription flanked by narrative reliefs.
-    panel(-4.72, 12.21, z - face * 0.06, 2.20, 2.65, face, 3);
-    panel(4.72, 12.21, z - face * 0.06, 2.20, 2.65, face, 3);
+    panel(-4.72, 12.21, z - face * 0.06, 2.20, 2.65, face);
+    panel(4.72, 12.21, z - face * 0.06, 2.20, 2.65, face);
     for (const x of [-3.44, 3.44]) box(0.20, 2.78, 0.2, x, 12.15, z);
     box(6.65, 2.67, 0.06, 0, 12.23, z - face * 0.10);
     for (const y of [12.15, 14.91]) box(6.95, 0.12, 0.18, 0, y, z);
@@ -125,7 +110,7 @@ export function arcusTraiani(b: Builder) {
   for (const side of [-1, 1]) {
     panelFrame = new THREE.Matrix4().makeRotationY(-side * Math.PI / 2);
     panelFrame.setPosition(side * (OW / 2 - 0.035), 0, 0);
-    panel(0, 2.1, 0, 4.5, 2.8, 1, 6);
+    panel(0, 2.1, 0, 4.5, 2.8, 1);
   }
   panelFrame = null;
   const radius = OW / 2 - 0.025;

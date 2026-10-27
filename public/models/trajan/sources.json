@@ -1,0 +1,478 @@
+[
+  {
+    "file": "city-attic-left-facade.jpg",
+    "title": "Arch of Trajan (Benevento) 02.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Arch_of_Trajan_(Benevento)_02.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Arch_of_Trajan_%28Benevento%29_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Bernard Gagnon",
+    "license": "CC0",
+    "crop": [
+      440,
+      675,
+      1005,
+      1280
+    ],
+    "type": "attic",
+    "slot": "city-attic-left",
+    "scene_label": "city-attic-left",
+    "placement": "city-attic-left; visually cross-matched facade photograph",
+    "recommended": true,
+    "warning": "Lower-resolution full-facade fallback, but no pigeon.",
+    "quad": [
+      [
+        455,
+        700
+      ],
+      [
+        1000,
+        675
+      ],
+      [
+        995,
+        1260
+      ],
+      [
+        440,
+        1280
+      ]
+    ],
+    "source_size": [
+      3840,
+      2560
+    ]
+  },
+  {
+    "file": "scene-03.jpg",
+    "title": "Arco di Traiano (Benevento), La stabilit\u00e0 e la sicurezza raggiunta dall'Impero sotto Traiano.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Arco_di_Traiano_(Benevento),_La_stabilit%C3%A0_e_la_sicurezza_raggiunta_dall%27Impero_sotto_Traiano.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/5/5f/Arco_di_Traiano_%28Benevento%29%2C_La_stabilit%C3%A0_e_la_sicurezza_raggiunta_dall%27Impero_sotto_Traiano.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Mongolo1984",
+    "license": "CC BY-SA 4.0",
+    "crop": [
+      770,
+      80,
+      5490,
+      3900
+    ],
+    "type": "pier",
+    "scene_label": "Arco di Traiano (Benevento), La stabilit\u00e0 e la sicurezza raggiunta dall'Impero sotto Traiano.jpg",
+    "placement": "city-upper-right; visually matched to full city facade photographs, except passage orientation follows secondary source",
+    "recommended": true,
+    "warning": "Same scene as CC0photo03; choose only one source.",
+    "slot": "city-upper-right",
+    "source_size": [
+      6000,
+      4000
+    ]
+  },
+  {
+    "file": "scene-04.jpg",
+    "title": "Arco di Traiano (Benevento), Nel campo di Marte, dinanzi al tempio del dio, Traiano, con Adriano al fianco e seguito dai littori, riceve dai due consoli, alla presenza della dea Roma.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Arco_di_Traiano_(Benevento),_Nel_campo_di_Marte,_dinanzi_al_tempio_del_dio,_Traiano,_con_Adriano_al_fianco_e_seguito_dai_littori,_riceve_dai_due_consoli,_alla_presenza_della_dea_Roma.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/d/d0/Arco_di_Traiano_%28Benevento%29%2C_Nel_campo_di_Marte%2C_dinanzi_al_tempio_del_dio%2C_Traiano%2C_con_Adriano_al_fianco_e_seguito_dai_littori%2C_riceve_dai_due_consoli%2C_alla_presenza_della_dea_Roma.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Mongolo1984",
+    "license": "CC BY-SA 4.0",
+    "crop": [
+      1200,
+      700,
+      4450,
+      3800
+    ],
+    "type": "attic",
+    "scene_label": "Arco di Traiano (Benevento), Nel campo di Marte, dinanzi al tempio del dio, Traiano, con Adriano al fianco e seguito dai littori, riceve dai due consoli, alla presenza della dea Roma.jpg",
+    "placement": "city-attic-right; visually matched to full city facade photographs, except passage orientation follows secondary source",
+    "recommended": true,
+    "slot": "city-attic-right",
+    "source_size": [
+      6000,
+      4000
+    ]
+  },
+  {
+    "file": "scene-05.jpg",
+    "title": "Arco di Traiano (Benevento), Traiano appare in primo piano a sinistra seguito dai littori. Il tema \u00e8 forse legato alle provvidenze per i veterani nelle regioni del Reno e del Danubio.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Arco_di_Traiano_(Benevento),_Traiano_appare_in_primo_piano_a_sinistra_seguito_dai_littori._Il_tema_%C3%A8_forse_legato_alle_provvidenze_per_i_veterani_nelle_regioni_del_Reno_e_del_Danubio.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/d/d9/Arco_di_Traiano_%28Benevento%29%2C_Traiano_appare_in_primo_piano_a_sinistra_seguito_dai_littori._Il_tema_%C3%A8_forse_legato_alle_provvidenze_per_i_veterani_nelle_regioni_del_Reno_e_del_Danubio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Mongolo1984",
+    "license": "CC BY-SA 4.0",
+    "crop": [
+      660,
+      80,
+      5410,
+      3920
+    ],
+    "type": "pier",
+    "scene_label": "Arco di Traiano (Benevento), Traiano appare in primo piano a sinistra seguito dai littori. Il tema \u00e8 forse legato alle provvidenze per i veterani nelle regioni del Reno e del Danubio.jpg",
+    "placement": "city-upper-left; visually matched to full city facade photographs, except passage orientation follows secondary source",
+    "recommended": true,
+    "slot": "city-upper-left",
+    "source_size": [
+      6000,
+      4000
+    ]
+  },
+  {
+    "file": "scene-06.jpg",
+    "title": "Arco di Traiano (Benevento), Traiano fa il suo ingresso a Roma nell'estate del 99, dopo aver sistemato il confine renano della provincia della Germania superiore di cui era governatore all'atto della sua proclamazione ad imperatore.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Arco_di_Traiano_(Benevento),_Traiano_fa_il_suo_ingresso_a_Roma_nell%27estate_del_99,_dopo_aver_sistemato_il_confine_renano_della_provincia_della_Germania_superiore_di_cui_era_governatore_all%27atto_della_sua_proclamazione_ad_imperatore.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Arco_di_Traiano_%28Benevento%29%2C_Traiano_fa_il_suo_ingresso_a_Roma_nell%27estate_del_99%2C_dopo_aver_sistemato_il_confine_renano_della_provincia_della_Germania_superiore_di_cui_era_governatore_all%27atto_della_sua_proclamazione_ad_imperatore.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Mongolo1984",
+    "license": "CC BY-SA 4.0",
+    "crop": [
+      1190,
+      220,
+      4850,
+      3750
+    ],
+    "type": "pier",
+    "scene_label": "Arco di Traiano (Benevento), Traiano fa il suo ingresso a Roma nell'estate del 99, dopo aver sistemato il confine renano della provincia della Germania superiore di cui era governatore all'atto della sua proclamazione ad imperatore.jpg",
+    "placement": "city-lower-left; visually matched to full city facade photographs, except passage orientation follows secondary source",
+    "recommended": true,
+    "slot": "city-lower-left",
+    "source_size": [
+      6000,
+      4000
+    ]
+  },
+  {
+    "file": "scene-07.jpg",
+    "title": "Arco di Traiano (Benevento), Traiano \u00e8 accolto dai Geni del Popolo Romano, del Senato e dell'Ordine Equestre.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Arco_di_Traiano_(Benevento),_Traiano_%C3%A8_accolto_dai_Geni_del_Popolo_Romano,_del_Senato_e_dell%27Ordine_Equestre.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/5/59/Arco_di_Traiano_%28Benevento%29%2C_Traiano_%C3%A8_accolto_dai_Geni_del_Popolo_Romano%2C_del_Senato_e_dell%27Ordine_Equestre.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Mongolo1984",
+    "license": "CC BY-SA 4.0",
+    "crop": [
+      1170,
+      260,
+      5100,
+      3850
+    ],
+    "type": "pier",
+    "scene_label": "Arco di Traiano (Benevento), Traiano \u00e8 accolto dai Geni del Popolo Romano, del Senato e dell'Ordine Equestre.jpg",
+    "placement": "city-lower-right; visually matched to full city facade photographs, except passage orientation follows secondary source",
+    "recommended": true,
+    "slot": "city-lower-right",
+    "source_size": [
+      6000,
+      4000
+    ]
+  },
+  {
+    "file": "Arch of Trajan (Benevento) 04.jpg",
+    "title": "Arch of Trajan (Benevento) 04.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Arch_of_Trajan_(Benevento)_04.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/0/00/Arch_of_Trajan_%28Benevento%29_04.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Bernard Gagnon",
+    "license": "CC0",
+    "crop": [
+      620,
+      1260,
+      2225,
+      3020
+    ],
+    "type": "attic",
+    "slot": "country-attic-right",
+    "scene_label": "country-attic-right",
+    "placement": "country-attic-right; visually cross-matched facade photograph",
+    "recommended": true,
+    "warning": "",
+    "source_size": [
+      3334,
+      4668
+    ]
+  },
+  {
+    "file": "country-attic-left-facade.jpg",
+    "title": "Benevento-Arch of Trajan from North.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Benevento-Arch_of_Trajan_from_North.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Benevento-Arch_of_Trajan_from_North.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Phil Tizzani",
+    "license": "CC BY-SA 2.0",
+    "crop": [
+      235,
+      185,
+      545,
+      510
+    ],
+    "type": "attic",
+    "slot": "country-attic-left",
+    "scene_label": "country-attic-left",
+    "placement": "country-attic-left; visually cross-matched facade photograph",
+    "recommended": true,
+    "warning": "Country facade crop, roughly250\u2013350px field: lower detail than dedicated scene photographs.",
+    "quad": [
+      [
+        245,
+        185
+      ],
+      [
+        545,
+        215
+      ],
+      [
+        525,
+        510
+      ],
+      [
+        235,
+        480
+      ]
+    ],
+    "source_size": [
+      1920,
+      2139
+    ]
+  },
+  {
+    "file": "country-upper-left-facade.jpg",
+    "title": "Benevento-Arch of Trajan from North.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Benevento-Arch_of_Trajan_from_North.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Benevento-Arch_of_Trajan_from_North.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Phil Tizzani",
+    "license": "CC BY-SA 2.0",
+    "crop": [
+      170,
+      885,
+      515,
+      1150
+    ],
+    "type": "pier",
+    "slot": "country-upper-left",
+    "scene_label": "country-upper-left",
+    "placement": "country-upper-left; visually cross-matched facade photograph",
+    "recommended": true,
+    "warning": "Country facade crop, roughly250\u2013350px field: lower detail than dedicated scene photographs.",
+    "quad": [
+      [
+        185,
+        885
+      ],
+      [
+        515,
+        900
+      ],
+      [
+        500,
+        1150
+      ],
+      [
+        170,
+        1140
+      ]
+    ],
+    "source_size": [
+      1920,
+      2139
+    ]
+  },
+  {
+    "file": "country-lower-left-facade.jpg",
+    "title": "Benevento-Arch of Trajan from North.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Benevento-Arch_of_Trajan_from_North.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Benevento-Arch_of_Trajan_from_North.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Phil Tizzani",
+    "license": "CC BY-SA 2.0",
+    "crop": [
+      155,
+      1275,
+      495,
+      1605
+    ],
+    "type": "pier",
+    "slot": "country-lower-left",
+    "scene_label": "country-lower-left",
+    "placement": "country-lower-left; visually cross-matched facade photograph",
+    "recommended": true,
+    "warning": "Country facade crop, roughly250\u2013350px field: lower detail than dedicated scene photographs.",
+    "quad": [
+      [
+        170,
+        1275
+      ],
+      [
+        495,
+        1290
+      ],
+      [
+        490,
+        1600
+      ],
+      [
+        155,
+        1605
+      ]
+    ],
+    "source_size": [
+      1920,
+      2139
+    ]
+  },
+  {
+    "file": "country-lower-right-facade.jpg",
+    "title": "Benevento-Arch of Trajan from North.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Benevento-Arch_of_Trajan_from_North.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Benevento-Arch_of_Trajan_from_North.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Phil Tizzani",
+    "license": "CC BY-SA 2.0",
+    "crop": [
+      1490,
+      1300,
+      1775,
+      1605
+    ],
+    "type": "pier",
+    "slot": "country-lower-right",
+    "scene_label": "country-lower-right",
+    "placement": "country-lower-right; visually cross-matched facade photograph",
+    "recommended": true,
+    "warning": "Country facade crop, roughly250\u2013350px field: lower detail than dedicated scene photographs.",
+    "quad": [
+      [
+        1490,
+        1300
+      ],
+      [
+        1760,
+        1325
+      ],
+      [
+        1775,
+        1600
+      ],
+      [
+        1510,
+        1605
+      ]
+    ],
+    "source_size": [
+      1920,
+      2139
+    ]
+  },
+  {
+    "file": "country-upper-right-facade.jpg",
+    "title": "Benevento-Arch of Trajan from North.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Benevento-Arch_of_Trajan_from_North.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Benevento-Arch_of_Trajan_from_North.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Phil Tizzani",
+    "license": "CC BY-SA 2.0",
+    "crop": [
+      1470,
+      955,
+      1750,
+      1210
+    ],
+    "type": "pier",
+    "slot": "country-upper-right",
+    "scene_label": "country-upper-right",
+    "placement": "country-upper-right; visually cross-matched facade photograph",
+    "recommended": true,
+    "warning": "Country facade crop, roughly250\u2013350px field: lower detail than dedicated scene photographs.",
+    "quad": [
+      [
+        1470,
+        955
+      ],
+      [
+        1730,
+        975
+      ],
+      [
+        1750,
+        1210
+      ],
+      [
+        1490,
+        1200
+      ]
+    ],
+    "source_size": [
+      1920,
+      2139
+    ]
+  },
+  {
+    "file": "scene-01.jpg",
+    "title": "Arco di Traiano (Benevento), Il sacrificio della cerimonia per l'apertura della via Traiana.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Arco_di_Traiano_(Benevento),_Il_sacrificio_della_cerimonia_per_l%27apertura_della_via_Traiana.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Arco_di_Traiano_%28Benevento%29%2C_Il_sacrificio_della_cerimonia_per_l%27apertura_della_via_Traiana.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Mongolo1984",
+    "license": "CC BY-SA 4.0",
+    "crop": [
+      2400,
+      750,
+      5700,
+      3400
+    ],
+    "type": "passage",
+    "scene_label": "Arco di Traiano (Benevento), Il sacrificio della cerimonia per l'apertura della via Traiana.jpg",
+    "placement": "passage-sacrifice; visually matched to full city facade photographs, except passage orientation follows secondary source",
+    "recommended": true,
+    "quad": [
+      [
+        2437,
+        750
+      ],
+      [
+        5656,
+        1530
+      ],
+      [
+        5600,
+        3400
+      ],
+      [
+        2440,
+        3125
+      ]
+    ],
+    "warning": "Strong perspective; use quad rectification, not rectangular crop alone.",
+    "slot": "passage-sacrifice",
+    "source_size": [
+      6000,
+      4000
+    ]
+  },
+  {
+    "file": "scene-02.jpg",
+    "title": "Arco di Traiano (Benevento), L'istituzione a Benevento, nel 101 dell'Institutio alimentaria.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Arco_di_Traiano_(Benevento),_L%27istituzione_a_Benevento,_nel_101_dell%27Institutio_alimentaria.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/4/44/Arco_di_Traiano_%28Benevento%29%2C_L%27istituzione_a_Benevento%2C_nel_101_dell%27Institutio_alimentaria.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "author": "Mongolo1984",
+    "license": "CC BY-SA 4.0",
+    "crop": [
+      600,
+      660,
+      4000,
+      3300
+    ],
+    "type": "passage",
+    "scene_label": "Arco di Traiano (Benevento), L'istituzione a Benevento, nel 101 dell'Institutio alimentaria.jpg",
+    "placement": "passage-alimenta; visually matched to full city facade photographs, except passage orientation follows secondary source",
+    "recommended": true,
+    "quad": [
+      [
+        655,
+        1400
+      ],
+      [
+        3970,
+        660
+      ],
+      [
+        3970,
+        3100
+      ],
+      [
+        600,
+        3300
+      ]
+    ],
+    "warning": "Oblique view; CC0photo05 offers better near-frontal full scene.",
+    "slot": "passage-alimenta",
+    "source_size": [
+      6000,
+      4000
+    ]
+  }
+]
