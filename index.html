@@ -30,7 +30,7 @@
 <div id="overlay">
   <h1>Beneventum</h1>
   <p>Anno Domini DCC. Gisulf is duke of the Lombards of Benevento. The fog rises from the Calore and the Sabato and fills the lanes between the old Roman stones. Bishop Barbatus has been dead eighteen years; the old men still remember the golden viper.</p>
-  <p class="keys">WASD or the stick to walk · Shift to hasten · Mouse to look · F or the lantern button for light · Gamepad works too</p>
+  <p class="keys">WASD or the stick to walk · Shift to hasten · Drag the view or use the mouse to look · F or the lantern button for light · Gamepad works too</p>
   <p class="enter">The fog gathers…</p>
 </div>
 <div id="region"></div>
@@ -64,16 +64,6 @@
   #joy:not(.held) #joy-knob { transition: transform 0.18s ease-out; }
   body.locked:not(.touch) #joy { opacity: 0; pointer-events: none; }
   body.touch #joy { opacity: 0.85; width: 156px; height: 156px; }
-  /* Tilt-to-look toggle: phones only, top-right. */
-  #tilt { display: none; position: fixed; z-index: 5; top: max(18px, calc(env(safe-area-inset-top, 0px) + 12px)); right: max(84px, calc(env(safe-area-inset-right, 0px) + 78px));
-    width: 54px; height: 54px; border-radius: 50%; padding: 0; cursor: pointer; touch-action: manipulation;
-    background: radial-gradient(circle at 38% 32%, rgba(60,42,22,0.85), rgba(14,10,6,0.85)); border: 2px solid rgba(201,154,86,0.75);
-    box-shadow: 0 0 14px rgba(0,0,0,0.6); color: #d9b878; opacity: 0.8; }
-  #tilt svg { width: 28px; height: 28px; display: block; margin: auto; }
-  #tilt.on { background: radial-gradient(circle at 38% 32%, #e8c88a 0%, #a8773a 50%, #4a3018 100%); color: #1c1208; opacity: 1; }
-  #tilt.off { opacity: 0.35; filter: grayscale(1); cursor: not-allowed; }
-  #tilt:focus-visible { outline: 2px solid #e8c88a; outline-offset: 3px; }
-  body.touch #tilt { display: block; }
   #overlay { z-index: 10; }
   /* Map button (top-right) and the map itself. */
   #mapbtn { position: fixed; z-index: 5; top: max(18px, calc(env(safe-area-inset-top, 0px) + 12px)); right: max(18px, calc(env(safe-area-inset-right, 0px) + 12px));
@@ -97,7 +87,6 @@
     font-style: italic; font-size: 0.9rem; color: #d8c9a8; opacity: 0.6; pointer-events: none; }
 </style>
 <div id="joy" aria-label="Movement stick"><div id="joy-knob"></div></div>
-<button id="tilt" type="button" aria-pressed="false" title="Tilt to look" aria-label="Tilt to look"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="5" width="12" height="22" rx="2.5" transform="rotate(-18 16 16)"/><path d="M4 12a12 12 0 0 1 3-6M28 20a12 12 0 0 1-3 6"/></svg></button>
 <button id="mapbtn" type="button" title="Map (M)" aria-label="Open the map" aria-expanded="false"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 8l7-3 10 3 7-3v19l-7 3-10-3-7 3z" fill="rgba(250,235,200,0.55)"/><path d="M11 5v19M21 8v19"/><path d="M7 19c3-1 5-6 8-5s4 4 9 1" stroke-dasharray="1.6 2"/><path d="M23.5 11.5l2 2m0-2l-2 2" stroke="#7a1a10"/></svg></button>
 <div id="mapov" role="dialog" aria-modal="true" aria-label="Map of the town"><div class="sheet"><canvas id="mapcv"></canvas><canvas id="mapme"></canvas></div><button class="close" type="button" aria-label="Close the map">×</button><div class="hint">M or Esc to close</div></div>
 <script type="module" src="/src/main.ts"></script>

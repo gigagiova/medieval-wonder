@@ -143,6 +143,7 @@ raw simulation from rejected thickness finishing and unfinished production rollo
 
 ## Hosting
 
-The game was previewed as a claude.ai artifact, which only coding sessions in that product can publish to. For a new agent, host `dist/` anywhere static, for example GitHub Pages. Tilt-to-look also needs a normally hosted page, because the artifact frame blocks motion sensors.
-
-The asset format rules in `AGENTS.md` came from that host. They are harmless elsewhere.
+The game is published at https://gigagiova.github.io/medieval-wonder/ through
+the GitHub Pages workflow on pushes to main. On phones, drag the view to look
+and use the on-screen stick to move. Device-orientation controls and their
+permission prompt/button have been removed.

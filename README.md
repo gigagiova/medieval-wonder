@@ -19,7 +19,7 @@ npm run dev      # http://localhost:5173
 npm run build    # static site in dist/
 ```
 
-**Controls** (on phones: on-screen stick, drag right half to look, tilt button for looking by moving the phone; tilt needs a normally hosted page such as GitHub Pages, as the claude.ai artifact frame blocks motion sensors): click to enter · WASD or on-screen stick to walk · Shift (or push the stick to the edge) to hasten · mouse look / drag / right-half touch drag · F lantern · Space jump · gamepad: left stick move, right stick look, triggers run, A jump, X/Y lantern.
+**Controls:** on phones, use the on-screen stick to walk and drag the view to look around. Motion sensors are not used. On desktop: click to enter · WASD to walk · Shift (or push the stick to the edge) to hasten · mouse look / click-drag · F lantern · Space jump. Gamepad: left stick move, right stick look, triggers run, A jump, X/Y lantern.
 
 ## How it's made
 
