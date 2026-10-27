@@ -122,7 +122,7 @@ export const PEOPLE_LINES: Record<GroupId, Line[]> = {
   mendicus: [
     { la: 'Elemosinam, propter Deum! Unum panem, unum nummum!', en: 'Alms, for God’s sake! One loaf, one coin!' },
     { la: 'Episcopus pauperes in matricula sua pascit. Ego non sum in matricula. Ego sum hic.', en: 'The bishop feeds the poor on his list. I am not on his list. I am here.' },
-    { la: 'In crypta extra muros, apud Sanctos Quadraginta, ossa sanctorum iacent. Dormivi ibi una nocte. Numquam iterum.', en: 'In the crypt outside the walls, at the Forty Saints, lie the bones of saints. I slept there one night. Never again.' },
+    { la: 'Extra muros veteres porticus Romanorum manent. Dormivi ibi una nocte; ventus per arcus sibilabat.', en: 'Outside the walls, old Roman galleries remain. I slept there one night; the wind whistled through the arches.' },
   ],
   // ------------------------------------------------------------ crafts and trade
   faber: [
@@ -200,7 +200,7 @@ export const PEOPLE_LINES: Record<GroupId, Line[]> = {
     { la: 'Pax tecum, peregrine. Nebula haec quadraginta dies non recessit.', en: 'Peace be with you, pilgrim. This fog has not lifted in forty days.' },
     { la: 'Benedicat te omnipotens Deus, Pater, et Filius, et Spiritus Sanctus.', en: 'May almighty God bless you: Father, Son and Holy Spirit.', bless: true },
     { la: 'Casinum desertum est ex quo Langobardi illud destruxerunt. Corpus sancti Benedicti sub ruinis iacet, aiunt.', en: 'Monte Cassino has lain empty since the Lombards destroyed it. St Benedict’s body lies under the ruins, they say.' },
-    { la: 'Extra muros, apud Sanctos Quadraginta, sub memoria martyris, fratres nostri dormiunt. Descende cum lucerna.', en: 'Outside the walls, at the Forty, beneath the martyr’s shrine, our brothers sleep. Go down with a lantern.' },
+    { la: 'Extra muros porticus antiquae adhuc stant. Caute ambula: lapides cadunt.', en: 'Outside the walls, ancient galleries still stand. Walk carefully: stones fall.' },
     { la: 'Otiositas inimica est animae.', en: 'Idleness is the enemy of the soul. (Rule of St Benedict, 48)' },
   ],
   sanctimonialis: [
@@ -229,6 +229,7 @@ export const PEOPLE_LINES: Record<GroupId, Line[]> = {
     { la: 'Κύριε ἐλέησον. — Pro filio meo in mari.', en: 'Lord, have mercy. — For my son at sea.' },
   ],
   iudaeus: [
+    { la: 'In synagoga convenimus ad legendum et orandum. Lucernam accende; iam vesperascit.', en: 'We gather in the synagogue to read and pray. Light the lamp; evening is coming.' },
     { la: 'Shalom — שָׁלוֹם. Pax tibi. Vestes tingo et vendo.', en: 'Shalom. Peace to you. I dye cloth and sell it.' },
     { la: 'Familia mea de Venusia est. Ibi patres nostri sub terra iacent, et in lapidibus scriptum est: «pax super requiem eius».', en: 'My family is from Venosa. Our fathers lie underground there, and on the stones it is written: “peace upon his resting place”.' },
     { la: 'Sabbato non vendo. Veni cras, vel heri.', en: 'On the Sabbath I don’t sell. Come tomorrow — or yesterday.' },

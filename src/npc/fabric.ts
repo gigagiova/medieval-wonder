@@ -13,21 +13,20 @@ import { withAtmos } from './rig';
 // simulated: the cloth's tangent frame is rebuilt per pixel from screen-space
 // derivatives of those coordinates.
 //
-// Wool, linen and felt scatter light: there is no glossy lobe at all (the
-// specular is all but removed, which is what made the old cloth read as
-// nylon), only a faint dye-coloured fuzz at grazing angles, as loose fibres
-// catch the light on a silhouette.
+// A rough dielectric base and Three's energy-compensated Charlie sheen model
+// describe cloth fibres. The old added sky-coloured silhouette rim amplified
+// coarse geometry and split normals, especially on dark wool.
 
 export type FabricKind = 'tabby' | 'twill' | 'felt' | 'linen' | 'leather';
 
 /** Per kind: metres per texture repeat, detail contrast, normal strength, roughness, fuzz, and how much specular survives. */
 const KINDS: Record<FabricKind, { tile: number; contrast: number; nrm: number; rough: number; fuzz: number; spec: number; hand: [number, number, number, number] }> = {
   // hand: how hand-made and worn it shows: slubs in the yarn, mottling of the dye, pilling, fading and grime.
-  tabby: { tile: 0.34, contrast: 1.25, nrm: 1.3, rough: 1.0, fuzz: 0.3, spec: 0.05, hand: [1, 1, 0.6, 1] },
-  twill: { tile: 0.4, contrast: 1.1, nrm: 1.1, rough: 1.0, fuzz: 0.3, spec: 0.05, hand: [0.8, 1, 0.7, 1] },
-  felt: { tile: 0.3, contrast: 1.3, nrm: 0.8, rough: 1.0, fuzz: 0.4, spec: 0.04, hand: [0.3, 1.2, 1, 1] },
-  linen: { tile: 0.36, contrast: 1.0, nrm: 0.9, rough: 0.95, fuzz: 0.15, spec: 0.08, hand: [1.3, 0.6, 0, 0.8] },
-  leather: { tile: 0.4, contrast: 0.8, nrm: 0.7, rough: 0.78, fuzz: 0.0, spec: 0.35, hand: [0, 0.6, 0, 0.6] },
+  tabby: { tile: 0.34, contrast: 0.8, nrm: 0.4, rough: 1.0, fuzz: 0.3, spec: 0.05, hand: [1, 1, 0.6, 1] },
+  twill: { tile: 0.4, contrast: 0.8, nrm: 0.35, rough: 1.0, fuzz: 0.3, spec: 0.05, hand: [0.8, 1, 0.7, 1] },
+  felt: { tile: 0.3, contrast: 0.8, nrm: 0.25, rough: 1.0, fuzz: 0.4, spec: 0.04, hand: [0.3, 1.2, 1, 1] },
+  linen: { tile: 0.36, contrast: 1.0, nrm: 0.3, rough: 0.95, fuzz: 0.15, spec: 0.08, hand: [1.3, 0.6, 0, 0.8] },
+  leather: { tile: 0.4, contrast: 0.8, nrm: 0.35, rough: 0.78, fuzz: 0.0, spec: 0.35, hand: [0, 0.6, 0, 0.6] },
 };
 
 const inBrowser = typeof document !== 'undefined';
@@ -51,7 +50,6 @@ function kindUniforms(kind: FabricKind): Record<string, { value: unknown }> {
       tFabD: { value: load(`textures/fabric/${kind}_d.webp`, THREE.RedFormat) },
       tFabN: { value: load(`textures/fabric/${kind}_n.webp`, THREE.RGFormat) },
       uFab: { value: new THREE.Vector4(1 / k.tile, k.contrast, k.nrm, k.fuzz) },
-      uFabSpec: { value: k.spec },
       uFabHand: { value: new THREE.Vector4(...k.hand) },
     };
     sets.set(kind, u);
@@ -68,7 +66,6 @@ export function fabricTextures(kind: FabricKind) {
 const FABRIC_GLSL = /* glsl */ `
 uniform sampler2D tFabD; uniform sampler2D tFabN;
 uniform vec4 uFab; // 1/tile, contrast, normal strength, fuzz
-uniform float uFabSpec;
 uniform vec4 uFabHand; // slubs, dye mottling, pilling, fading and grime
 varying vec3 vFab; varying vec3 vFabN;
 // A projection's (u, v) of a bind-pose point or offset: 0 looks along X, 1 along Y, 2 along Z.
@@ -113,7 +110,9 @@ export interface FabricOpts {
 export function fabric(kind: FabricKind, color: THREE.ColorRepresentation, o: FabricOpts = {}) {
   const k = KINDS[kind];
   const mode = o.attr ?? 'rest', rest = mode === 'rest';
-  const m = withAtmos(new THREE.MeshStandardMaterial({
+  const m = withAtmos(new THREE.MeshPhysicalMaterial({
+    sheen: k.fuzz, sheenColor: new THREE.Color(color).lerp(new THREE.Color(0xb0a090), 0.2),
+    sheenRoughness: 0.85, specularIntensity: k.spec,
     color, roughness: k.rough, metalness: 0, side: o.side ?? THREE.DoubleSide, vertexColors: o.vertexColors ?? rest,
   }), o.wraps ? { wraps: o.wraps } : {});
   const atmos = m.onBeforeCompile, atmosKey = m.customProgramCacheKey();
@@ -131,7 +130,7 @@ export function fabric(kind: FabricKind, color: THREE.ColorRepresentation, o: Fa
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>\n${FABRIC_GLSL}`)
       // Biplanar lookup in the bind pose: the two projections the surface
-      // faces most, weights sharpened so the blend band stays narrow. Warp
+      // faces most, blended gently across changes in surface direction. Warp
       // runs along bind-pose up on everything that hangs.
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         vec3 fP = vFab * uFab.x;
@@ -144,7 +143,7 @@ export function fabric(kind: FabricKind, color: THREE.ColorRepresentation, o: Fa
         vec2 fG1x = fabProj(fPx, fMa.x), fG1y = fabProj(fPy, fMa.x), fG2x = fabProj(fPx, fMe.x), fG2y = fabProj(fPy, fMe.x);
         vec2 fW = vec2(fA[fMa.x], fA[fMe.x]);
         fW = clamp((fW - 0.5773) / (1.0 - 0.5773), 0.0, 1.0);
-        fW = pow(fW, vec2(6.0));
+        fW = pow(fW, vec2(2.0));
         // (Near the diagonals both weights are tiny: normalise without an epsilon that would zero them.)
         fW = fW.x + fW.y > 1e-12 ? fW / (fW.x + fW.y) : vec2(1.0, 0.0);
         float fD1, fD2 = 1.0; vec2 fN1, fN2 = vec2(0.0);
@@ -190,8 +189,8 @@ export function fabric(kind: FabricKind, color: THREE.ColorRepresentation, o: Fa
           // Creases too small to model: long soft wrinkles running down the
           // cloth as it hangs, some short and crossing (bump from screen derivatives).
           vec2 fq = fabProj(vFab, fMa.x);
-          float hb = (texture2D(uNoise, vec2(fq.x * 4.0, fq.y * 0.45)).r - 0.5) * 0.006
-                   + (texture2D(uNoise, vec2(fq.x * 3.7 + 0.31, fq.y * 0.9 + fq.x * 1.1)).g - 0.5) * 0.003;
+          float hb = (texture2D(uNoise, vec2(fq.x * 4.0, fq.y * 0.45)).r - 0.5) * 0.002
+                   + (texture2D(uNoise, vec2(fq.x * 3.7 + 0.31, fq.y * 0.9 + fq.x * 1.1)).g - 0.5) * 0.001;
           vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition);
           vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx);
           float det = dot(dpx, r1);
@@ -205,31 +204,14 @@ export function fabric(kind: FabricKind, color: THREE.ColorRepresentation, o: Fa
         }`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         {
-          // No glossy lobe on wool and linen; a soft fibre fuzz on the silhouette instead.
-          reflectedLight.directSpecular *= uFabSpec;
-          reflectedLight.indirectSpecular *= uFabSpec;
-          float fNv = saturate(dot(geometryNormal, normalize(vViewPosition)));
-          float fz = pow(1.0 - fNv, 3.0) * uFab.w;
           // Hollows between the threads: occluded (multi-bounce AO, Jimenez
           // et al.) rather than painted dark, so the weave reads in shade too.
           float fAO = clamp(0.55 + 0.45 * fD, 0.0, 1.0);
           vec3 fAlb = diffuseColor.rgb;
           vec3 fA = 2.0404 * fAlb - 0.3324, fB = -4.7951 * fAlb + 0.6417, fC = 2.7552 * fAlb + 0.6903;
           reflectedLight.indirectDiffuse *= max(vec3(fAO), ((fAO * fA + fB) * fAO + fC) * fAO);
-          // Sheen: loose fibres scatter the sky back at grazing angles
-          // (the look of the Charlie / Estevez-Kulla cloth lobe, cheaply):
-          // added light, tinted towards the fibre, strongest on silhouettes,
-          // so dark wool keeps its form against a dark street.
-          #if defined( RE_IndirectDiffuse )
-          vec3 fSky = (irradiance + iblIrradiance) * RECIPROCAL_PI;
-          #else
-          vec3 fSky = vec3(0.0);
-          #endif
-          reflectedLight.indirectDiffuse += fSky * mix(fAlb, vec3(0.5), 0.7) * fz * 3.0;
-          reflectedLight.indirectDiffuse *= 1.0 + fz * 0.5;
-          reflectedLight.directDiffuse *= 1.0 + fz * 0.6;
         }`);
   };
-  m.customProgramCacheKey = () => `fab-${mode}-${atmosKey}`;
+  m.customProgramCacheKey = () => `fab-physical-${mode}-${atmosKey}`;
   return m;
 }

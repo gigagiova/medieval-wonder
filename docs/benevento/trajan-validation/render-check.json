@@ -1,0 +1,114 @@
+{
+  "baseline": "9200a4ac1282c0d5fb23930b40e57c4adc970ff5",
+  "scope": "Isolated arch with production materials, common neutral lighting and floor; excludes adjoining curtain walls and town.",
+  "before-front": {
+    "render": {
+      "frame": 2,
+      "calls": 5,
+      "triangles": 48024,
+      "points": 0,
+      "lines": 0
+    },
+    "dimensions": {
+      "width": 13.4,
+      "coreWidth": 12.6,
+      "depth": 6,
+      "opening": 5.2,
+      "spring": 5.6,
+      "height": 15.6
+    },
+    "passageRayHits": 0
+  },
+  "after-front": {
+    "render": {
+      "frame": 3,
+      "calls": 5,
+      "triangles": 44104,
+      "points": 0,
+      "lines": 0
+    },
+    "dimensions": {
+      "width": 13.4,
+      "coreWidth": 12.6,
+      "depth": 6,
+      "opening": 5.2,
+      "spring": 5.6,
+      "height": 15.6
+    },
+    "passageRayHits": 0
+  },
+  "before-quarter": {
+    "render": {
+      "frame": 4,
+      "calls": 5,
+      "triangles": 48024,
+      "points": 0,
+      "lines": 0
+    },
+    "dimensions": {
+      "width": 13.4,
+      "coreWidth": 12.6,
+      "depth": 6,
+      "opening": 5.2,
+      "spring": 5.6,
+      "height": 15.6
+    },
+    "passageRayHits": 0
+  },
+  "after-quarter": {
+    "render": {
+      "frame": 5,
+      "calls": 5,
+      "triangles": 44104,
+      "points": 0,
+      "lines": 0
+    },
+    "dimensions": {
+      "width": 13.4,
+      "coreWidth": 12.6,
+      "depth": 6,
+      "opening": 5.2,
+      "spring": 5.6,
+      "height": 15.6
+    },
+    "passageRayHits": 0
+  },
+  "before-vault": {
+    "render": {
+      "frame": 6,
+      "calls": 3,
+      "triangles": 47572,
+      "points": 0,
+      "lines": 0
+    },
+    "dimensions": {
+      "width": 13.4,
+      "coreWidth": 12.6,
+      "depth": 6,
+      "opening": 5.2,
+      "spring": 5.6,
+      "height": 15.6
+    },
+    "passageRayHits": 0
+  },
+  "after-vault": {
+    "render": {
+      "frame": 7,
+      "calls": 3,
+      "triangles": 43652,
+      "points": 0,
+      "lines": 0
+    },
+    "dimensions": {
+      "width": 13.4,
+      "coreWidth": 12.6,
+      "depth": 6,
+      "opening": 5.2,
+      "spring": 5.6,
+      "height": 15.6
+    },
+    "passageRayHits": 0
+  },
+  "errors": [],
+  "valid": true
+}

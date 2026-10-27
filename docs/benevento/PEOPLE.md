@@ -74,7 +74,7 @@ S. Maria (his name in 700 is not known), priests, deacons, monks, the nuns of St
 Theuderada — was rich and growing. Greek was spoken by people from the newly conquered Apulian towns
 (Taranto, Brindisi: **A** that they were taken, **I** that Greek-speakers came to the capital) and by
 visitors from Byzantine Naples and the East. Jews lived in Venosa and Oria (**A**) and are documented in
-Benevento from the 9th century (**A**); one or two Jewish families in 700 are **H**. A Bulgar from
+Benevento in a retrospective account of the 9th century (**A** for the account); one or two Jewish families in 700 are **H**. A Bulgar from
 Alzeco's settlement at Sepino, a day's ride away, is **A** for the region and **H** for the street. An
 African Latin who fled Carthage after its fall in 698 is **H** (refugees from Africa reached Italy;
 none is named in Benevento).
@@ -162,7 +162,7 @@ graze goats by the Iseum, help the smith and potter, learn to spin. Says: giant'
 the golden viper with garnet eyes (**L**, as grandmother's tale), women who fly by the Sabato (**L**).
 
 **Mendicus** (`mendicus`) — a beggar at the bishop's atrium; the Church kept a list (*matricula*) of the
-poor it fed (**I**). Says: the crypt at the Forty Saints.
+poor it fed (**I**). Says: the surviving Roman galleries outside the walls.
 
 ### Crafts and trade
 
@@ -216,7 +216,10 @@ Carthage fell to the Arabs two years ago (698, **A**), the Isis stones (hint 3).
 **Iudaeus** (`iudaeus`) — a dyer and cloth-seller whose family is from Venosa (**H** for Benevento in 700;
 **A** for Venosa). No distinctive dress was required in 700; he dresses like other townsmen, bearded,
 sometimes with a dyer's apron. *Shalom*, the Sabbath, the epitaph formula "peace upon his resting place"
-(**A** at Venosa, Hebrew 9th c.), reading Greek and Hebrew.
+(**A** at Venosa, Hebrew 9th c.), reading Greek and Hebrew. A surface station now
+places this role by the small synagogue entrance. The room and congregation in
+700 are an authorized reconstruction (**H**), informed by later local evidence
+and late-antique synagogue analogues; see `JEWISH-PRESENCE.md`.
 
 **Afer de Carthagine** (`afer`) — an African Latin refugee after 698 (**H**). Speaks "like Augustine".
 

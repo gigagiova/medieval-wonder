@@ -123,8 +123,10 @@ World coordinates in metres (x, z).
   for the walls (blocks in their footings) and burnt for lime ("Porta delle Calcare"): stumps of radial
   walls, a few standing bays, spoil heaps, a lime kiln.
 - **Santi Quaranta** (−548, −392): the great Roman complex (cryptoporticus) outside the walls;
-  shown with the catacomb module as hypogea used for burial, an ossuary chapel and a martyr's memoria.
-  The church "of the Forty" in it is medieval but undated: shown only as a chapel.
+  shown as Roman ruins with accessible barrel-vaulted passages. The unsupported catacomb
+  labyrinth, ossuary and martyr shrine have been removed. Surviving bay lengths, vault
+  profile and AD 700 condition are reconstruction hypotheses, not a measured excavation plan.
+  The map and teleport now use Porticus Romanae, avoiding the later church name.
 - **Torre della Catena** (−517, −27): the 7th-c. fort (today isolated by 1943 bombing); enterable.
 - **S. Ilario a Port'Aurea** (429, −285): the little church with two domes in line on the Via Traiana.
 - **Ponte Leproso** (axis from (−736.8, −143.4) to (−788.5, −61.4), OSM way 59431406, 97 m: the whole
@@ -330,8 +332,8 @@ World coordinates in metres (x, z).
 
 - The plan is schematic: houses are placed in its blocks, not on surveyed 8th-century plots.
 - East end of the circuit and Porta Summa's old position; the old Porta Rufina.
-- The Iseum's exact site (placed by the cathedral, see §5); the walnut (legend); the cistern (invented); the Santi Quaranta hypogea used
-  as catacombs (a reconstruction choice: the complex was a Roman cryptoporticus).
+- The Iseum's exact site (placed by the cathedral, see §5); the walnut (legend); the cistern (invented); the surviving extent and elevation of the Santi Quaranta Roman galleries
+  (the former speculative catacomb network has been removed).
 - The 700 ground level was several metres below today's in places; the DEM is modern.
 
 ## 8. How it is built (for whoever continues)
@@ -435,3 +437,186 @@ sites, and every spot is tested against the collision already built (1 m occupan
 follow the layout when it changes. The scans are packed by `tools/fetch-spolia.ts` (decimated to 5-12k
 triangles with ~1-2k far versions, scaled to real sizes, colour greyed); a shader adds grime in the
 hollows, rain streaks, lichen, moss on the tops and soil at the foot, and the common fog.
+
+
+## Character clothing reconstruction limits
+
+The NPC rebuild compares semicircular and rectangular cloak constructions.
+Their precise cuts, hem lengths and fold arrangements are **H — hypotheses**,
+not documented finds from Benevento in AD 700. A cloak fastened at the right
+shoulder with a disc brooch is **I — a regional inference** from seventh-century
+Lombard grave assemblages, as discussed in [PEOPLE.md](PEOPLE.md#the-dukes-people-lombard).
+Paul the Deacon, *Historia Langobardorum* IV 22 describes earlier Lombard dress
+and hair from paintings; it does not supply a sewing pattern for these assets.
+Physics-based draping establishes mechanical plausibility, not historical proof.
+The [construction research](../npc-audit/CLOAKS.md) keeps those claims separate.
+The later C-IPC mechanics fixture uses a 270-degree circular cut and four
+front attachment points. That cut and front fastening are also **H — hypotheses**;
+they are not evidence for a period clasp spanning its roughly 14 cm front gap.
+It remains a fit/motion experiment until fastening and garment finish are
+resolved. Its modern measured wool preset calibrates mechanics, not the exact
+composition or weave of a seventh-century textile.
+
+The rebuilt low rounded tunic neckline, its narrow turned facing and explicit
+textile thickness are also **H — reconstruction/engineering hypotheses**. The
+complete connected opening is authored deliberately; its shape is not claimed
+as a documented seventh-century Beneventan sewing pattern. Geometric and motion
+checks establish fit, not the historical attribution of that particular cut.
+
+
+## Burial-location review: Santi Quaranta and Sabariani
+
+The existing external Santi Quaranta catacombs are a gameplay reconstruction, not
+a verified AD 700 burial site. Do not infer funerary use from the word
+cryptoporticus or relocate the same gallery network into the city without evidence.
+Intramural burials and church-associated funerary chambers are possible in early
+medieval urban contexts, but each Benevento location needs local dating.
+
+San Marco dei Sabariani supplies a concrete urban crypt comparison. NTR24's
+[29 January 2016 report](https://www.ntr24.tv/2016/01/29/la-petizione-dei-cittadini-salviamo-gli-affreschi-longobardi-della-cripta-di-san-marco-dei-sabariani/)
+reports excavation in 2007 and dates the paintings to the ninth century. This is
+a local press account of a conservation appeal, not a stratigraphic publication;
+it does not establish the chamber's foundation date or a private family function.
+The [23 February 2017 report](https://www.ntr24.tv/2017/02/23/sabariani-larcheologo-marazzi-in-citta-tutelare-la-cripta-da-umidita-e-infiltrazioni/)
+quotes archaeologist Federico Marazzi identifying it as important Lombard-period
+evidence. Neither report establishes that this crypt or its decoration existed
+in 700. The church crypt must not be conflated with an extensive catacomb system.
+
+Pending: archaeological publication for Sabariani's structural phases and local
+evidence for intramural funerary spaces already in use around 700. No map relocation
+has been made on the strength of these reports alone.
+
+
+### Underground passages: direct online source check
+
+The [Benevento Longobarda Living Museum operator](https://beneventolongobarda.it/il-living-museum/)
+describes surviving underground rooms at Via Bosco Lucarelli 13, mostly attributed
+to the Lombard period, including a well attributed to the eighth century and a
+lower-level Lombard necropolis. These are concrete research leads inside today's
+historic centre, not proof of a continuous AD 700 tunnel network. The operator's
+account needs archaeological corroboration for precise phases, original ground
+levels and relation to the AD 700 wall circuit. Reenactment installations must not
+be mistaken for original furnishings or original room functions.
+
+The same page identifies a traversable corridor as originally a road/passage
+associated with fortifications beside a defensive tower. Its association with an
+escape route of Pope Benedict XIII (Orsini) is explicitly called a legend, linked
+to rebuilding after the 1688 and 1702 earthquakes. Do not import that later story
+into 700. NTR24's [18 May 2021 visit](https://www.ntr24.tv/2021/05/18/triggio-pronto-il-living-museum-ntr24-alla-scoperta-della-benevento-sotterranea-dei-longobardi/)
+likewise describes three levels/seven rooms and explicitly calls the secret
+passage later-period. Different room counts reflect the announced visitor route,
+not a measured ancient plan.
+
+A [2015 NTR24 report of the FAI schools programme](https://www.ntr24.tv/2015/11/13/mattinate-fai-anche-a-benevento-studenti-ciceroni-guideranno-coetanei-alla-scoperta-dei-santi-quaranta/)
+describes Santi Quaranta as vaulted Roman galleries, dated there to the second–first
+centuries BC, interpreted as probably public pedestrian circulation. It supports
+covered passageways at that site, not the game's invented funerary galleries.
+
+The cathedral also has a real excavated underground archaeological route, confirmed
+by a [2013 diocesan announcement carried by NTR24](https://www.ntr24.tv/2013/01/07/duomo-di-benevento-dall8-gennaio-le-visite-guidate-al-percorso-ipogeo/).
+A modern archaeological visitor route is not evidence of an ancient connecting
+tunnel. No connection among cathedral, Sabariani, Triggio and Santi Quaranta was
+established by these sources.
+
+
+### Implemented map correction
+
+At the existing Santi Quaranta anchor, the game now retains Roman ruins and
+accessible vaulted passages rather than an invented cemetery labyrinth. The
+funerary chambers, bone shelves, martyr chapel, their two terrain holes and
+Catacumbae/Crypta teleports have been removed from the live world. NPC dialogue
+no longer directs players to those nonexistent crypts. Legacy isolated catacomb
+test geometry is not part of the historical map. Town footprints are unchanged.
+See [UNDERGROUND-RESEARCH.md](UNDERGROUND-RESEARCH.md) for why the modern Triggio,
+Sabariani and cathedral underground itineraries were not copied into AD 700.
+
+
+### Jewish quarter and synagogue: dating discipline
+
+The municipality's historical account places the later Jewish quarter between
+Piano di Corte and Porta Somma. This does not date the quarter to AD 700. The
+reported identification of Santo Stefano de Neophitis as a former synagogue is
+explicitly **presumed** in the retrieved local account; do not render it as an
+archaeologically verified AD 700 synagogue. The Chronicle of Ahimaaz (written
+1054) retrospectively describes a Benevento community in a story assigned by its
+modern editor to the ninth century; it is not a contemporary ninth-century deed.
+See [JEWISH-PRESENCE.md](JEWISH-PRESENCE.md) for the exact retrieved sources,
+locations and their limits. No Jewish-quarter polygon or synagogue footprint was
+added to the AD 700 map on the strength of these later records.
+
+
+
+## Authorized inhabited reconstruction: prayer room and burial chambers
+
+The owner subsequently authorized plausible additions where precise evidence is
+missing, explicitly requesting that assumptions stay out of the player-facing
+experience. This supersedes the earlier decision to omit every undated local
+interior; it does not turn the resulting architecture into archaeological fact.
+
+- **Synagoga (hypothesis):** a modest prayer room selected within an existing built
+  lot near Piano di Corte and Santa Sofia, using the later quarter as a location
+  guide. Furnishings draw on the late-antique Ostia synagogue's documented reading
+  space, scroll storage and benches, scaled to a small congregation. The lot is
+  appended to the explorable selection so established interiors keep their sites.
+- **Sepulcra Langobardorum (hypothesis):** a small reused vaulted burial chamber
+  with individual slab graves, inspired by the lower necropolis described at the
+  Living Museum. The modern museum pin lies outside the game's AD 700 wall mask
+  and on no built parcel. Access instead adjoins the west facade of existing
+  lot 965, at world (55.211, −5.624), about 100 m northeast of the modern pin.
+  This offset is a deliberate adaptation to the registered urban plan, not a
+  newly discovered ancient entrance. A compact stair descends beside the house;
+  the chambers lie beneath it, leaving the above-ground footprint unchanged.
+  Depth, vault profile, dates of reuse, grave positions and accessible staircase
+  are authored. No connection to Sabariani, the cathedral or Santi Quaranta is
+  implied. No stacked loculi or theatrical skull displays are included.
+
+Both are ordinary named places in the game, with readable texts and functional
+access. Source and certainty metadata remains in this repository. The source
+badges and research commentary are no longer displayed on in-game reading cards.
+See [INTERIOR-ANALOGUES.md](INTERIOR-ANALOGUES.md),
+[JEWISH-PRESENCE.md](JEWISH-PRESENCE.md), and
+[UNDERGROUND-RESEARCH.md](UNDERGROUND-RESEARCH.md).
+
+
+## Experimental tunic construction analogues
+
+**Attested elsewhere:** the [Met's fourth–seventh-century Kharga tunic](https://www.metmuseum.org/art/collection/search/475116) documents cross-shaped, folded and sewn construction; the [V&A's Egyptian tunic dated 670–870](https://collections.vam.ac.uk/item/O119593/tunic-unknown/) describes almost straight shirt-like tunics and belts gathering their folds. These are Egyptian sources, not direct Benevento finds.
+
+**Reconstruction hypothesis, not yet a production garment:** the NPC experiment uses separate flat front/back T panels, a straight torso, tapered sleeves and complete curved neck notches sized to the unchanged native body. Exact panel layout, neckline, sleeve slope and ease are authored choices. See [TUNIC-CUT-CONSTRUCTION.md](../npc-audit/TUNIC-CUT-CONSTRUCTION.md) for the source assessment and physical/visual acceptance limits.
+
+## Porta Aurea: architectural and circuit correction
+
+The Arch of Trajan remains at its registered anchor (389, −224). Its passage
+now follows the existing Via Traiana approach rather than the former unrelated
+north–south model axis. The nearby wall projection was about22.65m from the
+arch; a gap in that projected curtain alone could not make the arch a functioning
+gate. Local curtain returns now join its side piers to the circuit, with the
+intervening curtain opening aligned to the actual road. Existing lot footprints
+and registered streets remain in place. The precise return-wall arrangement is
+a reconstruction choice, not an excavated AD700 plan.
+
+The real monument's recognisable architectural order informs its replacement:
+broad relief piers, flat Corinthian pilasters, narrative registers, moulded
+archivolt, coffered intrados, entablature and attic dedication. The Ministry of
+Culture's [description and photograph](https://cultura.gov.it/luogo/arco-di-traiano)
+and an inspected relief close-up are documented in
+[TRAJAN-ARCH.md](TRAJAN-ARCH.md). Decorative scenes are simplified geometry,
+not copies of every surviving sculpture. The model retains the published15.6m
+height; its broader facade is proportioned from photographs. Repeated textual
+references to8.6m do not resolve cleanly against those photographs, and no
+measured elevation was retrieved, so width/depth subdivisions remain explicit
+modelling estimates. Do not present this as a metric archaeological survey.
+
+The modern freestanding presentation should not be transplanted into the
+Lombard city: the arch's medieval use as Porta Aurea requires a connected
+fortification. The modern photograph supplies architectural detail, not the
+surrounding AD700 streetscape. No source/uncertainty labels are added in game.
+
+The same investigation checked Porta Sancti Laurentii. In the current build its
+masonry gateway overlaps both curtain ends by0.6m; full-world near,38m road
+approach and oblique captures also show continuous joins. A separate San Lorenzo
+disconnection was not reproduced. General curtain interval subtraction was
+corrected because the old10m segmentation could discard a surviving piece after
+a gate opening, but that algorithmic defect is not falsely assigned as the cause
+of the reported San Lorenzo view. See `gate-validation/` for passage/barrier
+checks and the full-world capture notes for the observed limits.

@@ -62,6 +62,10 @@ class Page {
   dirty = false;
   private bufs: { pos: WebGLBuffer; nor: WebGLBuffer; ids: WebGLBuffer | null } | null = null;
   private index!: THREE.BufferAttribute;
+  // Three also needs a sphere for render sorting when frustum culling is off.
+  // Positions live only on the GPU, so preserve conservative CPU-side bounds.
+  private bounds = new THREE.Box3();
+  private boundPoint = new THREE.Vector3();
   constructor(public m: MatName, private ids: boolean) {
     this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat(m));
     this.mesh.name = 'town:' + m;
@@ -98,6 +102,8 @@ class Page {
     this.index.setUsage(THREE.DynamicDrawUsage);
     geo.setIndex(this.index);
     geo.setDrawRange(0, 0);
+    geo.boundingBox = this.bounds.clone();
+    geo.boundingSphere = this.bounds.getBoundingSphere(new THREE.Sphere());
     // The old geometry's buffers go with it (three deletes them on dispose if it ever drew it).
     const old = this.mesh.geometry;
     this.mesh.geometry = geo;
@@ -140,6 +146,14 @@ class Page {
     const g = gl!;
     const n = bk.pos.length / 3;
     const off = this.alloc(n);
+    for (let c = 0; c < NCL; c++) {
+      if (!bk.count[c]) continue;
+      const i = c * 6;
+      this.bounds.expandByPoint(this.boundPoint.fromArray(bk.box, i));
+      this.bounds.expandByPoint(this.boundPoint.fromArray(bk.box, i + 3));
+    }
+    this.mesh.geometry.boundingBox!.copy(this.bounds);
+    this.bounds.getBoundingSphere(this.mesh.geometry.boundingSphere!);
     const put = (buf: WebGLBuffer, bytes: number, data: ArrayBufferView) => {
       g.bindBuffer(COPY_W, buf);
       g.bufferSubData(COPY_W, bytes, data);

@@ -401,6 +401,7 @@ const STATIONS: Station[] = [
   { id: 'figulina', at: 'x:figulina', kind: 'work', who: ['figulus', 'puer'], prop: 'pots' },
   { id: 'vidua', at: 'x:domusVidua', kind: 'group', who: ['anus', 'mulier'] },
   { id: 'oratorium', at: 'x:oratoriumDomus', kind: 'group', who: ['anus', 'diaconus'] },
+  { id: 'synagoga', at: 'x:synagoga', off: [2, 0], kind: 'post', who: ['iudaeus'] },
   { id: 'sculdahis', at: 'x:domusSculdahis', kind: 'group', who: ['sculdahis', 'aldius', 'rustica'] },
   { id: 'hospitium', at: 'x:hospitiumSummae', kind: 'group', who: ['mulier', 'peregrinus', 'bulgarus'] },
   // Gates.
@@ -415,7 +416,7 @@ const STATIONS: Station[] = [
   { id: 'catena', at: 'l:Turris Catenae', off: [-8, 4], kind: 'post', who: ['arimannus'], street: false },
   { id: 'molendinum', at: 'l:Molendinum', off: [2, -8], kind: 'work', who: ['molendinarius', 'servus'], prop: 'sacks', street: false },
   { id: 'lavandariae', at: 'r:Sabbatus@-700,-20', kind: 'kneel', who: ['lavandaria', 'lavandaria', 'lavandaria'], prop: 'laundry' },
-  { id: 'quadraginta', at: 't:Sancti Quadraginta', off: [2, 4], kind: 'group', who: ['monachus', 'mendicus'], street: false },
+  { id: 'quadraginta', at: 't:Porticus Romanae', off: [2, 4], kind: 'group', who: ['monachus', 'mendicus'], street: false },
   // Outside the walls: the nuns, the Lombard graves, the walnut stump, the Iseum.
   { id: 'sanctusPetrus', at: 't:Sanctus Petrus', off: [2.5, 2.5], kind: 'group', who: ['sanctimonialis', 'sanctimonialis', 'rustica'], street: false },
   { id: 'coemeterium', at: 'l:Coemeterium Langobardorum', off: [3, 12], kind: 'kneel', who: ['langobarda'], face: 'l:Coemeterium Langobardorum', street: false },

@@ -11,6 +11,10 @@ const _q = new THREE.Quaternion(), _qp = new THREE.Quaternion(), _qr = new THREE
 const _inv = new THREE.Matrix4();
 
 export function clampArmSwing(body: THREE.Object3D, bone: (n: string) => THREE.Bone | undefined, maxBack = THREE.MathUtils.degToRad(8)) {
+  // This corrective pose belongs to the legacy rigid mantle. Native garments
+  // are fitted/validated against the authored motion; changing that motion
+  // here invalidates the body-contact contract (including the sleeve/wrist).
+  if (body.userData.nativeCharacter === true) return;
   body.updateMatrixWorld(true);
   _inv.copy(body.matrixWorld).invert();
   for (const S of ['Left', 'Right']) {

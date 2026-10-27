@@ -14,11 +14,11 @@ import type { OutfitV2 } from './kit';
 
 interface Link { bone: THREE.Bone; child: THREE.Object3D; rest: THREE.Quaternion; len: number; p: THREE.Vector3; q: THREE.Vector3; t: THREE.Vector3; tq: THREE.Vector3; h: THREE.Vector3 }
 interface Chain { links: Link[] }
-interface Ring { chains: Chain[]; closed: boolean; stiff: number; drag: number; side: number[][] }
+interface Ring { chains: Chain[]; levels: Link[][]; closed: boolean; stiff: number; drag: number; side: number[][] }
 interface Cap { a: THREE.Object3D; b: THREE.Object3D; r: number; pa: THREE.Vector3; pb: THREE.Vector3 }
 
 const SETS: Record<string, { stiff: number; drag: number; closed: boolean }> = {
-  long: { stiff: 0.12, drag: 0.25, closed: true }, short: { stiff: 0.2, drag: 0.3, closed: true }, cape: { stiff: 0.05, drag: 0.22, closed: false },
+  long: { stiff: 0.12, drag: 0.25, closed: true }, short: { stiff: 0.2, drag: 0.3, closed: true }, cape: { stiff: 0.30, drag: 0.35, closed: false },
 };
 
 const _d = new THREE.Vector3(), _e = new THREE.Vector3(), _v = new THREE.Vector3(), _w = new THREE.Vector3();
@@ -79,7 +79,9 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
       const o = chains[k];
       return j < o.links.length ? tip(c, j).distanceTo(tip(o, j)) : -1;
     }));
-    rings.push({ chains, closed: S.closed, stiff: S.stiff, drag: S.drag, side });
+    const depth = Math.max(...chains.map((c) => c.links.length));
+    const levels = Array.from({ length: depth }, (_, j) => chains.map((c) => c.links[j]).filter(Boolean));
+    rings.push({ chains, levels, closed: S.closed, stiff: S.stiff, drag: S.drag, side });
   }
   if (!rings.length) return null;
   const B = (n: string) => bone(n)!;
@@ -89,10 +91,13 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
     cap('LeftLeg', 'LeftFoot', 0.08), cap('RightLeg', 'RightFoot', 0.08),
     cap('LeftUpLeg', 'RightUpLeg', 0.1), cap('Hips', 'Spine1', 0.13), cap('Spine1', 'Neck', 0.13),
     cap('LeftShoulder', 'LeftArm', 0.08), cap('RightShoulder', 'RightArm', 0.08),
-    cap('LeftArm', 'LeftForeArm', 0.1), cap('RightArm', 'RightForeArm', 0.1),
-    cap('LeftForeArm', 'LeftHand', 0.08), cap('RightForeArm', 'RightHand', 0.08),
+    // Fitted sleeves are ~6 cm at the elbow and taper to a 4 cm cuff.
+    // The previous 10/8 cm capsules inflated the mantle around invisible
+    // armour-sized arms, producing a sail even during a quiet walk.
+    cap('LeftArm', 'LeftForeArm', 0.075), cap('RightArm', 'RightForeArm', 0.075),
+    cap('LeftForeArm', 'LeftHand', 0.055), cap('RightForeArm', 'RightHand', 0.055),
   ];
-  let fresh = true, resting = false;
+  let fresh = true, resting = false, previousDt = 1 / 60;
   const g = new THREE.Vector3(0, -9.8, 0);
   /** Back to the plain hang (far from the camera), once. */
   const rest = () => {
@@ -101,17 +106,20 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
     fresh = true;
     for (const R of rings) for (const c of R.chains) for (const L of c.links) L.bone.quaternion.copy(L.rest);
   };
-  const update = (dt: number) => {
+  const advance = (dt: number) => {
     resting = false;
-    dt = Math.min(Math.max(dt, 1e-3), 1 / 15);
+    // Coefficients below describe a 60 Hz step. Verlet velocity is a
+    // displacement, so changes in frame duration must scale it as well as
+    // gravity. The caller bounds each step for stability at low frame rates.
+    const step = dt * 60, velocityScale = dt / previousDt;
     body.updateMatrixWorld(true);
     for (const c of caps) { c.pa.setFromMatrixPosition(c.a.matrixWorld); c.pb.setFromMatrixPosition(c.b.matrixWorld); }
     const s = body.getWorldScale(_v).x || scale;
     const grav = _e.copy(g).multiplyScalar(s * dt * dt * 0.3);
     for (const R of rings) {
-      const depth = Math.max(...R.chains.map((c) => c.links.length));
-      for (let j = 0; j < depth; j++) {
-        const lv = R.chains.map((c) => c.links[j]).filter(Boolean);
+      const drag = Math.pow(1 - R.drag, step), stiffness = R.stiff * step * step;
+      for (let j = 0; j < R.levels.length; j++) {
+        const lv = R.levels[j];
         for (const L of lv) {
           L.bone.quaternion.copy(L.rest);
           own(L.bone);
@@ -120,9 +128,11 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
           L.t.copy(L.child.position).applyMatrix4(L.bone.matrixWorld);
           if (fresh || L.p.distanceToSquared(L.t) > 1) { L.p.copy(L.t); L.q.copy(L.t); L.tq.copy(L.t); }
           // Velocity relative to the hang's own motion, damped.
-          _d.copy(L.p).sub(L.q).sub(_w.copy(L.t).sub(L.tq)).multiplyScalar(1 - R.drag);
+          _d.copy(L.p).sub(L.q).multiplyScalar(velocityScale).sub(_w.copy(L.t).sub(L.tq)).multiplyScalar(drag);
           L.q.copy(L.p);
-          L.p.add(_w).add(_d).add(grav).addScaledVector(_v.copy(L.t).sub(L.p), R.stiff);
+          L.p.add(_w);
+          _v.copy(L.t).sub(L.p).multiplyScalar(stiffness);
+          L.p.add(_d).add(grav).add(_v);
         }
         // Neighbours kept apart (and together) as at rest; then out of the body; then each at its length.
         for (let it = 0; it < 2; it++) {
@@ -158,6 +168,15 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
       }
     }
     fresh = false;
+    previousDt = dt;
+  };
+  const update = (dt: number) => {
+    if (!Number.isFinite(dt) || dt <= 0) return;
+    // Do not freeze cloth on a 15–20 FPS phone. Use at most three bounded
+    // steps; after a suspended tab or a long stall discard stale inertia.
+    if (dt > 0.25) fresh = true;
+    const elapsed = Math.min(dt, 0.1), steps = Math.ceil(elapsed * 30);
+    for (let i = 0; i < steps; i++) advance(elapsed / steps);
   };
   return { update, rest };
 }

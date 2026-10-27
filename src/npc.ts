@@ -16,6 +16,8 @@ import { loadV2, kitsV2, bodiesV2, outfitV2, type OutfitV2 } from './npc2/kit';
 import { dressV2 } from './npc2/dress';
 import { makeSprings } from './npc2/springs';
 import { clampArmSwing } from './npc2/arms';
+import { makeGarmentClearance } from './npc2/clearance';
+import { makeBlink } from './npc/expression';
 
 /** Townsfolk v2 (src/npc2): MakeHuman bodies in modelled garments, the default; `?npc=v1` for the older bodies. */
 export const NPC_V2 = typeof location !== 'undefined' && new URLSearchParams(location.search).get('npc') !== 'v1';
@@ -139,7 +141,7 @@ export function loadNpcAssets(): Promise<void> {
       kits![id] = { id, sex, template: t, motion: retarget(t, ual), m, scale: height / (top || 1.8) };
     });
     if (NPC_V2) {
-      await loadV2(get, ual);
+      await loadV2(get, ual, await get(DIR + 'walk-cmu.json'));
       for (const [id, k] of kitsV2) (kits as Record<string, KitData>)[id] = k as unknown as KitData;
     }
     npcDebug.buildMs.retarget = performance.now() - t0;
@@ -287,6 +289,7 @@ export class Person {
   private bones = new Map<string, THREE.Bone>();
   private kit: KitData;
   private swing: (() => void) | null;
+  private blink: ReturnType<typeof makeBlink> = null;
   /** A woman's load: a jar balanced on the head, or a basket over the right forearm. */
   private load: { jar: THREE.Object3D | null; jarQ: THREE.Quaternion; basket: boolean } = { jar: null, jarQ: new THREE.Quaternion(), basket: false };
 
@@ -307,7 +310,7 @@ export class Person {
     this.name = persona.name ?? pick(rnd, NAMES[role]);
     this.lines = persona.lines ?? LINES[role];
     this.title = persona.title ?? TITLE[role];
-    if (persona.headScale) this.bones.get('Head')?.scale.setScalar(persona.headScale);
+    if (persona.headScale && !this.body.userData.nativeCharacter) this.bones.get('Head')?.scale.setScalar(persona.headScale);
     this.line = Math.floor(rnd() * this.lines.length);
 
     // Skin, within what a Lombard town held: from fair (Lombards, some
@@ -415,12 +418,15 @@ export class Person {
     }));
 
     this.equip(gear);
+    if (this.body.userData.nativeCharacter) this.garmentClearance = makeGarmentClearance(this.body, this.bones);
+    if (this.body.userData.nativeCharacter) this.blink = makeBlink(this.body, rnd);
   }
   walkSpeed = 1.2;
   /** v2: the cloth bones' spring update (src/npc2/springs.ts), and the time it steps. */
   private springs: ReturnType<typeof makeSprings> = null;
   /** v2: wears a cloak, so carries the arms close (src/npc2/arms.ts). */
   private cloaked = false;
+  private garmentClearance: ReturnType<typeof makeGarmentClearance> = null;
   private springDt = 0;
   /** Half the width of a bucket or basket a peasant carries (0: none). */
   carryHalf = 0;
@@ -446,6 +452,16 @@ export class Person {
   }
   private holdLantern() {
     const G = this.grip!;
+    if (this.body.userData.nativeCharacter) {
+      // Native rigs retain their authored bone frames. Derive the palm frame
+      // from anatomical knuckles in reach(), never from local X/Y axes.
+      const orientation = this.group.getWorldQuaternion(new THREE.Quaternion());
+      const along = G.palm.clone().applyQuaternion(orientation).normalize();
+      const across = new THREE.Vector3(1, 0, 0).applyQuaternion(orientation);
+      across.addScaledVector(along, -across.dot(along)).normalize();
+      this.reach('Right', this.group.localToWorld(G.wrist.clone()), G.pole.clone().applyQuaternion(orientation), along, across, 1);
+      return;
+    }
     // Two-bone IK in his own frame, not his chest's: whatever the torso does, the lantern is held out ahead, clear of the robe.
     const C = _gq.copy(this.group.quaternion);
     const medial = _gx.set(1, 0, 0).applyQuaternion(C);
@@ -649,7 +665,23 @@ export class Person {
     kl.addScaledVector(fl, -kl.dot(fl)).normalize();
     const Ml = new THREE.Matrix4().makeBasis(fl, kl, fl.clone().cross(kl));
     const Mw = new THREE.Matrix4().makeBasis(F, K, F.clone().cross(K));
-    turn(hand, hand.getWorldQuaternion(_q3).slerp(new THREE.Quaternion().setFromRotationMatrix(Mw.multiply(Ml.transpose())), k).clone());
+    const handGoal = hand.getWorldQuaternion(new THREE.Quaternion()).slerp(new THREE.Quaternion().setFromRotationMatrix(Mw.multiply(Ml.transpose())), k);
+    // Share grip pronation with the forearm instead of wringing the wrist.
+    // Rotating around the elbow-to-wrist axis preserves the IK endpoint.
+    // This is the same separation of axial twist from the end-effector's
+    // orientation used by twist-correction rigs (Unity Animation Rigging).
+    const axis = hand.getWorldPosition(new THREE.Vector3()).sub(fore.getWorldPosition(new THREE.Vector3())).normalize();
+    const currentAcross = kl.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()));
+    const goalAcross = kl.clone().applyQuaternion(handGoal);
+    currentAcross.addScaledVector(axis, -currentAcross.dot(axis));
+    goalAcross.addScaledVector(axis, -goalAcross.dot(axis));
+    if (currentAcross.lengthSq() > 1e-6 && goalAcross.lengthSq() > 1e-6) {
+      currentAcross.normalize(); goalAcross.normalize();
+      const roll = Math.atan2(axis.dot(currentAcross.clone().cross(goalAcross)), currentAcross.dot(goalAcross));
+      const shared = THREE.MathUtils.clamp(roll * 0.75, -1.4, 1.4);
+      turn(fore, new THREE.Quaternion().setFromAxisAngle(axis, shared).multiply(fore.getWorldQuaternion(new THREE.Quaternion())));
+    }
+    turn(hand, handGoal);
     // Fingers closed (towards the palm) round what it holds.
     const sgn = side === 'Right' ? 1 : -1;
     const kw = B('HandIndex1').getWorldPosition(new THREE.Vector3()).sub(B('HandPinky1').getWorldPosition(_v)).normalize();
@@ -736,12 +768,17 @@ export class Person {
     for (const h of this.held) h.obj.visible = v;
   }
 
+  // Keep the authored pose separate from IK, gaze and cloth corrections.
+  // PropertyMixer skips writes for unchanged samples; without restoring these
+  // values an additive gaze/IK correction can be applied repeatedly to itself.
+  private animationPose: { bone: THREE.Bone; rotation: THREE.Quaternion; position: THREE.Vector3 | null }[] | null = null;
+
   /** Blend towards the wanted clip weights and advance the animation. */
   animate(dt: number, every: number, lookAt: THREE.Vector3 | null, ground?: (x: number, z: number) => number) {
     let dy = this.yaw - this.lastYaw;
     dy = Math.atan2(Math.sin(dy), Math.cos(dy));
     this.lastYaw = this.yaw;
-    this.yawRate += (Math.abs(dy) / Math.max(dt, 1e-4) - this.yawRate) * Math.min(1, dt * 8);
+    this.yawRate = THREE.MathUtils.damp(this.yawRate, Math.abs(dy) / Math.max(dt, 1e-4), 8, dt);
     // Setting off from standing: from the step where one foot is planted
     // under the body and the other passes it.
     if (this.w.walk === 0 && this.want.walk > 0) this.acts.walk.time = this.walkStart;
@@ -751,7 +788,7 @@ export class Person {
     let sum = 0;
     const rate = this.want.walk > 0 || this.w.walk > 0.01 ? 8 : 4;
     for (const n of ANIMS) {
-      this.w[n] += (this.want[n] - this.w[n]) * Math.min(1, dt * rate);
+      this.w[n] = THREE.MathUtils.damp(this.w[n], this.want[n], rate, dt);
       if (this.w[n] < 0.002) this.w[n] = 0;
       sum += this.w[n];
     }
@@ -765,7 +802,24 @@ export class Person {
     this.group.rotation.set(0, this.yaw, 0);
     this.animAcc += dt;
     if (++this.tick % every !== 0) return false;
+    if (!this.animationPose) {
+      const animated = new Set(this.acts.idle.getClip().tracks
+        .filter((track) => track.name.endsWith('.quaternion'))
+        .map((track) => canon(track.name.slice(0, -'.quaternion'.length))));
+      this.animationPose = [...this.bones].filter(([name]) => animated.has(name)).map(([name, bone]) => ({
+        bone, rotation: bone.quaternion.clone(), position: name === 'Hips' ? bone.position.clone() : null,
+      }));
+    }
+    for (const pose of this.animationPose) {
+      pose.bone.quaternion.copy(pose.rotation);
+      if (pose.position) pose.bone.position.copy(pose.position);
+    }
     this.mixer.update(this.animAcc);
+    this.blink?.(this.animAcc);
+    for (const pose of this.animationPose) {
+      pose.rotation.copy(pose.bone.quaternion);
+      if (pose.position) pose.position.copy(pose.bone.position);
+    }
     this.plant(this.animAcc, ground);
     this.springDt = this.animAcc;
     this.animAcc = 0;
@@ -774,6 +828,10 @@ export class Person {
       _sv.copy(k.leg.position).applyQuaternion(k.up.quaternion).normalize();
       k.bone.quaternion.setFromUnitVectors(k.bind, _sv).multiply(k.rest);
     }
+    // Legacy rigid mantles constrain free swing; native bodies bypass the limiter.
+    // Keep this before contact poses so gear IK wins.
+    if (this.cloaked && this.dist < 30) clampArmSwing(this.body, (n) => this.bones.get(n));
+    if (this.dist < 30) this.garmentClearance?.(THREE.MathUtils.clamp(this.w.walk ?? 0, 0, 1));
     if (this.grip) this.holdLantern();
     if (this.spear || this.leftGrip) this.holdGear();
     if (this.skirt) this.swingSkirt();
@@ -787,7 +845,7 @@ export class Person {
     }
     // A veil is pinned at the shoulders: she turns her body sooner than wring her neck in it.
     if (this.role === 'woman') target = THREE.MathUtils.clamp(target, -0.6, 0.6);
-    this.look.yaw += (target - this.look.yaw) * Math.min(1, dt * every * 3);
+    this.look.yaw = THREE.MathUtils.damp(this.look.yaw, target, 3, this.springDt);
     if (Math.abs(this.look.yaw) > 0.01) {
       for (const [n, f] of [['Neck', 0.4], ['Head', 0.6]] as const) {
         const b = this.bones.get(n);
@@ -801,7 +859,6 @@ export class Person {
     if (this.load.jar || this.load.basket) this.poseLoad();
     if (this.carryHalf && this.role === 'peasant') this.holdOut();
     this.swing?.();
-    if (this.cloaked && this.dist < 30) clampArmSwing(this.body, (n) => this.bones.get(n));
     if (this.springs) {
       // Cloth bones swing only near the camera (npcDebug.springDist); further off they hang still.
       const t0 = performance.now();
@@ -877,8 +934,16 @@ export class Person {
    */
   private aim(name: string, child: string, dir: THREE.Vector3, k = 1) {
     const b = this.bones.get(name), c = this.bones.get(child);
-    if (!b || !c) return;
-    const cur = c.getWorldPosition(_v3).sub(b.getWorldPosition(_v2)).normalize();
+    if (!b) return;
+    let cur: THREE.Vector3;
+    if (c) cur = c.getWorldPosition(_v3).sub(b.getWorldPosition(_v2)).normalize();
+    else if (name === 'Head' && child === 'HeadTop_End') {
+      // Native rigs need no artificial crown bone. Transform the measured
+      // crown direction from the original bind frame through the current head.
+      const bindRotation = new THREE.Quaternion().setFromRotationMatrix(this.bindOf(name));
+      cur = _v3.copy(this.outfit.m.bone(child)).sub(this.outfit.m.bone(name)).normalize()
+        .applyQuaternion(bindRotation.invert()).applyQuaternion(b.getWorldQuaternion(_q));
+    } else return;
     _q2.setFromUnitVectors(cur, dir);
     if (k < 1) _q2.slerp(_q.identity(), 1 - k);
     b.parent!.getWorldQuaternion(_q);

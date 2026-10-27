@@ -204,14 +204,16 @@ vec4 ntGet(sampler2D s, NT t, float w){
 
 // One planar projection of a full set.
 struct Smp { vec3 a; vec3 n; vec3 m; };
-Smp sampleSet(sampler2D A, sampler2D Nm, sampler2D M, vec2 uv){
-  NT t = ntSetup(uv);
-  float w = smoothstep(0.3, 0.7, t.f);
+Smp sampleSetNT(sampler2D A, sampler2D Nm, sampler2D M, NT t, float w){
   Smp s;
   s.a = ntGet(A, t, w).rgb;
   s.n = ntGet(Nm, t, w).xyz * 2.0 - 1.0;
   s.m = ntGet(M, t, w).rgb;
   return s;
+}
+Smp sampleSet(sampler2D A, sampler2D Nm, sampler2D M, vec2 uv){
+  NT t = ntSetup(uv);
+  return sampleSetNT(A, Nm, M, t, smoothstep(0.3, 0.7, t.f));
 }
 
 #ifdef TILE
@@ -347,6 +349,13 @@ Surf surface(vec3 p, vec3 n){
   s.rough = POROUS(t.m.g * ROUGH_K);
   s.nrm = normalize(n + t.n * NRM_K);
   s.h = t.m.b;
+  #if MAT == 21
+    // Carved relief already has geometric depth. The generic masonry scan's
+    // deep pits must not overwhelm faces, letters and fine Corinthian mouldings.
+    s.alb = mix(vec3(0.52, 0.49, 0.44), s.alb, 0.35);
+    s.ao = mix(1.0, s.ao, 0.30);
+    s.h = mix(0.62, s.h, 0.25);
+  #endif
   #if MAT == 2
   {
     // Decaying render: patches (a metre or two across, more of them low on
@@ -401,9 +410,15 @@ Surf surface(vec3 p, vec3 n){
   vec3 a = vec3(0.0), nn = vec3(0.0), m = vec3(0.0);
   float wsum = 0.0;
   if (cob > 0.01) {
-    float hc = texture2D(tM, uv / TILE).b;
+    // Height and visible stones must use the same anti-tiling transforms.
+    // Keep the region/weight and mip gradients fixed while offsetting UVs:
+    // parallax shifts the stone surface without changing its random tile selection.
+    NT ct = ntSetup(uv / TILE);
+    float cw = smoothstep(0.3, 0.7, ct.f);
+    float hc = ntGet(tM, ct, cw).b;
     vec2 off = -vd.xz / max(vd.y, 0.3) * (hc - 0.5) * 0.03 * near;
-    Smp c = sampleSet(tA, tN, tM, (uv + off) / TILE);
+    ct.uv += off / TILE;
+    Smp c = sampleSetNT(tA, tN, tM, ct, cw);
     // The scan's stones are warm; pull them towards grey river limestone.
     vec3 g = vec3(dot(c.a, vec3(0.3, 0.55, 0.15)));
     c.a = mix(c.a, g * vec3(1.02, 1.0, 0.95), 0.55);

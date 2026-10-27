@@ -4,8 +4,8 @@ import { LORE, VIPER_TRAIL, type Lore } from './lore';
 
 // Reading what the town has to say: walk up to an inscription, a scrap of
 // writing or a relic and a button offers to read it (or press E). The card
-// shows the text as written, a translation, where it comes from and whether
-// it is a real text, a paraphrase, an invention in period style or a legend.
+// shows the text as written and its translation. Sources and reconstruction
+// status remain in lore metadata and development notes, outside the game UI.
 // What you have found is remembered (in this browser only) and the map can
 // mark it.
 
@@ -40,8 +40,6 @@ function ui() {
   #lorecard .latin { font-family: 'Cardo', 'IM Fell English', Georgia, serif; font-size: 18px; line-height: 1.45; white-space: pre-wrap; margin: 0 0 14px; letter-spacing: 0.02em; }
   #lorecard .latin.ins { text-transform: uppercase; letter-spacing: 0.12em; font-size: 16px; }
   #lorecard .eng { font-size: 16px; line-height: 1.5; margin: 0 0 12px; }
-  #lorecard .src { font-size: 13px; font-style: italic; opacity: 0.8; margin: 0; }
-  #lorecard .tag { display: inline-block; font-size: 12px; padding: 1px 8px; margin-left: 8px; border: 1px solid rgba(90,26,12,0.5); border-radius: 10px; vertical-align: 3px; }
   #lorecard .trail { margin-top: 12px; font-size: 14px; color: #5a1a0c; }
   #lorecard button { position: absolute; top: 8px; right: 10px; border: 0; background: none; font-size: 26px; color: #5a1a0c; cursor: pointer; min-width: 44px; min-height: 44px; }`;
   document.head.appendChild(style);
@@ -62,7 +60,6 @@ function ui() {
   });
 }
 
-const STATUS: Record<string, string> = { attested: 'real text', paraphrase: 'retold from a source', style: 'invented, in period style', legend: 'legend' };
 function show(l: Lore) {
   if (!card) return;
   open = true;
@@ -71,10 +68,10 @@ function show(l: Lore) {
   const t = VIPER_TRAIL.indexOf(l.id);
   const trail = t >= 0 ? `<p class="trail">The golden viper: ${VIPER_TRAIL.filter((id) => found.has(id)).length} of ${VIPER_TRAIL.length} found.</p>` : '';
   card.innerHTML = `<div class="sheet" role="dialog" aria-label="${esc(l.title)}"><button aria-label="Close">×</button>
-    <h2>${esc(l.title)}<span class="tag">${STATUS[l.status]}</span></h2>
-    <p class="latin ${l.kind === 'inscription' || l.kind === 'graffito' ? 'ins' : ''}">${esc(l.latin)}</p>
+    <h2>${esc(l.title)}</h2>
+    <p lang="${l.language ?? (l.greek ? 'el' : 'la')}" dir="${l.language === 'he' ? 'rtl' : 'ltr'}" class="latin ${l.kind === 'inscription' || l.kind === 'graffito' ? 'ins' : ''}">${esc(l.latin)}</p>
     <p class="eng">${esc(l.english)}</p>
-    <p class="src">${esc(l.source)}</p>${trail}</div>`;
+    ${trail}</div>`;
   card.classList.add('open');
   if (document.pointerLockElement) document.exitPointerLock();
 }

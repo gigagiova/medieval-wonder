@@ -42,44 +42,8 @@ function vault(b: Builder, m: MatName, len: number, r: number, x: number, y: num
   b.geo(m, g, x, y, z, ry, false);
 }
 
-// ---------------------------------------------------------------- Arch of Trajan (Porta Aurea)
-/** Passage along local z; the countryside (Via Traiana) is +z. */
-export function arcusTraiani(b: Builder) {
-  seed(114);
-  const W = 8.6, D = 6.0, OW = 5.0, SP = 5.6, H = 11.4;
-  b.geo('marble', arcadeGeo(W, H, D, 1, OW, SP), 0, -0.2, 0, 0);
-  archRings(b, 'marble', 0, -0.2, 0, 0, D, OW, SP, 0.55, 0.36);
-  for (const sz of [-1, 1]) {
-    const fz = sz * (D / 2 + 0.35);
-    // Pedestals, engaged columns, capitals: two each side of the passage.
-    for (const x of [-(W / 2 - 0.62), -(OW / 2 + 0.66), OW / 2 + 0.66, W / 2 - 0.62]) {
-      b.box('marble', 1.15, 2.4, 0.8, x, -0.2, sz * (D / 2 + 0.3));
-      const shaft = new THREE.CylinderGeometry(0.36, 0.4, 6.6, 14, 6, false, sz > 0 ? -Math.PI / 2 : Math.PI / 2, Math.PI);
-      b.geo('marble', shaft, x, 2.2 + 3.3, fz - sz * 0.35, 0, false);
-      b.box('marble', 1.0, 0.75, 0.55, x, 8.8, fz - sz * 0.05, 0, false);
-    }
-    // Relief panels in two registers on the piers, and the long frieze.
-    for (const x of [-(W / 2 + OW / 2) / 2, (W / 2 + OW / 2) / 2]) {
-      b.box('marble', 1.15, 2.2, 0.12, x, 2.6, sz * (D / 2 + 0.03), 0, false);
-      b.box('marble', 1.15, 2.2, 0.12, x, 5.8, sz * (D / 2 + 0.03), 0, false);
-      b.box('slab', 1.0, 0.18, 0.14, x, 5.2, sz * (D / 2 + 0.05), 0, false);
-    }
-    b.box('marble', W - 0.4, 0.75, 0.14, 0, 8.9, sz * (D / 2 + 0.04), 0, false);
-    // The attic and its inscription.
-    b.box('slab', 4.3, 2.7, 0.12, 0, 12.0, sz * (D / 2 - 0.25), 0, false);
-  }
-  // Entablature: architrave, frieze, cornice in steps.
-  b.box('marble', W + 0.25, 0.6, D + 0.6, 0, H - 0.1, 0);
-  b.box('marble', W + 0.55, 0.4, D + 0.9, 0, H + 0.5, 0, 0, false);
-  b.box('marble', W - 0.2, 3.6, D - 0.5, 0, H + 0.9, 0);
-  b.box('marble', W + 0.1, 0.35, D - 0.2, 0, H + 4.45, 0, 0, false);
-  markReadable('arcusInscriptio', 0, 12.6, -(D / 2 - 0.1));
-  markReadable('arcusInscriptio', 0, 12.6, D / 2 - 0.1);
-  // A Lombard brazier keeps the gate; a niche shrine scratched into the pier.
-  brazier(b, -3.4, -6.5);
-  torch(b, -(W / 2 + 0.1), 3.2, -(D / 2) + 0.6, -Math.PI / 2);
-  markReadable('sesualdus', W / 2 + 0.2, 1.6, -D / 2 - 0.3);
-}
+// Architectural model lives separately from the other monuments.
+export { arcusTraiani } from './arcus-traiani';
 
 // ---------------------------------------------------------------- Arch "del Sacramento" (a gate)
 /** Passage along local z. Brick core, its marble long since prised away. */

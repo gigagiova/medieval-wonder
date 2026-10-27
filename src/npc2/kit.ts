@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { canon, mixamoFrames, retarget, type Motion } from '../npc/rig';
+import { canon, mixamoFrames, retarget, withAtmos, type Motion } from '../npc/rig';
 import { measure, type Garment, type Measure } from '../npc/garment';
 import { skinMaterial } from '../npc/scan';
 
@@ -18,6 +18,8 @@ import { skinMaterial } from '../npc/scan';
 export type Sex = 'man' | 'woman';
 export interface BodyMeta {
   body: string; sex: Sex; height: number;
+  /** Coherent native anatomy and authored skin; preserve bone axes and binds. */
+  nativeCharacter?: boolean;
   garments: Record<string, { fabric: string; layer: string; depth: number; map?: 'detail' | 'color' }>;
   outfits: Record<string, { garments: string[]; bit: number }>;
 }
@@ -42,24 +44,46 @@ export const BODIES_V2: { id: string; sex: Sex }[] = [
 export const kitsV2 = new Map<string, KitV2>();
 
 /** Load the v2 bodies (after the UAL clips): retarget each, measure it. */
-export async function loadV2(get: (u: string) => Promise<GLTF>, ual: GLTF) {
+export async function loadV2(get: (u: string) => Promise<GLTF>, ual: GLTF, walkSource?: GLTF) {
   const got = await Promise.all(BODIES_V2.map((b) => get(DIR + b.id + '.json').then((g) => [b, g] as const).catch((e) => { console.warn('npc2', b.id, e); return null; })));
   for (const r of got) {
     if (!r) continue;
     const [b, g] = r;
     const t = g.scene;
-    const meta = JSON.parse((g.scene.userData.npc2 ?? (g.parser.json.scenes?.[0]?.extras?.npc2) ?? '{}') as string) as BodyMeta;
-    prep(t);
-    mixamoFrames(t);
+    const encoded = g.scene.userData.npc2 ?? g.parser.json.scenes?.[0]?.extras?.npc2 ?? {};
+    const meta = (typeof encoded === 'string' ? JSON.parse(encoded) : encoded) as BodyMeta;
+    const native = meta.nativeCharacter === true || g.scene.userData.nativeCharacter === true;
+    t.userData.nativeCharacter = native;
+    prep(t, native);
+    if (!native) mixamoFrames(t);
     t.updateMatrixWorld(true);
-    let top = 0;
-    t.traverse((o) => { if (canon(o.name) === 'HeadTop_End') top = o.getWorldPosition(new THREE.Vector3()).y; });
-    kitsV2.set(b.id, { id: b.id, sex: b.sex, template: t, motion: retarget(t, ual), m: measureBody(t), scale: (meta.height || 1.7) / (top || 1.8), meta });
+    let top = native ? Number(g.scene.userData.nativeHeight ?? 0) : 0;
+    t.traverse((o) => { if (!native && canon(o.name) === 'HeadTop_End') top = o.getWorldPosition(new THREE.Vector3()).y; });
+    if (native && !(top > 0)) top = new THREE.Box3().setFromObject(t).getSize(new THREE.Vector3()).y;
+    const options = { preserveSpine: native };
+    const motion = retarget(t, ual, walkSource ? ['idle', 'talk', 'bless', 'kneel', 'pickup', 'interact'] : undefined, options);
+    if (walkSource) {
+      const walk = retarget(t, walkSource, ['walk', 'walkFormal'], options);
+      // CMU captures body motion, not individual fingers. Keep the relaxed
+      // authored idle hand rather than blending uncovered fingers to T-pose.
+      const fingers = /Hand(?:Thumb|Index|Middle|Ring|Pinky)\d\.quaternion$/;
+      for (const clip of Object.values(walk.clips)) {
+        clip.tracks = clip.tracks.filter((track) => !fingers.test(track.name));
+        for (const track of motion.clips.idle.tracks.filter((track) => fingers.test(track.name))) {
+          const q = Array.from(track.values.slice(0, 4));
+          clip.tracks.push(new THREE.QuaternionKeyframeTrack(track.name, [0, clip.duration], [...q, ...q]));
+        }
+      }
+      Object.assign(motion.clips, walk.clips);
+      motion.speed = walk.speed;
+      motion.start = walk.start;
+    }
+    kitsV2.set(b.id, { id: b.id, sex: b.sex, template: t, motion, m: measureBody(t), scale: (meta.height || (native ? top : 1.7)) / (top || 1.8), meta });
   }
 }
 
 /** Mesh roles by name; the rest pose kept as `rest`/`restN` for the fabric shader. */
-function prep(t: THREE.Object3D) {
+function prep(t: THREE.Object3D, native: boolean) {
   t.traverse((o) => {
     const m = o as THREE.SkinnedMesh;
     if (!m.isSkinnedMesh) return;
@@ -67,14 +91,26 @@ function prep(t: THREE.Object3D) {
     m.castShadow = false;
     // (A mesh of several materials loads as a group of meshes, named after it.)
     const n = /^G_|body|eye|low-poly/i.test(m.name) ? m.name : m.parent?.name ?? m.name;
-    m.userData.npc2 = /^G_/.test(n) ? 'garment' : /body/.test(n) ? 'body' : /eye|low-poly/i.test(n) ? 'eyes' : 'part';
+    const nativePart = m.userData.nativePart ?? m.parent?.userData.nativePart;
+    m.userData.npc2 = nativePart === 'skin' ? 'body' : nativePart === 'eyes' ? 'eyes' : /^G_/.test(n) ? 'garment' : /body/.test(n) ? 'body' : /eye|low-poly/i.test(n) ? 'eyes' : 'part';
+    if (native && m.userData.npc2 !== 'garment') {
+      // Native skin, eyes and hair already have their authored UVs/materials.
+      // Only add the game's atmosphere: no scan pores, beard paint or tint.
+      const prepare = (material: THREE.Material) => {
+        const mat = material.clone() as THREE.MeshStandardMaterial;
+        if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
+        return withAtmos(mat);
+      };
+      m.material = Array.isArray(m.material) ? m.material.map(prepare) : prepare(m.material);
+      return;
+    }
     if (m.userData.npc2 === 'eyes') {
       // Wet, a little shadowed by the lids: a soft highlight, the whites not paper-white.
       const src = m.material as THREE.MeshStandardMaterial;
       if (src.map) src.map.colorSpace = THREE.SRGBColorSpace;
       m.material = new THREE.MeshStandardMaterial({ map: src.map, color: 0xc8beb4, roughness: 0.18, metalness: 0 });
     }
-    if (m.userData.npc2 === 'garment') { m.userData.garment = n.replace(/^G_/, '').replace(/_\d+$/, ''); outward(m.geometry); }
+    if (m.userData.npc2 === 'garment') { m.userData.garment = n.replace(/^G_/, '').replace(/_\d+$/, ''); if (!native) outward(m.geometry); }
     if (m.userData.npc2 === 'body') {
       // Skin: npc.ts tints it per person and gives it the soft wrapped light of skin (withAtmos).
       // The same skin shading as the scanned v1 bodies (src/npc/scan.ts): pores, wrapped light, matte.
@@ -158,16 +194,18 @@ export function outfitV2(id: string, body: string): OutfitV2 {
     if (m.userData.npc2 === 'garment' && !of.garments.includes(m.userData.garment)) { drop.push(m); return; }
     // Triangles all of whose corners this outfit hides.
     const h = m.geometry.getAttribute('_hide');
-    if (!h) return;
+    if (!h && m.userData.npc2 !== 'garment') return;
     const g = m.geometry.clone();
-    const ix = g.index!, keep: number[] = [];
-    const hid = (i: number) => (Math.round(h.getX(i)) >> of.bit) & 1;
-    for (let i = 0; i < ix.count; i += 3) {
-      const a = ix.getX(i), b = ix.getX(i + 1), c = ix.getX(i + 2);
-      if (!(hid(a) && hid(b) && hid(c))) keep.push(a, b, c);
+    if (h) {
+      const ix = g.index!, keep: number[] = [];
+      const hid = (i: number) => (Math.round(h.getX(i)) >> of.bit) & 1;
+      for (let i = 0; i < ix.count; i += 3) {
+        const a = ix.getX(i), b = ix.getX(i + 1), c = ix.getX(i + 2);
+        if (!(hid(a) && hid(b) && hid(c))) keep.push(a, b, c);
+      }
+      g.setIndex(keep);
+      g.deleteAttribute('_hide');
     }
-    g.setIndex(keep);
-    g.deleteAttribute('_hide');
     // The bind pose, for the weave (fabric.ts lays it in metres on the rest shape).
     if (m.userData.npc2 === 'garment') {
       g.setAttribute('rest', g.attributes.position);
@@ -195,10 +233,27 @@ export function outfitV2(id: string, body: string): OutfitV2 {
 
 /** Where a belt sits (for fittings hung on it): the waist of the outermost body garment, measured round. */
 function beltOf(t: THREE.Object3D, M: Measure, meta: BodyMeta): Garment {
-  const y = THREE.MathUtils.lerp(M.bone('Hips').y, M.bone('Spine1').y, 0.55);
+  let y = THREE.MathUtils.lerp(M.bone('Hips').y, M.bone('Spine1').y, 0.55);
   const hips = M.bone('Hips');
   const rs = new Float32Array(36).fill(0);
   const v = new THREE.Vector3();
+  // Use the belt that was actually fitted to this body, not an anatomical
+  // waist estimate: otherwise fittings and the sword float above its strap.
+  // The densest horizontal band excludes a hanging belt end / rope knot.
+  const bands = new Map<number, { sum: number; count: number }>();
+  t.traverse((x) => {
+    const m = x as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh || m.userData.npc2 !== 'garment' || meta.garments[m.userData.garment]?.layer !== 'belt') return;
+    const p = m.geometry.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld);
+      if (Math.abs(v.y - y) > 0.2 || Math.hypot(v.x - hips.x, v.z - hips.z) > 0.3) continue;
+      const bin = Math.round(v.y / 0.02), band = bands.get(bin) ?? { sum: 0, count: 0 };
+      band.sum += v.y; band.count++; bands.set(bin, band);
+    }
+  });
+  let count = 0;
+  for (const band of bands.values()) if (band.count > count) { y = band.sum / band.count; count = band.count; }
   t.traverse((x) => {
     const m = x as THREE.SkinnedMesh;
     // The tunic or gown only (in the bind pose the arms hang out at waist height).

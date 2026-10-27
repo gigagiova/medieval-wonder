@@ -143,9 +143,18 @@ export function stripHeadPieces(root: THREE.Object3D) {
 
 export function measure(root: THREE.Object3D, skull?: { rx: number; rz: number }): Measure {
   root.updateMatrixWorld(true);
+  let crown: number | undefined;
   const joint = (n: string) => {
     let o: THREE.Object3D | undefined;
     root.traverse((x) => { if (!o && (x as THREE.Bone).isBone && canon(x.name) === n) o = x; });
+    if (!o && n === 'HeadTop_End') {
+      // Native MPFB has no artificial crown bone. Supply a measurement only;
+      // never add a deforming joint or change the authored skin binding.
+      root.traverse((x) => { if (!o && canon(x.name) === 'Head') o = x; });
+      const p = o!.getWorldPosition(new THREE.Vector3());
+      p.y = crown ?? p.y + 0.18;
+      return p;
+    }
     return o!.getWorldPosition(new THREE.Vector3());
   };
   // Clothes are cut round the base of the neck. A scan's neck joint can sit
@@ -183,6 +192,7 @@ export function measure(root: THREE.Object3D, skull?: { rx: number; rz: number }
   });
   const c = box.getCenter(new THREE.Vector3());
   const s = box.getSize(new THREE.Vector3());
+  crown = box.max.y;
   return { bone, head: { c, rx: s.x / 2, rz: s.z / 2, top: box.max.y, brow: c.y + s.y * 0.12, skull: true } };
 }
 

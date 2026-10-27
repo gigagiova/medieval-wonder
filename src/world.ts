@@ -4,7 +4,6 @@ import { Builder, rng, type Cell } from './builder';
 import type { MatName } from './materials';
 import { arcadeGeo, arcade, ruin, column, fallenDrum, gable, leanTo, pyramidRoof, ringGeo, archRings, quoinBox } from './shapes';
 import { torch, brazier, hornLantern, lucerna, polykandelon, candle } from './lights';
-import { buildCatacombs, CATACOMB_SPOTS, CELLA_STAIR } from './catacombs';
 import { buildForest, treeSpots } from './forest';
 import { buildBaths, BATHS_SPOT } from './baths';
 import { buildPalace, PALACE_SPOT } from './palace';
@@ -26,6 +25,7 @@ import { LORE, explorableLore } from './benevento/lore';
 import { buildPonteFratto, ponsTeleport, inPons, PONS as PONS_FRATTO, PONS_LANDMARK } from './benevento/pontefratto';
 import { buildSpolia } from './benevento/spolia';
 import { planFront } from './arch/dress';
+import { buildTriggioBurials, TRIGGIO_BURIALS, triggioBurialHole, triggioBurialDatum } from './benevento/triggio-burials';
 
 // Benevento in AD 700, under Duke Gisulf I: the town of the first Lombard
 // circuit on its ridge between the Calore and the Sabato, laid out on the
@@ -37,8 +37,6 @@ import { planFront } from './arch/dress';
 
 const rand = rng(1327);
 const R = (a: number, b: number) => a + (b - a) * rand();
-
-const STAIR_X = -36, STAIR_W = 3, STAIR_TOP = -52, HOLE_END = -56;
 
 let lay: Layout;
 let stream: FabricStream;
@@ -88,7 +86,14 @@ export function getTeleports(): Teleport[] {
   }
   at('Thermae', S.thermae, -20.6, 29.5, -30, 29.5);
   at('Amphitheatrum', S.amphitheatrum, -14, -8, 28, 22);
-  at('Sancti Quadraginta', S.quadraginta, -36, -46, -36, -56);
+  at('Porticus Romanae', S.quadraginta, -52.5, -71, -52.5, -85);
+  const burial = TRIGGIO_BURIALS;
+  at('Ad Sepulcra', S.triggioBurials, burial.entry.x, burial.entry.z, burial.stairX, burial.bottom);
+  {
+    const [x, z] = sw(S.triggioBurials, burial.chamber.x, burial.chamber.z);
+    out.push({ name: 'Sepulcra Langobardorum', x, z,
+      y: triggioBurialDatum() + burial.floor + 1.8, yaw: S.triggioBurials.rot });
+  }
   at('Turris Catenae', S.turrisCatenae, -10, 0, 0, 0);
   {
     // In the meadow on the town bank upstream, 40 m off: the whole bridge, cutwaters, five arches, the Sabato under the last two.
@@ -110,12 +115,6 @@ export function getTeleports(): Teleport[] {
     const [x, z] = sw(S.hortusSophiae, 0, c.bottom - 3);
     out.push({ name: 'Cisterna', x, z, y: fastTerrain(x, z) + c.depth + 1.85, yaw: 0 });
   }
-  {
-    const cs = CATACOMB_SPOTS, s = S.quadraginta;
-    const lw = (v: THREE.Vector3) => { const [x, z] = sw(s, v.x, v.z); return { x, z, y: fastTerrain(x, z) + v.y + 0.2 }; };
-    out.push({ name: 'Catacumbae', ...lw(cs.stairBottom), yaw: s.rot });
-    out.push({ name: 'Crypta', ...lw(cs.crypt), yaw: 0.9 + s.rot });
-  }
   // The gates: stand outside on the road that leaves each one (or straight out from the wall), a few
   // metres off, looking back at the gateway (inside, the houses of the plan come right up to them).
   for (const g of GATES) if (g.kind !== 'arch') {
@@ -134,6 +133,16 @@ export function getTeleports(): Teleport[] {
       break;
     }
     out.push(tp(g.name, g.at[0] + dx * 9, g.at[1] + dz * 9, g.at[0], g.at[1]));
+  }
+  const synagogue = lay?.lots.find((l) => l.explore?.id === 'synagoga');
+  if (synagogue?.front) {
+    const a = interiorAnchors({
+      c: synagogue.c.map((p) => [p.x, p.y] as P2),
+      front: { a: [synagogue.front.a.x, synagogue.front.a.y], b: [synagogue.front.b.x, synagogue.front.b.y], out: [synagogue.front.out.x, synagogue.front.out.y] },
+      h: synagogue.h, street: synagogue.street ?? 2,
+      seed: 1000 + synagogue.id * 7919, explore: synagogue.explore,
+    });
+    out.push(tp('Synagoga', a.outside[0], a.outside[1], a.door[0], a.door[1]));
   }
   out.push(ponsTeleport());
   return out;
@@ -238,77 +247,6 @@ function church(b: Builder) {
   hornLantern(b, -11.2, 2.4, -38.5);
 }
 
-function chapel(b: Builder) {
-  // Ossuary chapel over the catacomb stair. Door faces south.
-  const x0 = -40.5, x1 = -31.5, z0 = -60, z1 = -49, H = 5.5;
-  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-  b.box('rubble', x1 - x0, H, 0.8, cx, -0.2, z0);
-  b.box('rubble', 0.8, H, z1 - z0, x0, -0.2, cz);
-  b.box('rubble', 0.8, H, z1 - z0, x1, -0.2, cz);
-  arcade(b, 'rubble', x1 - x0, H, 0.8, 1, 2.0, 2.0, cx, -0.2, z1, 0);
-  gable(b, z1 - z0, x1 - x0, 1.9, cx, H - 0.2, cz, Math.PI / 2, 'rubble', 0.5);
-  torch(b, cx + 1.8, 2.6, z1 + 0.45, 0);
-  torch(b, x0 + 0.45, 2.4, -54, Math.PI / 2);
-  for (const s of [-1, 1]) skullShelf(b, s < 0 ? x0 + 0.4 : x1 - 0.4, 0.0, cz + 1, s < 0 ? Math.PI / 2 : -Math.PI / 2, 6, false);
-  const hx0 = STAIR_X - STAIR_W / 2, hx1 = STAIR_X + STAIR_W / 2;
-  b.box('marble', 0.3, 0.9, STAIR_TOP - HOLE_END, hx0 - 0.15, -0.1, (STAIR_TOP + HOLE_END) / 2);
-  b.box('marble', 0.3, 0.9, STAIR_TOP - HOLE_END, hx1 + 0.15, -0.1, (STAIR_TOP + HOLE_END) / 2);
-  b.box('marble', STAIR_W + 0.6, 0.9, 0.3, STAIR_X, -0.1, HOLE_END - 0.15);
-  lucerna(b, hx0 - 0.15, 0.82, -53, Math.PI / 2);
-  lucerna(b, hx1 + 0.15, 0.82, -55, -Math.PI / 2);
-}
-
-/** Wall shelf of skulls and long bones, with an oil lamp here and there. */
-function skullShelf(b: Builder, x: number, y: number, z: number, ry: number, len: number, under: boolean) {
-  const ox = Math.sin(ry), oz = Math.cos(ry);
-  const tx = Math.cos(ry), tz = -Math.sin(ry);
-  for (const ly of [y + 0.75, y + 1.6]) {
-    b.box('rock', len, 0.1, 0.42, x + ox * 0.21, ly, z + oz * 0.21, ry, false);
-    // Long bones stacked lengthwise at the back.
-    for (let k = 0; k < 3; k++) {
-      const kind = (['femur', 'humerus', 'tibia'] as const)[Math.floor(rand() * 3)];
-      b.prop(kind, x + ox * 0.1 + tx * R(-len / 3, len / 3), ly + 0.1 + k * 0.05, z + oz * 0.1 + tz * R(-len / 3, len / 3), ry + R(-0.15, 0.15), 0, 0, R(0.9, 1.05));
-    }
-    const n = Math.floor(len / 0.26);
-    for (let i = 0; i < n; i++) {
-      if (rand() < 0.25) continue;
-      const t = (i + 0.5) / n - 0.5;
-      const px = x + tx * t * len + ox * 0.26, pz = z + tz * t * len + oz * 0.26;
-      if (rand() < 0.08) { lucerna(b, px, ly + 0.05, pz, ry, under, rand() < 0.3); continue; }
-      b.prop('skull', px, ly + 0.1, pz, ry + R(-0.5, 0.5), R(-0.15, 0.1), R(-0.2, 0.2), R(0.92, 1.08));
-    }
-  }
-}
-
-
-/**
- * Outside the north postern: a little roofless martyr's chapel (cella
- * memoriae) standing over the crypt, reached by a trodden path.
- */
-function cellaMemoriae(b: Builder) {
-  // Roofless memoria over the martyr's crypt. Its floor is mostly the
-  // opening of the stair down to the crypt (CELLA_STAIR), walled round
-  // with a parapet; you walk round it to the head of the stair by the apse.
-  const cx = -20.3, cz = -93.1;
-  const ry = 0;
-  const P = (lx: number, lz: number): [number, number] => [cx + lx, cz + lz];
-  const [ex, ez] = P(0, 3.5);
-  b.geo('rubble', arcadeGeo(5.2, 3.6, 0.7, 1, 1.5, 1.7), ex, -0.2, ez, ry);
-  archRings(b, 'block', ex, -0.2, ez, ry, 0.7, 1.5, 1.7, 0.3, 0.2);
-  for (const s of [-1, 1]) {
-    const [wx, wz] = P(s * 2.6, 0.15);
-    ruin(b, 'rubble', 6.7, R(2.2, 3.4), 0.7, wx, -0.2, wz, ry + Math.PI / 2, 0.6);
-  }
-  for (let i = 0; i <= 6; i++) {
-    const a = Math.PI / 2 + (i / 6) * Math.PI;
-    const [ax, az] = P(Math.sin(a) * 2.3, -3.2 + Math.cos(a) * 2.3);
-    b.box('rubble', 1.3, R(1.6, 2.8), 0.7, ax, -0.2, az, ry + a);
-  }
-  const [tx, tz] = P(1.9, 3.88);
-  torch(b, tx, 2.2, tz, ry);
-}
-
-
 // ---------------------------------------------------------------- the nunnery of St Peter
 /**
  * Theuderada's foundation (before 687) across the Sabato: the church (built
@@ -337,16 +275,44 @@ function nunnery(b: Builder) {
   candle(b, -8.5, 1.0, -21.2, 0.3);
 }
 
-/** Above the hypogea of the Santi Quaranta: vaults of the Roman complex, open to the sky. */
-function quadragintaRuins(b: Builder) {
+/**
+ * Surviving Roman vaulted passages at the Santi Quaranta, at the existing
+ * archaeological anchor. Passage function is source-backed; bay dimensions,
+ * surviving elevations and this AD 700 state are reconstruction hypotheses.
+ * No burial galleries, ossuary or connecting underground network are implied.
+ */
+export function quadragintaRuins(b: Builder) {
+  // Keep the existing ruin frontage. Two bays retain their barrel vaults;
+  // the other bays survive as short arches. Both ends of each covered passage
+  // are open, with the continuous terrain as the walkable floor.
   for (let i = 0; i < 6; i++) {
-    const x = -60 + i * 7.5, z = -84;
-    b.geo('brick', arcadeGeo(7.6, R(5, 8), 2.0, 1, 4.6, 3.2), x, -0.4, z, 0);
-    if (rand() < 0.6) ruin(b, 'rubble', 7.6, R(1, 3), 2.0, x, 4.5, z, 0, 0.8);
+    const x = -60 + i * 7.5;
+    if (i === 1 || i === 2) {
+      const depth = 14, front = -83;
+      const profile = arcadeGeo(7.6, 6.1, depth, 1, 4.6, 2.7);
+      // Regular longitudinal sections bend with the terrain without repeatedly
+      // subdividing long, thin extruded triangles across the entire vault.
+      const vault = new THREE.ExtrudeGeometry(profile.parameters.shapes, {
+        depth, steps: 14, bevelEnabled: false, curveSegments: 12,
+      }).translate(0, 0, -depth / 2);
+      profile.dispose();
+      b.geo('brick', vault, x, -0.4, front - depth / 2, 0, true, 0, 0, true);
+      vault.dispose();
+      // Thin spring courses show the transition from walls to curved soffit.
+      for (const side of [-1, 1])
+        b.box('brick', 0.18, 0.16, depth, x + side * 2.3, 2.22, front - depth / 2, 0, false);
+    } else {
+      b.geo('brick', arcadeGeo(7.6, 6.0 + (i % 2) * 0.5, 2.0, 1, 4.6, 3.2), x, -0.4, -84, 0);
+      ruin(b, 'rubble', 7.6, 1.5, 2.0, x, 5.2, -84, 0, 0.7);
+    }
   }
-  ruin(b, 'brick', 30, 6, 1.4, -48, -0.4, -92, 0, 0.6);
+  // Detached wall remnants leave the two passage exits unobstructed.
+  ruin(b, 'brick', 8, 4.2, 1.4, -62, -0.4, -99, 0, 0.6);
   ruin(b, 'rubble', 18, 3.5, 1.2, -66, -0.4, -70, Math.PI / 2, 0.7);
-  for (let i = 0; i < 6; i++) fallenDrum(b, R(-62, -30), R(-80, -66), 0.4, R(1, 2), R(0, 3));
+  // Fallen architectural fragments stay off the arrival and gallery paths.
+  fallenDrum(b, -61, -73, 0.4, 1.5, 0.7);
+  fallenDrum(b, -34, -76, 0.4, 1.1, 2.1);
+  fallenDrum(b, -28, -69, 0.4, 1.8, 1.4);
 }
 
 /** The temple of the forum (old frame: centre 21, 6), its columns scavenged, houses grown against it. */
@@ -433,10 +399,12 @@ export const siteGroups: Record<string, THREE.Group> = {};
 function holes(): Hole[] {
   const S = SITES;
   const rect = (s: SiteDef, x0: number, z0: number, x1: number, z1: number): Hole => ({ pts: [sw(s, x0, z0), sw(s, x1, z0), sw(s, x1, z1), sw(s, x0, z1)] });
-  const hx0 = STAIR_X - STAIR_W / 2, hx1 = STAIR_X + STAIR_W / 2, ch = CELLA_STAIR.hole, c = M.CISTERN;
-  const list = [rect(S.quadraginta, hx0, HOLE_END, hx1, STAIR_TOP), rect(S.quadraginta, ch.x0, ch.z0, ch.x1, ch.z1), rect(S.hortusSophiae, c.x0, c.bottom, c.x1, c.top)];
+  const c = M.CISTERN;
+  const list = [rect(S.hortusSophiae, c.x0, c.bottom, c.x1, c.top),
+    { pts: triggioBurialHole().map(([x, z]) => sw(S.triggioBurials, x, z)) }];
   STAIR_ZONES.length = 0;
-  STAIR_ZONES.push({ ...xz(sw(S.quadraginta, STAIR_X, -54)), r: 9 }, { ...xz(sw(S.quadraginta, -20.1, -93.6)), r: 7 }, { ...xz(sw(S.hortusSophiae, 0, (c.top + c.bottom) / 2)), r: 8 });
+  STAIR_ZONES.push({ ...xz(sw(S.hortusSophiae, 0, (c.top + c.bottom) / 2)), r: 8 },
+    { ...xz(sw(S.triggioBurials, TRIGGIO_BURIALS.stairX, -1)), r: 12 });
   return list;
 }
 const xz = ([x, z]: P2) => ({ x, z });
@@ -469,7 +437,8 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
   };
   await at("At the dukes' curtis", 0.2, S.curtis, (g) => buildPalace(b, g as unknown as THREE.Scene));
   await at('In the bishop\'s church', 0.26, S.episcopium, (g) => { church(b); markReadable('calix', -17.0, 1.1, -62.4); buildLibrary(b, g as unknown as THREE.Scene); });
-  await at('Carving the hypogea of the Santi Quaranta', 0.32, S.quadraginta, () => { chapel(b); buildCatacombs(b); cellaMemoriae(b); quadragintaRuins(b); });
+  await at('Among the Roman galleries of the Santi Quaranta', 0.32, S.quadraginta, () => quadragintaRuins(b));
+  await at('Beneath the houses of Triggio', 0.36, S.triggioBurials, () => buildTriggioBurials(b));
   await at('In the old baths', 0.4, S.thermae, (g) => buildBaths(b, g as unknown as THREE.Scene));
   await at('At the nuns of St Peter', 0.45, S.sanctusPetrus, () => { church(b); nunnery(b); });
   await at('Under the Arch of Trajan', 0.5, S.arcusTraiani, () => M.arcusTraiani(b));
@@ -521,7 +490,7 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
 
 // ---------------------------------------------------------------- ground collision
 /** Walkable ground for the whole world: 4 m cells near the town, 8 m beyond; fine cells round the stair holes. */
-function groundCollider(b: Builder, items: Map<number, ChunkItems>, hl: Hole[]) {
+export function groundCollider(b: Builder, items: Map<number, ChunkItems>, hl: Hole[]) {
   const pos: number[] = [];
   const gv = new THREE.Vector3();
   const Y = (x: number, z: number) => { field0(x, z, gv); return gv.y + fastTerrain(x, z); };
@@ -695,10 +664,8 @@ export function regionName(p: THREE.Vector3): string {
   const ly = p.y - fastTerrain(p.x, p.z);
   const near = (s: SiteDef, r: number) => Math.hypot(p.x - s.x, p.z - s.z) < r;
   const S = SITES;
-  if (ly < -2.4) {
-    if (near(S.hortusSophiae, 30)) return 'Cisterna';
-    return 'Catacumbae Sanctorum Quadraginta';
-  }
+  if (ly < -2.4 && near(S.hortusSophiae, 30)) return 'Cisterna';
+  if (ly < -1.0 && near(S.triggioBurials, 16)) return 'Sepulcra Langobardorum';
   for (const g of GATES) if (Math.hypot(p.x - g.at[0], p.z - g.at[1]) < 8) return g.name;
   const named: [SiteDef, number][] = [[S.iseum, 13], [S.caballus, 15], [S.curtis, 26], [S.episcopium, 30], [S.forum, 18], [S.theatrum, 50], [S.thermae, 28], [S.amphitheatrum, 55], [S.quadraginta, 48],
     [S.turrisCatenae, 14], [S.sanctusHilarius, 16], [S.sanctusPetrus, 32], [S.necropolis, 28], [S.nux, 14], [S.molendinum, 14], [S.hortusSophiae, 16], [S.castellumAquae, 26], [S.pontesLeprosus, 50], [S.pontesOnuphrii, 45]];

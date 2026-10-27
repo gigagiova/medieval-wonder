@@ -1,11 +1,12 @@
 # Beneventum, AD 700: secrets, explorables and easter eggs
 
 Spoilers. Positions are world metres (x east, z south of 41.1305 N, 14.7745 E). In game, walk near a
-readable and press **E** (or the *Lege* button) to read the Latin and its English. What you have found
+readable and press **E** (or the *Lege* button) to read its original text and English translation. What you have found
 is kept in the browser (`localStorage: beneventum-found-v1`) and shown in red on the map.
 `getMapData()` exposes the same lists (`explorables`, `readables`, `districts`, `landmarks`).
 
-Status of each text: **attested** (a real text, quoted), **paraphrase** (a real source retold),
+Source/status metadata is retained in code and these development notes, not shown
+on the in-game reading cards. Status of each text: **attested** (a real text, quoted), **paraphrase** (a real source retold),
 **style** (invented in the manner of the period), **legend** (a real legend, or a story built on one).
 
 ## The trail of the golden viper
@@ -58,10 +59,12 @@ Each is a small culled zone with simple box collision.
 | domusSculdahis | house of the *sculdahis* (local judge) | -260, -275 | A law of King Rothari (Ed. Roth. 376, on the *masca*, the witch) | attested |
 | domusVidua | widow's house | 252, -155 | A psalm line (Ps. 145, 9) | attested |
 | domusFabri | carpenter's house | -43, -230 | A pilgrim's scratch | style |
+| synagoga | small synagogue | near Piano di Corte / Santa Sofia, selected existing lot | Deuteronomy 6:4, Hebrew and English | attested text; reconstructed setting |
 
 Underground and high places:
+- **Sepulcra**: a small Lombard burial chamber inspired by the Triggio lower necropolis, with a stair entrance and a readable grave slab. Its placement, access, and chamber layout are reconstruction choices; see HISTORY.md.
 - **Cisterna**: a Roman cistern under the duke's garden. A long stair leads down to a niche (viper trail 4).
-- **Catacumbae / Crypta**: the hypogeum and crypt at Sancti Quadraginta, west of the town.
+- **Porticus Romanae**: accessible Roman vaulted passages west of town. The invented catacombs, ossuary and martyr shrine have been removed; surviving bay dimensions and AD 700 condition are reconstruction hypotheses.
 - **Turris Catenae**: the chain tower on the Sabato. Its room is enterable and holds the watch roll.
 - **Bibliotheca**: the bishop's library and scriptorium, beside S. Maria.
 

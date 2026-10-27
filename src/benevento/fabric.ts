@@ -11,6 +11,7 @@ import { fastTerrain } from '../displace';
 import { torch, brazier } from '../lights';
 import { WALL700, BOUNDS, insideness, type P2 } from './geo';
 import { GATES, SITES, siteToWorld } from './sites';
+import { TRAJAN_DIMENSIONS } from './arcus-traiani-dimensions';
 import type { Layout, Plot, PlotKind } from './layout';
 import { buildInterior, interiorCollider } from './interiors';
 import { sortByCluster } from '../clusters';
@@ -135,25 +136,79 @@ export function wallPlan() {
       gates.push({ id: g.id, x: q.p[0], z: q.p[1], dx: q.d[0], dz: q.d[1], main: g.main, seed: Math.floor(rand() * 1e9) });
     }
   }
+  // The registered circuit misses the standing arch by 22.6m. Resolve only
+  // this local junction: short returns attach to the two solid piers,
+  // parallel to the arch and existing Via Traiana approach.
+  // The arch axis, road and all house footprints remain intact.
+  const originalGaps = gaps.map(g => ({ ...g }));
+  const returns: { a: P2; b: P2; out: P2 }[] = [];
+  const arch = SITES.arcusTraiani, join = TRAJAN_DIMENSIONS.coreWidth / 2 - 0.2;
+  const contacts: number[] = [];
+  for (const side of [-1, 1]) {
+    const pier = siteToWorld(arch, side * join, 0);
+    const dir: P2 = [-Math.sin(arch.rot), -Math.cos(arch.rot)];
+    let hit: { t: number; s: number; p: P2 } | undefined;
+    for (let k = 0; k < n; k++) {
+      const a = W[k], q = W[(k + 1) % n], ex = q[0] - a[0], ez = q[1] - a[1];
+      const cross = dir[0] * ez - dir[1] * ex;
+      if (Math.abs(cross) < 1e-8) continue;
+      const ax = a[0] - pier[0], az = a[1] - pier[1];
+      const t = (ax * ez - az * ex) / cross, u = (ax * dir[1] - az * dir[0]) / cross;
+      if (t > 0 && t < 60 && u >= 0 && u <= 1 && (!hit || t < hit.t))
+        hit = { t, s: cum[k] + u * (cum[k + 1] - cum[k]), p: [pier[0] + t * dir[0], pier[1] + t * dir[1]] };
+    }
+    if (!hit) throw new Error('Porta Aurea pier does not meet the registered circuit');
+    contacts.push(hit.s);
+    returns.push({ a: hit.p, b: pier, out: [side * Math.cos(arch.rot), -side * Math.sin(arch.rot)] });
+  }
+  const aureaGap = gaps.find(g => g.id === 'aurea')!;
+  aureaGap.s = (contacts[0] + contacts[1]) / 2;
+  aureaGap.half = Math.abs(contacts[0] - contacts[1]) / 2;
   const inGap = (s: number, m = 0) => gaps.some((g) => Math.abs(((s - g.s + perim / 2) % perim + perim) % perim - perim / 2) < g.half + m);
-  // Curtain pieces of ~10 m, broken at the gates.
+  // Subtract complete gap intervals: the former single-range clipping lost
+  // the trailing wall when both gap ends fell in one ten-metre section.
+  // Preserve the old random draw stream so unrelated towers/decor do not move.
   const STEP = 10;
   for (let s = 0; s < perim; s += STEP) {
-    let s0 = s, s1 = Math.min(s + STEP, perim);
-    for (const g of gaps) {
+    const end = Math.min(s + STEP, perim);
+    let old0 = s, old1 = end;
+    for (const g of originalGaps) {
       const a = g.s - g.half, b = g.s + g.half;
-      if (s1 > a && s0 < b) { if (s0 >= a) s0 = Math.max(s0, b); else s1 = Math.min(s1, a); }
+      if (old1 > a && old0 < b) { if (old0 >= a) old0 = Math.max(old0, b); else old1 = Math.min(old1, a); }
     }
-    if (s1 - s0 < 0.6 || inGap((s0 + s1) / 2)) continue;
-    const A = at(s0), B = at(s1);
-    pieces.push({ a: A.p, b: B.p, out: outward(A.p, A.d), h: R(8.6, 11.2), seed: Math.floor(rand() * 1e9) });
+    const hadPiece = old1 - old0 >= 0.6 && !originalGaps.some(g => Math.abs((old0 + old1) / 2 - g.s) < g.half);
+    const extra = rng(6060 + Math.round(s) * 31);
+    const h = hadPiece ? R(8.6, 11.2) : 8.6 + extra() * 2.6;
+    const seed = Math.floor((hadPiece ? rand() : extra()) * 1e9);
+    let ranges: [number, number][] = [[s, end]];
+    for (const g of gaps) for (const wrap of [-perim, 0, perim]) {
+      const a = g.s - g.half + wrap, b = g.s + g.half + wrap;
+      ranges = ranges.flatMap(([lo, hi]): [number, number][] => hi <= a || lo >= b ? [[lo, hi]] :
+        [...(lo < a ? [[lo, a] as [number, number]] : []), ...(hi > b ? [[b, hi] as [number, number]] : [])]);
+    }
+    for (const [s0, s1] of ranges) {
+      if (s1 - s0 < 0.01) continue;
+      const A = at(s0), B = at(s1);
+      pieces.push({ a: A.p, b: B.p, out: outward(A.p, A.d), h, seed });
+    }
   }
+  // Short regular pieces keep the new return geometry streamed and culled
+  // at the same scale as the existing curtain; overlap is the usual 0.5m.
+  returns.forEach((w, side) => {
+    const length = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+    const count = Math.ceil(length / STEP);
+    for (let i = 0; i < count; i++) {
+      const p = (t: number): P2 => [w.a[0] + (w.b[0] - w.a[0]) * t, w.a[1] + (w.b[1] - w.a[1]) * t];
+      pieces.push({ a: p(i / count), b: p((i + 1) / count), out: w.out, h: 9.2, seed: 760001 + side * 101 + i });
+    }
+  });
   // Towers every 40-55 m, square or round, a few reduced to stumps.
   for (let s = 18; s < perim; s += R(40, 55)) {
-    if (inGap(s, 10)) continue;
+    if (originalGaps.some(g => Math.abs(((s - g.s + perim / 2) % perim + perim) % perim - perim / 2) < g.half + 10)) continue;
     const q = at(s), o = outward(q.p, q.d);
     const u = rand();
-    towers.push({ x: q.p[0], z: q.p[1], ox: o[0], oz: o[1], kind: u < 0.52 ? 0 : u < 0.88 ? 1 : 2, h: R(12, 15), seed: Math.floor(rand() * 1e9), roof: rand() < 0.45, torch: rand() < 0.3 });
+    const t: TowerSpec = { x: q.p[0], z: q.p[1], ox: o[0], oz: o[1], kind: u < 0.52 ? 0 : u < 0.88 ? 1 : 2, h: R(12, 15), seed: Math.floor(rand() * 1e9), roof: rand() < 0.45, torch: rand() < 0.3 };
+    if (!inGap(s, 10)) towers.push(t);
   }
   return { pieces, towers, gates, perim };
 }

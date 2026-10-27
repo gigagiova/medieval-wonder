@@ -59,7 +59,7 @@ export interface Motion {
   start: { walk: number; walkFormal: number };
 }
 
-export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
+export function retarget(template: THREE.Object3D, ual: GLTF, clipNames = Object.keys(CLIP_SRC) as ClipName[], options: { preserveSpine?: boolean; footIK?: boolean } = {}): Motion {
   const tgt = SkeletonUtils.clone(template);
   tgt.updateMatrixWorld(true);
   const bones: THREE.Bone[] = [];
@@ -93,20 +93,28 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
     o.updateWorldMatrix(true, false);
     return { o, p: o.worldToLocal(j.getWorldPosition(new THREE.Vector3()).setY(0)) };
   }));
+  type SolePoint = { o: THREE.Object3D; p: THREE.Vector3; mesh?: THREE.SkinnedMesh; vertex?: number };
   let lowI = 0;
-  const lowest = (sole: { o: THREE.Object3D; p: THREE.Vector3 }[]) => {
+  const lowest = (sole: SolePoint[]) => {
     let m = Infinity;
-    sole.forEach((s, i) => { const y = v1.copy(s.p).applyMatrix4(s.o.matrixWorld).y; if (y < m) { m = y; lowI = i; } });
+    sole.forEach((s, i) => { const y = solePt(sole, i, v1).y; if (y < m) { m = y; lowI = i; } });
     return m;
   };
-  const solePt = (sole: { o: THREE.Object3D; p: THREE.Vector3 }[], i: number, out: THREE.Vector3) => out.copy(sole[i].p).applyMatrix4(sole[i].o.matrixWorld);
+  const solePt = (sole: SolePoint[], i: number, out: THREE.Vector3) => {
+    const point = sole[i];
+    // Shoes can blend ankle and toe weights. A rigid dominant-bone proxy
+    // can differ by centimetres; sample the actual skin when baking contact.
+    return point.mesh ? point.mesh.getVertexPosition(point.vertex!, out).applyMatrix4(point.mesh.matrixWorld)
+      : out.copy(point.p).applyMatrix4(point.o.matrixWorld);
+  };
   // The target's soles come from its shoes: the lowest vertices of each foot
   // at the heel, the toe tip and both sides of the ball, and the front of the
   // toe cap and back of the heel, each carried rigidly
   // by the bone that moves it most (shoes reach past the toe joint).
-  const tSole: { o: THREE.Object3D; p: THREE.Vector3; foot: number }[] = [];
+  const tSole: (SolePoint & { foot: number })[] = [];
+  const groundSole: (SolePoint & { foot: number })[] = [];
   {
-    const cand = new Map<THREE.Bone, { b: THREE.Bone; w: THREE.Vector3 }[]>();
+    const cand = new Map<THREE.Bone, { b: THREE.Bone; w: THREE.Vector3; mesh: THREE.SkinnedMesh; vertex: number }[]>();
     const feet = ['Left', 'Right'].map((S) => byCanon.get(S + 'Foot')!);
     const footOf = (b: THREE.Bone) => feet.find((f) => f === b || f.children.includes(b) || b.parent?.parent === f);
     const w = new THREE.Vector3();
@@ -123,7 +131,7 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
         m.getVertexPosition(i, w).applyMatrix4(m.matrixWorld);
         minY = Math.min(minY, w.y);
         if (!cand.has(f)) cand.set(f, []);
-        cand.get(f)!.push({ b, w: w.clone() });
+        cand.get(f)!.push({ b, w: w.clone(), mesh: m, vertex: i });
       }
     });
     const side = new THREE.Vector3().crossVectors(up, fT);
@@ -137,10 +145,13 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
       const ball = low.filter((c) => Math.abs(c.w.dot(fT) - mid) < 0.03);
       // The rounded toe cap and heel counter touch first when the foot tips.
       const shoe = list.filter((c) => c.w.y < Math.max(minY, fMin) + 0.05);
+      // Full lower shoe surface for the final support-height correction.
+      // Only evaluated while baking clips, never during the game frame loop.
+      for (const c of shoe) groundSole.push({ o: c.b, p: new THREE.Vector3(), foot: feet.indexOf(foot), mesh: c.mesh, vertex: c.vertex });
       const cap = shoe.reduce((a, c) => (c.w.dot(fT) > a.w.dot(fT) ? c : a)), back = shoe.reduce((a, c) => (c.w.dot(fT) < a.w.dot(fT) ? c : a));
       const pts = [toe, heel, cap, back];
       if (ball.length) pts.push(ball.reduce((a, c) => (c.w.dot(side) > a.w.dot(side) ? c : a)), ball.reduce((a, c) => (c.w.dot(side) < a.w.dot(side) ? c : a)));
-      for (const c of pts) tSole.push({ o: c.b, p: c.b.worldToLocal(c.w.clone()), foot: feet.indexOf(foot) });
+      for (const c of pts) tSole.push({ o: c.b, p: c.b.worldToLocal(c.w.clone()), foot: feet.indexOf(foot), mesh: c.mesh, vertex: c.vertex });
     }
   }
 
@@ -169,7 +180,11 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
   for (const b of mapped) {
     const d = srcDirs.get(b), n = canon(b.name);
     let s: THREE.Quaternion;
-    if (d) s = new THREE.Quaternion().setFromUnitVectors(byCanon.get(AIM[n])!.getWorldPosition(v1).sub(b.getWorldPosition(v2)).normalize(), d);
+    // Clavicle offsets differ anatomically between source rigs. Aligning
+    // their slope raises the target's shoulders to its ears; preserve the
+    // target shoulder rest position and transfer only captured motion.
+    if (n.endsWith('Shoulder') || (options.preserveSpine && /^(Spine\d?|Neck)$/.test(n))) s = new THREE.Quaternion();
+    else if (d) s = new THREE.Quaternion().setFromUnitVectors(byCanon.get(AIM[n])!.getWorldPosition(v1).sub(b.getWorldPosition(v2)).normalize(), d);
     else if (n === 'Hips' || n === 'Head') s = new THREE.Quaternion();
     else s = (swing.get(b.parent as THREE.Bone) ?? new THREE.Quaternion()).clone();
     swing.set(b, s);
@@ -189,6 +204,9 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
   const sideOf = [0, 1].map((k) => tSole.map((s, i) => (s.foot === k ? i : -1)).filter((i) => i >= 0));
   const plantFeet = (frames: number, dt: number, rot: Map<THREE.Bone, Float32Array>, hp: Float32Array, sLow: Float32Array, pose: (f: number) => void) => {
     const N = frames - 1; // the last frame repeats the first
+    const holdFrames = Math.max(1, Math.round(0.05 / dt));
+    const reachFrames = Math.max(1, Math.round((3 / 30) / dt));
+    const smoothFrames = Math.max(1, Math.round((4 / 30) / dt));
     // Contact points (lowest sole point per foot) and every sole point, per frame.
     const pts: THREE.Vector3[][] = [], low: { i: number; y: number }[][] = [];
     for (let f = 0; f < N; f++) {
@@ -196,8 +214,11 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
       pts.push(tSole.map((_, i) => solePt(tSole, i, new THREE.Vector3())));
       low.push(sideOf.map((ix) => ix.reduce((a, i) => (pts[f][i].y < a.y ? { i, y: pts[f][i].y } : a), { i: -1, y: Infinity })));
     }
-    // Planted: while the source's foot is on its ground.
-    const wAt = (f: number, k: number) => THREE.MathUtils.smoothstep(0.035 - sLow[(f % N) * 2 + k], 0, 0.02);
+    // Captured walks clear the floor by only a few centimetres. A 35 mm
+    // contact band plus a long hold mislabels swing as stance and accumulates
+    // offsets of more than half a metre. Grip only the actual support plane.
+    // The short release bridges heel-to-toe contact without holding a swing.
+    const wAt = (f: number, k: number) => THREE.MathUtils.smoothstep(0.008 - sLow[(f % N) * 2 + k], 0, 0.006);
     // Ground speed: median backward speed of a contact point flat on the ground.
     const vs: number[] = [];
     for (let f = 0; f < N; f++) for (const k of [0, 1]) {
@@ -214,8 +235,8 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
         const f = n % N, p = (n - 1) % N, i = low[p][k].i;
         // The grip on the ground lets go a few frames after the source's foot
         // starts to rise, while the target's longer toes still touch.
-        const w = Math.max(...[0, 1, 2, 3, 4].map((j) => wAt(f + N - j, k) * (1 - j * 0.15)));
-        o.sub(pts[f][i]).add(pts[p][i]).addScaledVector(fT, -v * dt).setY(0).multiplyScalar(w);
+        const w = Math.max(...Array.from({ length: holdFrames + 1 }, (_, j) => wAt(f + N - j, k) * (1 - (j / holdFrames) * 0.6)));
+        o.sub(pts[f][i]).add(pts[p][i]).addScaledVector(fT, -v * dt).setY(0).multiplyScalar(Math.pow(w, dt * 30));
         if (n > N) off[k][f].copy(o);
       }
     }
@@ -242,8 +263,9 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
     // How far each planted foot is left short of where it should be, smoothed over
     // a few frames so the pelvis dips without jerks.
     const short = Array.from({ length: N }, (_, f) => ik(f));
-    const dip = short.map((_, f) => Math.max(...[-3, -2, -1, 0, 1, 2, 3].map((j) => short[(f + j + N) % N])));
-    const sm = dip.map((_, f) => [-4, -3, -2, -1, 0, 1, 2, 3, 4].reduce((acc, j) => acc + dip[(f + j + N) % N] * (5 - Math.abs(j)), 0) / 25);
+    const dip = short.map((_, f) => Math.max(...Array.from({ length: reachFrames * 2 + 1 }, (_, j) => short[(f + j - reachFrames + N) % N])));
+    const sm = dip.map((_, f) => Array.from({ length: smoothFrames * 2 + 1 }, (_, j) => j - smoothFrames)
+      .reduce((acc, j) => acc + dip[(f + j + N) % N] * (smoothFrames + 1 - Math.abs(j)), 0) / ((smoothFrames + 1) ** 2));
     for (let f = 0; f < frames; f++) {
       hp[f * 3 + 1] -= Math.min(0.025, sm[f % N] * 1.2);
       ik(f);
@@ -264,8 +286,15 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
   const bake = (name: ClipName) => {
     const clip = clipBy(CLIP_SRC[name]);
     mixer.stopAllAction();
-    mixer.clipAction(clip).reset().play();
-    const fps = 30, frames = Math.max(2, Math.round(clip.duration * fps) + 1);
+    // Sample the actual endpoint, including root displacement. A repeating
+    // action wraps duration back to zero and loses the distance travelled.
+    const sourceAction = mixer.clipAction(clip).reset().setLoop(THREE.LoopOnce, 1);
+    sourceAction.clampWhenFinished = true;
+    sourceAction.play();
+    // Contact IK is nonlinear: 30 Hz quaternion interpolation can put a
+    // shoe through the floor between correctly planted samples.
+    const fps = name === 'walk' || name === 'walkFormal' ? 60 : 30;
+    const frames = Math.max(2, Math.round(clip.duration * fps) + 1);
     const times = new Float32Array(frames);
     const rot = new Map(mapped.map((b) => [b, new Float32Array(frames * 4)]));
     const hp = new Float32Array(frames * 3);
@@ -304,10 +333,10 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
       hips.position.copy(v1.fromArray(hp, f * 3).add(hipsRest).applyMatrix4(hipsParentInv));
       tgt.updateMatrixWorld(true);
     };
-    const ground = () => {
+    const ground = (points = tSole) => {
       for (let f = 0; f < frames; f++) {
         pose(f);
-        hp[f * 3 + 1] += clear[f] - lowest(tSole);
+        hp[f * 3 + 1] += clear[f] - lowest(points);
       }
     };
     // The source carries itself low: standing, it lunges on bent knees, one
@@ -339,9 +368,39 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
       ground();
     }
     let speed = 0, start = 0;
-    if (name === 'walk' || name === 'walkFormal') ({ v: speed, start } = plantFeet(frames, clip.duration / (frames - 1), rot, hp, sLow, pose));
+    if (name === 'walk' || name === 'walkFormal') {
+      if (options.footIK !== false) ({ v: speed, start } = plantFeet(frames, clip.duration / (frames - 1), rot, hp, sLow, pose));
+      // IK can exhaust a shorter leg's reach. Keep the supporting sole down
+      // after those corrections rather than baking a floating whole body.
+      ground(groundSole);
+      // IK changes the stride. Measure travel speed from the final supporting
+      // sole, rather than keeping the pre-correction estimate (which skates
+      // on shorter-legged bodies even when the planted pose itself is right).
+      const support = [0, 1].map((foot) => groundSole.filter((point) => point.foot === foot));
+      const velocities: number[] = [], before = new THREE.Vector3(), after = new THREE.Vector3();
+      const dt = clip.duration / (frames - 1);
+      for (let f = 0; f < frames - 1; f++) for (const sole of support) {
+        pose(f);
+        const y = lowest(sole), index = lowI;
+        if (y > 0.006) continue;
+        solePt(sole, index, before);
+        pose((f + 1) % (frames - 1));
+        solePt(sole, index, after);
+        if (after.y > 0.006 || Math.abs(after.y - before.y) > 0.003) continue;
+        velocities.push(-after.sub(before).dot(fT) / dt);
+      }
+      velocities.sort((a, b) => a - b);
+      const measured = velocities[velocities.length >> 1];
+      if (measured > 0.1 && Number.isFinite(measured)) speed = measured;
+    }
     for (let f = 0; f < frames; f++) {
       v1.fromArray(hp, f * 3).add(hipsRest).applyMatrix4(hipsParentInv).toArray(hp, f * 3);
+    }
+    // Authored looping clips can retain sub-degree capture drift at their
+    // actual endpoint. Close that final sample after preserving root travel.
+    if (LOOPS.has(name)) {
+      for (const values of rot.values()) values.set(values.subarray(0, 4), (frames - 1) * 4);
+      hp.set(hp.subarray(0, 3), (frames - 1) * 3);
     }
     const tracks: THREE.KeyframeTrack[] = mapped.map((b) => new THREE.QuaternionKeyframeTrack(`${b.name}.quaternion`, times, rot.get(b)!));
     tracks.push(new THREE.VectorKeyframeTrack(`${hips.name}.position`, times, hp));
@@ -349,7 +408,7 @@ export function retarget(template: THREE.Object3D, ual: GLTF): Motion {
   };
   const clips = {} as Record<ClipName, THREE.AnimationClip>;
   const speed = { walk: 1.2, walkFormal: 1 }, start = { walk: 0, walkFormal: 0 };
-  for (const n of Object.keys(CLIP_SRC) as ClipName[]) {
+  for (const n of clipNames) {
     const r = bake(n);
     clips[n] = r.clip;
     if (n === 'walk' || n === 'walkFormal') { speed[n] = r.speed; start[n] = r.start; }

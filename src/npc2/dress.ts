@@ -45,7 +45,11 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
       // Hemp rope: its own photographed twist (the map), toned to unbleached fibre.
       mat = matte(0x8a7a5c, 0.95);
     }
-    if (src.normalMap) { const k = (g as { nrm?: number }).nrm ?? 1; mat.normalMap = src.normalMap; mat.normalScale = new THREE.Vector2(k, k); }
+    if (src.normalMap) {
+      const strength = (g as { nrm?: number }).nrm ?? 1;
+      mat.normalMap = src.normalMap;
+      mat.normalScale.copy(src.normalScale).multiplyScalar(strength);
+    }
     // The viking tunic's map is a mail shirt's: worn so by soldiers only.
     if (src.map && !(g.id === 'shirt' && dyes.role !== 'soldier')) {
       mat.map = src.map;

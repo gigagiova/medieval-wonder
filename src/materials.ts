@@ -69,6 +69,8 @@ export const MAT = {
   block: 19,
   /** The small untextured materials of a cell in one draw: the material per vertex (attribute matId, see SMALL). */
   misc: 20,
+  /** Fine-grained carved marble for the Arch of Trajan's architectural order. */
+  carvedMarble: 21,
 } as const;
 export type MatName = keyof typeof MAT;
 /** Materials merged into 'misc' in town chunks and landmark cells (their shading needs no textures). */
@@ -94,6 +96,8 @@ const CFG: Partial<Record<number, MatCfg>> = {
   14: { set: 'marble', tile: 1.8, alb: 0.75, moss: 0.5 },
   // One dressed stone: quoins, voussoirs, sills. Greyed towards local limestone.
   19: { set: 'block', tile: 1.4, alb: 0.95, moss: 0.5, tint: [0.98, 0.98, 1.04] },
+  // Reuses the resident marble textures; no additional texture allocation.
+  21: { set: 'marble', tile: 0.65, alb: 1.0, nrm: 0.30, moss: 0.12 },
 };
 const f = (x: number) => x.toFixed(4);
 
@@ -125,7 +129,7 @@ export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
     }
   }
   (m as unknown as { defines: Record<string, string | number> }).defines = defines;
-  m.customProgramCacheKey = () => 'surf3-' + id;
+  m.customProgramCacheKey = () => 'surf4-' + id;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, shared, uniforms);
     const misc = id === MAT.misc;
@@ -142,6 +146,16 @@ export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
           vWNrm = normalize(mat3(modelMatrix) * objectNormal);
         #endif`,
       );
+    // Expand the current chunk locally so the shared heightfield lighting patch
+    // is preserved, while cavity micro-shadowing affects only our western key.
+    // Applying this after accumulation also darkened unrelated torch/point lights.
+    const lightsBegin = THREE.ShaderChunk.lights_fragment_begin.replace(
+      'getDirectionalLightInfo( directionalLight, directLight );',
+      `getDirectionalLightInfo( directionalLight, directLight );
+       #if UNROLLED_LOOP_INDEX == 0
+       directLight.color *= clamp(abs(dot(normal, directLight.direction)) + 2.0 * sAO * sAO - 1.0, 0.0, 1.0);
+       #endif`,
+    );
     sh.fragmentShader = sh.fragmentShader
       .replace(
         '#include <common>',
@@ -161,23 +175,16 @@ export function makeSurfaceMaterial(id: number): THREE.MeshStandardMaterial {
         '#include <normal_fragment_maps>',
         `#include <normal_fragment_maps>\n normal = normalize(mat3(viewMatrix) * S.nrm) * faceDirection;`,
       )
+      .replace('#include <lights_fragment_begin>', lightsBegin)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         {
           // Occlusion done the way engines do it (see docs/REALISM.md):
-          // micro-shadowing of direct light by the relief (Uncharted 4 /
-          // HDRP: saturate(|NoL| + 2 ao^2 - 1), against the key light),
-          // multi-bounce AO on indirect diffuse (Jimenez et al., GTAO), and
-          // specular occlusion (Lagarde, Frostbite) on reflections.
-          #if NUM_DIR_LIGHTS > 0
-          float nlK = dot(normal, directionalLights[0].direction);
-          #else
-          float nlK = 1.0;
-          #endif
-          float ms = clamp(abs(nlK) + 2.0 * sAO * sAO - 1.0, 0.0, 1.0);
-          reflectedLight.directDiffuse *= ms;
+          // Key-only micro-shadowing is applied before direct-light accumulation.
+          // Multi-bounce AO on indirect diffuse (Jimenez et al., GTAO), and
+          // specular occlusion (Lagarde, Frostbite) on reflections follow here.
           // Wet stone and puddles keep their gloss; dry porous stone does not.
           float specK = mix(SPEC_K, 1.0, S.wet);
-          reflectedLight.directSpecular *= ms * specK;
+          reflectedLight.directSpecular *= specK;
           vec3 alb = diffuseColor.rgb;
           vec3 ga = 2.0404 * alb - 0.3324, gb = -4.7951 * alb + 0.6417, gc = 2.7552 * alb + 0.6903;
           reflectedLight.indirectDiffuse *= max(vec3(sAO), ((sAO * ga + gb) * sAO + gc) * sAO);

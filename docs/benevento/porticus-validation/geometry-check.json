@@ -1,0 +1,15 @@
+{
+  "triangles": 17882,
+  "materials": 3,
+  "props": 0,
+  "lamps": 0,
+  "pathObstructions": [],
+  "funeraryTeleports": [],
+  "arrival": {
+    "name": "Porticus Romanae",
+    "x": -563.027715540894,
+    "z": -388.07345372853257,
+    "y": 30.124383516113287,
+    "yaw": 0.3200000000000018
+  }
+}

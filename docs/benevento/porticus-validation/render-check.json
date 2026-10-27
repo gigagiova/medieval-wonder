@@ -1,0 +1,26 @@
+{
+  "baseline": "9200a4ac1282c0d5fb23930b40e57c4adc970ff5",
+  "baselineScope": "Above-ground ruins, chapel and memoria; excludes underground mesh and separately instantiated bone props.",
+  "before": {
+    "frame": 2,
+    "calls": 7,
+    "triangles": 29872,
+    "points": 0,
+    "lines": 0
+  },
+  "after": {
+    "frame": 3,
+    "calls": 5,
+    "triangles": 13346,
+    "points": 0,
+    "lines": 0
+  },
+  "interior": {
+    "frame": 4,
+    "calls": 5,
+    "triangles": 13346,
+    "points": 0,
+    "lines": 0
+  },
+  "errors": []
+}

@@ -20,7 +20,7 @@ export const LINES: Record<Speaker, Line[]> = {
     { la: 'Pax tecum, peregrine. Nebula haec quadraginta dies non recessit.', en: 'Peace be with you, pilgrim. This fog has not lifted in forty days.' },
     { la: 'Benedicat te omnipotens Deus, Pater, et Filius, et Spiritus Sanctus.', en: 'May almighty God bless you: Father, Son and Holy Spirit.', bless: true },
     { la: 'In bibliotheca armarium est quod non recte stat. Pavimentum ante illud abrasum est… sed abbati ne dixeris.', en: 'In the library there is a press that does not stand true. The floor before it is scraped… but do not tell the abbot I said so.' },
-    { la: 'Extra posticum septentrionale, sub memoria martyris, fratres nostri dormiunt. Descende cum lucerna.', en: 'Outside the north postern, beneath the martyr’s shrine, our brothers sleep. Go down with a lantern.' },
+    { la: 'Extra muros porticus antiquae adhuc stant. Caute ambula: lapides cadunt.', en: 'Outside the walls, ancient galleries still stand. Walk carefully: stones fall.' },
     { la: 'Otiositas inimica est animae.', en: 'Idleness is the enemy of the soul. (Rule of St Benedict, 48)' },
     { la: 'Frater Theodorus libros Graecos describit. Dicit eos de auro faciendo loqui, et lucernam eius usque ad matutinum ardere.', en: 'Brother Theodore copies Greek books. He says they speak of making gold, and his lamp burns until Matins.' },
     { la: 'Signum ad vesperas mox pulsabitur. Festina; nox venit.', en: 'The bell will soon ring for Vespers. Hurry; night is coming.' },

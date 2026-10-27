@@ -41,6 +41,9 @@ export interface SiteDef extends Frame2 {
 // ---------------------------------------------------------------- the sites
 // Module-authored sites carry their old local origin (lx, lz).
 export const SITES: Record<string, SiteDef> = {
+  // Street-side access beneath existing lot 965; no clearing or terrace change.
+  // Inspired by Triggio burial evidence; exact access/plan are reconstruction.
+  triggioBurials: { id: 'triggioBurials', name: 'Sepulcra Langobardorum', x: 55.21095214765282, z: -5.624150871697467, rot: -0.066292758 },
   // The dukes' residence in the old praetorium: planum curiae, today Piazza Piano di Corte.
   curtis: { id: 'curtis', name: 'Curtis Ducis', x: 506, z: -140, rot: GRID_ROT, lx: 40, lz: -23, flat: [24, 40], clear: 22 },
   // The cathedral of S. Maria (consecrated 15 Dec 600) with its atrium; the bishop's house and books.
@@ -48,8 +51,9 @@ export const SITES: Record<string, SiteDef> = {
     reserve: [[-24, -70], [-3, -70], [-3, -27], [-24, -27]],
     // S. Maria (nave, aisle, apse) and the bishop's library beside it have their own slab floors.
     floors: [[[-22.2, -68], [-5.3, -68], [-5.3, -40.4], [-22.2, -40.4]]] },
-  // The Roman complex of the Santi Quaranta (cryptoporticus) outside the walls: hypogea, ossuary, memoria.
-  quadraginta: { id: 'quadraginta', name: 'Sancti Quadraginta', x: -548, z: -392, rot: 0.32, lx: -37, lz: -70, flat: [44, 70] },
+  // Roman cryptoporticus outside the walls: surviving covered public passages.
+  // Exact AD 700 elevations and passage arrangement remain reconstruction hypotheses.
+  quadraginta: { id: 'quadraginta', name: 'Porticus Romanae', x: -548, z: -392, rot: 0.32, lx: -37, lz: -70, flat: [44, 70] },
   // Baths between the later Porta S. Lorenzo and Port'Arsa, outside the circuit of 700.
   thermae: { id: 'thermae', name: 'Thermae', x: -419, z: -140, rot: 0.38, lx: -33, lz: 24, flat: [24, 42] },
   // Nunnery of St Peter outside the walls, founded by Theuderada (wife of Romuald I) beyond the Sabato on the Appia.
@@ -57,7 +61,7 @@ export const SITES: Record<string, SiteDef> = {
     floors: [[[-22.2, -68], [-9.4, -68], [-9.4, -40.4], [-22.2, -40.4]]] },
   theatrum: { id: 'theatrum', name: 'Theatrum', x: -229, z: -8, rot: 0, flat: [52, 74] },
   amphitheatrum: { id: 'amphitheatrum', name: 'Amphitheatrum', x: -593, z: -214, rot: 0.5, flat: [56, 80] },
-  arcusTraiani: { id: 'arcusTraiani', name: 'Porta Aurea', x: 389, z: -224, rot: 0, flat: [9, 22] },
+  arcusTraiani: { id: 'arcusTraiani', name: 'Porta Aurea', x: 389, z: -224, rot: -Math.atan2(24, 18), flat: [9, 22] },
   arcusSacramenti: { id: 'arcusSacramenti', name: 'Arcus Sacramenti', x: -76, z: -61, rot: 0, flat: [7, 16] },
   pontesLeprosus: { id: 'pontesLeprosus', name: 'Pons Leprosus', x: -764, z: -99, rot: 0 },
   pontesOnuphrii: { id: 'pontesOnuphrii', name: 'Pons Sancti Onuphrii', x: -86, z: -372, rot: 0 },
@@ -219,7 +223,7 @@ export const DISTRICTS: District[] = [
  * Town houses you can enter, each with something to find. The layout gives
  * each the frontage plot nearest its target; see lore.ts for what is inside.
  */
-export type ExploreKind = 'domus' | 'fabrica' | 'hospitium' | 'horreum' | 'officina' | 'figulina' | 'textrinum' | 'cella' | 'medicus' | 'pistrinum' | 'oratorium' | 'scola';
+export type ExploreKind = 'domus' | 'fabrica' | 'hospitium' | 'horreum' | 'officina' | 'figulina' | 'textrinum' | 'cella' | 'medicus' | 'pistrinum' | 'oratorium' | 'scola' | 'synagoga';
 export interface ExploreTarget { id: string; kind: ExploreKind; near: P2 }
 export const EXPLORE_TARGETS: ExploreTarget[] = [
   { id: 'domusAudoini', kind: 'domus', near: [452, -70] },        // an old Lombard's house by the curtis (the viper)
@@ -238,4 +242,5 @@ export const EXPLORE_TARGETS: ExploreTarget[] = [
   { id: 'domusSculdahis', kind: 'domus', near: [-262, -276] },    // the sculdahis (local judge)
   { id: 'domusVidua', kind: 'domus', near: [262, -150] },         // a widow's house
   { id: 'domusFabri', kind: 'fabrica', near: [-60, -230] },       // a joiner
+  { id: 'synagoga', kind: 'synagoga', near: [530, -80] },        // prayer room within an existing lot
 ];

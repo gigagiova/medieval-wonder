@@ -448,7 +448,7 @@ if (params.has('shot') && !params.has('at')) {
 
 // ---- Culling ----------------------------------------------------------------
 // 1. Zones: the earth is the biggest occluder. Underground cells are hidden
-//    above ground and vice versa, except around the ossuary stair.
+//    above ground and vice versa, except around surviving underground access zones.
 // 2. Distance: past ~120 m the fog has swallowed everything.
 // 3. Occlusion: (a) above ground, the houses and town walls near the eye are
 //    drawn into a small software depth buffer every frame and a cell is hidden

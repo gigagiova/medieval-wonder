@@ -1,0 +1,68 @@
+[
+  {
+    "camera": [
+      413.00174096175056,
+      44.8138444669465,
+      -242.00164549934672
+    ],
+    "rotation": [
+      0.16,
+      2.214297435588181,
+      0,
+      "YXZ"
+    ],
+    "stats": "build 166908ms, 141577 tris drawn, 106 calls, cells 66/398 visible, 2 occluded, chunks ready 12 (built 12, avg 1072 ms), geo 555, tex 104",
+    "render": {
+      "frame": 230,
+      "calls": 106,
+      "triangles": 141577,
+      "points": 2807,
+      "lines": 0
+    },
+    "memory": {
+      "geometries": 555,
+      "textures": 104
+    },
+    "captureError": null,
+    "cull": {
+      "visible": 66,
+      "occluded": 2,
+      "total": 398
+    },
+    "name": "aurea30",
+    "errors": []
+  },
+  {
+    "camera": [
+      -417.4991738538681,
+      30.40548329770857,
+      -331.1201212832172
+    ],
+    "rotation": [
+      0,
+      -1.8864695163958727,
+      0,
+      "YXZ"
+    ],
+    "stats": "build 166908ms, 122129 tris drawn, 49 calls, cells 42/398 visible, 1 occluded, chunks ready 12 (built 24, avg 671 ms), geo 559, tex 108",
+    "render": {
+      "frame": 328,
+      "calls": 49,
+      "triangles": 122129,
+      "points": 2825,
+      "lines": 0
+    },
+    "memory": {
+      "geometries": 559,
+      "textures": 108
+    },
+    "captureError": null,
+    "cull": {
+      "visible": 42,
+      "occluded": 1,
+      "total": 398
+    },
+    "name": "approach38",
+    "errors": []
+  }
+]

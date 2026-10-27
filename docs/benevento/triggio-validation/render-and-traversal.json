@@ -1,0 +1,80 @@
+{
+  "before": {
+    "frame": 2,
+    "calls": 15,
+    "triangles": 84660,
+    "points": 0,
+    "lines": 0
+  },
+  "after": {
+    "frame": 3,
+    "calls": 22,
+    "triangles": 106732,
+    "points": 0,
+    "lines": 0
+  },
+  "interior": {
+    "frame": 4,
+    "calls": 18,
+    "triangles": 99957,
+    "points": 0,
+    "lines": 0
+  },
+  "walk": [
+    {
+      "target": [
+        -1.25,
+        2.35
+      ],
+      "frames": 99,
+      "distance": 0.08476152526014433,
+      "height": -3.528909441525826
+    },
+    {
+      "target": [
+        2,
+        2
+      ],
+      "frames": 70,
+      "distance": 0.17922248110812763,
+      "height": -3.5381871178461353
+    },
+    {
+      "target": [
+        6.9,
+        1.8
+      ],
+      "frames": 102,
+      "distance": 0.15285835790788257,
+      "height": -3.594278982542683
+    },
+    {
+      "target": [
+        2,
+        2
+      ],
+      "frames": 103,
+      "distance": 0.1616269681880737,
+      "height": -3.541225441407626
+    },
+    {
+      "target": [
+        -1.25,
+        2.35
+      ],
+      "frames": 68,
+      "distance": 0.144673945122584,
+      "height": -3.5241736723926422
+    },
+    {
+      "target": [
+        -1.25,
+        -6.4
+      ],
+      "frames": 263,
+      "distance": 0.15777800131046102,
+      "height": 1.7339747134657912
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,20 @@
+{"elapsed": 10.92, "kind": "navigate", "url": "http://127.0.0.1:5400/?shot=413.00174096175056%2C44.8138444669465%2C-242.00164549934672%2C2.214297435588181%2C0.16&debug="}
+{"elapsed": 11.78, "kind": "requestfailed", "url": "https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=UnifrakturMaguntia&family=Cardo&display=swap", "reason": "net::ERR_CERT_AUTHORITY_INVALID"}
+{"elapsed": 11.78, "kind": "console", "level": "error", "message": "Failed to load resource: net::ERR_CERT_AUTHORITY_INVALID"}
+{"elapsed": 27.4, "kind": "console", "level": "error", "message": "Failed to load resource: the server responded with a status of 404 (Not Found)"}
+{"elapsed": 64.13, "kind": "loading", "state": {"stage": "Pacing out the lanes\u2026 10%", "ready": null, "stats": null}}
+{"elapsed": 98.47, "kind": "loading", "state": {"stage": "In the bishop's church\u2026 26%", "ready": null, "stats": null}}
+{"elapsed": 103.51, "kind": "requestfailed", "url": "https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Cardo&display=swap", "reason": "net::ERR_CERT_AUTHORITY_INVALID"}
+{"elapsed": 103.51, "kind": "console", "level": "error", "message": "Failed to load resource: net::ERR_CERT_AUTHORITY_INVALID"}
+{"elapsed": 113.49, "kind": "loading", "state": {"stage": "In the old baths\u2026 40%", "ready": null, "stats": null}}
+{"elapsed": 154.35, "kind": "loading", "state": {"stage": "At the forum\u2026 52%", "ready": null, "stats": null}}
+{"elapsed": 187.25, "kind": "loading", "state": {"stage": "The fog gathers\u2026 80%", "ready": null, "stats": null}}
+{"elapsed": 204.37, "kind": "loading", "state": {"stage": "Grinding the pigments\u2026 90%", "ready": null, "stats": null}}
+{"elapsed": 213.31, "kind": "console", "level": "warning", "message": "THREE.WebGLRenderer: KHR_parallel_shader_compile extension not supported."}
+{"elapsed": 272.22, "kind": "loading", "state": {"stage": "Enter", "ready": true, "stats": "build 166908ms, 111943 tris drawn, 56 calls, cells 67/398 visible, 1 occluded, chunks ready 12 (built 12, avg 1072 ms), geo 505, tex 73"}}
+{"elapsed": 273.98, "kind": "match-camera", "name": "aurea30", "target": {"name": "aurea30", "x": 413.00174096175056, "y": 44.8138444669465, "z": -242.00164549934672, "yaw": 2.214297435588181, "pitch": 0.16, "position": [413.00174096175056, 44.8138444669465, -242.00164549934672]}}
+{"elapsed": 351.53, "kind": "screenshot-start", "name": "aurea30", "camera": [413.00174096175056, 44.8138444669465, -242.00164549934672], "rotation": [0.16, 2.214297435588181, 0, "YXZ"], "stats": "build 166908ms, 141577 tris drawn, 106 calls, cells 66/398 visible, 2 occluded, chunks ready 12 (built 12, avg 1072 ms), geo 555, tex 104", "render": {"frame": 230, "calls": 106, "triangles": 141577, "points": 2807, "lines": 0}, "memory": {"geometries": 555, "textures": 104}, "captureError": null, "cull": {"visible": 66, "occluded": 2, "total": 398}}
+{"elapsed": 353.13, "kind": "screenshot-done", "name": "aurea30"}
+{"elapsed": 353.14, "kind": "match-camera", "name": "approach38", "target": {"name": "approach38", "x": -417.4991738538681, "y": 30.40548329770857, "z": -331.1201212832172, "yaw": -1.8864695163958727, "pitch": 0, "position": [-417.4991738538681, 30.40548329770857, -331.1201212832172]}}
+{"elapsed": 382.98, "kind": "screenshot-start", "name": "approach38", "camera": [-417.4991738538681, 30.40548329770857, -331.1201212832172], "rotation": [0, -1.8864695163958727, 0, "YXZ"], "stats": "build 166908ms, 122129 tris drawn, 49 calls, cells 42/398 visible, 1 occluded, chunks ready 12 (built 24, avg 671 ms), geo 559, tex 108", "render": {"frame": 328, "calls": 49, "triangles": 122129, "points": 2825, "lines": 0}, "memory": {"geometries": 559, "textures": 108}, "captureError": null, "cull": {"visible": 42, "occluded": 1, "total": 398}}
+{"elapsed": 391.82, "kind": "screenshot-done", "name": "approach38"}

@@ -48,7 +48,7 @@ Plastic is rarely specular in this game (world specular is already ~0):
 | Less metre-scale geometric displacement on masonry (bulge/lean kept) | smooth-normal dents read as moulded clay | free (load-time) | — | adopted |
 | River: two-fetch drifting ripples, mud-coloured shallows (no shoreline seam), Fresnel (Schlick F0 0.02) reflection of our own sky | invisible / plastic water | 2 fetches | — | adopted |
 | Skin: wrapped diffuse with a red-shifted terminator (cheap pre-integrated SSS) | waxy/plastic faces | a few ALU | NVIDIA [GPU Gems ch.16](https://developer.nvidia.com/gpugems/gpugems/part-iii-materials/chapter-16-real-time-approximations-subsurface-scattering); Penner, [Pre-Integrated Skin Shading](https://www.slideshare.net/slideshow/penner-preintegrated-skin-rendering-siggraph-2011-advances-in-realtime-rendering-course/13966747) | already in `src/npc/scan.ts`; tuned |
-| Cloth: no GGX lobe, fibre sheen (Charlie) only at grazing, cavity AO from the weave | satin/plastic clothes | a few ALU | Estevez & Kulla "Production Friendly Microfacet Sheen BRDF"; Filament cloth model; three.js `MeshPhysicalMaterial.sheen` ([discourse](https://discourse.threejs.org/t/what-is-the-best-material-in-threejs-for-clothing/3088)) | adopted (cheap form inside the fabric shader) |
+| Cloth: rough dielectric base, energy-compensated Charlie sheen, subtle weave normals | bright artificial rims and exaggerated faceting | physical sheen ALU; no extra draw pass | [Three.js physical lighting](https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderChunk/lights_physical_pars_fragment.glsl.js); [Filament cloth model](https://github.com/google/filament/blob/main/shaders/src/surface_shading_model_cloth.fs) | implemented in `src/npc/fabric.ts`; [controlled comparison](npc-audit/README.md#material-control-comparison) |
 
 ## Atmosphere
 
@@ -77,3 +77,11 @@ Plastic is rarely specular in this game (world specular is already ~0):
 - Film-still grade: S-curve, split toning (cold shadows, faint warm
   highlights), colour muted except warm firelight, vignette; bloom only
   above 0.95 (lamps, fire).
+
+## Character reconstruction
+
+The [NPC audit](npc-audit/README.md) separates material effects from incorrect
+geometry and rigging. The [cloak research](npc-audit/CLOAKS.md) records retrieved
+Blender and NVIDIA guidance on textile patterns, clasps, draping, moving-body
+collision, motion constraints and simulation resolution. The replacement cloak
+must pass visual and phone-budget checks before it is described as adopted.

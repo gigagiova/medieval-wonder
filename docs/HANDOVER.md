@@ -2,6 +2,56 @@
 
 This is the state of `main` (fast-forwarded from `claude/medieval-town`) at handover. Read `AGENTS.md` for the rules and the build commands.
 
+## Current worktree correction: underground sites
+
+The live Santi Quaranta landmark now represents Roman vaulted passages. Its
+unsupported catacomb network, ossuary, martyr shrine, two underground entrances
+and funerary teleports have been removed; NPC directions were updated. The site
+anchor and town plan are unchanged. Passage dimensions and survival in 700 remain
+reconstruction hypotheses. See `docs/benevento/UNDERGROUND-RESEARCH.md` and the
+latest HISTORY sections. The older isolated `catacomb-test.html` is a development
+scene, not part of the historical map. Modern Triggio/Sabariani/cathedral visitor
+routes have not been transplanted into the AD 700 city.
+
+## Current worktree additions: synagogue and urban burials
+
+The owner authorized plausible AD 700 reconstruction where direct evidence is
+incomplete. A small synagogue uses existing lot 795 near the later Jewish quarter:
+plain scroll cupboard, reading table, benches and lamps. A compact burial chamber
+with six slab graves sits beneath existing lot 965 in Triggio, reached by a stair
+beside the building. Its inspiration is the Benevento Longobarda Living Museum's
+burial layers, not a copy of its modern visitor route. The chosen entrance is about
+100 m northeast of the modern museum pin to respect the registered urban plan.
+See `JEWISH-PRESENCE.md`, `UNDERGROUND-RESEARCH.md`, `INTERIOR-ANALOGUES.md` and
+`HISTORY.md` in `docs/benevento/` for evidence and explicit reconstruction choices.
+
+Teleports: `Synagoga`, `Ad Sepulcra` (stair entrance), and
+`Sepulcra Langobardorum` (underground room). Readable objects retain their source
+and certainty metadata in code/developer notes; the in-game cards show the object
+text and translation without research-status badges. Hebrew uses RTL layout.
+
+Validation: production build passes; the actual capsule controller can descend,
+cross the burial room and return to the street. Whole-city captures and both
+reading-card checks pass. See `docs/benevento/triggio-validation/`,
+`synagogue-validation/`, and `world-interiors-validation/`. The underground
+full-world view is dark and offers the existing lantern prompt; no iPhone frame
+time measurement was made in the software-rendered capture environment.
+
+## Current worktree correction: Porta Aurea
+
+The Arch of Trajan is rebuilt with broad carved piers, Corinthian pilasters,
+relief registers, attic dedication and coffered vault. Its centre is unchanged;
+its axis now follows Via Traiana, and local curtain returns connect the piers
+to the registered wall circuit. The generated gate approach uses the same
+orientation. See `docs/benevento/TRAJAN-ARCH.md` for references, explicit
+photo-based dimension estimates and architectural validation. Gate connection
+checks are recorded in [gate-validation](benevento/gate-validation/README.md),
+and production screenshots in [gate-world-validation](benevento/gate-world-validation/README.md).
+The production build passes; passage/barrier checks pass and all 6,019 generated
+lot footprints, IDs and explorable selections remain unchanged.
+San Lorenzo is connected in the current geometry and all three inspected
+full-world approach views; the reported separate gap was not reproduced.
+
 ## What exists
 
 - **The city.** Benevento inside its walls at 1:1 scale, from the owner's urban plan:
@@ -17,7 +67,7 @@ This is the state of `main` (fast-forwarded from `claude/medieval-town`) at hand
     - Ponte Leproso at its surveyed size (Meomartini 1889) and Ponte Fratto;
     - Ad Caballum: the broken equestrian statue and S. Petrus ad Caballum;
     - about 122 scanned Roman spolia and statues, some set into the walls;
-    - monasteries, catacombs and cisterns.
+    - monasteries, underground burial chambers and cisterns.
 - **Explorables and secrets.** Interiors with readable texts and easter eggs are listed in `docs/benevento/SECRETS.md`. Lore is in `src/benevento/lore.ts`, `readables.ts` and `secrets.ts`.
 - **People.** Townsfolk with period roles (`src/npc/population.ts`, documented in `docs/benevento/PEOPLE.md`) and spoken lines (`src/npc/lines*.ts`). The default bodies are v2: MakeHuman bodies with scanned faces, wearing modelled garments that swing on spring "cloth bones".
 - **Rendering:**
@@ -65,6 +115,11 @@ This is the state of `main` (fast-forwarded from `claude/medieval-town`) at hand
   - an iPhone crash from texture memory.
 
 ## Open defects and next steps
+
+For the active native-character rebuild and parallel clothing experiments, read
+[the continuation record](npc-audit/CONTINUATION.md). It distinguishes validated
+raw simulation from rejected thickness finishing and unfinished production rollout.
+
 
 1. **Real-phone check.** No change since the latest performance pass has been checked on an iPhone. That pass measured, headless at 390×844:
 

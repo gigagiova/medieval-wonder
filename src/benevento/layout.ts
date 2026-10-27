@@ -250,7 +250,7 @@ export function layoutTown(seed = 700): Layout {
     if (g.w >= 7.5 && lengthOf(pts) > 6) { const m = along(pts, lengthOf(pts) / 2)!; lay.squares.push({ x: m.p.x, z: m.p.y, r: g.w / 2 }); }
   }
   // The arch gates: a paved way straight through, 30 m into the town.
-  for (const [id, dx, dz] of [['aurea', 0.88, -0.48], ['sacramenti', 0.62, -0.79]] as const) {
+  for (const [id, dx, dz] of [['aurea', -Math.sin(SITES.arcusTraiani.rot), -Math.cos(SITES.arcusTraiani.rot)], ['sacramenti', 0.62, -0.79]] as const) {
     const g = GATES.find((q) => q.id === id)!;
     // Inward is the side that is inside the walls.
     const sgn = insideness(g.at[0] - dx * 12, g.at[1] - dz * 12) > insideness(g.at[0] + dx * 12, g.at[1] + dz * 12) ? -1 : 1;

@@ -14,6 +14,8 @@ export interface Lore {
   kind: 'inscription' | 'codex' | 'graffito' | 'charter' | 'label' | 'note' | 'relic';
   latin: string;
   greek?: boolean;
+  /** Language of the original text; provenance stays in development metadata. */
+  language?: 'la' | 'el' | 'he';
   english: string;
   source: string;
   status: LoreStatus;
@@ -24,6 +26,18 @@ export interface Lore {
 }
 
 const L: Lore[] = [
+  {
+    id: 'synagoga', place: 'Synagoga', title: 'The words on the scroll', kind: 'codex', status: 'attested', language: 'he',
+    latin: 'שמע ישראל יהוה אלהינו יהוה אחד',
+    english: '“Hear, O Israel: the Lord our God, the Lord is one.” The scroll lies open on its wooden rollers. The benches are worn smooth where the congregation gathers to listen.',
+    source: 'Deuteronomy 6:4, Hebrew consonantal text. The small prayer room and its AD 700 placement are an authorized reconstruction, not a discovered synagogue plan; see docs/benevento/JEWISH-PRESENCE.md.',
+  },
+  {
+    id: 'triggioBurials', place: 'Sepulcra', title: 'A name worn away', kind: 'inscription', status: 'style',
+    latin: 'HIC REQVIESCIT IN PACE\nORATE PRO EO',
+    english: '“Here he rests in peace. Pray for him.” The name above has worn away. A small lamp rests beside the stone; the neighbouring graves are closed with heavy slabs.',
+    source: 'Invented epitaph using early Christian funerary formulas. Local inspiration: the lower Lombard necropolis described by Benevento Longobarda, Via Bosco Lucarelli. Chamber layout, date and access are reconstruction assumptions recorded in HISTORY.md.',
+  },
   // ------------------------------------------------------------ monuments
   {
     id: 'arcusInscriptio', title: 'The attic of the arch', kind: 'inscription', status: 'attested', range: 30,

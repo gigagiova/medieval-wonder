@@ -1,0 +1,63 @@
+{
+  "baseline": "9200a4ac1282c0d5fb23930b40e57c4adc970ff5",
+  "scope": "Real wall/gate/terrain geometry with neutral material, same current arch model both modes; baseline arch rotation0 vs corrected ViaTraiana alignment. No NPCs, town buildings, production streaming or postprocess.",
+  "views": {
+    "aurea-before-front": {
+      "frame": 2,
+      "calls": 24,
+      "triangles": 162532,
+      "points": 0,
+      "lines": 0
+    },
+    "aurea-before-top": {
+      "frame": 3,
+      "calls": 36,
+      "triangles": 210047,
+      "points": 0,
+      "lines": 0
+    },
+    "aurea-after-front": {
+      "frame": 4,
+      "calls": 28,
+      "triangles": 174814,
+      "points": 0,
+      "lines": 0
+    },
+    "aurea-after-top": {
+      "frame": 5,
+      "calls": 39,
+      "triangles": 221857,
+      "points": 0,
+      "lines": 0
+    },
+    "laurentii-before-front": {
+      "frame": 6,
+      "calls": 29,
+      "triangles": 126937,
+      "points": 0,
+      "lines": 0
+    },
+    "laurentii-before-top": {
+      "frame": 7,
+      "calls": 42,
+      "triangles": 166439,
+      "points": 0,
+      "lines": 0
+    },
+    "laurentii-after-front": {
+      "frame": 8,
+      "calls": 29,
+      "triangles": 126937,
+      "points": 0,
+      "lines": 0
+    },
+    "laurentii-after-top": {
+      "frame": 9,
+      "calls": 42,
+      "triangles": 166439,
+      "points": 0,
+      "lines": 0
+    }
+  },
+  "errors": []
+}
