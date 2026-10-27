@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Builder } from './builder';
+import { field, fastTerrain, toWorldXZ } from './displace';
 
 // Period light sources (Lombard Italy, 6th-8th c.): pitch torches, iron
 // braziers, Roman-type horn lanterns, clay lucernae, bronze polykandela with
@@ -16,17 +17,51 @@ export function torch(b: Builder, x: number, y: number, z: number, ry: number, u
   b.lamp('torch', v(x + ox * 0.35, y + 0.13, z + oz * 0.35), under);
 }
 
-/** Iron fire basket on a tripod: the street light of the age, at gates and squares. */
+/** A rigid iron fire bowl: its charcoal and rim must share one placement. */
 export function brazier(b: Builder, x: number, z: number, y = 0) {
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2;
-    b.box('iron', 0.05, 1.05, 0.05, x + Math.sin(a) * 0.22, y, z + Math.cos(a) * 0.22, a, true, -0.25);
-  }
-  // Bowl: a thin iron lathe, inside and out.
-  const bowl = new THREE.LatheGeometry([new THREE.Vector2(0.001, 0.0), new THREE.Vector2(0.24, 0.0), new THREE.Vector2(0.42, 0.3), new THREE.Vector2(0.44, 0.31), new THREE.Vector2(0.4, 0.3), new THREE.Vector2(0.22, 0.03), new THREE.Vector2(0.001, 0.03)], 16);
-  b.geo('iron', bowl, x, y + 0.95, z, 0, true);
-  b.geo('ember', new THREE.CylinderGeometry(0.38, 0.3, 0.12, 14), x, y + 1.14, z, 0, false);
-  b.lamp('brazier', v(x, y + 1.2, z));
+  // The masonry field used to bend iron at full strength and embers at 20%.
+  // Place this small assembled object once; never deform its parts separately.
+  const offset = field(x, y, z, 'stone', new THREE.Vector3());
+  const anchor = v(x, y, z).add(offset);
+  const world = toWorldXZ(anchor.x, anchor.z, [0, 0]);
+  const previousHeight = b.absY;
+  b.absY = previousHeight ?? fastTerrain(world[0], world[1]);
+  const add = (g: THREE.BufferGeometry, material: 'iron' | 'ember' | 'charcoal', collide = false) => {
+    g.translate(anchor.x, anchor.y, anchor.z);
+    b.add(g, material, undefined, collide, true, true);
+    g.dispose();
+  };
+  try {
+    for (let i = 0; i < 3; i++) {
+      const a = i * Math.PI * 2 / 3;
+      const foot = v(Math.sin(a) * 0.31, 0.025, Math.cos(a) * 0.31);
+      const top = v(Math.sin(a) * 0.19, 1.0, Math.cos(a) * 0.19);
+      const g = new THREE.BoxGeometry(0.045, foot.distanceTo(top), 0.045);
+      g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(v(0, 1, 0), top.clone().sub(foot).normalize()));
+      g.translate(...foot.add(top).multiplyScalar(0.5).toArray());
+      add(g, 'iron', true);
+    }
+    const profile = [[0.001, 0], [0.24, 0], [0.42, 0.3], [0.44, 0.31], [0.4, 0.3], [0.22, 0.03], [0.001, 0.03]];
+    add(new THREE.LatheGeometry(profile.map(([r, h]) => new THREE.Vector2(r, h)), 24).translate(0, 0.95, 0), 'iron', true);
+    // A low recessed fuel surface. The generated texture carries charcoal detail;
+    // individual low-poly blocks were more distracting than this simple bed.
+    // Both radii fit inside the sloping inner bowl, not merely its rim.
+    add(new THREE.CylinderGeometry(0.337, 0.20, 0.19, 32).translate(0, 1.09, 0), 'charcoal');
+    // Reuse lamp/fire configuration, then align its independently sampled
+    // position to this one rigid base. Preserve the lamp's configured lift.
+    const lampStart = b.lamps.length, flameStart = b.flames.length;
+    b.lamp('brazier', v(x, y + 1.2, z));
+    if (b.flames.length > flameStart) {
+      const target = v(world[0], b.absY + anchor.y + 1.2, world[1]);
+      const correction = target.clone().sub(b.flames[flameStart].pos);
+      b.flames[flameStart].pos.copy(target);
+      if (b.lamps.length > lampStart) {
+        b.lamps[lampStart].pos.add(correction);
+        // A nearby bowl must stay dark iron, not clip to porcelain white.
+        b.lamps[lampStart].intensity *= 0.35;
+      }
+    }
+  } finally { b.absY = previousHeight; }
 }
 
 /**

@@ -1,0 +1,77 @@
+{
+  "before-full": {
+    "frame": 2,
+    "calls": 2,
+    "triangles": 286,
+    "points": 0,
+    "lines": 0
+  },
+  "after-full": {
+    "frame": 3,
+    "calls": 3,
+    "triangles": 454,
+    "points": 0,
+    "lines": 0
+  },
+  "before-side": {
+    "frame": 4,
+    "calls": 2,
+    "triangles": 286,
+    "points": 0,
+    "lines": 0
+  },
+  "after-side": {
+    "frame": 5,
+    "calls": 3,
+    "triangles": 454,
+    "points": 0,
+    "lines": 0
+  },
+  "before-side-fire": {
+    "frame": 6,
+    "calls": 4,
+    "triangles": 300,
+    "points": 18,
+    "lines": 0
+  },
+  "after-side-fire": {
+    "frame": 7,
+    "calls": 5,
+    "triangles": 468,
+    "points": 18,
+    "lines": 0
+  },
+  "before-top": {
+    "frame": 8,
+    "calls": 2,
+    "triangles": 286,
+    "points": 0,
+    "lines": 0
+  },
+  "after-top": {
+    "frame": 9,
+    "calls": 3,
+    "triangles": 454,
+    "points": 0,
+    "lines": 0
+  },
+  "charcoalTextures": [
+    {
+      "compressed": true,
+      "width": 512,
+      "height": 512
+    },
+    {
+      "compressed": true,
+      "width": 1,
+      "height": 1
+    },
+    {
+      "compressed": true,
+      "width": 1,
+      "height": 1
+    }
+  ],
+  "valid": true,
+  "errors": []
+}

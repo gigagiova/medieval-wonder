@@ -1,0 +1,194 @@
+[
+  {
+    "site": false,
+    "x": 0,
+    "z": 0,
+    "y": 0,
+    "floor": null,
+    "vertices": 384,
+    "minWallClearance": 0.016614906506962013,
+    "feetAboveBase": [
+      0.022252965872858965,
+      0.021245885794733965,
+      0.021245885794733965
+    ],
+    "flameCentered": true,
+    "floorRestored": true
+  },
+  {
+    "site": false,
+    "x": -4.1,
+    "z": -6.5,
+    "y": 0,
+    "floor": null,
+    "vertices": 384,
+    "minWallClearance": 0.01661497632810921,
+    "feetAboveBase": [
+      0.022253353960500988,
+      0.021246273882375988,
+      0.021246273882375988
+    ],
+    "flameCentered": true,
+    "floorRestored": true
+  },
+  {
+    "site": false,
+    "x": 389,
+    "z": -224,
+    "y": 0,
+    "floor": null,
+    "vertices": 384,
+    "minWallClearance": 0.016604312496187268,
+    "feetAboveBase": [
+      0.022252480403956554,
+      0.021245400325831554,
+      0.021245400325831554
+    ],
+    "flameCentered": true,
+    "floorRestored": true
+  },
+  {
+    "site": false,
+    "x": -381,
+    "z": -319,
+    "y": 0,
+    "floor": null,
+    "vertices": 384,
+    "minWallClearance": 0.016600688358317295,
+    "feetAboveBase": [
+      0.02225110358986271,
+      0.02124593086037052,
+      0.02124593086037052
+    ],
+    "flameCentered": true,
+    "floorRestored": true
+  },
+  {
+    "site": false,
+    "x": 100,
+    "z": 100,
+    "y": 0,
+    "floor": null,
+    "vertices": 384,
+    "minWallClearance": 0.016612253674975763,
+    "feetAboveBase": [
+      0.02225316348167894,
+      0.02124608340355394,
+      0.02124608340355394
+    ],
+    "flameCentered": true,
+    "floorRestored": true
+  },
+  {
+    "site": false,
+    "x": 5,
+    "z": -3,
+    "y": 2.4,
+    "floor": 12,
+    "vertices": 384,
+    "minWallClearance": 0.016615244661027984,
+    "feetAboveBase": [
+      0.022251797329447598,
+      0.021245670925639004,
+      0.021245670925639004
+    ],
+    "flameCentered": true,
+    "floorRestored": true
+  },
+  {
+    "site": true,
+    "x": 0,
+    "z": 0,
+    "y": 0,
+    "floor": null,
+    "vertices": 384,
+    "minWallClearance": 0.01660479801737369,
+    "feetAboveBase": [
+      0.022252480403956554,
+      0.021245400325831554,
+      0.021245400325831554
+    ],
+    "flameCentered": true,
+    "floorRestored": true
+  },
+  {
+    "site": true,
+    "x": -4.1,
+    "z": -6.5,
+    "y": 0,
+    "floor": null,
+    "vertices": 384,
+    "minWallClearance": 0.016606931753502585,
+    "feetAboveBase": [
+      0.02225208322230543,
+      0.02124500314418043,
+      0.02124500314418043
+    ],
+    "flameCentered": true,
+    "floorRestored": true
+  },
+  {
+    "site": true,
+    "x": 389,
+    "z": -224,
+    "y": 0,
+    "floor": null,
+    "vertices": 384,
+    "minWallClearance": 0.016583463956721056,
+    "feetAboveBase": [
+      0.022250219498907597,
+      0.021246954118048222,
+      0.021246954118048222
+    ],
+    "flameCentered": true,
+    "floorRestored": true
+  },
+  {
+    "site": true,
+    "x": -381,
+    "z": -319,
+    "y": 0,
+    "floor": null,
+    "vertices": 384,
+    "minWallClearance": 0.016581660932119935,
+    "feetAboveBase": [
+      0.022250984125467,
+      0.021245811395974812,
+      0.021245811395974812
+    ],
+    "flameCentered": true,
+    "floorRestored": true
+  },
+  {
+    "site": true,
+    "x": 100,
+    "z": 100,
+    "y": 0,
+    "floor": null,
+    "vertices": 384,
+    "minWallClearance": 0.01660402581151177,
+    "feetAboveBase": [
+      0.02224972547355719,
+      0.021246460092697816,
+      0.021246460092697816
+    ],
+    "flameCentered": true,
+    "floorRestored": true
+  },
+  {
+    "site": true,
+    "x": 5,
+    "z": -3,
+    "y": 2.4,
+    "floor": 12,
+    "vertices": 384,
+    "minWallClearance": 0.016603571266857242,
+    "feetAboveBase": [
+      0.022252007648479122,
+      0.021244927570354122,
+      0.021244927570354122
+    ],
+    "flameCentered": true,
+    "floorRestored": true
+  }
+]

@@ -320,11 +320,12 @@ void smallSurf(int id, vec3 p, vec3 n, inout Surf s){
   } else if (id == 11) {
     s.alb = vec3(0.05,0.035,0.025)*(0.75+0.4*vnoise(p*vec3(25.,6.,25.))); s.rough = 1.0;
   } else if (id == 15) {
-    vec3 v = voronoi(p.xz*14.);
-    float hot = smoothstep(0.1,0.0,v.x-0.05) + 0.5*(1.-smoothstep(0.0,0.25,v.y-v.x));
-    float fl = 0.6+0.4*vnoise(vec3(p.xz*6., uTime*1.5));
-    s.alb = vec3(0.02);
-    s.emi = mix(vec3(0.9,0.12,0.02), vec3(1.0,0.45,0.1), v.z) * (1.-hot*0.8) * fl * 3.0;
+    // The recessed fuel bed supplies subdued heat beneath the charcoal.
+    // No cell/vein pattern; fuel geometry or a separate surface supplies detail.
+    float heat = smoothstep(0.30, 0.72, vnoise(p * 9.));
+    float pulse = 0.90 + 0.10 * vnoise(vec3(p.xz * 6., uTime * 0.65));
+    s.alb = vec3(0.012,0.009,0.007);
+    s.emi = vec3(0.65,0.025,0.002) * heat * pulse;
     s.rough = 1.0;
   } else if (id == 16) {
     float m = vnoise(p*vec3(30.,8.,30.));
@@ -381,7 +382,17 @@ Surf surface(vec3 p, vec3 n){
   #ifdef TINT
   s.alb = tintTex(s.alb, TINT, 1.0);
   #endif
-  weather(s, p, n, MOSS);
+  #if MAT == 22
+    s.rough = 1.0;
+    s.wet = 0.0;
+    // Restrained red heat follows only the image's darkest gaps. The charcoal
+    // remains opaque/matte; live flames provide the visible rising motion.
+    float gap = 1. - smoothstep(0.0007, 0.0035, dot(t.a, vec3(0.2126, 0.7152, 0.0722)));
+    float pulse = 0.92 + 0.08 * sin(uTime * 1.3);
+    s.emi = vec3(0.38, 0.012, 0.001) * gap * max(n.y, 0.) * pulse;
+  #else
+    weather(s, p, n, MOSS);
+  #endif
 #elif MAT == 4
   // Roof: one projection aligned with the slope, tiles running down it.
   vec3 A = normalize(cross(vec3(0.0, 1.0, 0.0), n) + vec3(1e-4, 0.0, 0.0));

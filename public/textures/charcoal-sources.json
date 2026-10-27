@@ -1,0 +1,10 @@
+{
+  "provenance": "OpenAI image generation",
+  "source_kind": "generated image, not a photograph or material scan",
+  "prompt": "Square seamless orthographic top-down tightly packed bed of black/dark gray hardwood lump charcoal; fractured ends, longitudinal wood grain, fine natural fissures, restrained ash, neutral diffuse illumination. No flames, bowl, orange glow, regular tiles, smooth pebbles or Voronoi pattern.",
+  "game_maps": {
+    "albedo": "512x512 downsample",
+    "normal": "1x1 neutral",
+    "packed": "1x1 AO 1, roughness 1, height 0.5"
+  }
+}

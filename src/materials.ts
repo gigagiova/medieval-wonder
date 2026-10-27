@@ -71,6 +71,8 @@ export const MAT = {
   misc: 20,
   /** Fine-grained carved marble for the Arch of Trajan's architectural order. */
   carvedMarble: 21,
+  /** Image-textured charcoal bed for brazier fuel. */
+  charcoal: 22,
 } as const;
 export type MatName = keyof typeof MAT;
 /** Materials merged into 'misc' in town chunks and landmark cells (their shading needs no textures). */
@@ -98,6 +100,7 @@ const CFG: Partial<Record<number, MatCfg>> = {
   19: { set: 'block', tile: 1.4, alb: 0.95, moss: 0.5, tint: [0.98, 0.98, 1.04] },
   // Reuses the resident marble textures; no additional texture allocation.
   21: { set: 'marble', tile: 0.65, alb: 1.0, nrm: 0.30, moss: 0.12 },
+  22: { set: 'charcoal', tile: 0.70, alb: 0.4, rough: 1.0, nrm: 0, moss: 0 },
 };
 const f = (x: number) => x.toFixed(4);
 

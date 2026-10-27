@@ -1,0 +1,157 @@
+{
+  "fps": 12,
+  "frames": 16,
+  "shaderTimeVaries": true,
+  "adjacentFrames": [
+    {
+      "fromSeconds": 2.4,
+      "toSeconds": 2.4833333333333334,
+      "changedBounds": [
+        277,
+        8,
+        585,
+        504
+      ]
+    },
+    {
+      "fromSeconds": 2.4833333333333334,
+      "toSeconds": 2.5666666666666664,
+      "changedBounds": [
+        277,
+        184,
+        584,
+        504
+      ]
+    },
+    {
+      "fromSeconds": 2.5666666666666664,
+      "toSeconds": 2.65,
+      "changedBounds": [
+        277,
+        116,
+        585,
+        504
+      ]
+    },
+    {
+      "fromSeconds": 2.65,
+      "toSeconds": 2.7333333333333334,
+      "changedBounds": [
+        278,
+        48,
+        584,
+        504
+      ]
+    },
+    {
+      "fromSeconds": 2.7333333333333334,
+      "toSeconds": 2.8166666666666664,
+      "changedBounds": [
+        278,
+        48,
+        585,
+        504
+      ]
+    },
+    {
+      "fromSeconds": 2.8166666666666664,
+      "toSeconds": 2.9,
+      "changedBounds": [
+        277,
+        79,
+        584,
+        504
+      ]
+    },
+    {
+      "fromSeconds": 2.9,
+      "toSeconds": 2.9833333333333334,
+      "changedBounds": [
+        278,
+        35,
+        584,
+        504
+      ]
+    },
+    {
+      "fromSeconds": 2.9833333333333334,
+      "toSeconds": 3.0666666666666664,
+      "changedBounds": [
+        277,
+        35,
+        584,
+        503
+      ]
+    },
+    {
+      "fromSeconds": 3.0666666666666664,
+      "toSeconds": 3.15,
+      "changedBounds": [
+        284,
+        71,
+        584,
+        502
+      ]
+    },
+    {
+      "fromSeconds": 3.15,
+      "toSeconds": 3.2333333333333334,
+      "changedBounds": [
+        277,
+        31,
+        585,
+        503
+      ]
+    },
+    {
+      "fromSeconds": 3.2333333333333334,
+      "toSeconds": 3.3166666666666664,
+      "changedBounds": [
+        278,
+        28,
+        585,
+        503
+      ]
+    },
+    {
+      "fromSeconds": 3.3166666666666664,
+      "toSeconds": 3.4,
+      "changedBounds": [
+        279,
+        8,
+        583,
+        502
+      ]
+    },
+    {
+      "fromSeconds": 3.4,
+      "toSeconds": 3.4833333333333334,
+      "changedBounds": [
+        277,
+        8,
+        584,
+        504
+      ]
+    },
+    {
+      "fromSeconds": 3.4833333333333334,
+      "toSeconds": 3.5666666666666664,
+      "changedBounds": [
+        287,
+        163,
+        558,
+        501
+      ]
+    },
+    {
+      "fromSeconds": 3.5666666666666664,
+      "toSeconds": 3.65,
+      "changedBounds": [
+        286,
+        123,
+        540,
+        500
+      ]
+    }
+  ]
+}
