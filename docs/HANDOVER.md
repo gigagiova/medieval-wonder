@@ -181,9 +181,8 @@ full-world approach views; the reported separate gap was not reproduced.
 
 ## Open defects and next steps
 
-For the active native-character rebuild and parallel clothing experiments, read
-[the continuation record](npc-audit/CONTINUATION.md). It distinguishes validated
-raw simulation from rejected thickness finishing and unfinished production rollout.
+The continuation record `npc-audit/CONTINUATION.md` and the NPC experiments it
+described were never committed and are lost; see [RECOVERY.md](RECOVERY.md).
 
 
 1. **Real-phone check.** No change since the latest performance pass has been checked on an iPhone. That pass measured, headless at 390×844:
