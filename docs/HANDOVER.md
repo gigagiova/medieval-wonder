@@ -3,6 +3,21 @@
 This is the state of `main` (fast-forwarded from `claude/medieval-town`) at handover. Read `AGENTS.md` for the rules and the build commands.
 
 
+## Wall tower registration — first increment (28 October 2026)
+
+The owner explicitly wants every tower/projection traced from the plan, with
+Civitas Nova excluded. This task is NOT complete: only Panaro has finished
+registration; other world towers are still procedural placeholders. The first
+inventory has14 mapped defensive features and12 plan-feature review candidates.
+See [TOWERS.md](benevento/TOWERS.md). Several tower positions expose15–25m
+errors in the current curtain, so retrace those sections before replacing all
+remaining placeholders. Do not silently snap source positions to the bad trace.
+Panaro is now a registered9m-diameter reconstructed tower at the mapped NE
+corner; it shares coordinates across collision, visual geometry and map.
+The parchment now uses the actual world tower list rather than inventing a
+separate random set. Next work: complete the source-feature review and curtain
+registration, replace remaining procedural positions, and recheck gate routes.
+
 ## Real terrain upgrade (28 October 2026)
 
 The main terrain grid now comes from INGV TINITALY1.1 bare-ground10m data,

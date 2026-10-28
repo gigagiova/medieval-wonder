@@ -1,0 +1,33 @@
+[
+  {
+    "camera": [
+      695,
+      49.27884991836549,
+      -174
+    ],
+    "rotation": [
+      -0.05,
+      2.484062284427135,
+      0,
+      "YXZ"
+    ],
+    "render": {
+      "frame": 280,
+      "calls": 54,
+      "triangles": 135173,
+      "points": 2793,
+      "lines": 0
+    },
+    "stats": "build 27021ms, 135173 tris drawn, 54 calls, cells 49/401 visible, 0 occluded, chunks ready 9 (built 21, avg 219 ms), geo 538, tex 97",
+    "error": null,
+    "afterCapture": {
+      "frame": 280,
+      "calls": 54,
+      "triangles": 135173,
+      "points": 2793,
+      "lines": 0
+    },
+    "name": "Torre del Santo Panaro",
+    "errors": []
+  }
+]

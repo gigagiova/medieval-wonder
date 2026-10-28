@@ -1,0 +1,25 @@
+{
+  "tower": {
+    "id": "panaro",
+    "name": "Torre del Santo Panaro",
+    "visit": [
+      695,
+      -174
+    ],
+    "x": 675.4100727763,
+    "z": -148.6295499275,
+    "ox": 0,
+    "oz": 0,
+    "radius": 4.5,
+    "kind": 1,
+    "h": 13,
+    "seed": 248001579,
+    "roof": false,
+    "torch": false
+  },
+  "wallDistanceM": 2.9291128650853118,
+  "wallOverlapM": 2.8208871349146882,
+  "duplicateNeighbours": 0,
+  "houseIntersections": 0,
+  "totalWorldTowers": 56
+}

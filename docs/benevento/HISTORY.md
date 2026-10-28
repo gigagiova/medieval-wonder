@@ -671,3 +671,16 @@ https://doi.org/10.13127/tinitaly/1.1 (CC BY4.0).
 
 This changes elevation only. It does not substitute modern streets for the
 owner's plan or complete its outstanding footprint tracing and registration.
+
+
+## Wall tower inventory — 28 October 2026
+
+The owner's perimeter projections are tower candidates to trace individually,
+not justification for towers at arbitrary fixed intervals. The first OSM
+inventory identifies14 defensive-tower ways in the historical-center bounds;
+this is neither a700 population count nor an exhaustive source-plan trace.
+Panaro's mapped round footprint is adopted at the northeast corner. Its13m
+height and top/masonry are reconstructed; a modern mapped footprint alone does
+not establish the survival of every elevation in700. Other projections still
+need registration against the curtain. See [TOWERS.md](TOWERS.md) for completed
+and outstanding work, Civitas Nova exclusions and source attribution.

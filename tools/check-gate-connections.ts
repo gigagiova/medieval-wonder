@@ -46,8 +46,10 @@ report.preExistingLotOverlaps=[...oldOverlaps];
 report.newLotOverlaps=report.lotOverlaps.filter((id:number)=>!oldOverlaps.has(id));
 const far=(p:number[])=>Math.hypot(p[0]-389,p[1]+250)>85;
 const distantPieces=(p:any)=>p.pieces.filter((w:any)=>far(w.a)&&far(w.b));
-const distantTowers=(p:any)=>p.towers.filter((t:any)=>far([t.x,t.z]));
+// Panaro was independently registered after the Aurea baseline was captured.
+const distantTowers=(p:any)=>p.towers.filter((t:any)=>far([t.x,t.z]) && Math.hypot(t.x+t.ox*2.4-675.4100727763,t.z+t.oz*2.4+148.6295499275)>=18);
 report.outside85mWallIdentical=JSON.stringify(distantPieces(baseline.plan))===JSON.stringify(distantPieces(plan));
+report.towerComparisonExcludesPanaroRadiusM=18;
 report.outside85mTowersIdentical=JSON.stringify(distantTowers(baseline.plan))===JSON.stringify(distantTowers(plan));
 report.archToPerimeterDistance=distPolyline(SITES.arcusTraiani.x,SITES.arcusTraiani.z,WALL700,true);
 const a=WALL700[51],b=WALL700[55],length=Math.hypot(b[0]-a[0],b[1]-a[1]);

@@ -1,0 +1,158 @@
+[
+  {
+    "id": "N01",
+    "planPx": [
+      239,
+      139
+    ],
+    "world": [
+      -300.9179013704787,
+      -368.24654041437736
+    ],
+    "interpretation": "Projection near the mapped Biffa; exact identification needs review.",
+    "status": "requires tracing review"
+  },
+  {
+    "id": "N02",
+    "planPx": [
+      329,
+      169
+    ],
+    "world": [
+      -214.44109284737917,
+      -327.9769298236637
+    ],
+    "interpretation": "Small rectangular north-wall projection.",
+    "status": "requires tracing review"
+  },
+  {
+    "id": "N03",
+    "planPx": [
+      385,
+      177
+    ],
+    "world": [
+      -160.36292667220397,
+      -312.4574126298906
+    ],
+    "interpretation": "Elongated projection; tower versus wall building unresolved.",
+    "status": "requires tracing review"
+  },
+  {
+    "id": "N04",
+    "planPx": [
+      650,
+      157
+    ],
+    "world": [
+      108.08291363775788,
+      -291.89921825605836
+    ],
+    "interpretation": "Small north-wall projection.",
+    "status": "requires tracing review"
+  },
+  {
+    "id": "N05",
+    "planPx": [
+      769,
+      150
+    ],
+    "world": [
+      232.41030057040257,
+      -281.02308083755406
+    ],
+    "interpretation": "Rectangular north-wall feature; wall building versus tower unresolved.",
+    "status": "requires tracing review"
+  },
+  {
+    "id": "N06",
+    "planPx": [
+      844,
+      141
+    ],
+    "world": [
+      311.53464503565226,
+      -278.701279946857
+    ],
+    "interpretation": "North-wall projection near OSM defensive tower1016982302.",
+    "status": "requires tracing review"
+  },
+  {
+    "id": "N07",
+    "planPx": [
+      1050,
+      178
+    ],
+    "world": [
+      522.0578775666269,
+      -210.8512931903541
+    ],
+    "interpretation": "Northeast feature near OSM defensive tower480303640.",
+    "status": "requires tracing review"
+  },
+  {
+    "id": "NE01",
+    "planPx": [
+      1203,
+      223
+    ],
+    "world": [
+      671.7055136265755,
+      -142.42298207544562
+    ],
+    "interpretation": "Rounded corner projection: Torre del Santo Panaro.",
+    "status": "implemented"
+  },
+  {
+    "id": "E01",
+    "planPx": [
+      1210,
+      362
+    ],
+    "world": [
+      647.7658649401981,
+      -4.128056118857515
+    ],
+    "interpretation": "East-wall projection near OSM defensive tower1015674809.",
+    "status": "requires tracing review"
+  },
+  {
+    "id": "S01",
+    "planPx": [
+      935,
+      543
+    ],
+    "world": [
+      351.8829417300402,
+      128.56153273809127
+    ],
+    "interpretation": "South-wall rectangular projection; tower versus building unresolved.",
+    "status": "requires tracing review"
+  },
+  {
+    "id": "G01",
+    "planPx": [
+      106,
+      324
+    ],
+    "world": [
+      -435.17478531993703,
+      -207.07983684014417
+    ],
+    "interpretation": "Gate/transition at Civitas Nova edge, not automatically a tower.",
+    "status": "requires tracing review"
+  },
+  {
+    "id": "G02",
+    "planPx": [
+      469,
+      436
+    ],
+    "world": [
+      -75.97576926348054,
+      -50.320242528263705
+    ],
+    "interpretation": "Sacramento marker/late-antique tower vicinity, avoid duplicating the gate.",
+    "status": "requires tracing review"
+  }
+]

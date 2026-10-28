@@ -334,17 +334,15 @@ function wall(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: numbe
   wobblyPath(ctx, dense, rnd, 0.6, true); ctx.stroke();
   ctx.strokeStyle = '#e4d0a4'; ctx.lineWidth = w * 0.45;
   wobblyPath(ctx, dense, rnd, 0.4, true); ctx.stroke();
-  // Towers along the circuit.
-  let acc = 0;
-  for (let i = 0; i < dense.length; i++) {
-    const [x, y] = dense[i], [nx, ny] = dense[(i + 1) % dense.length];
-    acc += Math.hypot(nx - x, ny - y);
-    if (acc < 45 * k) continue;
-    acc = 0;
+  // Draw the actual streamed towers, not a second random set of symbols.
+  for (const t of d.towers) {
+    const [x, y] = P(t.x, t.z);
     ctx.fillStyle = '#d9c08e'; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(0.8, k * 0.6);
     ctx.beginPath();
-    if (rnd() < 0.5) ctx.arc(x, y, w * 0.9, 0, Math.PI * 2); else ctx.rect(x - w * 0.8, y - w * 0.8, w * 1.6, w * 1.6);
+    if (t.kind !== 0) ctx.arc(x, y, w * 0.9, 0, Math.PI * 2);
+    else ctx.rect(x - w * 0.8, y - w * 0.8, w * 1.6, w * 1.6);
     ctx.fill(); ctx.stroke();
+    if (t.name) label(ctx, t.name, x - w * 2, y - w * 2.4, Math.max(9, k * 14), 0, true, 'right');
   }
   for (const g of d.gates) {
     const [x, y] = P(g.at[0], g.at[1]);

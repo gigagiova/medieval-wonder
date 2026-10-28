@@ -1,0 +1,16 @@
+import {wallPlan} from '../src/benevento/fabric';
+import {distPolyline,WALL700,inPoly} from '../src/benevento/geo';
+import {layoutTown} from '../src/benevento/layout';
+const plan=wallPlan(),tower=plan.towers.find(t=>t.id==='panaro')!;
+if(!tower||plan.towers.filter(t=>t.id==='panaro').length!==1)throw Error('Panaro must occur once');
+const distance=distPolyline(tower.x,tower.z,WALL700,true),radius=tower.radius!;
+if(distance>radius+1.25)throw Error('Panaro is detached from the curtain');
+const neighbours=plan.towers.filter(t=>t!==tower&&Math.hypot(t.x+t.ox*2.4-tower.x,t.z+t.oz*2.4-tower.z)<18);
+if(neighbours.length)throw Error('Duplicate tower beside mapped Panaro');
+const layout=layoutTown();
+if(layout.lots.some(l=>inPoly(...tower.visit!,l.c.map(p=>[p.x,p.y]))))throw Error("Panaro teleport inside a house");
+if(distPolyline(...tower.visit!,WALL700,true)<6)throw Error('Panaro visit point too close to curtain');
+if(plan.towers.some(t=>Math.hypot(t.x+t.ox*2.4-tower.visit![0],t.z+t.oz*2.4-tower.visit![1])<(t.radius??4)+3))throw Error('Visit point overlaps tower');
+const lots=layout.lots.filter(l=>l.c.some(p=>Math.hypot(p.x-tower.x,p.y-tower.z)<radius)||inPoly(tower.x,tower.z,l.c.map(p=>[p.x,p.y])));
+if(lots.length)throw Error('Tower intersects houses: '+lots.map(l=>l.id));
+console.log(JSON.stringify({tower,wallDistanceM:distance,wallOverlapM:radius+1.25-distance,duplicateNeighbours:neighbours.length,houseIntersections:lots.length,totalWorldTowers:plan.towers.length},null,2));

@@ -1,0 +1,34 @@
+{
+  "scope": "Northeast curtain, towers and ground; neutral materials and identical cameras. Baseline has old procedural towers; after includes registered Panaro. Excludes town buildings and production postprocessing.",
+  "views": {
+    "before-top": {
+      "frame": 2,
+      "calls": 52,
+      "triangles": 196168,
+      "points": 0,
+      "lines": 0
+    },
+    "before-front": {
+      "frame": 3,
+      "calls": 33,
+      "triangles": 137968,
+      "points": 0,
+      "lines": 0
+    },
+    "after-top": {
+      "frame": 4,
+      "calls": 52,
+      "triangles": 199104,
+      "points": 0,
+      "lines": 0
+    },
+    "after-front": {
+      "frame": 5,
+      "calls": 33,
+      "triangles": 140904,
+      "points": 0,
+      "lines": 0
+    }
+  },
+  "errors": []
+}

@@ -14,7 +14,8 @@ import { placeProp, commitProps, rand01, propSize, propsLoaded, type PropId } fr
 import { BOUNDS, RIVERS, WALL700, CIVITAS_NOVA, MEDIEVAL_OUTLINE, insideWalls, insideness, riverAt, inPoly, type P2 } from './benevento/geo';
 import { SITES, GATES, ROADS, siteToWorld, DISTRICTS, onWall, type SiteDef } from './benevento/sites';
 import { layoutTown, density, FREE, STREET, RESERVED, HOUSE, PLOT, type Layout } from './benevento/layout';
-import { makeChunks, buildChunk, CHUNK, lotForm, type Hole, type ChunkItems } from './benevento/fabric';
+import { REGISTERED_WALL_TOWERS } from './benevento/tower-sites';
+import { makeChunks, buildChunk, wallPlan, CHUNK, lotForm, type Hole, type ChunkItems } from './benevento/fabric';
 import { FabricStream } from './benevento/stream';
 import * as M from './benevento/monuments';
 import { theatreView } from './benevento/theatrum';
@@ -71,6 +72,9 @@ export function getTeleports(): Teleport[] {
     out.push(tp(name, x, z, lx2, lz2));
   };
   at('Porta Aurea', S.arcusTraiani, 0, 14, 0, 0);
+  for (const tower of REGISTERED_WALL_TOWERS) {
+    if (tower.name && tower.visit) out.push(tp(tower.name, ...tower.visit, tower.x, tower.z));
+  }
   {
     // On the paved way inside the arch (the one the layout cuts through), looking out at it.
     const g = GATES.find((q) => q.id === 'sacramenti')!, dx = 0.62, dz = -0.79;
@@ -376,6 +380,7 @@ export function getMapData() {
     bounds: BOUNDS,
     raster: lay.r,
     codes: { free: FREE, street: STREET, reserved: RESERVED, house: HOUSE, plot: PLOT, outside: 4 },
+    towers: wallPlan().towers.map(t => ({ x: t.x + t.ox * 2.4, z: t.z + t.oz * 2.4, kind: t.kind, name: t.name })),
     wall: WALL700, civitasNova: CIVITAS_NOVA, medievalOutline: MEDIEVAL_OUTLINE,
     rivers: RIVERS.map((r) => ({ name: r.name, pts: r.pts, w: r.w })),
     roads: ROADS,

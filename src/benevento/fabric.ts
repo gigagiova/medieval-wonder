@@ -11,6 +11,7 @@ import { fastTerrain } from '../displace';
 import { torch, brazier } from '../lights';
 import { WALL700, RAW_WALL700, BOUNDS, insideness, type P2 } from './geo';
 import { GATES, SITES, siteToWorld } from './sites';
+import { REGISTERED_WALL_TOWERS } from './tower-sites';
 import type { Layout, Plot, PlotKind } from './layout';
 import { buildInterior, interiorCollider } from './interiors';
 import { sortByCluster } from '../clusters';
@@ -79,7 +80,7 @@ export function lotForm(c: P2[], front: boolean, seed: number): { form?: 'tower'
   return {};
 }
 export interface WallPiece { a: P2; b: P2; out: P2; h: number; seed: number }
-export interface TowerSpec { x: number; z: number; ox: number; oz: number; kind: 0 | 1 | 2; h: number; seed: number; roof: boolean; torch: boolean }
+export interface TowerSpec { id?: string; name?: string; radius?: number; visit?: P2; x: number; z: number; ox: number; oz: number; kind: 0 | 1 | 2; h: number; seed: number; roof: boolean; torch: boolean }
 export interface GateSpec { id: string; x: number; z: number; dx: number; dz: number; main: boolean; seed: number }
 export interface PlotData { pts: P2[]; kind: PlotKind; seed: number }
 export interface Hole { pts: P2[] }
@@ -204,6 +205,14 @@ export function wallPlan() {
     const t: TowerSpec = { x: q.p[0], z: q.p[1], ox: o[0], oz: o[1], kind: u < 0.52 ? 0 : u < 0.88 ? 1 : 2, h: R(12, 15), seed: Math.floor(rand() * 1e9), roof: rand() < 0.45, torch: rand() < 0.3 };
     if (!inGap(s, 10)) towers.push(t);
   }
+  // Registered source footprints replace nearby procedural placeholders.
+  for (const registered of REGISTERED_WALL_TOWERS) {
+    for (let i = towers.length - 1; i >= 0; i--) {
+      const t = towers[i];
+      if (Math.hypot(t.x + t.ox * 2.4 - registered.x, t.z + t.oz * 2.4 - registered.z) < 18) towers.splice(i, 1);
+    }
+    towers.push({ ...registered });
+  }
   return { pieces, towers, gates, perim };
 }
 
@@ -244,7 +253,7 @@ function tower(b: Builder, t: TowerSpec) {
     if (t.roof) pyramidRoof(b, w + 0.6, 1.8, cx, t.h - 1.25, cz);
     else ruin(b, 'rubble', w, 1.6, d, cx, t.h - 1.25, cz, ry, 0.8);
   } else if (t.kind === 1) {
-    const r = 3.2 + rand() * 0.8;
+    const r = t.radius ?? (3.2 + rand() * 0.8);
     b.geo('rubble', new THREE.CylinderGeometry(r, r * 1.06, t.h, 28, 1), cx, t.h / 2 - 1.2, cz);
     if (b.mode === 'collide') return;
     b.geo('bigstone', new THREE.CylinderGeometry(r * 1.08, r * 1.1, 1.6, 28, 1), cx, -0.4, cz, 0, false);
@@ -762,7 +771,7 @@ export function lodChunk(it: ChunkItems): { walls: number[]; roofs: number[] } {
     tri(walls, Y(q[0][0], q[0][1], w.h), Y(q[2][0], q[2][1], w.h), Y(q[3][0], q[3][1], w.h));
   }
   for (const t of it.towers) {
-    const cx = t.x + t.ox * 2.4, cz = t.z + t.oz * 2.4, r = 3.2, n = 8, h = t.kind === 2 ? 2.3 : t.h - 1.2;
+    const cx = t.x + t.ox * 2.4, cz = t.z + t.oz * 2.4, r = t.radius ?? 3.2, n = 8, h = t.kind === 2 ? 2.3 : t.h - 1.2;
     inside = [cx, fastTerrain(cx, cz) + h * 0.3, cz];
     for (let k = 0; k < n; k++) {
       const a0 = (k / n) * Math.PI * 2, a1 = ((k + 1) / n) * Math.PI * 2;
