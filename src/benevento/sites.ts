@@ -177,7 +177,7 @@ function gateAt(near: P2): P2 {
   }
   return best ?? onWall(near[0], near[1]).p;
 }
-export const GATES: Gate[] = GATE_SPEC.map((g) => ({ id: g.id, name: g.name, main: g.main, kind: g.kind, at: g.kind === 'arch' ? g.near : gateAt(g.near) }));
+export const GATES: Gate[] = GATE_SPEC.map((g) => ({ id: g.id, name: g.name, main: g.main, kind: g.kind, at: g.kind === 'arch' ? g.near : g.id === 'summa' ? onWall(g.near[0], g.near[1]).p : gateAt(g.near) }));
 
 // ---------------------------------------------------------------- roads outside the walls
 export interface Road { name: string; pts: P2[]; w: number }

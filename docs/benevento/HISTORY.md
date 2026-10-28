@@ -684,3 +684,30 @@ height and top/masonry are reconstructed; a modern mapped footprint alone does
 not establish the survival of every elevation in700. Other projections still
 need registration against the curtain. See [TOWERS.md](TOWERS.md) for completed
 and outstanding work, Civitas Nova exclusions and source attribution.
+
+## The plan traced cell by cell — 28 October 2026
+
+Supersedes the parts of §3, §4 and §6 that describe the registration, the circuit
+and the generated houses; details and rules in [PLAN-TRACE.md](PLAN-TRACE.md).
+
+- **Footprints (attested by the owner's plan; their AD 700 use is inferred).** Every
+  building outline drawn on the plan is one house on that footprint (688 traced; 650
+  stand, the rest lie under landmark precincts). The 6,019 procedural lots, the street
+  encroachment of §6 and the procedural fill of large blocks are gone. The plan is a
+  survey of the later town: reading its outlines as AD 700 houses is the owner's rule
+  for the game, not a claim that these buildings stood in 700.
+- **Open ground (hypothesis).** Large undivided cells (> ~520 m²) are read as open:
+  gardens, vineyards, meadows, pens and ruins, walled where they face a lane. This fits
+  the "città ad isole" of the period (Brogiolo and Gelichi 1998), but the drawing itself
+  does not say what stood there. Wide parts of the lane spaces are open lane ground.
+- **Circuit (inferred).** The drawn outer line less Civitas Nova (3.05 km, 32.4 ha),
+  including the east end and the Rocca drawing that the earlier circuit cut off. The
+  opening drawn in the east line by the Rocca is taken as Porta Summa (hypothesis: it
+  replaces the earlier "150 m further west" position, for which the drawing has no wall).
+  The Castellum Aquae landmark now stands inside the circuit.
+- **Registration v2 (inferred).** Porta Aurea and the Arch of Sacramento are matched where
+  the plan's edges pass under their marker triangles, and four surviving towers mapped in
+  OSM (Biffa, ways 1016982302, 480303640, 1015674809) to the projections drawn on the outer
+  line. Porta Aurea is back at its mapped footprint, 2 m from the curtain.
+- **Towers (plan-traced; heights and tops are reconstruction).** Only eight: the
+  projections drawn on the outer line (TOWERS.md). The 40-55 m procedural towers are gone.
