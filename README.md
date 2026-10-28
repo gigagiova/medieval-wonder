@@ -60,3 +60,7 @@ npm run build    # static site in dist/
   echo in the catacombs.
 
 `?shot=x,y,z,yaw,pitch` places the camera (used for headless screenshots); `?debug` shows FPS in the title.
+
+Terrain data: TINITALY 1.1, INGV (Tarquini et al., 2023),
+[doi:10.13127/tinitaly/1.1](https://doi.org/10.13127/tinitaly/1.1), CC BY 4.0.
+See [terrain attribution and adaptations](public/licenses/tinitaly.txt).

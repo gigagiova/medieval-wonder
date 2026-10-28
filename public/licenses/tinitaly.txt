@@ -1,0 +1,18 @@
+Terrain data: TINITALY 1.1
+Tarquini S., Isola I., Favalli M., Battistini A., Dotta G. (2023).
+TINITALY, a digital elevation model of Italy with a 10 meters cell size (Version 1.1).
+Istituto Nazionale di Geofisica e Vulcanologia (INGV).
+https://doi.org/10.13127/tinitaly/1.1
+Source: https://tinitaly.pi.ingv.it/
+License: Creative Commons Attribution 4.0 International
+https://creativecommons.org/licenses/by/4.0/
+
+Modified for Medieval Wonder: cropped around Benevento, reprojected/resampled,
+river channels adapted to the reconstruction, boundaries blended, heights
+quantized to decimetres and local landmark terraces applied at runtime.
+No endorsement by INGV is implied.
+
+Earlier EU-DEM-derived terrain is retained at the crop boundary and in the
+regional extension: Copernicus EU-DEM v1.1 via OpenTopoData, adapted through
+smoothing and channel carving. Source documentation and access conditions:
+https://www.opentopodata.org/datasets/eudem/

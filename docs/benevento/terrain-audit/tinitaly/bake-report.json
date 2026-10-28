@@ -1,0 +1,17 @@
+{
+  "source": "TINITALY 1.1, INGV (2023)",
+  "doi": "https://doi.org/10.13127/tinitaly/1.1",
+  "license": "CC BY 4.0",
+  "sourceCrs": "EPSG:32632",
+  "sourceCellSizeM": 10,
+  "gridUnchanged": true,
+  "heightRangeM": [
+    104.9,
+    201.27490155255353
+  ],
+  "meanChangeM": -1.3137345073805733,
+  "maxAbsoluteChangeM": 26.03044433593749,
+  "boundaryMaxChangeM": 0.0,
+  "riverLevelsChanged": false,
+  "notes": "Reprojected bare-ground elevation; channel constraints and 60m boundary blend are authored adaptations. Modern terrain is not a survey of AD700 surfaces."
+}

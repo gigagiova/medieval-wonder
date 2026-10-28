@@ -3,6 +3,17 @@
 This is the state of `main` (fast-forwarded from `claude/medieval-town`) at handover. Read `AGENTS.md` for the rules and the build commands.
 
 
+## Real terrain upgrade (28 October 2026)
+
+The main terrain grid now comes from INGV TINITALY1.1 bare-ground10m data,
+reprojected from EPSG:32632 onto the existing geographic frame. The former
+EU-DEM25m terrain remains only in the boundary blend and regional extension.
+River levels/channel constraints and runtime landmark terraces are retained.
+See [TERRAIN.md](benevento/TERRAIN.md) for attribution, reproducible source crop,
+before/after elevation maps and validation. Layout density is frozen separately
+so new heights cannot reroll the horizontal town. Exact source-plan footprint
+tracing and the remaining map-registration discrepancies are still outstanding.
+
 ## Porta Aurea perimeter correction (28 October 2026)
 
 The old22.6m return-wall solution is superseded. Porta Aurea now lies on a

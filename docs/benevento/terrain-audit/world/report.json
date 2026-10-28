@@ -1,0 +1,64 @@
+[
+  {
+    "camera": [
+      377.8,
+      37.401405430081134,
+      -247.81792168674698
+    ],
+    "rotation": [
+      -0.05,
+      -0.9272952180016114,
+      0,
+      "YXZ"
+    ],
+    "render": {
+      "frame": 328,
+      "calls": 71,
+      "triangles": 129948,
+      "points": 2800,
+      "lines": 0
+    },
+    "stats": "build 40240ms, 129948 tris drawn, 71 calls, cells 67/402 visible, 2 occluded, chunks ready 11 (built 23, avg 275 ms), geo 542, tex 98",
+    "error": null,
+    "afterCapture": {
+      "frame": 328,
+      "calls": 71,
+      "triangles": 129948,
+      "points": 2800,
+      "lines": 0
+    },
+    "name": "Porta Aurea",
+    "errors": []
+  },
+  {
+    "camera": [
+      -704.4719726612124,
+      20.262935020285898,
+      -115.92458101534022
+    ],
+    "rotation": [
+      -0.05,
+      1.8363676735834928,
+      0,
+      "YXZ"
+    ],
+    "render": {
+      "frame": 450,
+      "calls": 65,
+      "triangles": 86773,
+      "points": 2793,
+      "lines": 0
+    },
+    "stats": "build 40240ms, 86773 tris drawn, 65 calls, cells 46/403 visible, 0 occluded, chunks ready 12 (built 35, avg 196 ms), geo 551, tex 113",
+    "error": null,
+    "afterCapture": {
+      "frame": 450,
+      "calls": 65,
+      "triangles": 86773,
+      "points": 2793,
+      "lines": 0
+    },
+    "name": "Pons Leprosus",
+    "errors": []
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "gates": [
+    {
+      "id": "aurea",
+      "passageFailures": [],
+      "barrierFailures": []
+    },
+    {
+      "id": "laurentii",
+      "passageFailures": [],
+      "barrierFailures": []
+    }
+  ],
+  "lotOverlaps": [
+    2,
+    1
+  ],
+  "returns": [],
+  "preExistingLotOverlaps": [
+    2,
+    1
+  ],
+  "newLotOverlaps": [],
+  "outside85mWallIdentical": true,
+  "outside85mTowersIdentical": true,
+  "archToPerimeterDistance": 4.440892098500626e-16,
+  "localWallCollinearityError": 9.864648784668016e-15,
+  "cityApproachLotOverlaps": []
+}

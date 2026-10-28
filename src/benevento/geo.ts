@@ -4,8 +4,9 @@ import { CORRECTED_WALL700 } from './aurea-perimeter';
 import { RAW_WALL700 } from './aurea-perimeter';
 export { RAW_WALL700 } from './aurea-perimeter';
 
-// Benevento as it lay c. AD 700, baked by tools/benevento/*.py: EU-DEM 25 m
-// elevations (smoothed, river channels carved), the Calore and Sabato from
+// Benevento reconstructed c. AD 700: INGV TINITALY 1.1 bare-ground elevations
+// at 10m, with adapted river channels and an EU-DEM boundary blend. See
+// docs/benevento/TERRAIN.md and public/licenses/tinitaly.txt. Rivers come from
 // OpenStreetMap, and the user's urban plan (docs/benevento) vectorised into
 // streets, blocks and open spaces, registered onto the real ground through
 // control points (thin-plate spline). The first Lombard circuit is the plan's

@@ -657,3 +657,17 @@ neighbors, following the owner's requested relative plan geometry. Its new
 world coordinate correction. The façade direction remains consistent with the
 mapped arch. See [AUREA-ALIGNMENT.md](AUREA-ALIGNMENT.md) for source evidence,
 alternatives and the explicit tradeoff. No recessed gate pocket is retained.
+
+## Terrain source revision — 28 October 2026
+
+The primary terrain is now INGV TINITALY1.1 (2023), a10m bare-ground DTM,
+retrieved as a georeferenced WCS crop and reprojected from EPSG:32632 into
+our geographic frame. This supersedes the EU-DEM25m primary-terrain description
+in §3. Existing river levels/channel carving and landmark terraces remain
+reconstruction adaptations; the outer60m blends into the former terrain for
+continuity. Modern topography is evidence for the landscape, not proof of
+AD700 street levels. See [TERRAIN.md](TERRAIN.md) and the source citation
+https://doi.org/10.13127/tinitaly/1.1 (CC BY4.0).
+
+This changes elevation only. It does not substitute modern streets for the
+owner's plan or complete its outstanding footprint tracing and registration.

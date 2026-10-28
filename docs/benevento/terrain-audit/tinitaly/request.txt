@@ -1,0 +1,1 @@
+https://tinitaly.pi.ingv.it/TINItaly_1_1/wcs?service=WCS&version=2.0.1&request=GetCoverage&coverageId=TINItaly_1_1__tinitaly_dem&format=image%2Ftiff&subset=E%28983247.777450368%2C985778.1210384071%29&subset=N%284568640.730562692%2C4570249.253540407%29

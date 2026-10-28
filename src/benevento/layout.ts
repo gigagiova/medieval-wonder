@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { rng } from '../builder';
 import { GEO_STREETS, GEO_PARCELS, GEO_STREET_AREAS, DECUMANUS, RAW_WALL700 as WALL700, BOUNDS, rawInsideness as insideness, insideness as currentInsideness, inPoly, distPolyline, type P2 } from './geo';
 import { SITES, GATES as CURRENT_GATES, ROADS, EXPLORE_TARGETS, FIXED_EXPLORE_LOTS, siteToWorld, type ExploreKind } from './sites';
-import { fastTerrain } from '../displace';
+import DENSITY from './layout-density.json';
 import type { Lot, BridgeSpec } from '../town';
 
 // The town of AD 700 laid out on the user's plan, which is the authority for
@@ -100,46 +100,18 @@ export const KEEP_OPEN: { x: number; z: number; r: number }[] = [];
 // inside Porta Aurea; low on the steep slopes to the Calore. It no longer
 // decides what is built (the plan does): only how tall the houses are, and
 // where the wells and the arches over the lanes go.
-const DS = 8;
-let DEN: Float32Array | null = null, DNX = 0, DNZ = 0, DX0 = 0, DZ0 = 0;
-function hashNoise(x: number, z: number) {
-  const s = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
-  return s - Math.floor(s);
-}
-function smoothNoise(x: number, z: number, cell: number) {
-  const fx = x / cell, fz = z / cell, i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
-  const a = hashNoise(i, j), b = hashNoise(i + 1, j), c = hashNoise(i, j + 1), d = hashNoise(i + 1, j + 1);
-  const su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v);
-  return (a * (1 - su) + b * su) * (1 - sv) + (c * (1 - su) + d * su) * sv;
-}
+// Authored layout density is independent of elevation sampling: a terrain
+// upgrade must not reroll house IDs or move streets and worship rooms.
+const DEN = (() => {
+  const raw = atob(DENSITY.float32le), bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  const view = new DataView(bytes.buffer), values = new Float32Array(DENSITY.nx * DENSITY.nz);
+  for (let i = 0; i < values.length; i++) values[i] = view.getFloat32(i * 4, true);
+  return values;
+})();
 export function density(x: number, z: number) {
-  if (!DEN) buildDensity();
-  const i = Math.floor((x - DX0) / DS), j = Math.floor((z - DZ0) / DS);
-  if (i < 0 || j < 0 || i >= DNX || j >= DNZ) return 0;
-  return DEN![j * DNX + i];
-}
-function buildDensity() {
-  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-  for (const [x, z] of WALL700) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
-  DX0 = x0 - 16; DZ0 = z0 - 16; DNX = Math.ceil((x1 - x0 + 32) / DS); DNZ = Math.ceil((z1 - z0 + 32) / DS);
-  DEN = new Float32Array(DNX * DNZ);
-  const mains = [DECUMANUS];
-  const focus: [number, number, number, number][] = [
-    [SITES.curtis.x, SITES.curtis.z, 0.5, 140], [SITES.episcopium.x, SITES.episcopium.z, 0.45, 130],
-    [389, -224, 0.3, 90], [SITES.forum.x, SITES.forum.z, 0.25, 90],
-  ];
-  for (let j = 0; j < DNZ; j++) for (let i = 0; i < DNX; i++) {
-    const x = DX0 + (i + 0.5) * DS, z = DZ0 + (j + 0.5) * DS;
-    let dDec = Infinity;
-    for (const m of mains) dDec = Math.min(dDec, distPolyline(x, z, m));
-    let d = 0.16 + 0.5 * Math.exp(-((dDec / 70) ** 2));
-    for (const [fx, fz, a, r] of focus) d += a * Math.exp(-(((x - fx) ** 2 + (z - fz) ** 2) / (r * r)));
-    d += 0.42 * (smoothNoise(x + 900, z + 900, 55) - 0.5);
-    // Steep ground (the bluffs over the Calore): gardens and scrub.
-    const sl = Math.hypot(fastTerrain(x + 4, z) - fastTerrain(x - 4, z), fastTerrain(x, z + 4) - fastTerrain(x, z - 4)) / 8;
-    d -= Math.max(0, sl - 0.08) * 2.2;
-    DEN[j * DNX + i] = Math.max(0, Math.min(1, d));
-  }
+  const i = Math.floor((x - DENSITY.x0) / DENSITY.step), j = Math.floor((z - DENSITY.z0) / DENSITY.step);
+  return i < 0 || j < 0 || i >= DENSITY.nx || j >= DENSITY.nz ? 0 : DEN[j * DENSITY.nx + i];
 }
 
 // ---------------------------------------------------------------- helpers
