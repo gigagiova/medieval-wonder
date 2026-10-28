@@ -68,8 +68,19 @@ function outside(bvh: MeshBVH, p: THREE.Vector3, n: THREE.Vector3, reach: number
   return fn.dot(n) > 0.2;
 }
 
-/** Count poke-through vertices for a person in its current pose. */
-export function pokeAudit(body: THREE.Object3D, depthOf: (g: string) => number, reach = 0.03) {
+/** The bone with the largest skin weight on a vertex (where on the body a crossing is). */
+function mainBone(m: THREE.SkinnedMesh, i: number) {
+  const J = m.geometry.attributes.skinIndex, W = m.geometry.attributes.skinWeight;
+  let best = 0, w = -1;
+  for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > w) { w = W.getComponent(i, k); best = J.getComponent(i, k); }
+  return m.skeleton.bones[best]?.name.replace('mixamorig', '') ?? '?';
+}
+
+/**
+ * Count poke-through vertices for a person in its current pose. With
+ * `where`, also tally each pair's offenders by the inner vertex's main bone.
+ */
+export function pokeAudit(body: THREE.Object3D, depthOf: (g: string) => number, reach = 0.03, where?: Record<string, Record<string, number>>) {
   body.updateMatrixWorld(true);
   const L = layers(body, depthOf);
   const res: Record<string, number> = {};
@@ -84,6 +95,7 @@ export function pokeAudit(body: THREE.Object3D, depthOf: (g: string) => number, 
         if (!outside(bvhP, p, pp.N.get(i)!, reach)) continue;
         if (outside(bvhB, pb.P.get(i)!, pb.N.get(i)!, reach)) continue;
         k++;
+        if (where) { const key = `${inner.name}>${outer.name}`, b = mainBone(inner.mesh, i); (where[key] ??= {})[b] = (where[key][b] ?? 0) + 1; }
       }
       if (k) res[`${inner.name}>${outer.name}`] = k;
     }
