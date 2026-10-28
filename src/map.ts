@@ -399,6 +399,8 @@ function glyphs(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: num
   };
   mark('Curtis Ducis', tower, 'Curtis Ducis');
   mark('Episcopium', church, 'S. Maria · Episcopium');
+  mark('Sanctus Modestus', church, 'S. Modestus', 3, 2.4);
+  mark('Sanctus Petrus ad Forum', church, 'S. Petrus ad Forum · Sepulcra', -5, -3);
   mark('Sanctus Petrus extra muros', church, 'S. Petrus');
   mark('Sanctus Hilarius ad Portam Auream', church, 'S. Hilarius', 0, 2.2);
   mark('Theatrum', (x, y) => ring(x, y, 44 * k, 44 * k, true));

@@ -47,7 +47,8 @@ Primary and scholarly (consulted directly or through the encyclopaedic syntheses
 | S. Sofia (Arechis II, 758–760) and its nunnery | 758–768 | **no** — its site is the dukes' orchard |
 | Civitas nova of Arechis II (theatre, baths recovered) | after 758, by 774 | **no** — theatre and baths outside |
 | Sacrum Palatium of Arechis II | 758–787 | **no** — the older curtis stands |
-| S. Modesto, Ss. Lupolo e Zosimo, churches of the Civitas nova | 758+ | **no** |
+| S. Modesto (old Via Episcopio site) | conflicting c.649 tradition / 758–774 parish history | modest AD700 precursor reconstructed; see MISSING-CHURCHES.md |
+| Ss. Lupolo e Zosimo, other churches of the Civitas nova | 758+ | **no** |
 | Porta Somma at the Rocca (east annex) | by 926 | **no** — the old gate is ~150 m further west |
 | Cathedral rebuilt by Bishop David / Sico; its crypt frescoes | 782–832 | **no** |
 | S. Bartolomeo (relics of 838) | 838+ | **no** |
@@ -219,8 +220,7 @@ World coordinates in metres (x, z).
   date or site): S. Cosma by the Ponte Leproso on the town bank, S. Lorenzo on the Appia (the gate's name),
   S. Benedetto a Pantano on the Calore, S. Pietro *de monachabus* in the forum area, S. Angelo de Caballo.
   The earliest dated after 700: S. Sofia a Ponticello (706–731), S. Marciano on the Calore (existing in 724;
-  the most likely of all to have stood already), S. Benedetto ad Caballum (742), S. Sofia (758–760). No
-  church documented before 700 is missing.
+  the most likely of all to have stood already), S. Benedetto ad Caballum (742), S. Sofia (758–760). This earlier inventory was incomplete; the San Modesto chronology conflict and the San Pietro/Pacca precursor are revisited in MISSING-CHURCHES.md.
 - **Lombard cemetery** (238, 286): the necropolis excavated south of the town (Rotili 1977); poles with
   wooden doves (perticae, Paul the Deacon HL V 34).
 - **The walnut** (−330, 478): legend only. The *Vita Barbati* tells of the sacred tree; the later
@@ -620,3 +620,25 @@ corrected because the old10m segmentation could discard a surviving piece after
 a gate opening, but that algorithmic defect is not falsely assigned as the cause
 of the reported San Lorenzo view. See `gate-validation/` for passage/barrier
 checks and the full-world capture notes for the observed limits.
+
+## Pacca and the missing churches — 28 October 2026
+
+The user identified old San Modesto near Via Episcopio, San Pietro ad Forum,
+and the Piazza Cardinal Pacca urban burial discovery. See
+[MISSING-CHURCHES.md](MISSING-CHURCHES.md) and [PIAZZA-PACCA.md](PIAZZA-PACCA.md)
+for retrieved sources, identification limits and conflicting dates. The old
+San Modesto site must not be confused with the modern Rione Libertà parish.
+Its c.649 foundation tradition conflicts with the parish's 758–774 dating;
+the AD700 chapel is an authorized precursor hypothesis. San Pietro delle
+Monache in the Pacca quarter is securely documented later; its identification
+with the user's ad Forum name remains unverified. A single precursor is
+represented, avoiding a duplicate monastery or confusion with extra-muros
+San Pietro.
+
+Pacca's reported tombs were discovered in2023 inside the city. These reports
+do not date the specific graves to700. The game's four cists, rectangular
+reused room and west-frontage stair by lot873 are an authorized reconstruction;
+the3.3m floor depth is an access design, not the reported2m below modern street
+level. No connected catacomb network is inferred. The church approach crosses
+a small stone bridge over the stair. The original Triggio chamber remains
+a distinct reconstruction at its existing location.

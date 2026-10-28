@@ -1,0 +1,33 @@
+[
+  {
+    "camera": [
+      -135.4688263495942,
+      34.13933914875902,
+      -147.51082298217813
+    ],
+    "rotation": [
+      -0.25,
+      -0.2063238940297207,
+      0,
+      "YXZ"
+    ],
+    "render": {
+      "frame": 256,
+      "calls": 59,
+      "triangles": 200513,
+      "points": 2814,
+      "lines": 0
+    },
+    "stats": "build 56772ms, 200513 tris drawn, 59 calls, cells 63/402 visible, 12 occluded, chunks ready 10 (built 22, avg 745 ms), geo 549, tex 112",
+    "error": null,
+    "afterCapture": {
+      "frame": 256,
+      "calls": 59,
+      "triangles": 200513,
+      "points": 2814,
+      "lines": 0
+    },
+    "name": "Sepulcra Sancti Petri",
+    "errors": []
+  }
+]

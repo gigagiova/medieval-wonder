@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { rng } from '../builder';
 import { GEO_STREETS, GEO_PARCELS, GEO_STREET_AREAS, DECUMANUS, WALL700, BOUNDS, insideness, inPoly, distPolyline, type P2 } from './geo';
-import { SITES, GATES, ROADS, EXPLORE_TARGETS, siteToWorld, type ExploreKind } from './sites';
+import { SITES, GATES, ROADS, EXPLORE_TARGETS, FIXED_EXPLORE_LOTS, siteToWorld, type ExploreKind } from './sites';
 import { fastTerrain } from '../displace';
 import type { Lot, BridgeSpec } from '../town';
 
@@ -878,6 +878,12 @@ export function layoutTown(seed = 700): Layout {
 
   // 10. Roads outside the walls.
   for (const rd of ROADS) lay.streets.push({ pts: rd.pts.map(([x, z]) => V(x, z)), w: rd.w, main: false, kind: 'road' });
+  for (const target of FIXED_EXPLORE_LOTS) {
+    const lot = lay.lots.find((l) => l.id === target.lot);
+    if (!lot?.front || lot.c.length !== 4 || lot.explore) throw new Error(`Invalid fixed worship-room lot ${target.lot}`);
+    lot.explore = { id: target.id, kind: target.kind };
+    lot.h = 4.2; // Modest worship-room elevation; original footprint is retained.
+  }
   void BOUNDS; void inPoly;
   return lay;
 }

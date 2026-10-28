@@ -1,0 +1,26 @@
+{
+  "lots": 6019,
+  "footprintChanges": 0,
+  "pietroLot": 873,
+  "modestoGeneratedCorners": [
+    [
+      -27.6,
+      3.9999999999999996
+    ],
+    [
+      -28.35,
+      7.549999999999999
+    ],
+    [
+      -18.559671340986817,
+      9.61838281755487
+    ],
+    [
+      -17.809671340986817,
+      6.06838281755487
+    ]
+  ],
+  "modestoInsideBuiltParcel": true,
+  "modestoInside700Circuit": false,
+  "churchFrontOrthogonal": true
+}

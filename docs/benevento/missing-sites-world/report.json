@@ -1,0 +1,95 @@
+[
+  {
+    "camera": [
+      -29.491003462360762,
+      40.239927658678546,
+      5.210257241840943
+    ],
+    "rotation": [
+      -0.05,
+      -1.7790026208275405,
+      0,
+      "YXZ"
+    ],
+    "render": {
+      "frame": 254,
+      "calls": 63,
+      "triangles": 93728,
+      "points": 2807,
+      "lines": 0
+    },
+    "stats": "build 41833ms, 93728 tris drawn, 63 calls, cells 65/402 visible, 7 occluded, chunks ready 13 (built 13, avg 178 ms), geo 538, tex 94",
+    "error": null,
+    "afterCapture": {
+      "frame": 254,
+      "calls": 63,
+      "triangles": 93728,
+      "points": 2807,
+      "lines": 0
+    },
+    "name": "Sanctus Modestus",
+    "errors": []
+  },
+  {
+    "camera": [
+      -140.28608867083608,
+      37.776725645115725,
+      -150.3659425525535
+    ],
+    "rotation": [
+      -0.05,
+      -1.7771202208246255,
+      0,
+      "YXZ"
+    ],
+    "render": {
+      "frame": 376,
+      "calls": 65,
+      "triangles": 141398,
+      "points": 2807,
+      "lines": 0
+    },
+    "stats": "build 41833ms, 141398 tris drawn, 65 calls, cells 55/401 visible, 19 occluded, chunks ready 9 (built 22, avg 516 ms), geo 549, tex 99",
+    "error": null,
+    "afterCapture": {
+      "frame": 376,
+      "calls": 65,
+      "triangles": 141398,
+      "points": 2807,
+      "lines": 0
+    },
+    "name": "Sanctus Petrus ad Forum",
+    "errors": []
+  },
+  {
+    "camera": [
+      -135.4688263495942,
+      34.13933914875902,
+      -147.51082298217813
+    ],
+    "rotation": [
+      -0.25,
+      -0.2063238940297207,
+      0,
+      "YXZ"
+    ],
+    "render": {
+      "frame": 496,
+      "calls": 59,
+      "triangles": 234240,
+      "points": 2814,
+      "lines": 0
+    },
+    "stats": "build 41833ms, 234240 tris drawn, 59 calls, cells 66/405 visible, 12 occluded, chunks ready 10 (built 23, avg 597 ms), geo 555, tex 99",
+    "error": null,
+    "afterCapture": {
+      "frame": 496,
+      "calls": 59,
+      "triangles": 234240,
+      "points": 2814,
+      "lines": 0
+    },
+    "name": "Sepulcra Sancti Petri",
+    "errors": []
+  }
+]

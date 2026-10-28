@@ -1,3 +1,4 @@
+import { buildSanModesto, MODESTO_LOT, modestoDatum } from './benevento/san-modesto';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Builder, rng, type Cell } from './builder';
@@ -27,6 +28,7 @@ import { buildSpolia } from './benevento/spolia';
 import { addTrajanReliefs } from './benevento/trajan-reliefs';
 import { planFront } from './arch/dress';
 import { buildTriggioBurials, TRIGGIO_BURIALS, triggioBurialHole, triggioBurialDatum } from './benevento/triggio-burials';
+import { buildPaccaBurials, PACCA_SITE, PACCA, paccaHole, paccaDatum } from './benevento/pacca-burials';
 
 // Benevento in AD 700, under Duke Gisulf I: the town of the first Lombard
 // circuit on its ridge between the Calore and the Sabato, laid out on the
@@ -80,6 +82,7 @@ export function getTeleports(): Teleport[] {
   at('Sancta Maria', S.episcopium, -17.6, -45, -17, -62);
   at('Bibliotheca', S.episcopium, -12.6, -50, -7, -50);
   at('Forum', S.forum, 12, 10, -6, -5);
+  { const a = interiorAnchors(MODESTO_LOT); const [x,z] = sw(S.sanctusModestus,...a.outside), [dx,dz] = sw(S.sanctusModestus,...a.door); out.push({...tp('Sanctus Modestus',x,z,dx,dz),y:modestoDatum()+1.8}); }
   {
     // On the lower walkway of the cavea, looking across the seats to the stage.
     const v = theatreView(), [x, z] = sw(S.theatrum, v.x, v.z), [lx, lz] = sw(S.theatrum, v.lx, v.lz);
@@ -90,6 +93,11 @@ export function getTeleports(): Teleport[] {
   at('Porticus Romanae', S.quadraginta, -52.5, -71, -52.5, -85);
   const burial = TRIGGIO_BURIALS;
   at('Ad Sepulcra', S.triggioBurials, burial.entry.x, burial.entry.z, burial.stairX, burial.bottom);
+  at('Ad Sepulcra Sancti Petri', PACCA_SITE, PACCA.entry.x, PACCA.entry.z, PACCA.stairX, PACCA.bottom);
+  {
+    const [x,z]=sw(PACCA_SITE,PACCA.chamber.x,PACCA.chamber.z);
+    out.push({name:'Sepulcra Sancti Petri',x,z,y:paccaDatum()+PACCA.floor+1.8,yaw:PACCA_SITE.rot});
+  }
   {
     const [x, z] = sw(S.triggioBurials, burial.chamber.x, burial.chamber.z);
     out.push({ name: 'Sepulcra Langobardorum', x, z,
@@ -135,15 +143,16 @@ export function getTeleports(): Teleport[] {
     }
     out.push(tp(g.name, g.at[0] + dx * 9, g.at[1] + dz * 9, g.at[0], g.at[1]));
   }
-  const synagogue = lay?.lots.find((l) => l.explore?.id === 'synagoga');
-  if (synagogue?.front) {
+  for (const [id, name] of [['synagoga', 'Synagoga'], ['sanctusPetrusForum', 'Sanctus Petrus ad Forum'], ['sanctusModestus', 'Sanctus Modestus']] as const) {
+    const synagogue = lay?.lots.find((l) => l.explore?.id === id);
+    if (!synagogue?.front) continue;
     const a = interiorAnchors({
       c: synagogue.c.map((p) => [p.x, p.y] as P2),
       front: { a: [synagogue.front.a.x, synagogue.front.a.y], b: [synagogue.front.b.x, synagogue.front.b.y], out: [synagogue.front.out.x, synagogue.front.out.y] },
       h: synagogue.h, street: synagogue.street ?? 2,
       seed: 1000 + synagogue.id * 7919, explore: synagogue.explore,
     });
-    out.push(tp('Synagoga', a.outside[0], a.outside[1], a.door[0], a.door[1]));
+    out.push(tp(name, a.outside[0], a.outside[1], a.door[0], a.door[1]));
   }
   out.push(ponsTeleport());
   return out;
@@ -355,6 +364,12 @@ export function getMapData() {
     { name: 'Templum', ...W(S.forum), kind: 'market' },
   ];
   for (const s of Object.values(S)) landmarks.push({ name: s.name, x: s.x, z: s.z, kind: 'site' });
+  const pietro = lay.lots.find((l) => l.explore?.id === 'sanctusPetrusForum');
+  if (pietro) {
+    const centre = pietro.c[0].clone().add(pietro.c[2]).multiplyScalar(0.5);
+    landmarks.push({ name: 'Sanctus Petrus ad Forum', x: centre.x, z: centre.y, kind: 'church' });
+  }
+  landmarks.push({ name: PACCA_SITE.name, ...W(PACCA_SITE), kind: 'site' });
   for (const g of GATES) landmarks.push({ name: g.name, x: g.at[0], z: g.at[1], kind: 'gate' });
   landmarks.push(PONS_LANDMARK);
   return {
@@ -402,10 +417,12 @@ function holes(): Hole[] {
   const rect = (s: SiteDef, x0: number, z0: number, x1: number, z1: number): Hole => ({ pts: [sw(s, x0, z0), sw(s, x1, z0), sw(s, x1, z1), sw(s, x0, z1)] });
   const c = M.CISTERN;
   const list = [rect(S.hortusSophiae, c.x0, c.bottom, c.x1, c.top),
-    { pts: triggioBurialHole().map(([x, z]) => sw(S.triggioBurials, x, z)) }];
+    { pts: triggioBurialHole().map(([x, z]) => sw(S.triggioBurials, x, z)) },
+    { pts: paccaHole().map(([x,z])=>sw(PACCA_SITE,x,z)) }];
   STAIR_ZONES.length = 0;
   STAIR_ZONES.push({ ...xz(sw(S.hortusSophiae, 0, (c.top + c.bottom) / 2)), r: 8 },
-    { ...xz(sw(S.triggioBurials, TRIGGIO_BURIALS.stairX, -1)), r: 12 });
+    { ...xz(sw(S.triggioBurials, TRIGGIO_BURIALS.stairX, -1)), r: 12 },
+    { ...xz(sw(PACCA_SITE,PACCA.stairX,-1)), r:12 });
   return list;
 }
 const xz = ([x, z]: P2) => ({ x, z });
@@ -440,6 +457,8 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
   await at('In the bishop\'s church', 0.26, S.episcopium, (g) => { church(b); markReadable('calix', -17.0, 1.1, -62.4); buildLibrary(b, g as unknown as THREE.Scene); });
   await at('Among the Roman galleries of the Santi Quaranta', 0.32, S.quadraginta, () => quadragintaRuins(b));
   await at('Beneath the houses of Triggio', 0.36, S.triggioBurials, () => buildTriggioBurials(b));
+  await at('Burials by Sanctus Petrus', 0.365, PACCA_SITE, () => buildPaccaBurials(b));
+  await at('At Sanctus Modestus in Triggio', 0.37, S.sanctusModestus, () => buildSanModesto(b));
   await at('In the old baths', 0.4, S.thermae, (g) => buildBaths(b, g as unknown as THREE.Scene));
   await at('At the nuns of St Peter', 0.45, S.sanctusPetrus, () => { church(b); nunnery(b); });
   await at('Under the Arch of Trajan', 0.5, S.arcusTraiani, () => M.arcusTraiani(b));
@@ -668,6 +687,9 @@ export function regionName(p: THREE.Vector3): string {
   const S = SITES;
   if (ly < -2.4 && near(S.hortusSophiae, 30)) return 'Cisterna';
   if (ly < -1.0 && near(S.triggioBurials, 16)) return 'Sepulcra Langobardorum';
+  if (ly < -1.0 && near(PACCA_SITE, 12)) return 'Sepulcra Sancti Petri';
+  if (near(PACCA_SITE, 10)) return 'Sanctus Petrus ad Forum';
+  if (near(S.sanctusModestus, 10)) return 'Sanctus Modestus';
   for (const g of GATES) if (Math.hypot(p.x - g.at[0], p.z - g.at[1]) < 8) return g.name;
   const named: [SiteDef, number][] = [[S.iseum, 13], [S.caballus, 15], [S.curtis, 26], [S.episcopium, 30], [S.forum, 18], [S.theatrum, 50], [S.thermae, 28], [S.amphitheatrum, 55], [S.quadraginta, 48],
     [S.turrisCatenae, 14], [S.sanctusHilarius, 16], [S.sanctusPetrus, 32], [S.necropolis, 28], [S.nux, 14], [S.molendinum, 14], [S.hortusSophiae, 16], [S.castellumAquae, 26], [S.pontesLeprosus, 50], [S.pontesOnuphrii, 45]];

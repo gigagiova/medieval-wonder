@@ -27,6 +27,24 @@ export interface Lore {
 
 const L: Lore[] = [
   {
+    id: 'sanctusModestus', place: 'Sanctus Modestus', title: 'A prayer in the Triggio', kind: 'codex', status: 'attested',
+    latin: 'DOMINE DILEXI DECOREM DOMVS TVAE',
+    english: '“Lord, I have loved the beauty of your house.” The words are read beside an oil lamp. The small church shelters those who come from the houses and gardens nearby.',
+    source: 'Psalm 25:8 in the Vulgate numbering. Old San Modesto precinct at Via Episcopio/Triggio; a chapel in 700 is an authorized reconstruction because traditional 649 and documented 774 dates differ. The later church and cloister are not copied wholesale. See MISSING-CHURCHES.md.',
+  },
+  {
+    id:'paccaBurials',place:'Sepulcra Sancti Petri',title:'Beneath the old walls',kind:'inscription',status:'style',
+    latin:'IN PACE REQVIESCAT',
+    english:'“May they rest in peace.” Stone slabs close the graves beneath the old masonry. An oil lamp burns beside the narrow passage.',
+    source:'Invented early Christian formula. Piazza Cardinal Pacca excavations reported urban tombs in May2023; their AD700 use, this reused chamber and access are authorized reconstruction, not a surveyed excavated plan. See docs/benevento/PIAZZA-PACCA.md.',
+  },
+  {
+    id: 'sanctusPetrusForum', place: 'Sanctus Petrus ad Forum', title: 'The apostle’s keys', kind: 'codex', status: 'attested',
+    latin: 'ET TIBI DABO CLAVES REGNI CAELORVM',
+    english: '“And I will give you the keys of the kingdom of heaven.” A small lamp burns beside the book on the stone altar. Beyond the doorway, the street passes the old Roman masonry.',
+    source: 'Matthew 16:19, Vulgate phrase. Church placement uses the San Pietro delle Monache/Piazza Cardinal Pacca area; AD 700 predecessor, ad Forum identification and this compact plan are reconstruction hypotheses, not a measured excavated basilica. See MISSING-CHURCHES.md.',
+  },
+  {
     id: 'synagoga', place: 'Synagoga', title: 'The words on the scroll', kind: 'codex', status: 'attested', language: 'he',
     latin: 'שמע ישראל יהוה אלהינו יהוה אחד',
     english: '“Hear, O Israel: the Lord our God, the Lord is one.” The scroll lies open on its wooden rollers. The benches are worn smooth where the congregation gathers to listen.',

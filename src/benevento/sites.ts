@@ -41,6 +41,9 @@ export interface SiteDef extends Frame2 {
 // ---------------------------------------------------------------- the sites
 // Module-authored sites carry their old local origin (lx, lz).
 export const SITES: Record<string, SiteDef> = {
+  // Old Triggio San Modesto parcel, not the modern Rione Libertà church.
+  sanctusModestus: { id: 'sanctusModestus', name: 'Sanctus Modestus', x: -22.98, z: 6.81, rot: 0,
+    floors: [[[-4.62,-2.81],[-5.37,.74],[4.42,2.81],[5.17,-.74]]] },
   // Street-side access beneath existing lot 965; no clearing or terrace change.
   // Inspired by Triggio burial evidence; exact access/plan are reconstruction.
   triggioBurials: { id: 'triggioBurials', name: 'Sepulcra Langobardorum', x: 55.21095214765282, z: -5.624150871697467, rot: -0.066292758 },
@@ -223,7 +226,7 @@ export const DISTRICTS: District[] = [
  * Town houses you can enter, each with something to find. The layout gives
  * each the frontage plot nearest its target; see lore.ts for what is inside.
  */
-export type ExploreKind = 'domus' | 'fabrica' | 'hospitium' | 'horreum' | 'officina' | 'figulina' | 'textrinum' | 'cella' | 'medicus' | 'pistrinum' | 'oratorium' | 'scola' | 'synagoga';
+export type ExploreKind = 'domus' | 'fabrica' | 'hospitium' | 'horreum' | 'officina' | 'figulina' | 'textrinum' | 'cella' | 'medicus' | 'pistrinum' | 'oratorium' | 'scola' | 'synagoga' | 'ecclesia';
 export interface ExploreTarget { id: string; kind: ExploreKind; near: P2 }
 export const EXPLORE_TARGETS: ExploreTarget[] = [
   { id: 'domusAudoini', kind: 'domus', near: [452, -70] },        // an old Lombard's house by the curtis (the viper)
@@ -243,4 +246,10 @@ export const EXPLORE_TARGETS: ExploreTarget[] = [
   { id: 'domusVidua', kind: 'domus', near: [262, -150] },         // a widow's house
   { id: 'domusFabri', kind: 'fabrica', near: [-60, -230] },       // a joiner
   { id: 'synagoga', kind: 'synagoga', near: [530, -80] },        // prayer room within an existing lot
+];
+
+/** Existing final lots repurposed only after procedural street encroachment.
+ * Selecting these in the earlier random pass would move unrelated footprints. */
+export const FIXED_EXPLORE_LOTS = [
+  { lot: 873, id: 'sanctusPetrusForum', kind: 'ecclesia' as ExploreKind },
 ];

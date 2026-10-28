@@ -1,0 +1,154 @@
+{
+  "scope": "Isolated production chapel geometry and colliders, fixed studio illumination and neutral context ground; not whole-city budget",
+  "views": {
+    "pietro-before-outside": {
+      "camera": [
+        -144.10337210932227,
+        37.05452313584128,
+        -151.164908853632
+      ],
+      "quaternion": [
+        0.043033684319158376,
+        -0.7743548372653334,
+        0.05297322970263062,
+        0.6290600328685415
+      ],
+      "frame": 2,
+      "calls": 13,
+      "triangles": 8688,
+      "points": 0,
+      "lines": 0,
+      "targetHeight": 4.2
+    },
+    "pietro-after-outside": {
+      "camera": [
+        -144.10337210932227,
+        37.05452313584128,
+        -151.164908853632
+      ],
+      "quaternion": [
+        0.043033684319158376,
+        -0.7743548372653334,
+        0.05297322970263062,
+        0.6290600328685415
+      ],
+      "frame": 3,
+      "calls": 11,
+      "triangles": 12714,
+      "points": 0,
+      "lines": 0,
+      "targetHeight": 4.2
+    },
+    "pietro-after-inside": {
+      "camera": [
+        -137.00714007623898,
+        37.48671453622892,
+        -149.67965098624245
+      ],
+      "quaternion": [
+        -0.015559813779622421,
+        -0.757656418737279,
+        -0.018075242014683548,
+        0.6522177005934868
+      ],
+      "frame": 4,
+      "calls": 11,
+      "triangles": 12714,
+      "points": 0,
+      "lines": 0,
+      "targetHeight": 4.2
+    },
+    "modesto-before-outside": {
+      "camera": [
+        -33.30677126236076,
+        40.18992765867855,
+        4.404107741840943
+      ],
+      "quaternion": [
+        0.020212291274708166,
+        -0.7763576462438166,
+        0.024928656090433706,
+        0.6294750435924464
+      ],
+      "frame": 5,
+      "calls": 3,
+      "triangles": 14,
+      "points": 0,
+      "lines": 0,
+      "targetHeight": 4
+    },
+    "modesto-after-outside": {
+      "camera": [
+        -33.30677126236076,
+        40.18992765867855,
+        4.404107741840943
+      ],
+      "quaternion": [
+        0.020212291274708166,
+        -0.7763576462438166,
+        0.024928656090433706,
+        0.6294750435924464
+      ],
+      "frame": 6,
+      "calls": 11,
+      "triangles": 14940,
+      "points": 0,
+      "lines": 0,
+      "targetHeight": 4
+    },
+    "modesto-after-inside": {
+      "camera": [
+        -26.213356762360764,
+        40.08992765867855,
+        5.902718991840943
+      ],
+      "quaternion": [
+        -0.024638885952630245,
+        -0.7869897182150785,
+        -0.03149509516647471,
+        0.6156688782967834
+      ],
+      "frame": 7,
+      "calls": 10,
+      "triangles": 13496,
+      "points": 0,
+      "lines": 0,
+      "targetHeight": 4
+    }
+  },
+  "paths": [
+    {
+      "id": "pietro",
+      "off": -0.22,
+      "hits": 0
+    },
+    {
+      "id": "pietro",
+      "off": 0,
+      "hits": 0
+    },
+    {
+      "id": "pietro",
+      "off": 0.22,
+      "hits": 0
+    },
+    {
+      "id": "modesto",
+      "off": -0.22,
+      "hits": 0
+    },
+    {
+      "id": "modesto",
+      "off": 0,
+      "hits": 0
+    },
+    {
+      "id": "modesto",
+      "off": 0.22,
+      "hits": 0
+    }
+  ],
+  "errors": [],
+  "beforePietroGeometryHeightM": 6.161621243710503,
+  "metadataNote": "targetHeight describes final chapel profile; before Pietro uses the original house height recorded separately. Before Modesto has no building."
+}

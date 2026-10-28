@@ -8,6 +8,7 @@ import { tiledGable } from '../arch/roof';
 import { lucerna, candle } from '../lights';
 import type { LotData } from './fabric';
 import { buildSynagogue, synagogueLayout } from './synagogue';
+import { buildUrbanChurch, urbanChurchLayout } from './urban-church';
 
 // Houses you can walk into. A single tall ground-floor room under a plank
 // ceiling on beams, an arched door in a thick street wall, beaten-earth
@@ -34,7 +35,8 @@ const at = (f: IFrame, u: number, w: number): [number, number] => [f.a.x + f.e.x
 /** Where the readable thing is (x, y, z, facing yaw) and where to stand. */
 export function interiorAnchors(l: LotData) {
   const f = interiorFrame(l);
-  const [x, z] = l.explore?.kind === 'synagoga' ? synagogueLayout(f).read : at(f, f.L - f.T - 0.55, f.D * 0.55);
+  const church = urbanChurchLayout(f);
+  const [x, z] = l.explore?.kind === 'ecclesia' ? church.at(church.altarU, church.altarW) : l.explore?.kind === 'synagoga' ? synagogueLayout(f).read : at(f, f.L - f.T - 0.55, f.D * 0.55);
   const [sx, sz] = at(f, f.door, f.T + 1.2);
   const [ox, oz] = at(f, f.door, -1.6);
   return { read: [x, 0.95, z] as [number, number, number], ry: f.ry, stand: [sx, sz] as [number, number], outside: [ox, oz] as [number, number], door: at(f, f.door, 0) };
@@ -57,9 +59,10 @@ export function interiorCollider(b: Builder, l: LotData) {
   // The ceiling stops anyone climbing out through the roof.
   { const [x, z] = at(f, L / 2, D / 2); b.box('wood', L, 0.2, D, x, H1, z, ry); }
   if (l.explore?.kind === 'synagoga') buildSynagogue(b, f, true);
+  if (l.explore?.kind === 'ecclesia') buildUrbanChurch(b, f, true);
 }
 
-const KIND_MATS: Record<string, MatName> = { fabrica: 'rubble', figulina: 'brick', pistrinum: 'brick', oratorium: 'plaster', scola: 'plaster', medicus: 'plaster', synagoga: 'plaster' };
+const KIND_MATS: Record<string, MatName> = { fabrica: 'rubble', figulina: 'brick', pistrinum: 'brick', oratorium: 'plaster', scola: 'plaster', medicus: 'plaster', synagoga: 'plaster', ecclesia: 'plaster' };
 
 export function buildInterior(b: Builder, l: LotData) {
   const f = interiorFrame(l);
@@ -108,6 +111,11 @@ export function buildInterior(b: Builder, l: LotData) {
   // A small barred window high in the back wall, and a slit beside the door.
   box('iron', 0.5, 0.6, T + 0.05, L * 0.4, 2.3, D - T / 2);
   box('window', 0.22, 0.6, T + 0.04, Math.min(L - 0.5, dr + 0.5), 1.5, T / 2);
+
+  if (kind === 'ecclesia') {
+    buildUrbanChurch(b, f);
+    return; // Worship room, without a domestic hearth, bed or workshop fixtures.
+  }
 
   if (kind === 'synagoga') {
     buildSynagogue(b, f);

@@ -2,6 +2,27 @@
 
 This is the state of `main` (fast-forwarded from `claude/medieval-town`) at handover. Read `AGENTS.md` for the rules and the build commands.
 
+
+## Missing churches and Pacca burials (28 October 2026)
+
+San Modesto is reconstructed at the old Via Episcopio/Triggio cloister parcel,
+not the modern Rione Libertà church. Its small standalone chapel is outside
+the retained AD700 circuit and within a registered built parcel. The649
+tradition conflicts with the parish's758–774 date; the early chapel is a
+reconstruction, not a secure chronological assertion. San Pietro uses existing
+lot873 near the former delle Monache site in Piazza Cardinal Pacca; the
+user's ad Forum identification remains unverified. Four closed cist graves
+in a compact reused underground room are accessible beside its west frontage.
+The reported2023 discovery is real, but this700 plan/date/access is inferred.
+
+All6019 existing lot footprints remain unchanged. The new church assignment
+is applied after procedural layout so it cannot shift later lots/randomness.
+Teleports: Sanctus Modestus, Sanctus Petrus ad Forum, Ad Sepulcra Sancti Petri,
+Sepulcra Sancti Petri. The original Triggio burials remain separate. Source
+notes: docs/benevento/MISSING-CHURCHES.md and PIAZZA-PACCA.md. Pacca's real-player
+descent/interior/return check passes; church entry and parcel containment checks
+are recorded with the capture tools. Full-world review: missing-sites-world/.
+
 ## Current worktree correction: underground sites
 
 The live Santi Quaranta landmark now represents Roman vaulted passages. Its

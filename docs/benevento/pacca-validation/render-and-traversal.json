@@ -1,0 +1,81 @@
+{
+  "scope": "Existing town chunks, production groundCollider and Player; isolated lighting, no NPCs.",
+  "before": {
+    "frame": 2,
+    "calls": 38,
+    "triangles": 390012,
+    "points": 0,
+    "lines": 0
+  },
+  "after": {
+    "frame": 3,
+    "calls": 42,
+    "triangles": 409936,
+    "points": 0,
+    "lines": 0
+  },
+  "interior": {
+    "frame": 4,
+    "calls": 56,
+    "triangles": 502232,
+    "points": 0,
+    "lines": 0
+  },
+  "walk": [
+    {
+      "target": [
+        -1.25,
+        2.35
+      ],
+      "frames": 107,
+      "distance": 0.12262579356031525,
+      "height": -1.6484906304371876
+    },
+    {
+      "target": [
+        2,
+        2
+      ],
+      "frames": 72,
+      "distance": 0.17970582351258874,
+      "height": -1.6759885967857215
+    },
+    {
+      "target": [
+        6,
+        1.8
+      ],
+      "frames": 83,
+      "distance": 0.17279987683352793,
+      "height": -1.7149981954995965
+    },
+    {
+      "target": [
+        2,
+        2
+      ],
+      "frames": 84,
+      "distance": 0.16025246139232904,
+      "height": -1.678439264204016
+    },
+    {
+      "target": [
+        -1.25,
+        2.35
+      ],
+      "frames": 68,
+      "distance": 0.14341002231614322,
+      "height": -1.6494357297553108
+    },
+    {
+      "target": [
+        -1.25,
+        -6.4
+      ],
+      "frames": 215,
+      "distance": 0.14787839500713493,
+      "height": 1.6947595420655261
+    }
+  ],
+  "errors": []
+}
