@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { rng } from '../builder';
-import { GEO_STREETS, GEO_PARCELS, GEO_STREET_AREAS, DECUMANUS, WALL700, BOUNDS, insideness, inPoly, distPolyline, type P2 } from './geo';
-import { SITES, GATES, ROADS, EXPLORE_TARGETS, FIXED_EXPLORE_LOTS, siteToWorld, type ExploreKind } from './sites';
+import { GEO_STREETS, GEO_PARCELS, GEO_STREET_AREAS, DECUMANUS, RAW_WALL700 as WALL700, BOUNDS, rawInsideness as insideness, insideness as currentInsideness, inPoly, distPolyline, type P2 } from './geo';
+import { SITES, GATES as CURRENT_GATES, ROADS, EXPLORE_TARGETS, FIXED_EXPLORE_LOTS, siteToWorld, type ExploreKind } from './sites';
 import { fastTerrain } from '../displace';
 import type { Lot, BridgeSpec } from '../town';
 
@@ -16,6 +16,9 @@ import type { Lot, BridgeSpec } from '../town';
 export const FREE = 0, STREET = 1, RESERVED = 2, HOUSE = 3, OUTSIDE = 4, PLOT = 5;
 type V2 = THREE.Vector2;
 const V = (x: number, z: number) => new THREE.Vector2(x, z);
+// Keep procedural sampling stable; the corrected gate approach is applied
+// after generation so a local registration repair cannot reroll the city.
+const GATES = CURRENT_GATES.map(g => g.id === 'aurea' ? { ...g, at: [389, -224] as P2 } : g);
 
 /** 0.5 m occupancy raster over the walled town. */
 export class Raster {
@@ -872,6 +875,29 @@ export function layoutTown(seed = 700): Layout {
             if (k >= 0 && r.grid[k] === STREET) r.trod[k] = 255;
           }
         }
+      }
+    }
+  }
+
+  // Apply the local Porta Aurea registration repair after deterministic house
+  // generation. Its 30m approach meets the existing plan lane at (365,-238),
+  // without moving or cutting any building footprint.
+  {
+    const arch = SITES.arcusTraiani;
+    const approach: Street = {
+      pts: [siteToWorld(arch, 0, 30), siteToWorld(arch, 0, -6)].map(([x,z]) => V(x,z)),
+      w: 5, main: false, kind: 'lane',
+    };
+    lay.streets.push(approach);
+    for (let z = -276; z < -216; z += r.res) for (let x = 350; x < 455; x += r.res) {
+      const k = r.idx(x,z);
+      if (k < 0) continue;
+      // Reconcile the small changed boundary with the actual circuit. House
+      // raster cells retain their registered plan footprints.
+      if (r.grid[k] === OUTSIDE && currentInsideness(x,z) > 0.5) r.grid[k] = STREET;
+      if (r.grid[k] !== HOUSE && currentInsideness(x,z) < 0.5) r.grid[k] = OUTSIDE;
+      if (distSeg(V(x,z), approach.pts[0], approach.pts[1]) < approach.w / 2) {
+        r.grid[k] = STREET; r.parcel[k] = 0; r.trod[k] = 255;
       }
     }
   }

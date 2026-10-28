@@ -1,7 +1,9 @@
 import { baseHeight, WALL700, type P2 } from './geo';
+import { AUREA_CENTER } from './aurea-perimeter';
 
-// Every place in Benevento, AD 700, at its real position (metres, x east,
-// z south; see geo.ts). Positions come from OpenStreetMap features of the
+// Places in Benevento, AD 700, registered to real ground (metres, x east,
+// z south; see geo.ts). Porta Aurea uses the plan-relative perimeter repair
+// documented in AUREA-ALIGNMENT.md. Other positions come from OSM features of the
 // surviving monuments and excavations; see docs/benevento/HISTORY.md for the
 // sources and what is attested, inferred or legendary.
 
@@ -64,7 +66,7 @@ export const SITES: Record<string, SiteDef> = {
     floors: [[[-22.2, -68], [-9.4, -68], [-9.4, -40.4], [-22.2, -40.4]]] },
   theatrum: { id: 'theatrum', name: 'Theatrum', x: -229, z: -8, rot: 0, flat: [52, 74] },
   amphitheatrum: { id: 'amphitheatrum', name: 'Amphitheatrum', x: -593, z: -214, rot: 0.5, flat: [56, 80] },
-  arcusTraiani: { id: 'arcusTraiani', name: 'Porta Aurea', x: 389, z: -224, rot: -Math.atan2(24, 18), flat: [9, 22] },
+  arcusTraiani: { id: 'arcusTraiani', name: 'Porta Aurea', x: AUREA_CENTER[0], z: AUREA_CENTER[1], rot: -Math.atan2(24, 18), flat: [9, 22] },
   arcusSacramenti: { id: 'arcusSacramenti', name: 'Arcus Sacramenti', x: -76, z: -61, rot: 0, flat: [7, 16] },
   pontesLeprosus: { id: 'pontesLeprosus', name: 'Pons Leprosus', x: -764, z: -99, rot: 0 },
   pontesOnuphrii: { id: 'pontesOnuphrii', name: 'Pons Sancti Onuphrii', x: -86, z: -372, rot: 0 },
@@ -153,7 +155,7 @@ export interface Gate { id: string; name: string; at: P2; main: boolean; kind: '
  * of the decumanus, 150 m short of its 10th-century successor.
  */
 const GATE_SPEC: { id: string; name: string; near: P2; main: boolean; kind: Gate['kind'] }[] = [
-  { id: 'aurea', name: 'Porta Aurea', near: [389, -224], main: true, kind: 'arch' },
+  { id: 'aurea', name: 'Porta Aurea', near: AUREA_CENTER, main: true, kind: 'arch' },
   { id: 'summa', name: 'Porta Summa', near: [590, 80], main: true, kind: 'gate' },
   { id: 'rufina', name: 'Porta Rufina', near: [168, 96], main: false, kind: 'gate' },
   { id: 'sacramenti', name: 'Arcus Sacramenti', near: [-76, -61], main: false, kind: 'arch' },
@@ -175,7 +177,7 @@ export const ROADS: Road[] = [
   // bank upstream of the bridge, and up to the bridge's town-side ramp.
   { name: 'Via ad Pontem Leprosum', w: 2.8, pts: [[-82, -52], [-120, -38], [-168, -30], [-205, -52], [-262, -70], [-330, -60], [-400, -48], [-470, -40], [-517, -14], [-570, -30], [-640, -70], [-690, -98], [-736.9, -115.1], [-714.4, -178.9]] },
   // The Traiana: through the Arch of Trajan, past S. Ilario, down to the Calore and on to Apulia.
-  { name: 'Via Traiana', w: 3.2, pts: [[392, -228], [416, -246], [452, -268], [500, -300], [560, -342], [622, -390], [690, -444], [770, -500], [900, -530]] },
+  { name: 'Via Traiana', w: 3.2, pts: [[AUREA_CENTER[0] + 3.2, AUREA_CENTER[1] - 2.4], [AUREA_CENTER[0] + 19.2, AUREA_CENTER[1] - 14.4], [452, -268], [500, -300], [560, -342], [622, -390], [690, -444], [770, -500], [900, -530]] },
   // Porta Gloriosa down to the bridge of S. Onofrio and the road north (the old Latina).
   { name: 'Via Latina', w: 3.0, pts: [g('gloriosa'), [-80, -330], [-84, -350], [-90, -398], [-98, -428], [-118, -480], [-150, -560], [-200, -680], [-240, -800]] },
   // South from Porta Rufina past the Lombard cemetery to the Sabato ford.

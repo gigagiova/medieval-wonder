@@ -1,0 +1,33 @@
+[
+  {
+    "camera": [
+      377.8,
+      44.62466212306239,
+      -247.81792168674698
+    ],
+    "rotation": [
+      -0.05,
+      -0.9272952180016114,
+      0,
+      "YXZ"
+    ],
+    "render": {
+      "frame": 280,
+      "calls": 70,
+      "triangles": 129167,
+      "points": 2800,
+      "lines": 0
+    },
+    "stats": "build 44373ms, 129167 tris drawn, 70 calls, cells 67/402 visible, 2 occluded, chunks ready 11 (built 23, avg 367 ms), geo 552, tex 118",
+    "error": null,
+    "afterCapture": {
+      "frame": 280,
+      "calls": 70,
+      "triangles": 129167,
+      "points": 2800,
+      "lines": 0
+    },
+    "name": "Porta Aurea",
+    "errors": []
+  }
+]

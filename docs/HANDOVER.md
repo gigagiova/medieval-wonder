@@ -3,6 +3,19 @@
 This is the state of `main` (fast-forwarded from `claude/medieval-town`) at handover. Read `AGENTS.md` for the rules and the build commands.
 
 
+## Porta Aurea perimeter correction (28 October 2026)
+
+The old22.6m return-wall solution is superseded. Porta Aurea now lies on a
+continuous curtain, with annotation-contaminated wall samples52–54 straightened
+between their neighboring samples. Its plan-relative anchor is(389,-256.218),
+not the old marker-centroid(389,-224). This prioritizes the owner's original
+plan over an exact modern geographic anchor; see
+[benevento/AUREA-ALIGNMENT.md](benevento/AUREA-ALIGNMENT.md) for the explicit
+registration tradeoff. The raw outline is used only for deterministic layout
+sampling. The current map, curtain and containment share the repaired outline.
+All6,019 house footprints remain unchanged; the new gate approach joins an
+existing lane and Via Traiana follows the relocated passage.
+
 ## Missing churches and Pacca burials (28 October 2026)
 
 San Modesto is reconstructed at the old Via Episcopio/Triggio cloister parcel,

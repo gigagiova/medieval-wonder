@@ -1,0 +1,34 @@
+{
+  "scope": "Real curtain, towers, arch and ground; neutral material; identical arch registration and cameras. Baseline includes the actual recessed returns. Excludes town buildings and production postprocessing.",
+  "views": {
+    "before-top": {
+      "frame": 2,
+      "calls": 80,
+      "triangles": 435883,
+      "points": 0,
+      "lines": 0
+    },
+    "before-front": {
+      "frame": 3,
+      "calls": 65,
+      "triangles": 356105,
+      "points": 0,
+      "lines": 0
+    },
+    "after-top": {
+      "frame": 4,
+      "calls": 79,
+      "triangles": 408925,
+      "points": 0,
+      "lines": 0
+    },
+    "after-front": {
+      "frame": 5,
+      "calls": 63,
+      "triangles": 328675,
+      "points": 0,
+      "lines": 0
+    }
+  },
+  "errors": []
+}

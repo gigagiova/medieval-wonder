@@ -1,5 +1,8 @@
 import RAW from './geo.json';
 import { cellaruloHeight } from './cellarulo';
+import { CORRECTED_WALL700 } from './aurea-perimeter';
+import { RAW_WALL700 } from './aurea-perimeter';
+export { RAW_WALL700 } from './aurea-perimeter';
 
 // Benevento as it lay c. AD 700, baked by tools/benevento/*.py: EU-DEM 25 m
 // elevations (smoothed, river channels carved), the Calore and Sabato from
@@ -35,7 +38,7 @@ const G = RAW as unknown as Raw;
 export const DATUM = 100;
 export const BOUNDS = { x0: G.bounds[0], z0: G.bounds[1], x1: G.bounds[2], z1: G.bounds[3] };
 export const RIVERS = G.rivers;
-export const WALL700 = G.wall;
+export const WALL700 = CORRECTED_WALL700;
 export const CIVITAS_NOVA = G.civitasNova;
 export const MEDIEVAL_OUTLINE = G.medievalOutline;
 export const GEO_STREETS = G.streets;
@@ -109,33 +112,38 @@ export function distPolyline(x: number, z: number, pts: P2[], closed = false) {
 // used for ground roughness and many cheap queries.
 const MS = 4;
 const MNX = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / MS) + 1, MNZ = Math.ceil((BOUNDS.z1 - BOUNDS.z0) / MS) + 1;
-const MASK = (() => {
+function wallMask(wall: P2[]) {
   const m = new Float32Array(MNX * MNZ);
   // Only rows/cols over the wall's bbox can be inside.
   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-  for (const [x, z] of WALL700) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  for (const [x, z] of wall) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
   for (let j = 0; j < MNZ; j++) {
     const z = BOUNDS.z0 + j * MS;
     if (z < z0 - 8 || z > z1 + 8) continue;
     for (let i = 0; i < MNX; i++) {
       const x = BOUNDS.x0 + i * MS;
       if (x < x0 - 8 || x > x1 + 8) continue;
-      const ins = inPoly(x, z, WALL700);
-      const d = distPolyline(x, z, WALL700, true);
+      const ins = inPoly(x, z, wall);
+      const d = distPolyline(x, z, wall, true);
       m[j * MNX + i] = ins ? Math.min(1, 0.5 + d / 16) : Math.max(0, 0.5 - d / 16);
     }
   }
   return m;
-})();
+}
+const MASK = wallMask(WALL700);
+const RAW_MASK = wallMask(RAW_WALL700);
 /** ~1 well inside the circuit, ~0 well outside, 0.5 on the wall line. */
-export function insideness(x: number, z: number) {
+function sampleWallMask(mask: Float32Array, x: number, z: number) {
   const fx = (x - BOUNDS.x0) / MS, fz = (z - BOUNDS.z0) / MS;
   const i = Math.floor(fx), j = Math.floor(fz);
   if (i < 0 || j < 0 || i >= MNX - 1 || j >= MNZ - 1) return 0;
   const tx = fx - i, tz = fz - j;
-  const a = MASK[j * MNX + i], b = MASK[j * MNX + i + 1], c = MASK[(j + 1) * MNX + i], d = MASK[(j + 1) * MNX + i + 1];
+  const a = mask[j * MNX + i], b = mask[j * MNX + i + 1], c = mask[(j + 1) * MNX + i], d = mask[(j + 1) * MNX + i + 1];
   return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
 }
+// Retain the original mask only while generating stable procedural lot IDs.
+export const rawInsideness = (x: number, z: number) => sampleWallMask(RAW_MASK, x, z);
+export const insideness = (x: number, z: number) => sampleWallMask(MASK, x, z);
 export const insideWalls = (x: number, z: number) => insideness(x, z) > 0.5;
 
 /** Water level of a river near (x, z), and the distance to its centre line, or null if far. */

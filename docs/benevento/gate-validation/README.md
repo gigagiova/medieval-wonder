@@ -1,3 +1,8 @@
+> Superseded for Porta Aurea on28October2026: the return-wall connection below
+> was collision-safe but created an incorrect inward pocket. See
+> [the perimeter correction](../AUREA-ALIGNMENT.md) and its matched captures.
+> These older screenshots are retained as historical validation evidence.
+
 # Gate / curtain connection audit
 
 The standing Porta Aurea anchor `(389,-224)` is 22.646 m from the nearest

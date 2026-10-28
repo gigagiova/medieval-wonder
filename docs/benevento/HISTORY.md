@@ -642,3 +642,18 @@ the3.3m floor depth is an access design, not the reported2m below modern street
 level. No connected catacomb network is inferred. The church approach crosses
 a small stone bridge over the stair. The original Triggio chamber remains
 a distinct reconstruction at its existing location.
+
+
+## Porta Aurea and the continuous curtain — 28 October 2026
+
+The former narrow inward return walls were an implementation workaround,
+not a supported historical feature. The original source registration placed
+the arch at a large triangular annotation's centroid, while the automated
+wall contour also included annotation ink. The repair places the gate directly
+on the local perimeter and straightens the contaminated samples between their
+neighbors, following the owner's requested relative plan geometry. Its new
+(389,-256.218) anchor is a schematic-registration reconstruction, approximately
+32m north of the previous modern-footprint anchor; it is not a surveyed real
+world coordinate correction. The façade direction remains consistent with the
+mapped arch. See [AUREA-ALIGNMENT.md](AUREA-ALIGNMENT.md) for source evidence,
+alternatives and the explicit tradeoff. No recessed gate pocket is retained.

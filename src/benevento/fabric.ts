@@ -9,9 +9,8 @@ import { planFront, frontColliders, sideLine } from '../arch/dress';
 import { reseedShapes, ruin, arcadeGeo, archRings, quoinBox, pyramidRoof, wellHead, fallenDrum } from '../shapes';
 import { fastTerrain } from '../displace';
 import { torch, brazier } from '../lights';
-import { WALL700, BOUNDS, insideness, type P2 } from './geo';
+import { WALL700, RAW_WALL700, BOUNDS, insideness, type P2 } from './geo';
 import { GATES, SITES, siteToWorld } from './sites';
-import { TRAJAN_DIMENSIONS } from './arcus-traiani-dimensions';
 import type { Layout, Plot, PlotKind } from './layout';
 import { buildInterior, interiorCollider } from './interiors';
 import { sortByCluster } from '../clusters';
@@ -101,20 +100,22 @@ export const chunkKey = (i: number, j: number) => (i + 2048) * 4096 + (j + 2048)
 const GATE_GAP: Record<string, number> = { aurea: 4.8, sacramenti: 3.8 };
 export function wallPlan() {
   const pieces: WallPiece[] = [], towers: TowerSpec[] = [], gates: GateSpec[] = [];
-  const W = WALL700, n = W.length;
+  const W = WALL700, raw = RAW_WALL700, n = W.length;
   const rand = rng(6060);
   const R = (a: number, b: number) => a + (b - a) * rand();
   // Gate positions along the perimeter.
   const gaps: { s: number; half: number; id: string }[] = [];
+  const originalGaps: { s: number; half: number; id: string }[] = [];
   const cum: number[] = [0];
-  for (let k = 0; k < n; k++) cum.push(cum[k] + Math.hypot(W[(k + 1) % n][0] - W[k][0], W[(k + 1) % n][1] - W[k][1]));
+  for (let k = 0; k < n; k++) cum.push(cum[k] + Math.hypot(raw[(k + 1) % n][0] - raw[k][0], raw[(k + 1) % n][1] - raw[k][1]));
   const perim = cum[n];
   const at = (s: number): { p: P2; d: P2 } => {
     s = ((s % perim) + perim) % perim;
     let k = 0;
     while (k < n - 1 && cum[k + 1] < s) k++;
     const a = W[k], b = W[(k + 1) % n], L = cum[k + 1] - cum[k] || 1, t = (s - cum[k]) / L;
-    return { p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], d: [(b[0] - a[0]) / L, (b[1] - a[1]) / L] };
+    const physical = k >= 51 && k <= 54 ? Math.hypot(b[0] - a[0], b[1] - a[1]) || 1 : L;
+    return { p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], d: [(b[0] - a[0]) / physical, (b[1] - a[1]) / physical] };
   };
   const outward = (p: P2, d: P2): P2 => {
     const nrm: P2 = [-d[1], d[0]];
@@ -122,48 +123,47 @@ export function wallPlan() {
   };
   for (const g of GATES) {
     // Arc-length position of the gate on the circuit.
-    let best = { s: 0, d: Infinity };
+    let best = { s: 0, d: Infinity, scale: 1 };
+    let original = { s: 0, d: Infinity };
     for (let k = 0; k < n; k++) {
       const a = W[k], b = W[(k + 1) % n], dx = b[0] - a[0], dz = b[1] - a[1];
       const t = Math.max(0, Math.min(1, ((g.at[0] - a[0]) * dx + (g.at[1] - a[1]) * dz) / (dx * dx + dz * dz || 1)));
       const d = Math.hypot(a[0] + dx * t - g.at[0], a[1] + dz * t - g.at[1]);
-      if (d < best.d) best = { s: cum[k] + t * (cum[k + 1] - cum[k]), d };
+      if (d < best.d) best = { s: cum[k] + t * (cum[k + 1] - cum[k]), d, scale: (cum[k + 1] - cum[k]) / Math.hypot(dx, dz) };
+      const r = raw[k], q = raw[(k + 1) % n], rx = q[0] - r[0], rz = q[1] - r[1];
+      const anchor = g.id === 'aurea' ? [389, -224] : g.at;
+      const u = Math.max(0, Math.min(1, ((anchor[0] - r[0]) * rx + (anchor[1] - r[1]) * rz) / (rx * rx + rz * rz)));
+      const rd = Math.hypot(r[0] + rx * u - anchor[0], r[1] + rz * u - anchor[1]);
+      if (rd < original.d) original = { s: cum[k] + u * (cum[k + 1] - cum[k]), d: rd };
     }
     const half = GATE_GAP[g.id] ?? (g.kind === 'postern' ? 1.2 : g.main ? 2.9 : 2.0);
-    gaps.push({ s: best.s, half, id: g.id });
+    originalGaps.push({ s: original.s, half, id: g.id });
+    gaps.push({ s: best.s, half: (g.id === 'aurea' ? 5.1 : half) * best.scale, id: g.id });
     if (g.kind !== 'arch') {
       const q = at(best.s);
       gates.push({ id: g.id, x: q.p[0], z: q.p[1], dx: q.d[0], dz: q.d[1], main: g.main, seed: Math.floor(rand() * 1e9) });
     }
   }
-  // The registered circuit misses the standing arch by 22.6m. Resolve only
-  // this local junction: short returns attach to the two solid piers,
-  // parallel to the arch and existing Via Traiana approach.
-  // The arch axis, road and all house footprints remain intact.
-  const originalGaps = gaps.map(g => ({ ...g }));
-  const returns: { a: P2; b: P2; out: P2 }[] = [];
-  const arch = SITES.arcusTraiani, join = TRAJAN_DIMENSIONS.coreWidth / 2 - 0.2;
-  const contacts: number[] = [];
-  for (const side of [-1, 1]) {
-    const pier = siteToWorld(arch, side * join, 0);
-    const dir: P2 = [-Math.sin(arch.rot), -Math.cos(arch.rot)];
-    let hit: { t: number; s: number; p: P2 } | undefined;
+  // Convert both physical pier contacts separately: the stable raw arc
+  // parameter has different scale on either side of a corrected vertex.
+  const aurea = gaps.find(g => g.id === 'aurea')!;
+  const center = GATES.find(g => g.id === 'aurea')!.at;
+  const tangent = at(aurea.s).d;
+  const contacts = [-1, 1].map(side => {
+    const target: P2 = [center[0] + side * tangent[0] * 5.1, center[1] + side * tangent[1] * 5.1];
+    let best = { d: Infinity, s: 0 };
     for (let k = 0; k < n; k++) {
-      const a = W[k], q = W[(k + 1) % n], ex = q[0] - a[0], ez = q[1] - a[1];
-      const cross = dir[0] * ez - dir[1] * ex;
-      if (Math.abs(cross) < 1e-8) continue;
-      const ax = a[0] - pier[0], az = a[1] - pier[1];
-      const t = (ax * ez - az * ex) / cross, u = (ax * dir[1] - az * dir[0]) / cross;
-      if (t > 0 && t < 60 && u >= 0 && u <= 1 && (!hit || t < hit.t))
-        hit = { t, s: cum[k] + u * (cum[k + 1] - cum[k]), p: [pier[0] + t * dir[0], pier[1] + t * dir[1]] };
+      const a = W[k], b = W[(k + 1) % n], dx = b[0] - a[0], dz = b[1] - a[1];
+      const t = Math.max(0, Math.min(1, ((target[0] - a[0]) * dx + (target[1] - a[1]) * dz) / (dx * dx + dz * dz)));
+      const d = Math.hypot(a[0] + dx * t - target[0], a[1] + dz * t - target[1]);
+      if (d < best.d) best = { d, s: cum[k] + t * (cum[k + 1] - cum[k]) };
     }
-    if (!hit) throw new Error('Porta Aurea pier does not meet the registered circuit');
-    contacts.push(hit.s);
-    returns.push({ a: hit.p, b: pier, out: [side * Math.cos(arch.rot), -side * Math.sin(arch.rot)] });
-  }
-  const aureaGap = gaps.find(g => g.id === 'aurea')!;
-  aureaGap.s = (contacts[0] + contacts[1]) / 2;
-  aureaGap.half = Math.abs(contacts[0] - contacts[1]) / 2;
+    return best.s;
+  });
+  aurea.s = (contacts[0] + contacts[1]) / 2;
+  aurea.half = Math.abs(contacts[0] - contacts[1]) / 2;
+  // The corrected curtain crosses the arch obliquely, meeting the solid
+  // piers at their front/back faces. No passage-parallel return walls.
   const inGap = (s: number, m = 0) => gaps.some((g) => Math.abs(((s - g.s + perim / 2) % perim + perim) % perim - perim / 2) < g.half + m);
   // Subtract complete gap intervals: the former single-range clipping lost
   // the trailing wall when both gap ends fell in one ten-metre section.
@@ -186,22 +186,16 @@ export function wallPlan() {
       ranges = ranges.flatMap(([lo, hi]): [number, number][] => hi <= a || lo >= b ? [[lo, hi]] :
         [...(lo < a ? [[lo, a] as [number, number]] : []), ...(hi > b ? [[b, hi] as [number, number]] : [])]);
     }
+    ranges = ranges.flatMap(([lo, hi]) => {
+      const cuts = [lo, ...cum.slice(52, 56).filter(v => v > lo && v < hi), hi];
+      return cuts.slice(0, -1).map((v, i): [number, number] => [v, cuts[i + 1]]);
+    });
     for (const [s0, s1] of ranges) {
       if (s1 - s0 < 0.01) continue;
       const A = at(s0), B = at(s1);
       pieces.push({ a: A.p, b: B.p, out: outward(A.p, A.d), h, seed });
     }
   }
-  // Short regular pieces keep the new return geometry streamed and culled
-  // at the same scale as the existing curtain; overlap is the usual 0.5m.
-  returns.forEach((w, side) => {
-    const length = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
-    const count = Math.ceil(length / STEP);
-    for (let i = 0; i < count; i++) {
-      const p = (t: number): P2 => [w.a[0] + (w.b[0] - w.a[0]) * t, w.a[1] + (w.b[1] - w.a[1]) * t];
-      pieces.push({ a: p(i / count), b: p((i + 1) / count), out: w.out, h: 9.2, seed: 760001 + side * 101 + i });
-    }
-  });
   // Towers every 40-55 m, square or round, a few reduced to stumps.
   for (let s = 18; s < perim; s += R(40, 55)) {
     if (originalGaps.some(g => Math.abs(((s - g.s + perim / 2) % perim + perim) % perim - perim / 2) < g.half + 10)) continue;
