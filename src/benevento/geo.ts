@@ -1,25 +1,34 @@
 import RAW from './geo.json';
 import { cellaruloHeight } from './cellarulo';
 import { CORRECTED_WALL700 } from './aurea-perimeter';
-import { RAW_WALL700 } from './aurea-perimeter';
 export { RAW_WALL700 } from './aurea-perimeter';
 
 // Benevento reconstructed c. AD 700: INGV TINITALY 1.1 bare-ground elevations
 // at 10m, with adapted river channels and an EU-DEM boundary blend. See
 // docs/benevento/TERRAIN.md and public/licenses/tinitaly.txt. Rivers come from
 // OpenStreetMap, and the user's urban plan (docs/benevento) vectorised into
-// streets, blocks and open spaces, registered onto the real ground through
-// control points (thin-plate spline). The first Lombard circuit is the plan's
-// outline minus the Civitas nova of Arechis II and the 10th-century annex at
-// the later Porta Somma: 2.83 km (2750 m in Bertelli 1992).
+// building footprints, courtyards, open spaces and lanes, registered onto the real
+// ground through control points (thin-plate spline, registration v2). The circuit
+// of 700 is the plan's drawn outer line minus the Civitas nova of Arechis II
+// (the grey area 1): ~3.06 km (2750 m in Bertelli 1992, without the east annex
+// the plan draws). See docs/benevento/PLAN-TRACE.md.
 // Frame: metres, x east, z south; origin lat 41.1305 N, lon 14.7745 E.
 
 export type P2 = [number, number];
 export interface River { name: string; pts: P2[]; w: number; level: number[] }
 /** A lane of the plan (skeleton of its street spaces): width as drawn, on the decumanus, inside the circuit of 700. */
 export interface GeoStreet { w: number; main: boolean; in: boolean; pts: P2[] }
-/** A block or plot of the plan ('open' = a large unbuilt space), inside the circuit of 700 or not. */
-export interface GeoParcel { k: 'parcel' | 'open'; a: number; in: boolean; pts: P2[] }
+/**
+ * A cell of the plan, traced between its drawn lines (tools/benevento/plan_trace.py):
+ * 'house' a drawn building footprint, 'court' a yard enclosed by buildings, 'open' a large
+ * unbuilt space (garden, square). Rules and uncertainty: docs/benevento/PLAN-TRACE.md.
+ * src: the traced region it came from (a ring round a court is cut into several pieces).
+ */
+export interface GeoParcel { k: 'house' | 'court' | 'open'; a: number; in: boolean; src: number; pts: P2[];
+  /** An open cell that is a wide part of the plan's lane spaces (a square), not a closed yard. */
+  sq?: boolean }
+/** A wall tower traced from a projection drawn on the plan's outer line (docs/benevento/TOWERS.md). */
+export interface GeoTower { id: string; name: string | null; x: number; z: number; wall: P2; offset: number; shape: 'square' | 'round'; osm: number | null }
 export interface GeoArea { hole: boolean; pts: P2[] }
 interface Raw {
   bounds: [number, number, number, number];
@@ -32,6 +41,7 @@ interface Raw {
   parcels: GeoParcel[];
   streetAreas: GeoArea[];
   decumanus: P2[];
+  towers: GeoTower[];
 }
 const G = RAW as unknown as Raw;
 
@@ -45,6 +55,7 @@ export const MEDIEVAL_OUTLINE = G.medievalOutline;
 export const GEO_STREETS = G.streets;
 export const GEO_PARCELS = G.parcels;
 export const GEO_STREET_AREAS = G.streetAreas;
+export const GEO_TOWERS = G.towers;
 /** The decumanus maximus (platea publica maior): one lane across the town, through the plan's corridors along the line of the later Via Magistrale. */
 export const DECUMANUS = G.decumanus;
 
@@ -132,7 +143,6 @@ function wallMask(wall: P2[]) {
   return m;
 }
 const MASK = wallMask(WALL700);
-const RAW_MASK = wallMask(RAW_WALL700);
 /** ~1 well inside the circuit, ~0 well outside, 0.5 on the wall line. */
 function sampleWallMask(mask: Float32Array, x: number, z: number) {
   const fx = (x - BOUNDS.x0) / MS, fz = (z - BOUNDS.z0) / MS;
@@ -142,9 +152,9 @@ function sampleWallMask(mask: Float32Array, x: number, z: number) {
   const a = mask[j * MNX + i], b = mask[j * MNX + i + 1], c = mask[(j + 1) * MNX + i], d = mask[(j + 1) * MNX + i + 1];
   return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
 }
-// Retain the original mask only while generating stable procedural lot IDs.
-export const rawInsideness = (x: number, z: number) => sampleWallMask(RAW_MASK, x, z);
 export const insideness = (x: number, z: number) => sampleWallMask(MASK, x, z);
+/** Kept for tools: the traced circuit is now the only one. */
+export const rawInsideness = insideness;
 export const insideWalls = (x: number, z: number) => insideness(x, z) > 0.5;
 
 /** Water level of a river near (x, z), and the distance to its centre line, or null if far. */

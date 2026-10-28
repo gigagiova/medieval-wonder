@@ -9,7 +9,7 @@ import { planFront, frontColliders, sideLine } from '../arch/dress';
 import { reseedShapes, ruin, arcadeGeo, archRings, quoinBox, pyramidRoof, wellHead, fallenDrum } from '../shapes';
 import { fastTerrain } from '../displace';
 import { torch, brazier } from '../lights';
-import { WALL700, RAW_WALL700, BOUNDS, insideness, type P2 } from './geo';
+import { WALL700, BOUNDS, insideness, GEO_TOWERS, type P2 } from './geo';
 import { GATES, SITES, siteToWorld } from './sites';
 import { REGISTERED_WALL_TOWERS } from './tower-sites';
 import type { Layout, Plot, PlotKind } from './layout';
@@ -82,7 +82,7 @@ export function lotForm(c: P2[], front: boolean, seed: number): { form?: 'tower'
 export interface WallPiece { a: P2; b: P2; out: P2; h: number; seed: number }
 export interface TowerSpec { id?: string; name?: string; radius?: number; visit?: P2; x: number; z: number; ox: number; oz: number; kind: 0 | 1 | 2; h: number; seed: number; roof: boolean; torch: boolean }
 export interface GateSpec { id: string; x: number; z: number; dx: number; dz: number; main: boolean; seed: number }
-export interface PlotData { pts: P2[]; kind: PlotKind; seed: number }
+export interface PlotData { pts: P2[]; kind: PlotKind; seed: number; walls?: number[] }
 export interface Hole { pts: P2[] }
 export interface WellSpec { x: number; z: number; seed: number }
 export interface ChunkItems {
@@ -101,86 +101,58 @@ export const chunkKey = (i: number, j: number) => (i + 2048) * 4096 + (j + 2048)
 const GATE_GAP: Record<string, number> = { aurea: 4.8, sacramenti: 3.8 };
 export function wallPlan() {
   const pieces: WallPiece[] = [], towers: TowerSpec[] = [], gates: GateSpec[] = [];
-  const W = WALL700, raw = RAW_WALL700, n = W.length;
+  const W = WALL700, n = W.length;
   const rand = rng(6060);
   const R = (a: number, b: number) => a + (b - a) * rand();
-  // Gate positions along the perimeter.
-  const gaps: { s: number; half: number; id: string }[] = [];
-  const originalGaps: { s: number; half: number; id: string }[] = [];
   const cum: number[] = [0];
-  for (let k = 0; k < n; k++) cum.push(cum[k] + Math.hypot(raw[(k + 1) % n][0] - raw[k][0], raw[(k + 1) % n][1] - raw[k][1]));
+  for (let k = 0; k < n; k++) cum.push(cum[k] + Math.hypot(W[(k + 1) % n][0] - W[k][0], W[(k + 1) % n][1] - W[k][1]));
   const perim = cum[n];
   const at = (s: number): { p: P2; d: P2 } => {
     s = ((s % perim) + perim) % perim;
     let k = 0;
     while (k < n - 1 && cum[k + 1] < s) k++;
     const a = W[k], b = W[(k + 1) % n], L = cum[k + 1] - cum[k] || 1, t = (s - cum[k]) / L;
-    const physical = k >= 51 && k <= 54 ? Math.hypot(b[0] - a[0], b[1] - a[1]) || 1 : L;
-    return { p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], d: [(b[0] - a[0]) / physical, (b[1] - a[1]) / physical] };
+    return { p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], d: [(b[0] - a[0]) / L, (b[1] - a[1]) / L] };
   };
   const outward = (p: P2, d: P2): P2 => {
     const nrm: P2 = [-d[1], d[0]];
     return insideness(p[0] + nrm[0] * 6, p[1] + nrm[1] * 6) < 0.5 ? nrm : [-nrm[0], -nrm[1]];
   };
+  const nearestS = (x: number, z: number) => {
+    let best = { s: 0, d: Infinity };
+    for (let k = 0; k < n; k++) {
+      const a = W[k], b = W[(k + 1) % n], dx = b[0] - a[0], dz = b[1] - a[1];
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz || 1)));
+      const d = Math.hypot(a[0] + dx * t - x, a[1] + dz * t - z);
+      if (d < best.d) best = { s: cum[k] + t * (cum[k + 1] - cum[k]), d };
+    }
+    return best;
+  };
+  // Gate gaps along the traced curtain. An arch gate's gap spans its piers: the curtain meets
+  // the solid pier faces, whatever angle it comes in at.
+  const gaps: { s: number; half: number; id: string }[] = [];
   for (const g of GATES) {
-    // Arc-length position of the gate on the circuit.
-    let best = { s: 0, d: Infinity, scale: 1 };
-    let original = { s: 0, d: Infinity };
-    for (let k = 0; k < n; k++) {
-      const a = W[k], b = W[(k + 1) % n], dx = b[0] - a[0], dz = b[1] - a[1];
-      const t = Math.max(0, Math.min(1, ((g.at[0] - a[0]) * dx + (g.at[1] - a[1]) * dz) / (dx * dx + dz * dz || 1)));
-      const d = Math.hypot(a[0] + dx * t - g.at[0], a[1] + dz * t - g.at[1]);
-      if (d < best.d) best = { s: cum[k] + t * (cum[k + 1] - cum[k]), d, scale: (cum[k + 1] - cum[k]) / Math.hypot(dx, dz) };
-      const r = raw[k], q = raw[(k + 1) % n], rx = q[0] - r[0], rz = q[1] - r[1];
-      const anchor = g.id === 'aurea' ? [389, -224] : g.at;
-      const u = Math.max(0, Math.min(1, ((anchor[0] - r[0]) * rx + (anchor[1] - r[1]) * rz) / (rx * rx + rz * rz)));
-      const rd = Math.hypot(r[0] + rx * u - anchor[0], r[1] + rz * u - anchor[1]);
-      if (rd < original.d) original = { s: cum[k] + u * (cum[k + 1] - cum[k]), d: rd };
-    }
+    const best = nearestS(g.at[0], g.at[1]);
     const half = GATE_GAP[g.id] ?? (g.kind === 'postern' ? 1.2 : g.main ? 2.9 : 2.0);
-    originalGaps.push({ s: original.s, half, id: g.id });
-    gaps.push({ s: best.s, half: (g.id === 'aurea' ? 5.1 : half) * best.scale, id: g.id });
-    if (g.kind !== 'arch') {
-      const q = at(best.s);
-      gates.push({ id: g.id, x: q.p[0], z: q.p[1], dx: q.d[0], dz: q.d[1], main: g.main, seed: Math.floor(rand() * 1e9) });
+    if (g.kind === 'arch') {
+      const site = g.id === 'aurea' ? SITES.arcusTraiani : SITES.arcusSacramenti;
+      const ex = Math.cos(site.rot), ez = -Math.sin(site.rot);
+      const s0 = nearestS(g.at[0] - ex * half, g.at[1] - ez * half).s, s1 = nearestS(g.at[0] + ex * half, g.at[1] + ez * half).s;
+      gaps.push({ s: (s0 + s1) / 2, half: Math.max(1.5, Math.abs(s1 - s0) / 2), id: g.id });
+      continue;
     }
+    gaps.push({ s: best.s, half, id: g.id });
+    const q = at(best.s);
+    gates.push({ id: g.id, x: q.p[0], z: q.p[1], dx: q.d[0], dz: q.d[1], main: g.main, seed: Math.floor(rand() * 1e9) });
   }
-  // Convert both physical pier contacts separately: the stable raw arc
-  // parameter has different scale on either side of a corrected vertex.
-  const aurea = gaps.find(g => g.id === 'aurea')!;
-  const center = GATES.find(g => g.id === 'aurea')!.at;
-  const tangent = at(aurea.s).d;
-  const contacts = [-1, 1].map(side => {
-    const target: P2 = [center[0] + side * tangent[0] * 5.1, center[1] + side * tangent[1] * 5.1];
-    let best = { d: Infinity, s: 0 };
-    for (let k = 0; k < n; k++) {
-      const a = W[k], b = W[(k + 1) % n], dx = b[0] - a[0], dz = b[1] - a[1];
-      const t = Math.max(0, Math.min(1, ((target[0] - a[0]) * dx + (target[1] - a[1]) * dz) / (dx * dx + dz * dz)));
-      const d = Math.hypot(a[0] + dx * t - target[0], a[1] + dz * t - target[1]);
-      if (d < best.d) best = { d, s: cum[k] + t * (cum[k + 1] - cum[k]) };
-    }
-    return best.s;
-  });
-  aurea.s = (contacts[0] + contacts[1]) / 2;
-  aurea.half = Math.abs(contacts[0] - contacts[1]) / 2;
-  // The corrected curtain crosses the arch obliquely, meeting the solid
-  // piers at their front/back faces. No passage-parallel return walls.
   const inGap = (s: number, m = 0) => gaps.some((g) => Math.abs(((s - g.s + perim / 2) % perim + perim) % perim - perim / 2) < g.half + m);
-  // Subtract complete gap intervals: the former single-range clipping lost
-  // the trailing wall when both gap ends fell in one ten-metre section.
-  // Preserve the old random draw stream so unrelated towers/decor do not move.
+  // The curtain in pieces of up to ten metres, split at the traced vertices so it follows
+  // every turn of the drawn outer line.
   const STEP = 10;
   for (let s = 0; s < perim; s += STEP) {
     const end = Math.min(s + STEP, perim);
-    let old0 = s, old1 = end;
-    for (const g of originalGaps) {
-      const a = g.s - g.half, b = g.s + g.half;
-      if (old1 > a && old0 < b) { if (old0 >= a) old0 = Math.max(old0, b); else old1 = Math.min(old1, a); }
-    }
-    const hadPiece = old1 - old0 >= 0.6 && !originalGaps.some(g => Math.abs((old0 + old1) / 2 - g.s) < g.half);
-    const extra = rng(6060 + Math.round(s) * 31);
-    const h = hadPiece ? R(8.6, 11.2) : 8.6 + extra() * 2.6;
-    const seed = Math.floor((hadPiece ? rand() : extra()) * 1e9);
+    const h = R(8.6, 11.2);
+    const seed = Math.floor(rand() * 1e9);
     let ranges: [number, number][] = [[s, end]];
     for (const g of gaps) for (const wrap of [-perim, 0, perim]) {
       const a = g.s - g.half + wrap, b = g.s + g.half + wrap;
@@ -188,30 +160,31 @@ export function wallPlan() {
         [...(lo < a ? [[lo, a] as [number, number]] : []), ...(hi > b ? [[b, hi] as [number, number]] : [])]);
     }
     ranges = ranges.flatMap(([lo, hi]) => {
-      const cuts = [lo, ...cum.slice(52, 56).filter(v => v > lo && v < hi), hi];
+      const cuts = [lo, ...cum.filter(v => v > lo && v < hi), hi];
       return cuts.slice(0, -1).map((v, i): [number, number] => [v, cuts[i + 1]]);
     });
     for (const [s0, s1] of ranges) {
-      if (s1 - s0 < 0.01) continue;
-      const A = at(s0), B = at(s1);
+      if (s1 - s0 < 0.05) continue;
+      const A = at(s0 + 1e-6), B = at(s1 - 1e-6);
       pieces.push({ a: A.p, b: B.p, out: outward(A.p, A.d), h, seed });
     }
   }
-  // Towers every 40-55 m, square or round, a few reduced to stumps.
-  for (let s = 18; s < perim; s += R(40, 55)) {
-    if (originalGaps.some(g => Math.abs(((s - g.s + perim / 2) % perim + perim) % perim - perim / 2) < g.half + 10)) continue;
-    const q = at(s), o = outward(q.p, q.d);
-    const u = rand();
-    const t: TowerSpec = { x: q.p[0], z: q.p[1], ox: o[0], oz: o[1], kind: u < 0.52 ? 0 : u < 0.88 ? 1 : 2, h: R(12, 15), seed: Math.floor(rand() * 1e9), roof: rand() < 0.45, torch: rand() < 0.3 };
-    if (!inGap(s, 10)) towers.push(t);
-  }
-  // Registered source footprints replace nearby procedural placeholders.
-  for (const registered of REGISTERED_WALL_TOWERS) {
-    for (let i = towers.length - 1; i >= 0; i--) {
-      const t = towers[i];
-      if (Math.hypot(t.x + t.ox * 2.4 - registered.x, t.z + t.oz * 2.4 - registered.z) < 18) towers.splice(i, 1);
-    }
-    towers.push({ ...registered });
+  // Towers: only those traced from the plan's projections (docs/benevento/TOWERS.md). Each
+  // stands where its projection is drawn (or where the mapped surviving tower stands), its
+  // body set into the curtain: never detached from it, never moved along it.
+  for (const g of GEO_TOWERS) {
+    const reg = REGISTERED_WALL_TOWERS.find((t) => t.id === g.id);
+    if (reg) { towers.push({ ...reg }); continue; }
+    const best = nearestS(g.x, g.z);
+    if (inGap(best.s, 4)) continue;
+    const q = at(best.s), o = outward(q.p, q.d);
+    const trnd = rng(Math.round(Math.abs(g.x * 131 + g.z * 17)) + 7);
+    const round = g.shape === 'round';
+    // tower() puts the body 2.4 m out from (x, z) along (ox, oz): (x, z) is chosen so the body's
+    // centre lands on the drawn/mapped centre's offset from the curtain line (0-3.5 m out).
+    const off = Math.max(0, Math.min(3.5, (g.x - q.p[0]) * o[0] + (g.z - q.p[1]) * o[1]));
+    towers.push({ id: g.id, name: g.name ?? undefined, x: q.p[0] + o[0] * (off - 2.4), z: q.p[1] + o[1] * (off - 2.4), ox: o[0], oz: o[1],
+      kind: round ? 1 : 0, h: 12 + trnd() * 3, seed: Math.floor(trnd() * 1e9), roof: trnd() < 0.45, torch: trnd() < 0.3, radius: round ? 3.6 : undefined });
   }
   return { pieces, towers, gates, perim };
 }
@@ -286,7 +259,9 @@ function plot(b: Builder, p: PlotData) {
   const P = p.pts;
   let cx = 0, cz = 0;
   for (const [x, z] of P) { cx += x / P.length; cz += z / P.length; }
-  const fence = p.kind === 'orto' || p.kind === 'stabulum' || p.kind === 'vinea';
+  // A garden of the plan with lanes or open ground beside it: rubble walls on those sides.
+  if (p.walls) plotWalls(b, p);
+  const fence = !p.walls && (p.kind === 'orto' || p.kind === 'stabulum' || p.kind === 'vinea');
   if (fence) {
     // Wattle on stakes, set a little inside the plot edge, with gaps for gates.
     for (let k = 0; k < P.length; k++) {
@@ -372,6 +347,42 @@ function plot(b: Builder, p: PlotData) {
       const x = R(x0 + 2, x1 - 2), z = R(z0 + 2, z1 - 2);
       if (inside(x, z)) fallenDrum(b, x, z, R(0.3, 0.45), R(0.8, 2), R(0, 3));
     }
+  }
+}
+
+/**
+ * Rubble walls a little over head height on the edges of a drawn open cell that face a lane
+ * or open ground (p.walls), with a coping of flat stones and one gate on the longest of them.
+ */
+function plotWalls(b: Builder, p: PlotData) {
+  const r = rng(p.seed * 7 + 5);
+  const P = p.pts, T = 0.45, n = P.length;
+  const h = 2.0 + r() * 0.6;
+  let cx = 0, cz = 0;
+  for (const [x, z] of P) { cx += x / n; cz += z / n; }
+  let gateK = -1, gl = 0;
+  for (const k of p.walls!) { const a = P[k], c = P[(k + 1) % n], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (L > gl) { gl = L; gateK = k; } }
+  for (const k of p.walls!) {
+    const a = P[k], c = P[(k + 1) % n];
+    const L = Math.hypot(c[0] - a[0], c[1] - a[1]);
+    if (L < 0.6) continue;
+    const ry = Math.atan2(c[0] - a[0], c[1] - a[1]) - Math.PI / 2;
+    // inward normal of this edge (towards the plot), whichever way the ring winds
+    let ix = -(c[1] - a[1]) / L, iz = (c[0] - a[0]) / L;
+    const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
+    if (ix * (cx - mx) + iz * (cz - mz) < 0) { ix = -ix; iz = -iz; }
+    const ox = ix * T / 2, oz = iz * T / 2;
+    const seg = (t0: number, t1: number) => {
+      if (t1 - t0 < 0.05) return;
+      const tm = (t0 + t1) / 2;
+      flat(b, 'rubble', (t1 - t0) * L + T, h, T, a[0] + (c[0] - a[0]) * tm + ox, -0.3, a[1] + (c[1] - a[1]) * tm + oz, ry);
+      if (b.mode === 'collide') return;
+      flat(b, 'slab', (t1 - t0) * L + T + 0.05, 0.08, T + 0.1, a[0] + (c[0] - a[0]) * tm + ox, h - 0.3, a[1] + (c[1] - a[1]) * tm + oz, ry, false);
+    };
+    if (k === gateK && L > 3) {
+      const g = 1.4 / L, t = 0.5 + (r() - 0.5) * Math.max(0, 1 - g - 1.2 / L);
+      seg(0, t - g / 2); seg(t + g / 2, 1);
+    } else seg(0, 1);
   }
 }
 
@@ -647,7 +658,7 @@ export function makeChunks(lay: Layout, holes: Hole[]): Map<number, ChunkItems> 
     });
   }
   for (const br of lay.bridges) get(br.x, br.z).bridges.push({ ...br, seed: 50000 + seed++ * 104729 });
-  for (const p of lay.plots) get(p.cx, p.cz).plots.push({ pts: p.pts, kind: p.kind, seed: p.seed });
+  for (const p of lay.plots) get(p.cx, p.cz).plots.push({ pts: p.pts, kind: p.kind, seed: p.seed, walls: p.walls });
   for (const w of lay.wells) get(w.x, w.z).wells.push({ x: w.x, z: w.z, seed: 70000 + seed++ * 31 });
   const wp = wallPlan();
   for (const p of wp.pieces) get((p.a[0] + p.b[0]) / 2, (p.a[1] + p.b[1]) / 2).walls.push(p);

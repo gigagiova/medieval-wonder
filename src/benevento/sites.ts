@@ -250,8 +250,9 @@ export const EXPLORE_TARGETS: ExploreTarget[] = [
   { id: 'synagoga', kind: 'synagoga', near: [530, -80] },        // prayer room within an existing lot
 ];
 
-/** Existing final lots repurposed only after procedural street encroachment.
- * Selecting these in the earlier random pass would move unrelated footprints. */
-export const FIXED_EXPLORE_LOTS = [
-  { lot: 873, id: 'sanctusPetrusForum', kind: 'ecclesia' as ExploreKind },
+/** Worship rooms placed in the drawn footprint nearest a chosen point (after the
+ * houses above): San Pietro ad Forum by the former delle Monache site in Piazza
+ * Cardinal Pacca (docs/benevento/MISSING-CHURCHES.md, PIAZZA-PACCA.md). */
+export const FIXED_EXPLORE_LOTS: { near: P2; id: string; kind: ExploreKind }[] = [
+  { near: [-134.9, -149.5], id: 'sanctusPetrusForum', kind: 'ecclesia' },
 ];
