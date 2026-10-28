@@ -46,9 +46,10 @@ export const SITES: Record<string, SiteDef> = {
   // Old Triggio San Modesto parcel, not the modern Rione Libertà church.
   sanctusModestus: { id: 'sanctusModestus', name: 'Sanctus Modestus', x: -22.98, z: 6.81, rot: 0,
     floors: [[[-4.62,-2.81],[-5.37,.74],[4.42,2.81],[5.17,-.74]]] },
-  // Street-side access beneath existing lot 965; no clearing or terrace change.
-  // Inspired by Triggio burial evidence; exact access/plan are reconstruction.
-  triggioBurials: { id: 'triggioBurials', name: 'Sepulcra Langobardorum', x: 55.21095214765282, z: -5.624150871697467, rot: -0.066292758 },
+  // Street-side access beneath a traced house front in Triggio (tools/benevento/anchor_burials.ts:
+  // the nearest front, 34 m from the former site, whose lane takes the stair); no clearing or
+  // terrace change. Inspired by Triggio burial evidence; exact access/plan are reconstruction.
+  triggioBurials: { id: 'triggioBurials', name: 'Sepulcra Langobardorum', x: 83.618, z: 12.461, rot: -1.865224 },
   // The dukes' residence in the old praetorium: planum curiae, today Piazza Piano di Corte.
   curtis: { id: 'curtis', name: 'Curtis Ducis', x: 506, z: -140, rot: GRID_ROT, lx: 40, lz: -23, flat: [24, 40], clear: 22 },
   // The cathedral of S. Maria (consecrated 15 Dec 600) with its atrium; the bishop's house and books.

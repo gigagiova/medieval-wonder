@@ -9,7 +9,7 @@ import type { P2 } from './geo';
 
 // A compact reuse of masonry chambers, inspired by the Triggio burial evidence.
 // The footprint, access and AD 700 use are authored reconstruction (see HISTORY).
-// Local +x goes under existing lot 965; the stair follows its west street facade.
+// Local +x goes under a traced house; the stair follows its street facade.
 export const TRIGGIO_BURIALS = {
   stairX: -1.25, stairWidth: 1.6, top: -5.2, bottom: 2.0, floor: -5.2,
   hole: { x0: -2.12, x1: -0.38, z0: -5.35, z1: 3.45 },
