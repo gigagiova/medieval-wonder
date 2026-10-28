@@ -262,8 +262,8 @@ export function layoutTown(seed = 700): Layout {
   parcels.forEach((p, n) => {
     const pid = n + 1;
     if (p.k !== 'house') return;
-    // A landmark precinct or the curtain band takes most of it: the landmark stands here.
-    if (reservedShare(p.pts) > 0.3) return;
+    // A landmark precinct (or its floor) takes part of it: the landmark stands here instead.
+    if (reservedShare(p.pts) > 0.08) return;
     let pts = p.pts.map(([x, z]) => V(x, z));
     for (const tol of [0.3, 0.5, 0.75, 1.0, 1.4]) { pts = simplifyRing(p.pts.map(([x, z]) => V(x, z)), tol); if (pts.length <= 12) break; }
     if (pts.length < 3 || areaOf(pts) < 5) return;

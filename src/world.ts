@@ -387,6 +387,8 @@ export function getMapData() {
     gates: GATES,
     streets: lay.streets.map((s) => ({ pts: s.pts, w: s.w, main: s.main, kind: s.kind })),
     plots: lay.plots.map((p) => ({ pts: p.pts, kind: p.kind })),
+    /** The traced building footprints, as built (the parchment inks them one by one). */
+    houses: lay.lots.map((l) => l.c.map((p) => [p.x, p.y] as P2)),
     landmarks,
     /** Quarters of the town and its surroundings, for placing people (see sites.ts DISTRICTS). */
     districts: DISTRICTS,

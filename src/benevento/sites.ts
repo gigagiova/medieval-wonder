@@ -83,7 +83,7 @@ export const SITES: Record<string, SiteDef> = {
   forum: { id: 'forum', name: 'Forum', x: -40, z: -168, rot: GRID_ROT, flat: [16, 30], clear: 18 },
   // The Roman castellum aquae on the height outside Porta Summa, where the Rocca dei Rettori will stand
   // (OSM: the Rocca at 41.1290 N, 14.7820 E); the aqueduct comes in from the east-south-east.
-  castellumAquae: { id: 'castellumAquae', name: 'Castellum Aquae', x: 622, z: 160, rot: 2.64, flat: [14, 30] },
+  castellumAquae: { id: 'castellumAquae', name: 'Castellum Aquae', x: 622, z: 160, rot: 2.64, flat: [14, 30], clear: 17 },
   hortusSophiae: { id: 'hortusSophiae', name: 'Hortus Curtis', x: 566, z: -16, rot: GRID_ROT, clear: 20 },
   // The little square before the curtis gate named after a Roman equestrian statue (Piazza Piano di
   // Corte: two fragments of an equestrian monument found there in 1920), with the church of
@@ -157,7 +157,7 @@ export interface Gate { id: string; name: string; at: P2; main: boolean; kind: '
  */
 const GATE_SPEC: { id: string; name: string; near: P2; main: boolean; kind: Gate['kind'] }[] = [
   { id: 'aurea', name: 'Porta Aurea', near: AUREA_CENTER, main: true, kind: 'arch' },
-  { id: 'summa', name: 'Porta Summa', near: [590, 80], main: true, kind: 'gate' },
+  { id: 'summa', name: 'Porta Summa', near: [652, 101], main: true, kind: 'gate' }, // where the traced decumanus meets the drawn east line
   { id: 'rufina', name: 'Porta Rufina', near: [168, 96], main: false, kind: 'gate' },
   { id: 'sacramenti', name: 'Arcus Sacramenti', near: [-76, -61], main: false, kind: 'arch' },
   { id: 'laurentii', name: 'Porta Sancti Laurentii', near: [-392, -332], main: true, kind: 'gate' },
@@ -184,7 +184,7 @@ export const ROADS: Road[] = [
   // South from Porta Rufina past the Lombard cemetery to the Sabato ford.
   { name: 'Via Rufina', w: 2.6, pts: [g('rufina'), [172, 140], [184, 200], [214, 252], [236, 320], [222, 420], [200, 520], [178, 610]] },
   // East from Porta Summa.
-  { name: 'Via Summa', w: 2.8, pts: [g('summa'), [618, 108], [646, 140], [700, 172], [790, 200], [900, 236]] },
+  { name: 'Via Summa', w: 2.8, pts: [g('summa'), [672, 106], [700, 128], [740, 168], [790, 200], [900, 236]] },
   // Down the riverside from Torre della Catena along the Sabato to the old walnut.
   { name: 'Semita Nucis', w: 1.8, pts: [[-517, -14], [-492, 40], [-470, 110], [-450, 200], [-418, 300], [-380, 400], [-345, 462]] },
   // The mill lane off the Leproso road.
