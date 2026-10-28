@@ -172,18 +172,19 @@ export function layoutTown(seed = 700): Layout {
   for (let k = 0; k < r.grid.length; k++) if (r.grid[k] === FREE && !r.parcel[k]) r.grid[k] = STREET;
 
   // 3. Landmark precincts are kept clear (their modules build them); the forum is an open square.
+  const precinct = new Uint8Array(r.grid.length);
   for (const s of Object.values(SITES)) {
     if (!s.clear && !s.reserve) continue;
     const square = s.id === 'forum' || !!s.square;
     const poly: P2[] = s.reserve ? s.reserve.map(([lx, lz]) => siteToWorld(s, lx, lz))
       : Array.from({ length: 20 }, (_, i) => [s.x + Math.cos((i / 20) * Math.PI * 2) * s.clear!, s.z + Math.sin((i / 20) * Math.PI * 2) * s.clear!] as P2);
-    r.fill(poly, (k) => { if (r.grid[k] !== OUTSIDE) r.grid[k] = square ? STREET : RESERVED; });
+    r.fill(poly, (k) => { if (r.grid[k] !== OUTSIDE) { r.grid[k] = square ? STREET : RESERVED; precinct[k] = 1; } });
     if (square) lay.squares.push({ x: s.x, z: s.z, r: s.clear! });
   }
   // Landmarks with their own floor (a church, a chapel) take the ground of the cells they stand on.
   for (const s of Object.values(SITES)) for (const f of s.floors ?? []) {
     const poly = f.map(([lx, lz]) => siteToWorld(s, lx, lz));
-    r.fill(poly, (k) => { if (r.grid[k] !== OUTSIDE) r.grid[k] = RESERVED; });
+    r.fill(poly, (k) => { if (r.grid[k] !== OUTSIDE) { r.grid[k] = RESERVED; precinct[k] = 1; } });
   }
 
   // 4. Lanes: the plan's centre lines (for walkers, worn ground and the arches over them),
@@ -255,7 +256,7 @@ export function layoutTown(seed = 700): Layout {
   let lotId = 0;
   const reservedShare = (pts: P2[]) => {
     let tot = 0, res = 0;
-    r.fill(pts, (k) => { tot++; if (r.grid[k] === RESERVED) res++; });
+    r.fill(pts, (k) => { tot++; if (r.grid[k] === RESERVED || precinct[k]) res++; });
     return tot ? res / tot : 1;
   };
   // Houses first (their raster marks decide which garden edges face a street).

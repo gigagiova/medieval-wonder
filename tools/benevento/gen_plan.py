@@ -89,7 +89,7 @@ streets = []
 for s in T['lanes']:
     pts = W(s['pts'])
     L = np.sum(np.linalg.norm(np.diff(pts, axis=0), axis=1))
-    if L < 3: continue
+    if L < 1: continue
     streets.append({'w': round(float(s['w_px']) * 0.98, 2), 'pts': pts.round(2).tolist()})
 print('lanes', len(streets), 'length', round(sum(LineString(s['pts']).length for s in streets)), 'm')
 

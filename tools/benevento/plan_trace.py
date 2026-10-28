@@ -47,7 +47,7 @@ circle1 = wash(128, 149, 1500)   # the curtis circle (5): real town, kept
 # Ink: darker than ~72% of the local paper. Faint one-pixel lines on white have cores
 # of 140-160, so a fixed threshold of 120 lost them and let blocks leak into the lanes.
 reg = lambda a: cv2.dilate(a, np.ones((5, 5), np.uint8))
-THR = np.full_like(g1, 184); THR[reg(circle1) > 0] = 101; THR[reg(cn1) > 0] = 115
+THR = np.full_like(g1, int(sys.argv[2]) if len(sys.argv) > 2 else 150); THR[reg(circle1) > 0] = 101; THR[reg(cn1) > 0] = 115
 
 # ---------------------------------------------------------------- ink, at 1x first
 ink1 = (g1 < THR).astype(np.uint8)
@@ -87,6 +87,10 @@ glyph[STUB[1]:STUB[3], STUB[0]:STUB[2]] = 1
 # removed by an opening. The curtis circle (5) is a translucent wash laid over the
 # plan that bulges past the town's north line: it does not count as drawn town.
 drawn = (ink1 | cn1).astype(np.uint8)
+# The east line stops 8 px short of the Rocca at (1233,477)-(1235,486): an opening in the
+# circuit (taken as Porta Summa), not the edge of the town. The circuit is closed across it.
+SUMMA_GAP = ((1233.0, 477.0), (1235.0, 486.0))
+cv2.line(drawn, tuple(map(int, SUMMA_GAP[0])), tuple(map(int, SUMMA_GAP[1])), 1, 2)
 drawn[tri_mask > 0] = 1            # keep the triangle's area as part of the town
 m = cv2.morphologyEx(drawn, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)), iterations=2)
 cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -111,7 +115,7 @@ up = lambda a: cv2.resize(a, (W1 * K, H1 * K), interpolation=cv2.INTER_NEAREST)
 G = cv2.resize(g1, (W1 * K, H1 * K), interpolation=cv2.INTER_CUBIC)
 ink = ((G < up(THR)) & (up(glyph) == 0) & (up(tri_mask) == 0)).astype(np.uint8)
 # the edges hidden under the two triangles, drawn in as lines
-for (a, b) in (AUREA_EDGE, SACRAMENTO_EDGE):
+for (a, b) in (AUREA_EDGE, SACRAMENTO_EDGE, SUMMA_GAP):
     cv2.line(ink, (int(a[0] * K), int(a[1] * K)), (int(b[0] * K), int(b[1] * K)), 1, K)
 town = cv2.resize(town1, (W1 * K, H1 * K), interpolation=cv2.INTER_LINEAR)
 town = (cv2.GaussianBlur(town.astype(np.float32), (0, 0), K * 0.7) > 0.5).astype(np.uint8)
@@ -184,7 +188,7 @@ for l in range(1, ncell):
         sl = objs0[l - 1]
         mm = cell[sl] == l
         filled = ndi.binary_fill_holes(mm)
-        kind[l] = 2 if (filled.sum() - mm.sum()) > 0.25 * mm.sum() and a < 4000 else 1
+        kind[l] = 2 if (filled.sum() - mm.sum()) > 0.25 * mm.sum() and a < 1200 and w < 7 else 1
     elif a <= 520:
         kind[l] = 2
     else:
@@ -206,9 +210,10 @@ for l in range(1, wn):
     a = mm.sum() / (K * K)
     if a < 150: continue
     cell[mm] = nxt
-    # A small widening is a square of the lanes; a large one is most likely a block whose
-    # outline is broken in the drawing: it is kept open (a garden), never built over.
-    if a < 300: squares.add(nxt)
+    # A wide part of the lane spaces: a square, or (when large) most likely a block whose
+    # outline is broken in the drawing. Either way it stays open lane ground: never built
+    # over, never walled (walling it would cut lanes the drawing leaves open).
+    squares.add(nxt)
     nxt += 1
     extra_kind.append(3)
 kind = np.concatenate([kind, np.array(extra_kind, np.uint8)])
@@ -282,6 +287,73 @@ for l in range(1, ncell):
         # enough to be a yard rather than a back room
         elif a >= 100 and all(kind[q] == 2 for q in others): kind[l] = 4
 
+# Lines drawn across a lane (where two blocks' outlines meet) cut short pieces out of it. A
+# small narrow cell that touches two or more separate lane pieces is such a piece of lane,
+# not a building: it would otherwise plug the lane. Repeated so chains of pieces join up.
+street_like = lambda q: kind[q] == 1 or q in squares
+lane_pieces = 0
+for _ in range(4):
+    changed = 0
+    for l, nb in nbr_cache.items():
+        if kind[l] not in (2, 4): continue
+        a = tot[l] / (K * K)
+        r_in = inner_r[l] if l < len(inner_r) else 99
+        if a > 160 or 2 * r_in > 9: continue
+        sts = [q for q in np.nonzero(nb)[0] if q and q != l and street_like(q) and nb[q] > 2 * K]
+        if len(sts) < 2: continue
+        # ...and it touches them at its two ends (a lane piece), not along its sides (a
+        # corner house, or a house between two parallel lanes)
+        sl = objs[l - 1]
+        y0, y1 = max(0, sl[0].start - 3), min(HH, sl[0].stop + 3)
+        x0, x1 = max(0, sl[1].start - 3), min(WW, sl[1].stop + 3)
+        sub = full[y0:y1, x0:x1]
+        mm = (sub == l).astype(np.uint8)
+        ys, xs = np.nonzero(mm)
+        c = np.array([xs.mean(), ys.mean()])
+        ev, evec = np.linalg.eigh(np.cov(np.stack([xs, ys])))
+        ax = evec[:, 1]
+        u = (np.stack([xs, ys], 1) - c) @ ax
+        ring = cv2.dilate(mm, ker, iterations=2) & (1 - mm)
+        ry, rx = np.nonzero(ring)
+        lab_r = sub[ry, rx]
+        ends = set()
+        for q in sts:
+            sel = lab_r == q
+            uq = ((np.stack([rx[sel], ry[sel]], 1) - c) @ ax).mean()
+            ends.add(-1 if uq < u.min() * 0.6 else 1 if uq > u.max() * 0.6 else 0)
+        if -1 in ends and 1 in ends and ev[1] > 1.5 * ev[0]:
+            kind[l] = 1; changed += 1
+    lane_pieces += changed
+    if not changed: break
+print('lane pieces cut off by cross lines, rejoined', lane_pieces)
+
+# Where the drawing leaves a gap in a lane's line, the lane and the block beside it read as
+# one large open cell, and the lane network falls apart there. An open cell that joins two
+# otherwise separate parts of the lane network (each over 200 px^2) is taken as lane ground
+# (a square), smallest first, only while it still joins separate parts.
+st_like = np.isin(full, [q for q in range(ncell) if kind[q] == 1] + list(squares)).astype(np.uint8)
+ncomp, clab = cv2.connectedComponents(st_like, connectivity=4)
+csize = np.bincount(clab.ravel()); csize[0] = 0
+parent = list(range(ncomp))
+def root(a):
+    while parent[a] != a: parent[a] = parent[parent[a]]; a = parent[a]
+    return a
+joined = 0
+for l in sorted(nbr_cache, key=lambda q: tot[q]):
+    if kind[l] != 3 or l in squares: continue
+    sl = objs[l - 1]
+    y0, y1 = max(0, sl[0].start - 3), min(HH, sl[0].stop + 3)
+    x0, x1 = max(0, sl[1].start - 3), min(WW, sl[1].stop + 3)
+    mm = (full[y0:y1, x0:x1] == l).astype(np.uint8)
+    ring = cv2.dilate(mm, ker, iterations=2) & (1 - mm)
+    cs_ = [c for c in np.unique(clab[y0:y1, x0:x1][ring > 0]) if c and csize[c] > 200 * K * K]
+    roots = {root(c) for c in cs_}
+    if len(roots) >= 2:
+        squares.add(l); joined += 1
+        rs = list(roots)
+        for r_ in rs[1:]: parent[r_] = rs[0]
+print('open cells joining parts of the lane network, taken as squares', joined)
+
 # ---------------------------------------------------------------- polygons
 def ring_pts(mask, x0, y0):
     cs, hier = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
@@ -320,8 +392,9 @@ for i, c in enumerate(cs):
     c = cv2.approxPolyDP(c, 0.6 * K, True)[:, 0, :]
     if len(c) < 3: continue
     street_areas.append({'hole': bool(hier[0][i][3] >= 0), 'pts': ((c + 0.5) / K).round(2).tolist()})
-# Centre lines over the paper part of the lanes (not their ink share), widths from it.
-lane_paper = st_full & paper
+# Centre lines over the lane spaces with their share of the ink (so a line drawn across a
+# lane does not cut its centre line) and the squares; widths to the lines' centres.
+lane_paper = (st_full | np.isin(full, list(squares))).astype(np.uint8)
 lane_paper = cv2.morphologyEx(lane_paper, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
 ldist = cv2.distanceTransform(lane_paper, cv2.DIST_L2, 5)
 skel = skeletonize(lane_paper > 0).astype(np.uint8)
@@ -342,15 +415,13 @@ for s in nodes:
             nx_ = [r for r in neigh(cur) if r != prev and (cur, r) not in seen]
             if not nx_: break
             r = nx_[0]; seen.add((cur, r)); seen.add((r, cur)); path.append(r); prev, cur = cur, r
-        if len(path) >= 4: polys.append(path)
+        if len(path) >= 2: polys.append(path)
 lanes = []
 for pth in polys:
     a = np.array(pth, float)
     L = np.sum(np.linalg.norm(np.diff(a, axis=0), axis=1)) / K
-    if L < 3: continue
     simp = cv2.approxPolyDP(a.astype(np.float32).reshape(-1, 1, 2), 0.5 * K, False)[:, 0, :]
-    # drawn width: lane paper plus one line width (the ink shared to each side)
-    wd = np.array([ldist[int(y), int(x)] for x, y in a]) * 2 / K + 1.6
+    wd = np.array([ldist[int(y), int(x)] for x, y in a]) * 2 / K
     lanes.append({'w_px': round(float(np.clip(np.median(wd), 1.6, 9)), 2), 'pts': ((simp + 0.5) / K).round(2).tolist()})
 print('lane centre lines', len(lanes), 'length px', round(sum(np.sum(np.linalg.norm(np.diff(np.array(s['pts']), axis=0), axis=1)) for s in lanes)))
 

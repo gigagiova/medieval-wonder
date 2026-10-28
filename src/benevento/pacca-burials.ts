@@ -11,7 +11,7 @@ import { siteToWorld, type SiteDef } from './sites';
 // No cleared parcels: the stair follows the street front of the San Pietro house
 // (frame from tools/benevento/anchor_burials.ts; footbridge before the church door).
 export const PACCA_SITE: SiteDef = {id:'paccaBurials',name:'Sepulcra Sancti Petri',
-  x:-72.07,z:-130.831,rot:-1.812504};
+  x:-102.979,z:-125.375,rot:2.660187};
 export const PACCA = {floor:-3.3,top:-5.2,bottom:2,stairX:-1.25,width:1.6,
   entry:{x:-1.25,z:-6.4},chamber:{x:3.7,z:2.05}} as const;
 export const paccaHole = (): P2[] => [[-2.12,-5.35],[-.38,-5.35],[-.38,3.45],[-2.12,3.45]];

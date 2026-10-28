@@ -17,7 +17,9 @@ export { RAW_WALL700 } from './aurea-perimeter';
 export type P2 = [number, number];
 export interface River { name: string; pts: P2[]; w: number; level: number[] }
 /** A lane of the plan (skeleton of its street spaces): width as drawn, on the decumanus, inside the circuit of 700. */
-export interface GeoStreet { w: number; main: boolean; in: boolean; pts: P2[] }
+export interface GeoStreet { w: number; main: boolean; in: boolean; pts: P2[];
+  /** Part of the plan's one connected lane network (gates open on these). */
+  net?: boolean }
 /**
  * A cell of the plan, traced between its drawn lines (tools/benevento/plan_trace.py):
  * 'house' a drawn building footprint, 'court' a yard enclosed by buildings, 'open' a large

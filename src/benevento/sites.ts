@@ -1,4 +1,4 @@
-import { baseHeight, WALL700, type P2 } from './geo';
+import { baseHeight, WALL700, GEO_STREETS, type P2 } from './geo';
 import { AUREA_CENTER } from './aurea-perimeter';
 
 // Places in Benevento, AD 700, registered to real ground (metres, x east,
@@ -47,9 +47,9 @@ export const SITES: Record<string, SiteDef> = {
   sanctusModestus: { id: 'sanctusModestus', name: 'Sanctus Modestus', x: -22.98, z: 6.81, rot: 0,
     floors: [[[-4.62,-2.81],[-5.37,.74],[4.42,2.81],[5.17,-.74]]] },
   // Street-side access beneath a traced house front in Triggio (tools/benevento/anchor_burials.ts:
-  // the nearest front, 34 m from the former site, whose lane takes the stair); no clearing or
+  // the nearest front, 32 m from the former site, whose lane takes the stair); no clearing or
   // terrace change. Inspired by Triggio burial evidence; exact access/plan are reconstruction.
-  triggioBurials: { id: 'triggioBurials', name: 'Sepulcra Langobardorum', x: 83.618, z: 12.461, rot: -1.865224 },
+  triggioBurials: { id: 'triggioBurials', name: 'Sepulcra Langobardorum', x: 84.264, z: 8.645, rot: 1.238895 },
   // The dukes' residence in the old praetorium: planum curiae, today Piazza Piano di Corte.
   curtis: { id: 'curtis', name: 'Curtis Ducis', x: 506, z: -140, rot: GRID_ROT, lx: 40, lz: -23, flat: [24, 40], clear: 22 },
   // The cathedral of S. Maria (consecrated 15 Dec 600) with its atrium; the bishop's house and books.
@@ -157,7 +157,7 @@ export interface Gate { id: string; name: string; at: P2; main: boolean; kind: '
  */
 const GATE_SPEC: { id: string; name: string; near: P2; main: boolean; kind: Gate['kind'] }[] = [
   { id: 'aurea', name: 'Porta Aurea', near: AUREA_CENTER, main: true, kind: 'arch' },
-  { id: 'summa', name: 'Porta Summa', near: [652, 101], main: true, kind: 'gate' }, // where the traced decumanus meets the drawn east line
+  { id: 'summa', name: 'Porta Summa', near: [647.7, 116.7], main: true, kind: 'gate' }, // the opening drawn in the east line by the Rocca
   { id: 'rufina', name: 'Porta Rufina', near: [168, 96], main: false, kind: 'gate' },
   { id: 'sacramenti', name: 'Arcus Sacramenti', near: [-76, -61], main: false, kind: 'arch' },
   { id: 'laurentii', name: 'Porta Sancti Laurentii', near: [-392, -332], main: true, kind: 'gate' },
@@ -165,7 +165,19 @@ const GATE_SPEC: { id: string; name: string; near: P2; main: boolean; kind: Gate
   { id: 'rectoris', name: 'Porta Rectoris', near: [196, -292], main: false, kind: 'gate' },
   { id: 'posterula', name: 'Posterula', near: [283, -287], main: false, kind: 'postern' },
 ];
-export const GATES: Gate[] = GATE_SPEC.map((g) => ({ id: g.id, name: g.name, main: g.main, kind: g.kind, at: g.kind === 'arch' ? g.near : onWall(g.near[0], g.near[1]).p }));
+/** A gate opens where one of the plan's lanes reaches the traced curtain: the lane end nearest
+ * the gate's recorded position (within 60 m) of the connected lane network, else the nearest point of the curtain. */
+function gateAt(near: P2): P2 {
+  let best: P2 | null = null, bd = 60;
+  for (const s of GEO_STREETS) if (s.net) for (const e of [s.pts[0], s.pts[s.pts.length - 1]]) {
+    const w = onWall(e[0], e[1]);
+    if (w.d > 3.5) continue;
+    const d = Math.hypot(w.p[0] - near[0], w.p[1] - near[1]);
+    if (d < bd) { bd = d; best = w.p; }
+  }
+  return best ?? onWall(near[0], near[1]).p;
+}
+export const GATES: Gate[] = GATE_SPEC.map((g) => ({ id: g.id, name: g.name, main: g.main, kind: g.kind, at: g.kind === 'arch' ? g.near : gateAt(g.near) }));
 
 // ---------------------------------------------------------------- roads outside the walls
 export interface Road { name: string; pts: P2[]; w: number }

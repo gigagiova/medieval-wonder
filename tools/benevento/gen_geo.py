@@ -70,7 +70,29 @@ def nearest_node(x, z):
 # the gates on the traced curtain nearest the old positions
 ext = town.exterior
 gate = lambda x, z: np.array(ext.interpolate(ext.project(Point(x, z))).coords[0])
-gl, gs = gate(-392, -332), gate(652, 101)
+# The lanes that form one connected network as drawn (ends meeting within 3 m, no bridging):
+# gates and the decumanus's ends are put where these reach the curtain.
+par = {}
+def find(a):
+    while par.setdefault(a, a) != a: par[a] = par[par[a]]; a = par[a]
+    return a
+for i in range(len(streets)): par[find(node_of[2 * i])] = find(node_of[2 * i + 1])
+roots = [find(node_of[2 * i]) for i in range(len(streets))]
+cnt = {}
+for i, rt in enumerate(roots): cnt[rt] = cnt.get(rt, 0) + LineString(streets[i]['pts']).length
+main_root = max(cnt, key=cnt.get)
+for i, st in enumerate(streets): st['net'] = roots[i] == main_root
+print('connected lane network', round(cnt[main_root]), 'm of', round(sum(cnt.values())), 'm')
+def gate_on_net(x, z):
+    best, bd = None, 80
+    for st in streets:
+        if not st['net']: continue
+        for e in (st['pts'][0], st['pts'][-1]):
+            if ext.distance(Point(*e)) > 3.5: continue
+            d = np.hypot(e[0] - x, e[1] - z)
+            if d < bd: bd, best = d, e
+    return gate(*best) if best is not None else gate(x, z)
+gl, gs = gate_on_net(-392, -332), gate(647.7, 116.7)  # Summa: the opening drawn in the east line (plan_trace.py SUMMA_GAP)
 print('decumanus ends: S. Lorenzo', gl.round(1), 'Summa', gs.round(1))
 # start and end on the lane ends nearest the gates that belong to the main lane network
 seen_c = {}
