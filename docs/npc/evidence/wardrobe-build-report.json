@@ -1,0 +1,500 @@
+[
+ {
+  "body": "m_young",
+  "garments": {
+   "shirt": {
+    "fitted": false,
+    "edges": 6062,
+    "perimeter_max": 2.1214675659186888e-05,
+    "strain_p50": 0.0,
+    "strain_p99": 0.012234103363160822,
+    "strain_max": 0.09691907115020411,
+    "area_p99": 0.057980775076058255,
+    "flips": 1,
+    "moved_max_cm": 2.2060520765090827,
+    "drawn_in_cm": 1.9416077544844508,
+    "band_radius_after_cm": 15.108912380476337,
+    "alpha": 0.0,
+    "facing_loops": 1,
+    "facing_tris": 168,
+    "belt_y": 0.9634970965627289,
+    "belts": {
+     "belt": {
+      "style": "leather",
+      "tris": 578
+     }
+    }
+   },
+   "tunic": {
+    "fitted": false,
+    "edges": 6241,
+    "perimeter_max": 0.00012690867027598252,
+    "strain_p50": 0.0,
+    "strain_p99": 0.029353282059313927,
+    "strain_max": 0.1531231776160223,
+    "area_p99": 0.18969684880525975,
+    "flips": 13,
+    "moved_max_cm": 3.2530968204957182,
+    "drawn_in_cm": 2.6449620569259813,
+    "band_radius_after_cm": 53.37094382998649,
+    "alpha": 0.4,
+    "facing_loops": 3,
+    "facing_tris": 768,
+    "belt_y": 1.0284970965627287,
+    "belts": {
+     "belt_tunic": {
+      "style": "leather",
+      "tris": 578
+     },
+     "cord_tunic": {
+      "style": "cord",
+      "tris": 1266
+     }
+    }
+   },
+   "longrobe": {
+    "fitted": false,
+    "edges": 8501,
+    "perimeter_max": 0.0,
+    "strain_p50": 0.0,
+    "strain_p99": 0.016995048680701008,
+    "strain_max": 0.16428392401680877,
+    "area_p99": 0.16934488707621292,
+    "flips": 11,
+    "moved_max_cm": 2.727755061963292,
+    "drawn_in_cm": 2.49744600382181,
+    "band_radius_after_cm": 53.37094382998649,
+    "alpha": 0.5,
+    "facing_loops": 5,
+    "facing_tris": 1752,
+    "belt_y": 1.0284970965627287,
+    "belts": {
+     "belt_robe": {
+      "style": "leather",
+      "tris": 578
+     },
+     "cord_robe": {
+      "style": "cord",
+      "tris": 1266
+     },
+     "sash_robe": {
+      "style": "sash",
+      "tris": 686
+     }
+    }
+   },
+   "robe": {
+    "fitted": false,
+    "edges": 8501,
+    "perimeter_max": 0.0,
+    "strain_p50": 0.0,
+    "strain_p99": 0.009645557873044068,
+    "strain_max": 0.09521545055013382,
+    "area_p99": 0.09697758356107872,
+    "flips": 4,
+    "moved_max_cm": 1.9308221662801415,
+    "drawn_in_cm": 2.088142155068637,
+    "band_radius_after_cm": 52.89831921811401,
+    "alpha": 0.6,
+    "facing_loops": 5,
+    "facing_tris": 1752,
+    "belt_y": 1.0284970965627287,
+    "belts": {
+     "rope": {
+      "style": "cord",
+      "tris": 1266
+     }
+    }
+   }
+  },
+  "body_unchanged": true
+ },
+ {
+  "body": "m_mid",
+  "garments": {
+   "shirt": {
+    "fitted": false,
+    "edges": 6062,
+    "perimeter_max": 2.3512154331939428e-05,
+    "strain_p50": 0.0,
+    "strain_p99": 0.022341203517762323,
+    "strain_max": 0.12493312437574715,
+    "area_p99": 0.07389431068627315,
+    "flips": 1,
+    "moved_max_cm": 3.055072677625187,
+    "drawn_in_cm": 2.382723446279908,
+    "band_radius_after_cm": 15.497720248025438,
+    "alpha": 0.0,
+    "facing_loops": 1,
+    "facing_tris": 168,
+    "belt_y": 0.9871565305879232,
+    "belts": {
+     "belt": {
+      "style": "leather",
+      "tris": 578
+     }
+    }
+   },
+   "tunic": {
+    "fitted": false,
+    "edges": 6241,
+    "perimeter_max": 0.00015596466279432786,
+    "strain_p50": 0.0,
+    "strain_p99": 0.028847977435899133,
+    "strain_max": 0.1579449723041797,
+    "area_p99": 0.19006748225945813,
+    "flips": 13,
+    "moved_max_cm": 3.262747921595162,
+    "drawn_in_cm": 2.974060993269967,
+    "band_radius_after_cm": 54.03669786231288,
+    "alpha": 0.3,
+    "facing_loops": 3,
+    "facing_tris": 768,
+    "belt_y": 1.052156530587923,
+    "belts": {
+     "belt_tunic": {
+      "style": "leather",
+      "tris": 578
+     },
+     "cord_tunic": {
+      "style": "cord",
+      "tris": 1266
+     }
+    }
+   },
+   "longrobe": {
+    "fitted": false,
+    "edges": 8501,
+    "perimeter_max": 0.0,
+    "strain_p50": 0.0,
+    "strain_p99": 0.02037529322125252,
+    "strain_max": 0.1814924869085516,
+    "area_p99": 0.1506004009942019,
+    "flips": 6,
+    "moved_max_cm": 2.785299023445048,
+    "drawn_in_cm": 2.288135304527411,
+    "band_radius_after_cm": 54.03669786231288,
+    "alpha": 0.5,
+    "facing_loops": 5,
+    "facing_tris": 1752,
+    "belt_y": 1.052156530587923,
+    "belts": {
+     "belt_robe": {
+      "style": "leather",
+      "tris": 578
+     },
+     "cord_robe": {
+      "style": "cord",
+      "tris": 1266
+     },
+     "sash_robe": {
+      "style": "sash",
+      "tris": 686
+     }
+    }
+   },
+   "robe": {
+    "fitted": false,
+    "edges": 8501,
+    "perimeter_max": 0.0,
+    "strain_p50": 0.0,
+    "strain_p99": 0.012704447423472641,
+    "strain_max": 0.18331002369713073,
+    "area_p99": 0.09150895108881098,
+    "flips": 2,
+    "moved_max_cm": 2.1603794175796986,
+    "drawn_in_cm": 2.275744342749128,
+    "band_radius_after_cm": 54.03669786231288,
+    "alpha": 0.5,
+    "facing_loops": 5,
+    "facing_tris": 1752,
+    "belt_y": 1.052156530587923,
+    "belts": {
+     "rope": {
+      "style": "cord",
+      "tris": 1266
+     }
+    }
+   }
+  },
+  "body_unchanged": true
+ },
+ {
+  "body": "m_old",
+  "garments": {
+   "shirt": {
+    "fitted": false,
+    "edges": 6062,
+    "perimeter_max": 6.131841417122974e-05,
+    "strain_p50": 0.0,
+    "strain_p99": 0.026580764029617066,
+    "strain_max": 0.16271813613462632,
+    "area_p99": 0.06570586007992352,
+    "flips": 0,
+    "moved_max_cm": 3.4215583175879707,
+    "drawn_in_cm": 2.0830665517902496,
+    "band_radius_after_cm": 17.070090483932994,
+    "alpha": 0.4,
+    "facing_loops": 1,
+    "facing_tris": 164,
+    "belt_y": 0.9134170769449831,
+    "belts": {
+     "belt": {
+      "style": "leather",
+      "tris": 578
+     }
+    }
+   },
+   "tunic": {
+    "fitted": false,
+    "edges": 6241,
+    "perimeter_max": 0.00019278474054584827,
+    "strain_p50": 0.0,
+    "strain_p99": 0.02489874818305185,
+    "strain_max": 0.1761805846934819,
+    "area_p99": 0.14762685984301743,
+    "flips": 6,
+    "moved_max_cm": 2.52892989334524,
+    "drawn_in_cm": 2.12452495190463,
+    "band_radius_after_cm": 50.863346592863536,
+    "alpha": 0.6,
+    "facing_loops": 3,
+    "facing_tris": 768,
+    "belt_y": 1.018417076944983,
+    "belts": {
+     "belt_tunic": {
+      "style": "leather",
+      "tris": 578
+     },
+     "cord_tunic": {
+      "style": "cord",
+      "tris": 1266
+     }
+    }
+   },
+   "longrobe": {
+    "fitted": false,
+    "edges": 8501,
+    "perimeter_max": 0.0,
+    "strain_p50": 0.0,
+    "strain_p99": 0.019500327748385893,
+    "strain_max": 0.18870204872614807,
+    "area_p99": 0.12314089818886635,
+    "flips": 8,
+    "moved_max_cm": 2.7063709703249765,
+    "drawn_in_cm": 2.12452495190463,
+    "band_radius_after_cm": 50.863346592863536,
+    "alpha": 0.6,
+    "facing_loops": 5,
+    "facing_tris": 1752,
+    "belt_y": 1.018417076944983,
+    "belts": {
+     "belt_robe": {
+      "style": "leather",
+      "tris": 578
+     },
+     "cord_robe": {
+      "style": "cord",
+      "tris": 1266
+     },
+     "sash_robe": {
+      "style": "sash",
+      "tris": 686
+     }
+    }
+   },
+   "robe": {
+    "fitted": false,
+    "edges": 8501,
+    "perimeter_max": 0.0,
+    "strain_p50": 0.0,
+    "strain_p99": 0.016528461811627017,
+    "strain_max": 0.12748519870725838,
+    "area_p99": 0.09347778058065369,
+    "flips": 3,
+    "moved_max_cm": 3.3903757817261466,
+    "drawn_in_cm": 2.104534572900987,
+    "band_radius_after_cm": 50.56350300898499,
+    "alpha": 0.5,
+    "facing_loops": 5,
+    "facing_tris": 1752,
+    "belt_y": 1.018417076944983,
+    "belts": {
+     "rope": {
+      "style": "cord",
+      "tris": 1266
+     }
+    }
+   }
+  },
+  "body_unchanged": true
+ },
+ {
+  "body": "m_elder",
+  "garments": {
+   "shirt": {
+    "fitted": false,
+    "edges": 6062,
+    "perimeter_max": 4.242519620967222e-05,
+    "strain_p50": 0.0,
+    "strain_p99": 0.021385438309382696,
+    "strain_max": 0.10954778870288137,
+    "area_p99": 0.05090380949169829,
+    "flips": 0,
+    "moved_max_cm": 3.517159420824697,
+    "drawn_in_cm": 2.8061781075713723,
+    "band_radius_after_cm": 16.73220865289247,
+    "alpha": 0.0,
+    "facing_loops": 1,
+    "facing_tris": 168,
+    "belt_y": 0.915285387601179,
+    "belts": {
+     "belt": {
+      "style": "leather",
+      "tris": 578
+     }
+    }
+   },
+   "tunic": {
+    "fitted": false,
+    "edges": 6241,
+    "perimeter_max": 0.00022166761227970788,
+    "strain_p50": 0.0,
+    "strain_p99": 0.026567257107054612,
+    "strain_max": 0.12053710353265952,
+    "area_p99": 0.20163633861594077,
+    "flips": 3,
+    "moved_max_cm": 2.9255209662412773,
+    "drawn_in_cm": 1.9298452923601273,
+    "band_radius_after_cm": 48.732859437703574,
+    "alpha": 0.5,
+    "facing_loops": 3,
+    "facing_tris": 768,
+    "belt_y": 0.9902853876011788,
+    "belts": {
+     "belt_tunic": {
+      "style": "leather",
+      "tris": 578
+     },
+     "cord_tunic": {
+      "style": "cord",
+      "tris": 1266
+     }
+    }
+   },
+   "longrobe": {
+    "fitted": false,
+    "edges": 8501,
+    "perimeter_max": 0.0,
+    "strain_p50": 0.0,
+    "strain_p99": 0.023913105475065696,
+    "strain_max": 0.16672205603352092,
+    "area_p99": 0.14354923206851863,
+    "flips": 7,
+    "moved_max_cm": 3.861031359692274,
+    "drawn_in_cm": 2.9254439914947747,
+    "band_radius_after_cm": 48.732859437703574,
+    "alpha": 0.2,
+    "facing_loops": 5,
+    "facing_tris": 1752,
+    "belt_y": 0.9902853876011788,
+    "belts": {
+     "belt_robe": {
+      "style": "leather",
+      "tris": 578
+     },
+     "cord_robe": {
+      "style": "cord",
+      "tris": 1266
+     },
+     "sash_robe": {
+      "style": "sash",
+      "tris": 686
+     }
+    }
+   },
+   "robe": {
+    "fitted": false,
+    "edges": 8501,
+    "perimeter_max": 0.0,
+    "strain_p50": 0.0,
+    "strain_p99": 0.01765223140266315,
+    "strain_max": 0.13875543107669067,
+    "area_p99": 0.10746765450760509,
+    "flips": 5,
+    "moved_max_cm": 3.161082244924688,
+    "drawn_in_cm": 2.9254439914947747,
+    "band_radius_after_cm": 47.80849868562496,
+    "alpha": 0.2,
+    "facing_loops": 5,
+    "facing_tris": 1752,
+    "belt_y": 0.9902853876011788,
+    "belts": {
+     "rope": {
+      "style": "cord",
+      "tris": 1266
+     }
+    }
+   }
+  },
+  "body_unchanged": true
+ },
+ {
+  "body": "w_young",
+  "garments": {
+   "gown": {
+    "fitted": true,
+    "edges": 5500,
+    "perimeter_max": 0.0,
+    "strain_p50": 0.0,
+    "strain_p99": 0.0,
+    "strain_max": 0.0,
+    "area_p99": 0.0,
+    "flips": 0,
+    "moved_max_cm": 0.0,
+    "drawn_in_cm": 0.0,
+    "band_radius_after_cm": 43.792318426559916,
+    "alpha": 0.0,
+    "facing_loops": 1,
+    "facing_tris": 144,
+    "belt_y": 0.8864784403187045,
+    "belts": {
+     "girdle": {
+      "style": "sash",
+      "tris": 686
+     }
+    }
+   }
+  },
+  "body_unchanged": true
+ },
+ {
+  "body": "w_mid",
+  "garments": {
+   "gown": {
+    "fitted": true,
+    "edges": 5500,
+    "perimeter_max": 0.0,
+    "strain_p50": 0.0,
+    "strain_p99": 0.0,
+    "strain_max": 0.0,
+    "area_p99": 0.0,
+    "flips": 0,
+    "moved_max_cm": 0.0,
+    "drawn_in_cm": 0.0,
+    "band_radius_after_cm": 44.9399985373452,
+    "alpha": 0.0,
+    "facing_loops": 1,
+    "facing_tris": 144,
+    "belt_y": 0.890666579060478,
+    "belts": {
+     "girdle": {
+      "style": "sash",
+      "tris": 686
+     }
+    }
+   }
+  },
+  "body_unchanged": true
+ }
+]

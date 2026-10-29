@@ -30,6 +30,9 @@ function posed(m: THREE.SkinnedMesh, bind = false) {
   for (const i of used) {
     if (bind) { P.set(i, v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld).clone()); N.set(i, w.fromBufferAttribute(n, i).transformDirection(m.matrixWorld).clone()); continue; }
     m.getVertexPosition(i, v);
+    const skinned = v.clone();
+    // (Garments kept off the limbs on the GPU, src/npc2/push.ts: the same projection here.)
+    (m.userData.push as ((p: THREE.Vector3) => void) | undefined)?.(v);
     // Normal: skin a point a millimetre out along it.
     w.fromBufferAttribute(p, i).addScaledVector(new THREE.Vector3().fromBufferAttribute(n, i), 0.001);
     const tmp = p.getX(i), ty = p.getY(i), tz = p.getZ(i);
@@ -37,7 +40,7 @@ function posed(m: THREE.SkinnedMesh, bind = false) {
     const q = m.getVertexPosition(i, new THREE.Vector3());
     p.setXYZ(i, tmp, ty, tz);
     P.set(i, v.clone().applyMatrix4(m.matrixWorld));
-    N.set(i, q.applyMatrix4(m.matrixWorld).sub(P.get(i)!).normalize());
+    N.set(i, q.sub(skinned).transformDirection(m.matrixWorld));
   }
   return { P, N };
 }
@@ -46,7 +49,7 @@ function shell(m: THREE.SkinnedMesh, bind = false) {
   const g = new THREE.BufferGeometry();
   const src = m.geometry, p = src.attributes.position, arr = new Float32Array(p.count * 3), v = new THREE.Vector3();
   for (let i = 0; i < p.count; i++) {
-    if (bind) v.fromBufferAttribute(p, i); else m.getVertexPosition(i, v);
+    if (bind) v.fromBufferAttribute(p, i); else { m.getVertexPosition(i, v); (m.userData.push as ((q: THREE.Vector3) => void) | undefined)?.(v); }
     v.applyMatrix4(m.matrixWorld);
     arr[i * 3] = v.x; arr[i * 3 + 1] = v.y; arr[i * 3 + 2] = v.z;
   }
@@ -68,8 +71,19 @@ function outside(bvh: MeshBVH, p: THREE.Vector3, n: THREE.Vector3, reach: number
   return fn.dot(n) > 0.2;
 }
 
-/** Count poke-through vertices for a person in its current pose. */
-export function pokeAudit(body: THREE.Object3D, depthOf: (g: string) => number, reach = 0.03) {
+/** The bone with the largest skin weight on a vertex (where on the body a crossing is). */
+function mainBone(m: THREE.SkinnedMesh, i: number) {
+  const J = m.geometry.attributes.skinIndex, W = m.geometry.attributes.skinWeight;
+  let best = 0, w = -1;
+  for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > w) { w = W.getComponent(i, k); best = J.getComponent(i, k); }
+  return m.skeleton.bones[best]?.name.replace('mixamorig', '') ?? '?';
+}
+
+/**
+ * Count poke-through vertices for a person in its current pose. With
+ * `where`, also tally each pair's offenders by the inner vertex's main bone.
+ */
+export function pokeAudit(body: THREE.Object3D, depthOf: (g: string) => number, reach = 0.03, where?: Record<string, Record<string, number>>) {
   body.updateMatrixWorld(true);
   const L = layers(body, depthOf);
   const res: Record<string, number> = {};
@@ -84,6 +98,7 @@ export function pokeAudit(body: THREE.Object3D, depthOf: (g: string) => number, 
         if (!outside(bvhP, p, pp.N.get(i)!, reach)) continue;
         if (outside(bvhB, pb.P.get(i)!, pb.N.get(i)!, reach)) continue;
         k++;
+        if (where) { const key = `${inner.name}>${outer.name}`, b = mainBone(inner.mesh, i); (where[key] ??= {})[b] = (where[key][b] ?? 0) + 1; }
       }
       if (k) res[`${inner.name}>${outer.name}`] = k;
     }

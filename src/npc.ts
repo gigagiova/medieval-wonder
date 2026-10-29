@@ -12,11 +12,12 @@ import * as Props from './npc/props';
 import { makeStaff } from './npc/population-props';
 import { fabric, type FabricKind } from './npc/fabric';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
-import { loadV2, kitsV2, bodiesV2, outfitV2, type OutfitV2 } from './npc2/kit';
+import { loadV2, kitsV2, bodiesV2, outfitV2, type OutfitV2, type BeltStyle } from './npc2/kit';
 import { dressV2 } from './npc2/dress';
 import { makeSprings } from './npc2/springs';
 import { clampArmSwing } from './npc2/arms';
 import { makeGarmentClearance } from './npc2/clearance';
+import { makePush } from './npc2/push';
 import { makeBlink } from './npc/expression';
 
 /** Townsfolk v2 (src/npc2): MakeHuman bodies in modelled garments, the default; `?npc=v1` for the older bodies. */
@@ -96,7 +97,7 @@ let weave: THREE.Texture | null = null;
 let loading: Promise<void> | null = null;
 
 /** Dev switches and numbers (test page). */
-export const npcDebug = { beard: null as number | null, prof: { anim: 0, logic: 0, frames: 0, springs: 0, springPeople: 0 }, springDist: 15, cloth: clothStats, maxSim: 3, simDist: 15, people: [] as Person[], buildMs: {} as Record<string, number> };
+export const npcDebug = { beard: null as number | null, prof: { anim: 0, logic: 0, frames: 0, springs: 0, springPeople: 0 }, springDist: 15, cloth: clothStats, maxSim: 3, simDist: 15, people: [] as Person[], buildMs: {} as Record<string, number>, /** Worst grasp reach error (m) since load: a bar the straight-wristed fist could not reach. */ gripErr: 0, gripLog: [] as string[] };
 
 // ------------------------------------------------------------------ loading
 
@@ -165,7 +166,7 @@ const faces = new Map<string, { geo: THREE.BufferGeometry; map: THREE.Texture }>
 
 /** An outfit on a body, tailored on first use (0.2-0.7 s each); `outfit:body#face` with another face. */
 function outfitFor(key: string): Outfit {
-  if (NPC_V2 && kitsV2.has(key.split(':')[1])) return outfitV2(key.split(':')[0], key.split(':')[1]) as unknown as Outfit;
+  if (NPC_V2 && kitsV2.has(key.split(':')[1])) return outfitV2(key.split(':')[0], key.split(':')[1], key.split(':')[2] as BeltStyle | undefined) as unknown as Outfit;
   let o = outfits.get(key);
   if (!o && key.includes('#')) {
     const [base, fid] = key.split('#'), b = outfitFor(base), f = faces.get(fid)!;
@@ -241,6 +242,8 @@ export interface Look {
   colors?: { tunic: number; over: number; head: number; belt?: number; beltKind?: FabricKind; kinds?: [FabricKind, FabricKind, FabricKind] };
   /** Body scale against the body's own (children), and the head's scale on it. */
   scale?: number; headScale?: number;
+  /** v2: how they are girded, if not the outfit's default belt (tools/npc3/wardrobe.json). */
+  belt?: BeltStyle;
   equip?: (h: EquipHooks) => void;
 }
 export interface EquipHooks {
@@ -367,6 +370,8 @@ export class Person {
       tunic = dye(lc.tunic); over = dye(lc.over); head = dye(lc.head, 0.1);
       if (lc.belt !== undefined) belt = fabric(lc.beltKind ?? 'leather', dye(lc.belt));
     }
+    // A cord of no named cloth is hemp: its own twisted, unbleached look.
+    if (persona.belt === 'cord' && !lc?.beltKind) belt = matte(0x7e6e50, 0.95);
     // Coarse tabby homespun; twill for gowns and soldiers' tunics; fulled wool (felt) for cloaks; linen veils.
     const kinds: FabricKind[] = lc?.kinds ?? (role === 'monk' ? ['tabby', 'tabby', 'tabby'] : role === 'woman' ? ['twill', 'twill', 'linen'] : role === 'soldier' ? ['twill', 'felt', 'tabby'] : ['tabby', 'felt', 'tabby']);
     const mats = [fabric(kinds[0], tunic), fabric(kinds[1], over), belt, fabric(kinds[2], head)];
@@ -397,6 +402,7 @@ export class Person {
       ? dressV2(this.body, outfit as unknown as OutfitV2, { tunic, over, head, belt, leg: dye(pick(rnd, [...DYES.undyed, ...DYES.woad]), 0.3), shoe: new THREE.Color(0x8a7a6a).multiplyScalar(0.8 + rnd() * 0.3), kinds: lc?.kinds, role }) as unknown as Clothing
       : new Clothing(scene, outfit.garment, skel, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
     if (v2) this.springs = makeSprings(this.body, outfit as unknown as OutfitV2, this.scale, (n) => this.bones.get(n));
+    if (v2) this.push = makePush(this.body, outfit as unknown as OutfitV2, (n) => this.bones.get(n));
     this.cloaked = v2 && (outfit as unknown as OutfitV2).garments.some((g) => g.id === 'cloak');
 
     // Motion.
@@ -424,6 +430,8 @@ export class Person {
   walkSpeed = 1.2;
   /** v2: the cloth bones' spring update (src/npc2/springs.ts), and the time it steps. */
   private springs: ReturnType<typeof makeSprings> = null;
+  /** v2: garment vertices kept off the limbs beneath them, on the GPU (src/npc2/push.ts). */
+  private push: ReturnType<typeof makePush> = null;
   /** v2: wears a cloak, so carries the arms close (src/npc2/arms.ts). */
   private cloaked = false;
   private garmentClearance: ReturnType<typeof makeGarmentClearance> = null;
@@ -459,7 +467,7 @@ export class Person {
       const along = G.palm.clone().applyQuaternion(orientation).normalize();
       const across = new THREE.Vector3(1, 0, 0).applyQuaternion(orientation);
       across.addScaledVector(along, -across.dot(along)).normalize();
-      this.reach('Right', this.group.localToWorld(G.wrist.clone()), G.pole.clone().applyQuaternion(orientation), along, across, 1);
+      this.grasp('Right', this.group.localToWorld(G.wrist.clone()), across, along, 0, 0.03, 1);
       return;
     }
     // Two-bone IK in his own frame, not his chest's: whatever the torso does, the lantern is held out ahead, clear of the robe.
@@ -498,7 +506,8 @@ export class Person {
       _gw.setFromRotationMatrix(_gm);
       bone.quaternion.copy(bone.parent!.getWorldQuaternion(_gr).invert().multiply(_gw));
     };
-    basis(G.hand, _gt.copy(G.palm).applyQuaternion(C));
+    // The fingers continue the forearm (a straight wrist), knuckles across, palm down.
+    basis(G.hand, _gt.copy(fy));
     // Fingers closed round the bail.
     for (const f of G.fingers) f.bone.quaternion.copy(f.rest).multiply(_gr.setFromAxisAngle(_gx.set(1, 0, 0), f.curl));
   }
@@ -509,7 +518,7 @@ export class Person {
   private thighBind = [0, 0];
   private spear: THREE.Object3D | null = null;
   /** What the left hand holds: a point on it, the line of the fist along it, the palm's facing (all in its own frame). */
-  private leftGrip: { obj: THREE.Object3D; at: THREE.Vector3; axis: THREE.Vector3; palm: THREE.Vector3; depth: number; always: boolean; pole: THREE.Vector3 } | null = null;
+  private leftGrip: { obj: THREE.Object3D; at: THREE.Vector3; axis: THREE.Vector3; depth: number; always: boolean; slide: number; f0: THREE.Vector3; follow?: boolean } | null = null;
 
   private bindOf(name: string) {
     const b = this.bones.get(name)!;
@@ -541,9 +550,11 @@ export class Person {
       const yL = new THREE.Vector3(0, Math.cos(0.6), 0).addScaledVector(tL, Math.sin(0.6)).addScaledVector(nL, -0.1).normalize();
       const zL = nL.clone().addScaledVector(yL, -nL.dot(yL)).normalize();
       const spatha = Props.makeSpatha(), qS = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(yL.clone().cross(zL), yL, zL));
-      // Walking or standing, his left hand rests on the hilt, palm down and in.
-      const palm = new THREE.Vector3(-1, -1, 0).normalize().applyQuaternion(qS.clone().invert());
-      if (g.shield !== 'arm') this.leftGrip = { obj: spatha, at: new THREE.Vector3(0, 0.055, 0), axis: new THREE.Vector3(0, -1, 0), palm, depth: 0.028, always: false, pole: new THREE.Vector3(0.5, -0.2, -1) };
+      // Walking or standing, his left hand rests over the pommel, the fingers
+      // curled across it (round the hilt's crosswise axis, local X) and the
+      // wrist straight: a hand round the near-upright grip itself would need
+      // the forearm level with the hip, out of reach with the wrist unbent.
+      if (g.shield !== 'arm') this.leftGrip = { obj: spatha, at: new THREE.Vector3(0, 0.118, 0), axis: new THREE.Vector3(1, 0, 0), depth: 0.024, always: false, slide: 0.05, f0: new THREE.Vector3(0.15, -1, 0.35).normalize() };
       on('Hips', spatha, Props.placeAt(new THREE.Vector3(belt.cx + Math.sin(aL) * rL, belt.y - 0.01, belt.cz + Math.cos(aL) * rL - 0.02), qS));
       // The scramasax hangs flat against his right hip, behind the spear
       // hand, its point slanting down and back (under a cloak, out of sight).
@@ -559,14 +570,13 @@ export class Person {
         const sp = m.bone('Spine2');
         on('Spine2', s, Props.placeAt(new THREE.Vector3(sp.x, sp.y - 0.06, sp.z - 0.21), new THREE.Quaternion().setFromEuler(new THREE.Euler(0.14, Math.PI, 0.05))));
       } else {
-        // Carried at his left side, his fist through the grip behind the boss
-        // (see holdGear), the face turned outwards and a little forwards.
-        // Hung from the hips, where his
-        // hanging hand holds it, so walking never swings it into his legs.
+        // Carried at his left side by the grip behind the boss, the face
+        // turned outwards: holdGear moves it with his hanging fist (the grip
+        // fore and aft, the wrist straight), held out clear of his legs.
         const hp = m.bone('Hips'), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2 - 0.25, Math.PI / 2, 'YXZ'));
         const grip = new THREE.Vector3(hp.x + 0.33, hp.y - 0.12, hp.z + 0.04);
         on('Hips', s, Props.placeAt(grip.clone().addScaledVector(new THREE.Vector3(0, 0, 1).applyQuaternion(q), 0.065), q));
-        this.leftGrip = { obj: s, at: new THREE.Vector3(0, 0, -0.065), axis: new THREE.Vector3(0, 1, 0), palm: new THREE.Vector3(0, 0, -1), depth: 0.022, always: true, pole: new THREE.Vector3(-0.15, 0, -1) };
+        this.leftGrip = { obj: s, at: new THREE.Vector3(0, 0, -0.065), axis: new THREE.Vector3(0, 1, 0), depth: 0.022, always: true, slide: 0.08, f0: new THREE.Vector3(0.1, -1, 0).normalize(), follow: true };
       }
     }
     if (g.sticks) {
@@ -637,53 +647,100 @@ export class Person {
   }
 
   /**
-   * Two-bone reach: the wrist from the clip's place towards `goal` (by k), the
-   * elbow bent towards `pole`; then the hand turned, by k, so its fingers lie
-   * along F and its knuckles along K, and closed into a fist.
+   * A straight-wristed grasp. The fist closes round a bar (a shaft, a hilt, a
+   * bail) through `g` along the unit axis K. The hand continues the forearm's
+   * line exactly (wrist bend 0°: the middle metacarpal on the forearm axis,
+   * the anatomical neutral wrist), so the fingers' direction F is also the
+   * forearm's. F may turn freely round the bar, and the fist may slide along
+   * it by up to `slide` m: those two freedoms are searched for the one whose
+   * elbow the upper arm reaches exactly, preferring F near F0 and an elbow
+   * bent forwards, never hyperextended. The upper arm and forearm are then
+   * aimed, the forearm takes most of the grip's roll (pronation), the hand
+   * gets the forearm's line and the bar's knuckle direction, and the fingers
+   * close. `k` blends from the clip's pose. Returns the reach error (m).
    */
-  private reach(side: 'Left' | 'Right', goal: THREE.Vector3, pole: THREE.Vector3, F: THREE.Vector3, K: THREE.Vector3, k: number) {
+  private grasp(side: 'Left' | 'Right', g: THREE.Vector3, K: THREE.Vector3, F0: THREE.Vector3, slide: number, depth: number, k: number) {
     const B = (n: string) => this.bones.get(side + n)!;
     const arm = B('Arm'), fore = B('ForeArm'), hand = B('Hand');
+    const before = [arm, fore, hand].map((b) => b.quaternion.clone());
     const A = arm.getWorldPosition(new THREE.Vector3()), E0 = fore.getWorldPosition(new THREE.Vector3()), W0 = hand.getWorldPosition(new THREE.Vector3());
     const l1 = A.distanceTo(E0), l2 = E0.distanceTo(W0);
-    const AT = W0.clone().lerp(goal, k).sub(A);
-    const d = THREE.MathUtils.clamp(AT.length(), Math.abs(l1 - l2) + 1e-3, (l1 + l2) * 0.999);
-    const u = AT.normalize();
-    const perp = pole.clone().addScaledVector(u, -pole.dot(u)).normalize();
-    const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
-    const E = A.clone().addScaledVector(u, a).addScaledVector(perp, h), W = A.clone().addScaledVector(u, d);
+    const along = 0.6 * B('HandMiddle1').getWorldPosition(_v).distanceTo(W0), d = depth * this.scale;
+    const sgn = side === 'Right' ? -1 : 1;
+    const fwd = _v2.set(Math.sin(this.yaw), 0, Math.cos(this.yaw)).clone();
+    const U = new THREE.Vector3().crossVectors(K, Math.abs(K.y) < 0.9 ? UP : fwd).normalize(), V = new THREE.Vector3().crossVectors(K, U);
+    const F = new THREE.Vector3(), W = new THREE.Vector3(), E = new THREE.Vector3(), u = new THREE.Vector3(), P = new THREE.Vector3();
+    const place = (phi: number, s: number) => {
+      F.copy(U).multiplyScalar(Math.cos(phi)).addScaledVector(V, Math.sin(phi));
+      P.crossVectors(F, K).multiplyScalar(sgn);
+      W.copy(g).addScaledVector(K, s).addScaledVector(F, -along).addScaledVector(P, -d);
+      E.copy(W).addScaledVector(F, -l2);
+      u.copy(E).sub(A);
+      const r = u.length();
+      u.divideScalar(r || 1);
+      const flex = u.dot(F); // cos of the elbow's bend: 1 straight
+      // The bend's direction (forearm off the upper arm's line) should point forwards, not back or into the trunk.
+      const bend = F.clone().addScaledVector(u, -flex), bl = bend.length();
+      const fwdBend = bl > 0.05 ? bend.dot(fwd) / bl : 0.5;
+      return 4000 * (r - l1) ** 2 / (l1 * l1) + 0.15 * (1 - F.dot(F0)) + 0.4 * Math.max(0, -fwdBend) + 2 * Math.max(0, -0.55 - flex) + 0.5 * (s / Math.max(slide, 1e-3)) ** 2 * 0.02;
+    };
+    let best = { c: Infinity, phi: 0, s: 0 };
+    const S = slide > 0 ? 6 : 0;
+    for (let i = 0; i < 48; i++) for (let j = -S; j <= S; j++) {
+      const phi = (i / 48) * Math.PI * 2, s = S ? (j / S) * slide : 0, c = place(phi, s);
+      if (c < best.c) best = { c, phi, s };
+    }
+    for (let it = 0; it < 3; it++) {
+      const dp = (Math.PI * 2) / 48 / (2 + it * 2), ds = S ? slide / S / (2 + it * 2) : 0;
+      for (const [a, b] of [[-dp, 0], [dp, 0], [0, -ds], [0, ds]]) { const c = place(best.phi + a, best.s + b); if (c < best.c) best = { c, phi: best.phi + a, s: best.s + b }; }
+    }
+    place(best.phi, best.s);
+    const err = Math.abs(A.distanceTo(E) - l1);
+    // If the elbow can't be reached exactly (the bar out of reach), the arm reaches the wrist by two-bone IK
+    // with the elbow on the line found; the straightening pass then keeps the hand on the forearm.
+    if (err > 0.002) {
+      const AT = W.clone().sub(A), dd = THREE.MathUtils.clamp(AT.length(), Math.abs(l1 - l2) + 1e-3, (l1 + l2) * 0.999);
+      AT.normalize();
+      const perp = E.clone().sub(A).addScaledVector(AT, -E.clone().sub(A).dot(AT));
+      if (perp.lengthSq() < 1e-8) perp.copy(fwd);
+      perp.normalize();
+      const a = (l1 * l1 - l2 * l2 + dd * dd) / (2 * dd);
+      E.copy(A).addScaledVector(AT, a).addScaledVector(perp, Math.sqrt(Math.max(0, l1 * l1 - a * a)));
+      W.copy(A).addScaledVector(AT, dd);
+      F.copy(W).sub(E).normalize();
+    }
     const turn = (b: THREE.Bone, q: THREE.Quaternion) => {
       b.parent!.getWorldQuaternion(_q).invert();
       b.quaternion.copy(_q.multiply(q));
       b.updateMatrixWorld(true);
     };
     const aim = (b: THREE.Bone, from: THREE.Vector3, to: THREE.Vector3) => turn(b, _q2.setFromUnitVectors(from.normalize(), to.normalize()).multiply(b.getWorldQuaternion(_q3)));
-    aim(arm, E0.sub(A), E.clone().sub(A));
-    aim(fore, hand.getWorldPosition(W0).sub(E), W.sub(E));
+    aim(arm, E0.clone().sub(A), E.clone().sub(A));
+    aim(fore, hand.getWorldPosition(new THREE.Vector3()).sub(fore.getWorldPosition(new THREE.Vector3())), W.clone().sub(E));
+    // The hand's own frame: fingers (to the middle knuckle) and knuckles (pinky to index), in the bone's local axes.
     const fl = B('HandMiddle1').position.clone().normalize();
     const kl = B('HandIndex1').position.clone().sub(B('HandPinky1').position);
     kl.addScaledVector(fl, -kl.dot(fl)).normalize();
+    const Kp = K.clone().addScaledVector(F, -K.dot(F)).normalize();
     const Ml = new THREE.Matrix4().makeBasis(fl, kl, fl.clone().cross(kl));
-    const Mw = new THREE.Matrix4().makeBasis(F, K, F.clone().cross(K));
-    const handGoal = hand.getWorldQuaternion(new THREE.Quaternion()).slerp(new THREE.Quaternion().setFromRotationMatrix(Mw.multiply(Ml.transpose())), k);
-    // Share grip pronation with the forearm instead of wringing the wrist.
-    // Rotating around the elbow-to-wrist axis preserves the IK endpoint.
-    // This is the same separation of axial twist from the end-effector's
-    // orientation used by twist-correction rigs (Unity Animation Rigging).
-    const axis = hand.getWorldPosition(new THREE.Vector3()).sub(fore.getWorldPosition(new THREE.Vector3())).normalize();
-    const currentAcross = kl.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()));
+    const Mw = new THREE.Matrix4().makeBasis(F, Kp, F.clone().cross(Kp));
+    const handGoal = new THREE.Quaternion().setFromRotationMatrix(Mw.multiply(Ml.transpose()));
+    // Pronation shared with the forearm: rotating it round its own axis keeps the wrist where it is
+    // (the twist/swing split of twist-correction rigs, e.g. Unity Animation Rigging's twist correction).
+    const axis = F.clone();
+    const currentAcross = kl.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion())).addScaledVector(axis, 0);
     const goalAcross = kl.clone().applyQuaternion(handGoal);
     currentAcross.addScaledVector(axis, -currentAcross.dot(axis));
     goalAcross.addScaledVector(axis, -goalAcross.dot(axis));
     if (currentAcross.lengthSq() > 1e-6 && goalAcross.lengthSq() > 1e-6) {
       currentAcross.normalize(); goalAcross.normalize();
       const roll = Math.atan2(axis.dot(currentAcross.clone().cross(goalAcross)), currentAcross.dot(goalAcross));
-      const shared = THREE.MathUtils.clamp(roll * 0.75, -1.4, 1.4);
-      turn(fore, new THREE.Quaternion().setFromAxisAngle(axis, shared).multiply(fore.getWorldQuaternion(new THREE.Quaternion())));
+      turn(fore, new THREE.Quaternion().setFromAxisAngle(axis, THREE.MathUtils.clamp(roll * 0.75, -1.4, 1.4)).multiply(fore.getWorldQuaternion(new THREE.Quaternion())));
     }
     turn(hand, handGoal);
+    if (k < 0.999) [arm, fore, hand].forEach((b, i) => { b.quaternion.copy(before[i].slerp(b.quaternion, k)); });
+    arm.updateMatrixWorld(true);
     // Fingers closed (towards the palm) round what it holds.
-    const sgn = side === 'Right' ? 1 : -1;
     const kw = B('HandIndex1').getWorldPosition(new THREE.Vector3()).sub(B('HandPinky1').getWorldPosition(_v)).normalize();
     for (const f of ['Index', 'Middle', 'Ring', 'Pinky']) [1.25, 1.5, 0.9].forEach((ang, j) => {
       const b = B(`Hand${f}${j + 1}`);
@@ -691,8 +748,32 @@ export class Person {
       // From the bind pose's straight fingers, not the clip's own curl.
       b.quaternion.slerp(this.bindLocal(b), k);
       b.updateMatrixWorld(true);
-      turn(b, _q2.setFromAxisAngle(kw, ang * sgn * k).multiply(b.getWorldQuaternion(_q3)).clone());
+      turn(b, _q2.setFromAxisAngle(kw, ang * -sgn * k).multiply(b.getWorldQuaternion(_q3)).clone());
     });
+    npcDebug.gripErr = Math.max(npcDebug.gripErr, err);
+    if (err > 0.01) npcDebug.gripLog = [...npcDebug.gripLog.slice(-20), `${this.title} ${side} ${err.toFixed(3)} walk ${(this.w.walk ?? 0).toFixed(2)} talk ${(this.w.talk ?? 0).toFixed(2)}`];
+    return err;
+  }
+
+  /**
+   * Wrists held straight: each hand turned, by the least rotation, so its
+   * middle metacarpal (wrist to middle knuckle) continues the forearm's line
+   * (elbow to wrist). Its roll about that line (pronation) is the clip's.
+   * Run after every other pose correction; the clips' own wrist flexion and
+   * deviation (up to 60° in the walk capture) is removed.
+   */
+  private straightWrists() {
+    for (const side of ['Left', 'Right']) {
+      const fore = this.bones.get(side + 'ForeArm'), hand = this.bones.get(side + 'Hand'), mid = this.bones.get(side + 'HandMiddle1');
+      if (!fore || !hand || !mid) continue;
+      const e = fore.getWorldPosition(_h1), w = hand.getWorldPosition(_h2), m = mid.getWorldPosition(_h3);
+      const f = _h4.copy(w).sub(e).normalize(), h = _h5.copy(m).sub(w).normalize();
+      if (f.dot(h) > 0.99999) continue;
+      _q2.setFromUnitVectors(h, f).multiply(hand.getWorldQuaternion(_q3));
+      hand.parent!.getWorldQuaternion(_q).invert();
+      hand.quaternion.copy(_q.multiply(_q2));
+      hand.updateMatrixWorld(true);
+    }
   }
 
   private bindQ = new Map<THREE.Bone, THREE.Quaternion>();
@@ -730,30 +811,44 @@ export class Person {
     const dir = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyAxisAngle(UP, this.yaw).normalize();
     if (this.leftGrip) {
       const g = this.leftGrip, k = g.always ? 1 : 1 - THREE.MathUtils.clamp(this.w.talk ?? 0, 0, 1);
-      if (k > 0.001) {
+      if (k > 0.001 && g.follow) {
+        // The shield goes where his hanging fist is (but out clear of the
+        // thigh), its grip fore and aft through the fist, its face out.
+        const hips = this.bones.get('Hips')!.getWorldPosition(new THREE.Vector3());
+        const left = dir(1, 0, 0), K = dir(0, -0.08, 1);
+        const fist = this.fistAt('Left', g.depth, new THREE.Vector3());
+        const out = fist.clone().sub(hips).dot(left), want = 0.31 * this.scale;
+        if (out < want) fist.addScaledVector(left, want - out);
+        this.grasp('Left', fist, K, dir(g.f0.x, g.f0.y, g.f0.z), g.slide, g.depth, 1);
+        const at = this.fistAt('Left', g.depth, new THREE.Vector3());
+        const face = left.clone().addScaledVector(K, -left.dot(K)).normalize();
+        const R = new THREE.Matrix4().makeBasis(K.clone().cross(face), K, face);
+        const q = new THREE.Quaternion().setFromRotationMatrix(R);
+        const pos = at.sub(g.at.clone().multiplyScalar(sc).applyQuaternion(q));
+        g.obj.parent!.updateMatrixWorld(true);
+        new THREE.Matrix4().compose(pos, q, _v.setScalar(sc)).premultiply(g.obj.parent!.matrixWorld.clone().invert()).decompose(g.obj.position, g.obj.quaternion, g.obj.scale);
+      } else if (k > 0.001) {
         g.obj.updateMatrixWorld(true);
         const q = g.obj.getWorldQuaternion(new THREE.Quaternion());
-        const K = g.axis.clone().applyQuaternion(q), P = g.palm.clone().applyQuaternion(q);
-        const F = K.clone().cross(P).normalize(); // a left hand's palm faces F × K
+        const K = g.axis.clone().applyQuaternion(q).normalize();
         const target = g.obj.localToWorld(g.at.clone());
-        // Twice: the wrist's offset from the fist depends on how the hand is turned.
-        for (let i = 0; i < 2; i++) {
-          const off = this.fistAt('Left', g.depth, new THREE.Vector3()).sub(this.bones.get('LeftHand')!.getWorldPosition(_v));
-          this.reach('Left', target.clone().sub(off), dir(g.pole.x, g.pole.y, g.pole.z), F, K, k);
-        }
+        // The fist over the pommel, the wrist straight; it may slide a little along the bar.
+        this.grasp('Left', target, K, dir(g.f0.x, g.f0.y, g.f0.z), g.slide, g.depth, k);
       }
     }
     if (this.spear) {
       const hand = this.bones.get('RightHand')!;
       // A hint of the clip's own movement in where the hand is held.
       const T = toW(-0.25, THREE.MathUtils.lerp(1.04, 1.01, walk), THREE.MathUtils.lerp(0.11, 0.2, walk)).lerp(hand.getWorldPosition(_v), 0.15);
-      // Fingers forward and a little in, knuckles stacked up the shaft, palm to the leg.
-      const K = dir(0, 1, 0), F = dir(0.18, 0, 1);
-      this.reach('Right', T, dir(-0.35, 0, -1), F, K, 1);
-      const grip = this.fistAt('Right', 0.03, new THREE.Vector3());
-      // Standing, the butt (0.8 m below the grip) is on the ground.
+      // The fist round the shaft (knuckles stacked up it, palm to the leg), the
+      // fingers and forearm forward and a little in, the wrist straight; the
+      // fist may slide up or down the shaft to where the elbow falls naturally.
       const tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.02, this.yaw, -0.05, 'YXZ'));
       const axis = _v3.set(0, 1, 0).applyQuaternion(tilt);
+      const F = dir(0.18, 0, 1);
+      this.grasp('Right', T.addScaledVector(F, 0.06 * this.scale), axis.clone(), F, 0.12, 0.03, 1);
+      const grip = this.fistAt('Right', 0.03, new THREE.Vector3());
+      // Standing, the butt (0.8 m below the grip) is on the ground.
       grip.addScaledVector(axis, -(1 - walk) * (grip.y - this.pos.y - 0.805 * sc) / axis.y);
       const m = new THREE.Matrix4().compose(grip, tilt, _v.setScalar(sc)).premultiply(hand.matrixWorld.clone().invert());
       m.decompose(this.spear.position, this.spear.quaternion, this.spear.scale);
@@ -858,6 +953,7 @@ export class Person {
     }
     if (this.load.jar || this.load.basket) this.poseLoad();
     if (this.carryHalf && this.role === 'peasant') this.holdOut();
+    this.straightWrists();
     this.swing?.();
     if (this.springs) {
       // Cloth bones swing only near the camera (npcDebug.springDist); further off they hang still.
@@ -865,6 +961,7 @@ export class Person {
       if (this.dist < npcDebug.springDist) { this.springs.update(this.springDt); npcDebug.prof.springPeople++; } else this.springs.rest();
       npcDebug.prof.springs += performance.now() - t0;
     }
+    if (this.push) { this.body.updateMatrixWorld(true); this.push(); }
     return true;
   }
 
@@ -971,10 +1068,9 @@ export class Person {
     }
     if (this.load.basket) {
       // The right arm bent at the elbow, the forearm carried forward level
-      // with the basket's handle over it; the wrist relaxed.
+      // with the basket's handle over it; the wrist straight (straightWrists).
       this.aim('RightArm', 'RightForeArm', d.set(-0.5, -1, 0.16).normalize().applyQuaternion(yq));
       this.aim('RightForeArm', 'RightHand', d.set(-0.5, 0.1, 1).normalize().applyQuaternion(yq));
-      this.aim('RightHand', 'RightHandMiddle1', d.set(0.06, -0.35, 1).normalize().applyQuaternion(yq));
     }
   }
 
@@ -1064,7 +1160,7 @@ function cast(role: Role, o: { outfit?: number; body?: number; seed?: number; ge
   const v2b = NPC_V2 ? bodiesV2(id, OUTFITS[id].sex) : [];
   const bs: string[] = v2b.length ? v2b : OUTFITS[id].bodies;
   let key = `${id}:${bs[(o.body ?? Math.floor(rnd() * bs.length)) % bs.length]}`;
-  if (v2b.length) return { role, id, key, rnd, gear: o.gear, look: o.look };
+  if (v2b.length) return { role, id, key: key + (o.look?.belt ? ':' + o.look.belt : ''), rnd, gear: o.gear, look: o.look };
   for (const [fid, f] of Object.entries(FACES)) if (f.outfits.includes(id) && faces.has(fid) && (o.face ?? rnd() < f.share)) { key += '#' + fid; break; }
   return { role, id, key, rnd, gear: o.gear, look: o.look };
 }
