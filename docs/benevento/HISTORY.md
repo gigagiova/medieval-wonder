@@ -706,6 +706,14 @@ sources and certainty per group are in `tools/npc3/wardrobe.json` and
 - **I — women:** belts are attested for Lombard women in graves; a woven sash
   (girdle) tied at the front is the inference for women whose fittings were
   not metal and for Latin townswomen. The tied ends and their lengths are **H**.
+- **A — the words:** Isidore of Seville, *Etymologiae* XIX 33 "De cingulis"
+  (c. 625), distinguishes the wide *cinctus*, the *semicinctium* and the
+  narrowest *cingulum*, and gives *zona* as its Greek name: belts of several
+  widths were ordinary wear in the 7th-century Latin West.
+- **I — analogues for Latin and Greek townsfolk:** the Ravenna mosaics (6th c.)
+  and the paintings of Santa Maria Antiqua in Rome (7th–early 8th c.) show
+  laymen in belted knee tunics and clergy in long girdled tunics; they are
+  Italian but not Beneventan.
 
 How the belts are fitted is an engineering choice, not evidence: the belt
 draws the tunic in by a physical solve that keeps every panel's dimensions

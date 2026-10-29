@@ -98,6 +98,14 @@ function outerSurface(m: THREE.SkinnedMesh) {
   return out;
 }
 
+const BELT = /belt|cord|rope|girdle|sash/;
+/** Whether a ray out along the normal meets the shell (from inside) within reach. */
+function under(bvh: MeshBVH, p: THREE.Vector3, n: THREE.Vector3, reach: number) {
+  ray.origin.copy(p).addScaledVector(n, -0.0005);
+  ray.direction.copy(n);
+  return !!bvh.raycastFirst(ray, THREE.DoubleSide, 0, reach);
+}
+
 /** The bone with the largest skin weight on a vertex (where on the body a crossing is). */
 function mainBone(m: THREE.SkinnedMesh, i: number) {
   const J = m.geometry.attributes.skinIndex, W = m.geometry.attributes.skinWeight;
@@ -125,6 +133,9 @@ export function pokeAudit(body: THREE.Object3D, depthOf: (g: string) => number, 
         if (!surf[i]) continue;
         if (!outside(bvhP, p, pp.N.get(i)!, reach)) continue;
         if (outside(bvhB, pb.P.get(i)!, pb.N.get(i)!, reach)) continue;
+        // A belt is a narrow band: only what it girds (lay under it in the bind
+        // pose) can come out through it; a sleeve hanging over it cannot.
+        if (BELT.test(outer.name) && !under(bvhB, pb.P.get(i)!, pb.N.get(i)!, 0.06)) continue;
         k++;
         if (where) { const key = `${inner.name}>${outer.name}`, b = mainBone(inner.mesh, i); (where[key] ??= {})[b] = (where[key][b] ?? 0) + 1; }
       }
