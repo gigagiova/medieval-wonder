@@ -14,8 +14,8 @@ import type { OutfitV2 } from './kit';
 
 interface Link { bone: THREE.Bone; child: THREE.Object3D; rest: THREE.Quaternion; len: number; p: THREE.Vector3; q: THREE.Vector3; t: THREE.Vector3; tq: THREE.Vector3; h: THREE.Vector3 }
 interface Chain { links: Link[] }
-interface Ring { chains: Chain[]; levels: Link[][]; closed: boolean; stiff: number; drag: number; side: number[][] }
-interface Cap { a: THREE.Object3D; b: THREE.Object3D; r: number; pa: THREE.Vector3; pb: THREE.Vector3 }
+interface Ring { chains: Chain[]; levels: Link[][]; closed: boolean; stiff: number; drag: number; side: number[][]; cape: boolean }
+interface Cap { a: THREE.Object3D; b: THREE.Object3D; r: number; pa: THREE.Vector3; pb: THREE.Vector3; /** Ends as points in the bones' frames (else the bone origins). */ la?: THREE.Vector3; lb?: THREE.Vector3 }
 
 const SETS: Record<string, { stiff: number; drag: number; closed: boolean }> = {
   long: { stiff: 0.12, drag: 0.25, closed: true }, short: { stiff: 0.2, drag: 0.3, closed: true }, cape: { stiff: 0.30, drag: 0.35, closed: false },
@@ -81,7 +81,7 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
     }));
     const depth = Math.max(...chains.map((c) => c.links.length));
     const levels = Array.from({ length: depth }, (_, j) => chains.map((c) => c.links[j]).filter(Boolean));
-    rings.push({ chains, levels, closed: S.closed, stiff: S.stiff, drag: S.drag, side });
+    rings.push({ chains, levels, closed: S.closed, stiff: S.stiff, drag: S.drag, side, cape: set === 'cape' });
   }
   if (!rings.length) return null;
   const B = (n: string) => bone(n)!;
@@ -97,6 +97,14 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
     cap('LeftArm', 'LeftForeArm', 0.075), cap('RightArm', 'RightForeArm', 0.075),
     cap('LeftForeArm', 'LeftHand', 0.055), cap('RightForeArm', 'RightHand', 0.055),
   ];
+  // A cloak's chains are also kept outside what is worn under it: two upright
+  // capsules side by side from the hips to the chest (in plan a stadium, like
+  // the trunk, wider than deep), sized from the
+  // tunic, robe and belt actually beneath (the gathered blouse over the belt,
+  // the flare of the skirt), plus the cloak's own thickness. The fixed trunk
+  // capsule above is round and 13 cm: a belted tunic stands out further, and
+  // the cloak's front edges swung in through it in the walk.
+  const capeCaps = rings.some((R) => R.cape) ? underCloak(body, B) : [];
   let fresh = true, resting = false, previousDt = 1 / 60;
   const g = new THREE.Vector3(0, -9.8, 0);
   /** Back to the plain hang (far from the camera), once. */
@@ -114,6 +122,7 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
     const step = dt * 60, velocityScale = dt / previousDt;
     body.updateMatrixWorld(true);
     for (const c of caps) { c.pa.setFromMatrixPosition(c.a.matrixWorld); c.pb.setFromMatrixPosition(c.b.matrixWorld); }
+    for (const c of capeCaps) { c.pa.copy(c.la!).applyMatrix4(c.a.matrixWorld); c.pb.copy(c.lb!).applyMatrix4(c.b.matrixWorld); }
     const s = body.getWorldScale(_v).x || scale;
     const grav = _e.copy(g).multiplyScalar(s * dt * dt * 0.3);
     for (const R of rings) {
@@ -151,6 +160,7 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
         }
         for (const L of lv) {
           for (const c of caps) pushOut(L.p, c, c.r * s + 0.01 * s);
+          if (R.cape) for (const c of capeCaps) pushOut(L.p, c, c.r * s);
           const len = L.len * s;
           _d.copy(L.p).sub(L.h);
           const dl = _d.length();
@@ -179,6 +189,57 @@ export function makeSprings(body: THREE.Object3D, outfit: OutfitV2, scale: numbe
     for (let i = 0; i < steps; i++) advance(elapsed / steps);
   };
   return { update, rest };
+}
+
+/**
+ * The capsules a cloak's chains are kept outside of (see makeSprings), in the
+ * bind pose: ends as points in the bones' own frames, radii from the vertices
+ * of the tunic-, robe- and belt-layer garments' trunk (not sleeves) that lie
+ * along each (their 90th percentile distance), plus 1 cm.
+ */
+function underCloak(body: THREE.Object3D, B: (n: string) => THREE.Bone) {
+  const pts: THREE.Vector3[] = [];
+  let skel: THREE.Skeleton | null = null;
+  body.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh || m.userData.npc2 !== 'garment' || !m.visible) return;
+    skel ??= m.skeleton;
+    const id = m.userData.garment as string;
+    if (!/^(shirt|tunic|longrobe|robe|belt|belt_tunic|belt_robe|cord_tunic|cord_robe|sash_robe|rope)$/.test(id)) return;
+    const P = m.geometry.attributes.position, used = m.geometry.index ? new Set(m.geometry.index.array as unknown as number[]) : null;
+    const J = m.geometry.attributes.skinIndex, W = m.geometry.attributes.skinWeight;
+    for (let i = 0; i < P.count; i++) {
+      if (used && !used.has(i)) continue;
+      // The trunk's cloth only (not the sleeves).
+      let best = 0, w = -1;
+      for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > w) { w = W.getComponent(i, k); best = J.getComponent(i, k); }
+      if (/Arm|Hand|Shoulder|Neck|Head/.test(m.skeleton.bones[best]?.name ?? '')) continue;
+      pts.push(new THREE.Vector3().fromBufferAttribute(P, i).applyMatrix4(m.bindMatrix));
+    }
+  });
+  if (!skel || !pts.length) return [];
+  const sk = skel as THREE.Skeleton;
+  const bindAt = (b: THREE.Bone) => new THREE.Vector3().setFromMatrixPosition(sk.boneInverses[sk.bones.indexOf(b)].clone().invert());
+  const local = (b: THREE.Bone, p: THREE.Vector3) => p.clone().applyMatrix4(sk.boneInverses[sk.bones.indexOf(b)]);
+  const ab = new THREE.Vector3(), q = new THREE.Vector3();
+  const make = (a: THREE.Bone, b: THREE.Bone, pa: THREE.Vector3, pb: THREE.Vector3): Cap | null => {
+    ab.subVectors(pb, pa);
+    const ds: number[] = [];
+    for (const p of pts) {
+      const t = q.subVectors(p, pa).dot(ab) / ab.lengthSq();
+      if (t <= 0 || t >= 1) continue;
+      const d = p.distanceTo(q.copy(pa).addScaledVector(ab, t));
+      if (d < 0.25) ds.push(d);
+    }
+    if (ds.length < 20) return null;
+    ds.sort((x, y) => x - y);
+    return { a, b, r: ds[Math.floor(ds.length * 0.9)] + 0.01, pa: new THREE.Vector3(), pb: new THREE.Vector3(), la: local(a, pa), lb: local(b, pb) };
+  };
+  const hips = B('Hips'), chest = B('Spine2');
+  const h = bindAt(hips), c = bindAt(chest);
+  const out: (Cap | null)[] = [];
+  for (const x of [-0.07, 0.07]) out.push(make(hips, chest, h.clone().add(new THREE.Vector3(x, 0, 0)), c.clone().add(new THREE.Vector3(x, 0, 0))));
+  return out.filter((x): x is Cap => !!x);
 }
 
 function pushOut(p: THREE.Vector3, c: Cap, r: number) {

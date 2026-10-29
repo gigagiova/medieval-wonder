@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { OutfitV2 } from './kit';
+import { bindLayer, layerPoint, LAYER_HEAD, LAYER_BODY } from './layer';
 
 // Cloth kept outside the limbs it hangs over, per vertex, on the GPU.
 //
@@ -246,6 +247,11 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
       caps.push({ a, b, from, extend, r: r0 * kq + MARGIN, r1: r1 * kq + MARGIN, h: bone(d.home ?? d.a) ?? a, own: (d.own ?? []).map((n) => skel.bones.indexOf(bone(n)!)).filter((k) => k >= 0).slice(0, 2), side: !!d.side, la: d.ao ? toLocal(a, pa) : undefined, lb: d.bo ? toLocal(b, pb) : undefined });
     }
     if (!caps.length) continue;
+    // A cloak or a hood's cape is also kept outside the garments beneath it (layer.ts).
+    const lay = layerOf.get(m.userData.garment as string);
+    const myDepth = depthOf.get(m.userData.garment as string) ?? 50;
+    const hasLayer = (lay === 'over' || lay === 'head') && bindLayer(m, meshes.filter((o) => o.userData.npc2 === 'garment' && o !== m
+      && (depthOf.get(o.userData.garment as string) ?? 50) < myDepth && ['tunic', 'belt'].includes(layerOf.get(o.userData.garment as string) ?? '')));
     const A = new Float32Array(MAX_CAPS * 4), B = new Float32Array(MAX_CAPS * 4), R = new Float32Array(MAX_CAPS), X = new Float32Array(MAX_CAPS * 2);
     const uA = { value: Array.from({ length: MAX_CAPS }, () => new THREE.Vector4()) }, uB = { value: Array.from({ length: MAX_CAPS }, () => new THREE.Vector4()) }, uR = { value: R }, uX = { value: Array.from({ length: MAX_CAPS }, () => new THREE.Vector2()) };
     const M = Array.from({ length: MAX_CAPS }, () => new THREE.Matrix4());
@@ -254,10 +260,10 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
     mat.onBeforeCompile = (sh, r) => {
       prev.call(mat, sh, r);
       sh.uniforms.uPushA = uA; sh.uniforms.uPushB = uB; sh.uniforms.uPushR = uR; sh.uniforms.uPushX = uX;
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${GLSL_HEAD}`)
-        .replace('#include <skinning_vertex>', `#include <skinning_vertex>${GLSL_BODY}`);
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${GLSL_HEAD}${hasLayer ? LAYER_HEAD : ''}`)
+        .replace('#include <skinning_vertex>', `#include <skinning_vertex>${GLSL_BODY}${hasLayer ? LAYER_BODY : ''}`);
     };
-    mat.customProgramCacheKey = () => key + '-push';
+    mat.customProgramCacheKey = () => key + (hasLayer ? '-pushL' : '-push');
     m.onBeforeRender = () => {
       for (let i = 0; i < MAX_CAPS; i++) { uA.value[i].fromArray(A, i * 4); uB.value[i].fromArray(B, i * 4); uX.value[i].fromArray(X, i * 2); }
       (mat as THREE.Material & { uniformsNeedUpdate: boolean }).uniformsNeedUpdate = true;
@@ -266,7 +272,8 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
     const rest = new THREE.Vector3(), P = m.geometry.attributes.position, SJ = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight;
     m.userData.push = (p: THREE.Vector3, i: number) => {
       const own = (b: number) => { let w = 0; for (let k = 0; k < 4; k++) if (SJ.getComponent(i, k) === b) w += SW.getComponent(i, k); return w; };
-      return pushPoint(p, rest.fromBufferAttribute(P, i), A, B, R, X, own, M);
+      pushPoint(p, rest.fromBufferAttribute(P, i), A, B, R, X, own, M);
+      return hasLayer ? layerPoint(m, i, p) : p;
     };
     m.userData.pushCaps = caps.map((c) => [c.a.name, c.b.name, +c.r.toFixed(3), +c.r1.toFixed(3)]);
     setups.push({ mesh: m, caps, A, B, R, M });
