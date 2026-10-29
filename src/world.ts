@@ -574,6 +574,10 @@ function distToPolyline(x: number, z: number, pts: P2[]) {
   return best;
 }
 function keepOut(x: number, z: number) {
+  // No trees against the outer face of the curtain (a defended wall keeps its foot clear),
+  // nor on the view from a registered tower's visiting point.
+  if (insideness(x, z) > 0.1) return true;
+  for (const t of REGISTERED_WALL_TOWERS) if (t.visit && Math.hypot(x - t.visit[0], z - t.visit[1]) < 9) return true;
   for (const r of ROADS) if (distToPolyline(x, z, r.pts) < r.w / 2 + 3.5) return true;
   for (const s of Object.values(SITES)) {
     const r = s.flat ? s.flat[1] + 4 : s.clear ? s.clear + 6 : 14;
