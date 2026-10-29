@@ -1,80 +1,888 @@
 {
-  "about": "Wardrobe requirements for the townsfolk of Benevento, AD 700: every population group of src/npc/population.ts and every outfit profile of the v2 bodies (public/models/npc2). Rebuilt on 28 October 2026 after the earlier tools/npc3/wardrobe.json was lost with an uncommitted workspace; nothing here is copied from that file. Certainty: A attested (for this group, or for Lombard Italy in the 7th c.), I inferred from neighbouring evidence, H hypothesis/game choice. Narrative and limits: docs/npc/WARDROBE.md; groups: docs/benevento/PEOPLE.md.",
-  "certainty": { "A": "attested", "I": "inferred", "H": "hypothesis" },
-  "sources": {
-    "PD": { "cite": "Paul the Deacon, Historia Langobardorum IV 22 (dress of the earlier Lombards, from Theodelinda's paintings at Monza: loose garments, mostly linen, with broad borders woven in various colours; later trousers and leg wraps)", "url": "https://thehistorianshut.com/2021/03/04/a-palace-portrait-of-lombard-fashion/" },
-    "RB22": { "cite": "Regula Benedicti 22: the monks sleep clothed and girded with belts or cords (cingulis aut funibus), without their knives at their sides", "url": "https://sourcebooks.web.fordham.edu/source/rul-benedict-excerp.asp" },
-    "RB22b": { "cite": "Regula Benedicti 22, English translation (Palni Press)", "url": "https://pressbooks.palni.org/ruleofbenedict/chapter/rb-22" },
-    "OR1": { "cite": "Ordo Romanus I (late 7th / early 8th c. Roman papal ordo): the subdeacons bring the linen (alb), the girdle (cingulum), the amice, the dalmatics; English after Atchley", "url": "https://sacrificium-laudis.blogspot.com/p/ordo-romanus-i-english.html" },
-    "VEST": { "cite": "Origins of ecclesiastical vestments: the girdled alb (linea) of Roman clergy", "url": "https://en.wikipedia.org/wiki/Origins_of_ecclesiastical_vestments" },
-    "BELT": { "cite": "Longobard belts as a typical, widespread component of dress for men and women; the early-7th-c. 'five-piece' bronze belt (buckle, tongue plate, strap end), later embellished with more plates and pendants (archaeometric study of Lombard belt fittings, Int. J. Metalcasting 2020)", "url": "https://link.springer.com/doi/10.1007/s40962-020-00518-y" },
-    "MET": { "cite": "Gold buckle and strap end, c. 600, from a Lombard horseman's grave associated with Castel Trosino (Metropolitan Museum of Art)", "url": "https://www.metmuseum.org/art/collection/search/470278" },
-    "CASSANO": { "cite": "Cassano d'Adda (Lombardy): bronze five-piece belt sets of the late 6th-early 7th c.; the seax usually hung from such belts (absent in those graves)", "url": "https://fastionline.org/s/folder/item/30087" },
-    "ROTILI": { "cite": "M. Rotili, La necropoli longobarda di Benevento (1977): belt sets, disc brooches, gold-leaf crosses in Benevento's own Lombard graves (see docs/benevento/PEOPLE.md section 1)" },
-    "VA": { "cite": "V&A Egyptian tunic dated 670-870: an almost straight shirt-like tunic; belts gathered its folds (Egyptian analogue, not a Benevento find)", "url": "https://collections.vam.ac.uk/item/O119593/tunic-unknown/" },
-    "MET_TUNIC": { "cite": "Met Kharga tunic, 4th-7th c.: cross-shaped, folded and sewn construction (Egyptian analogue)", "url": "https://www.metmuseum.org/art/collection/search/475116" }
+ "about": "Wardrobe requirements for the townsfolk of Benevento, AD 700: every population group of src/npc/population.ts and every outfit profile of the v2 bodies (public/models/npc2). Rebuilt on 28 October 2026 (every group sourced on 29 October) after the earlier tools/npc3/wardrobe.json was lost with an uncommitted workspace; nothing here is copied from that file. Certainty: A attested (for this group, or for Lombard Italy in the 7th c.), I inferred from neighbouring evidence, H hypothesis/game choice. Narrative and limits: docs/npc/WARDROBE.md; groups: docs/benevento/PEOPLE.md.",
+ "certainty": {
+  "A": "attested",
+  "I": "inferred",
+  "H": "hypothesis"
+ },
+ "sources": {
+  "PD": {
+   "cite": "Paul the Deacon, Historia Langobardorum IV 22 (dress of the earlier Lombards, from Theodelinda's paintings at Monza: loose garments, mostly linen, with broad borders woven in various colours; later trousers and leg wraps)",
+   "url": "https://thehistorianshut.com/2021/03/04/a-palace-portrait-of-lombard-fashion/"
   },
-  "belt_styles": {
-    "leather": { "geometry": "strap 3.2 cm high, 4 mm thick, round the cinched waist; tongue 11 cm hanging from the buckle at the front", "fittings": "buckle prop at the front (src/npc/population-props.ts makeBuckle): bronze frame and plate for Lombard men, a plain iron frame for townsmen; Lombard office-holders add the multi-part set of plates and strap ends (props.ts makeBeltFittings)", "sources": ["BELT", "MET", "CASSANO", "ROTILI"], "certainty": "A for Lombard men (five-piece and multi-part sets); I for Latin townsmen's plain belts" },
-    "cord": { "geometry": "round cord 1.2 cm thick, knotted at the front left with two ends (42 and 36 cm) hanging down the skirt", "material": "hemp (unbleached, matte) for monks and the poor; white linen (cingulum) for priests and deacons", "sources": ["RB22", "RB22b", "OR1", "VEST"], "certainty": "A for monks (belts or cords) and for the clergy's girdle over the alb; the knot and the length of the ends are H" },
-    "sash": { "geometry": "woven band 4.2 cm wide, 3 mm thick, tied at the front left with two ends (34 and 28 cm)", "material": "tabby wool or linen in the group's dye", "sources": ["BELT", "PD"], "certainty": "I: women's belts are attested in Lombard graves (often with buckles and pendants); a textile girdle is the inference for women whose graves keep no metal fittings and for Latin townswomen; the tied ends are H" }
+  "RB22": {
+   "cite": "Regula Benedicti 22: the monks sleep clothed and girded with belts or cords (cingulis aut funibus), without their knives at their sides",
+   "url": "https://sourcebooks.web.fordham.edu/source/rul-benedict-excerp.asp"
   },
-  "cinch": {
-    "rule": "A belt draws the cloth in without changing the garment's dimensions: every edge of the garment keeps its length (99th percentile change <= 3 %, worst edge <= 20 %, judged per cm on sub-cm edges), the hem, neck and cuff perimeters within 1 %; the excess gathers and blouses above and below the belt. The 'belted-tunic study', which reshaped the panels, was rejected for exactly that.",
-    "tool": "tools/npc3/wardrobe_build.py",
-    "fitted_exception": "The gown's bodice is cut fitted at the waist: the girdle is tied over it and nothing is drawn in."
+  "RB22b": {
+   "cite": "Regula Benedicti 22, English translation (Palni Press)",
+   "url": "https://pressbooks.palni.org/ruleofbenedict/chapter/rb-22"
   },
-  "necklines": {
-    "rule": "No open, single-sided or see-through neckline: each neckline and sleeve cuff of a body garment has a turned-in facing (a 4 mm rim and a 2.5 cm inner band facing the body), drawn with the cloth's own material.",
-    "certainty": "H: the exact finish is not documented for Benevento; turned and hemmed edges are the ordinary finish of woven garments (MET_TUNIC, VA)."
+  "OR1": {
+   "cite": "Ordo Romanus I (late 7th / early 8th c. Roman papal ordo): the subdeacons bring the linen (alb), the girdle (cingulum), the amice, the dalmatics; English after Atchley",
+   "url": "https://sacrificium-laudis.blogspot.com/p/ordo-romanus-i-english.html"
   },
-  "outfits": {
-    "soldier":      { "garments": ["shirt (knee tunic)", "leather belt", "hose and leg wraps", "boots"], "belt": { "shirt": "leather" }, "worn_by": ["arimannus", "gasindus", "bulgarus"], "sources": ["PD", "BELT", "ROTILI"], "certainty": "A/I" },
-    "soldierCloak": { "garments": ["shirt", "leather belt", "cloak with disc brooch at the right shoulder", "hose", "boots"], "belt": { "shirt": "leather" }, "worn_by": ["gasindus", "gastaldius", "sculdahis", "arimannus", "senexLangobardus"], "sources": ["PD", "BELT", "ROTILI"], "certainty": "A/I" },
-    "peasantHood":  { "garments": ["knee tunic", "belt (leather; hemp cord for slaves and beggars)", "hood with shoulder cape", "hose", "boots"], "belt": { "tunic": "leather|cord" }, "worn_by": ["aldius", "servus", "puer", "mendicus", "faber", "figulus", "molendinarius", "calcarius", "peregrinus"], "sources": ["VA", "MET_TUNIC"], "certainty": "I" },
-    "peasantCloak": { "garments": ["shirt", "leather belt", "cloak", "hose", "boots"], "belt": { "shirt": "leather" }, "worn_by": ["aldius", "puer", "faber", "aurifex", "pistor", "molendinarius"], "sources": ["VA"], "certainty": "I" },
-    "robe":         { "garments": ["ankle-length tunic", "belt (leather, cingulum cord or sash by role)", "shoes"], "belt": { "longrobe": "leather|cord|sash" }, "worn_by": ["negotiator", "notarius", "medicus", "presbyter", "diaconus", "graecus", "iudaeus", "afer"], "sources": ["OR1", "VEST"], "certainty": "A for the clergy's girdled alb; I for the others" },
-    "robeCloak":    { "garments": ["ankle-length tunic", "belt", "mantle (paenula/pallium)", "shoes"], "belt": { "longrobe": "leather|cord|sash" }, "worn_by": ["negotiator", "medicus", "presbyter", "peregrinus", "graecus", "iudaeus"], "sources": ["OR1", "VEST"], "certainty": "I" },
-    "monk":         { "garments": ["habit (tunica)", "cord", "cowl (cuculla)", "shoes"], "belt": { "robe": "cord" }, "worn_by": ["monachus"], "sources": ["RB22", "RB22b"], "certainty": "A" },
-    "monkBare":     { "garments": ["habit", "cord", "shoes"], "belt": { "robe": "cord" }, "worn_by": ["monachus"], "sources": ["RB22"], "certainty": "A" },
-    "woman":        { "garments": ["gown (long tunic, fitted bodice)", "girdle (woven sash)", "linen veil", "shoes"], "belt": { "gown": "sash" }, "worn_by": ["langobarda", "rustica", "mulier", "puella", "lavandaria", "textrix", "sanctimonialis", "graeca"], "sources": ["BELT", "PD"], "certainty": "I" },
-    "womanShawl":   { "garments": ["gown", "girdle", "veil", "shoes"], "belt": { "gown": "sash" }, "worn_by": ["langobarda", "rustica", "mulier", "anus", "textrix", "sanctimonialis", "graeca"], "sources": ["BELT"], "certainty": "I", "note": "the v2 bodies have no separate shawl garment; this profile wears the veil only (open defect)" }
+  "VEST": {
+   "cite": "Origins of ecclesiastical vestments: the girdled alb (linea) of Roman clergy",
+   "url": "https://en.wikipedia.org/wiki/Origins_of_ecclesiastical_vestments"
   },
-  "groups": {
-    "gasindus":         { "people": "Lombard", "outfits": ["soldierCloak", "soldier"], "belt": "leather", "buckle": "bronze", "fittings": "multi-part set with the arms; spatha; seax when not cloaked", "sources": ["BELT", "MET", "ROTILI"], "certainty": "A" },
-    "gastaldius":       { "people": "Lombard", "outfits": ["soldierCloak"], "belt": "leather", "buckle": "bronze", "fittings": "multi-part set (beltSet)", "sources": ["BELT", "ROTILI"], "certainty": "A/I" },
-    "sculdahis":        { "people": "Lombard", "outfits": ["soldierCloak"], "belt": "leather", "buckle": "bronze", "fittings": "multi-part set (beltSet)", "sources": ["BELT", "ROTILI"], "certainty": "A/I" },
-    "arimannus":        { "people": "Lombard", "outfits": ["soldier", "soldierCloak"], "belt": "leather", "buckle": "bronze", "fittings": "multi-part set with spatha and seax", "sources": ["BELT", "CASSANO", "ROTILI"], "certainty": "A" },
-    "langobarda":       { "people": "Lombard", "outfits": ["woman", "womanShawl"], "belt": "sash", "fittings": "disc brooch at the throat; belt pendants of the graves not modelled", "sources": ["BELT", "PD"], "certainty": "I" },
-    "senexLangobardus": { "people": "Lombard", "outfits": ["soldierCloak"], "belt": "leather", "buckle": "bronze", "fittings": "multi-part set (beltSet)", "sources": ["BELT", "PD"], "certainty": "I" },
-    "bulgarus":         { "people": "Bulgar settled by Romuald (HL V 29), dressed as a Lombard freeman", "outfits": ["soldier"], "belt": "leather", "buckle": "bronze", "fittings": "with the arms: set, sword, seax", "sources": ["PD"], "certainty": "H" },
-    "aldius":           { "people": "half-free, Lombard or Latin", "outfits": ["peasantHood", "peasantCloak"], "belt": "leather", "buckle": "iron", "sources": ["VA"], "certainty": "I" },
-    "rustica":          { "people": "Latin or Lombard countrywoman", "outfits": ["woman", "womanShawl"], "belt": "sash", "sources": ["BELT"], "certainty": "I" },
-    "servus":           { "people": "slave", "outfits": ["peasantHood"], "belt": "cord", "note": "hemp cord, worn and patched dress", "sources": [], "certainty": "H" },
-    "mulier":           { "people": "Latin townswoman", "outfits": ["woman", "womanShawl"], "belt": "sash", "sources": ["BELT"], "certainty": "I" },
-    "anus":             { "people": "old woman", "outfits": ["womanShawl"], "belt": "sash", "sources": [], "certainty": "I" },
-    "puer":             { "people": "boy", "outfits": ["peasantHood", "peasantCloak"], "belt": "leather", "buckle": "iron", "sources": [], "certainty": "I" },
-    "puella":           { "people": "girl", "outfits": ["woman"], "belt": "sash", "sources": [], "certainty": "I" },
-    "mendicus":         { "people": "beggar", "outfits": ["peasantHood"], "belt": "cord", "sources": [], "certainty": "H" },
-    "faber":            { "people": "smith", "outfits": ["peasantCloak", "peasantHood"], "belt": "leather", "buckle": "iron", "fittings": "leather apron tied at the belt", "sources": [], "certainty": "I" },
-    "aurifex":          { "people": "goldsmith", "outfits": ["peasantCloak"], "belt": "leather", "buckle": "iron", "fittings": "apron", "sources": [], "certainty": "I" },
-    "figulus":          { "people": "potter", "outfits": ["peasantHood"], "belt": "leather", "buckle": "iron", "fittings": "clay-stained apron", "sources": [], "certainty": "I" },
-    "pistor":           { "people": "baker", "outfits": ["peasantCloak"], "belt": "leather", "buckle": "iron", "fittings": "linen apron", "sources": [], "certainty": "I" },
-    "molendinarius":    { "people": "miller", "outfits": ["peasantHood", "peasantCloak"], "belt": "leather", "buckle": "iron", "fittings": "linen apron", "sources": [], "certainty": "I" },
-    "calcarius":        { "people": "lime-burner", "outfits": ["peasantHood"], "belt": "leather", "buckle": "iron", "sources": [], "certainty": "I" },
-    "lavandaria":       { "people": "washerwoman", "outfits": ["woman"], "belt": "sash", "sources": [], "certainty": "I" },
-    "textrix":          { "people": "weaver", "outfits": ["woman", "womanShawl"], "belt": "sash", "sources": [], "certainty": "I" },
-    "negotiator":       { "people": "Latin merchant", "outfits": ["robe", "robeCloak"], "belt": "leather", "buckle": "iron", "fittings": "scrip at the belt", "sources": [], "certainty": "I" },
-    "notarius":         { "people": "Latin notary", "outfits": ["robe"], "belt": "sash", "sources": [], "certainty": "H" },
-    "medicus":          { "people": "physician", "outfits": ["robe", "robeCloak"], "belt": "leather", "buckle": "iron", "fittings": "scrip", "sources": [], "certainty": "I" },
-    "presbyter":        { "people": "priest", "outfits": ["robeCloak", "robe"], "belt": "cord", "note": "white linen cingulum over the alb", "sources": ["OR1", "VEST"], "certainty": "A" },
-    "diaconus":         { "people": "deacon", "outfits": ["robe"], "belt": "cord", "note": "white linen cingulum over the alb", "sources": ["OR1", "VEST"], "certainty": "A" },
-    "monachus":         { "people": "monk", "outfits": ["monk", "monkBare"], "belt": "cord", "note": "belt or cord (RB 22); hemp cord chosen", "sources": ["RB22", "RB22b"], "certainty": "A" },
-    "sanctimonialis":   { "people": "nun of St Peter's", "outfits": ["woman", "womanShawl"], "belt": "sash", "note": "dark girdle", "sources": ["RB22"], "certainty": "I" },
-    "peregrinus":       { "people": "pilgrim (Frankish, English, Lombard)", "outfits": ["robeCloak", "peasantHood"], "belt": "leather", "buckle": "iron", "fittings": "scrip, staff", "sources": [], "certainty": "I" },
-    "graecus":          { "people": "Greek merchant from Taranto", "outfits": ["robeCloak", "robe"], "belt": "sash", "sources": [], "certainty": "H" },
-    "graeca":           { "people": "Greek woman", "outfits": ["woman", "womanShawl"], "belt": "sash", "sources": [], "certainty": "H" },
-    "iudaeus":          { "people": "Jewish dyer from Venosa, dressed like other townsmen", "outfits": ["robe", "robeCloak"], "belt": "leather", "buckle": "iron", "sources": [], "certainty": "I" },
-    "afer":             { "people": "African Latin refugee after 698", "outfits": ["robe"], "belt": "sash", "sources": [], "certainty": "H" }
+  "BELT": {
+   "cite": "Longobard belts as a typical, widespread component of dress for men and women; the early-7th-c. 'five-piece' bronze belt (buckle, tongue plate, strap end), later embellished with more plates and pendants (archaeometric study of Lombard belt fittings, Int. J. Metalcasting 2020)",
+   "url": "https://link.springer.com/doi/10.1007/s40962-020-00518-y"
+  },
+  "MET": {
+   "cite": "Gold buckle and strap end, c. 600, from a Lombard horseman's grave associated with Castel Trosino (Metropolitan Museum of Art)",
+   "url": "https://www.metmuseum.org/art/collection/search/470278"
+  },
+  "CASSANO": {
+   "cite": "Cassano d'Adda (Lombardy): bronze five-piece belt sets of the late 6th-early 7th c.; the seax usually hung from such belts (absent in those graves)",
+   "url": "https://fastionline.org/s/folder/item/30087"
+  },
+  "ROTILI": {
+   "cite": "M. Rotili, La necropoli longobarda di Benevento (1977): belt sets, disc brooches, gold-leaf crosses in Benevento's own Lombard graves (see docs/benevento/PEOPLE.md section 1)"
+  },
+  "VA": {
+   "cite": "V&A Egyptian tunic dated 670-870: an almost straight shirt-like tunic; belts gathered its folds (Egyptian analogue, not a Benevento find)",
+   "url": "https://collections.vam.ac.uk/item/O119593/tunic-unknown/"
+  },
+  "MET_TUNIC": {
+   "cite": "Met Kharga tunic, 4th-7th c.: cross-shaped, folded and sewn construction (Egyptian analogue)",
+   "url": "https://www.metmuseum.org/art/collection/search/475116"
+  },
+  "ISID": {
+   "cite": "Isidore of Seville, Etymologiae XIX 33 'De cingulis' (c. 625): cinctus (wide), semicinctium, cingulum (narrowest); zona, the Greek name of the cingulum; XIX 22-25 on tunics",
+   "url": "https://penelope.uchicago.edu/Thayer/L/Roman/Texts/Isidore/19*.html"
+  },
+  "ROTH": {
+   "cite": "Edictum Rothari (643): the legal ranks of the Lombard kingdom (free arimanni, half-free aldii, servi), on which the poorer groups' plainer dress is inferred",
+   "url": "https://en.wikipedia.org/wiki/Edictum_Rothari"
+  },
+  "RAV": {
+   "cite": "Ravenna mosaics, Sant'Apollinare Nuovo (6th c.): laymen in belted knee tunics, clergy in long girdled tunics, women in long tunics with mantles and veils",
+   "url": "https://en.wikipedia.org/wiki/Sant%27Apollinare_Nuovo"
+  },
+  "RAV2": {
+   "cite": "San Vitale, Ravenna: the court panels of Justinian and Theodora (c. 547), Byzantine lay and court dress",
+   "url": "https://en.wikipedia.org/wiki/San_Vitale"
+  },
+  "SMA": {
+   "cite": "Santa Maria Antiqua, Rome: wall paintings of the 7th and early 8th c. (John VII, 705-707): clergy and lay donors of the period in central Italy",
+   "url": "https://en.wikipedia.org/wiki/Santa_Maria_Antiqua"
+  },
+  "BYZ": {
+   "cite": "Byzantine dress: the long tunic with a belt or sash for townsmen; women's long tunics with a girdle",
+   "url": "https://en.wikipedia.org/wiki/Byzantine_dress"
+  },
+  "WILL": {
+   "cite": "Huneberc, Hodoeporicon of St Willibald (c. 778): an English pilgrim's journey through Lombard Italy in the 720s (staff and scrip; ordinary travelling clothes)",
+   "url": "https://en.wikipedia.org/wiki/Hodoeporicon"
+  },
+  "VENOSA": {
+   "cite": "Jewish inscriptions of Venosa (5th-9th c.): a deeply Latinized community; no evidence of distinctive dress in this period",
+   "url": "https://www.jewishvirtuallibrary.org/venosa"
   }
+ },
+ "belt_styles": {
+  "leather": {
+   "geometry": "strap 3.2 cm high, 4 mm thick, round the cinched waist; tongue 11 cm hanging from the buckle at the front",
+   "fittings": "buckle prop at the front (src/npc/population-props.ts makeBuckle): bronze frame and plate for Lombard men, a plain iron frame for townsmen; Lombard office-holders add the multi-part set of plates and strap ends (props.ts makeBeltFittings)",
+   "sources": [
+    "BELT",
+    "MET",
+    "CASSANO",
+    "ROTILI",
+    "ISID"
+   ],
+   "certainty": "A for Lombard men (five-piece and multi-part sets); I for Latin townsmen's plain belts"
+  },
+  "cord": {
+   "geometry": "round cord 1.2 cm thick, knotted at the front left with two ends (42 and 36 cm) hanging down the skirt",
+   "material": "hemp (unbleached, matte) for monks and the poor; white linen (cingulum) for priests and deacons",
+   "sources": [
+    "RB22",
+    "RB22b",
+    "OR1",
+    "VEST",
+    "ISID"
+   ],
+   "certainty": "A for monks (belts or cords) and for the clergy's girdle over the alb; the knot and the length of the ends are H"
+  },
+  "sash": {
+   "geometry": "woven band 4.2 cm wide, 3 mm thick, tied at the front left with two ends (34 and 28 cm)",
+   "material": "tabby wool or linen in the group's dye",
+   "sources": [
+    "BELT",
+    "PD",
+    "ISID",
+    "RAV"
+   ],
+   "certainty": "I: women's belts are attested in Lombard graves (often with buckles and pendants); a textile girdle is the inference for women whose graves keep no metal fittings and for Latin townswomen; the tied ends are H"
+  }
+ },
+ "cinch": {
+  "rule": "A belt draws the cloth in without changing the garment's dimensions: every edge of the garment keeps its length (99th percentile change <= 3 %, worst edge <= 20 %, judged per cm on sub-cm edges), the hem, neck and cuff perimeters within 1 %; the excess gathers and blouses above and below the belt. The 'belted-tunic study', which reshaped the panels, was rejected for exactly that.",
+  "tool": "tools/npc3/wardrobe_build.py",
+  "fitted_exception": "The gown's bodice is cut fitted at the waist: the girdle is tied over it and nothing is drawn in."
+ },
+ "necklines": {
+  "rule": "No open, single-sided or see-through neckline: each neckline and sleeve cuff of a body garment has a turned-in facing (a 4 mm rim and a 2.5 cm inner band facing the body), drawn with the cloth's own material.",
+  "certainty": "H: the exact finish is not documented for Benevento; turned and hemmed edges are the ordinary finish of woven garments (MET_TUNIC, VA)."
+ },
+ "outfits": {
+  "soldier": {
+   "garments": [
+    "shirt (knee tunic)",
+    "leather belt",
+    "hose and leg wraps",
+    "boots"
+   ],
+   "belt": {
+    "shirt": "leather"
+   },
+   "worn_by": [
+    "arimannus",
+    "gasindus",
+    "bulgarus"
+   ],
+   "sources": [
+    "PD",
+    "BELT",
+    "ROTILI",
+    "ISID"
+   ],
+   "certainty": "A/I"
+  },
+  "soldierCloak": {
+   "garments": [
+    "shirt",
+    "leather belt",
+    "cloak with disc brooch at the right shoulder",
+    "hose",
+    "boots"
+   ],
+   "belt": {
+    "shirt": "leather"
+   },
+   "worn_by": [
+    "gasindus",
+    "gastaldius",
+    "sculdahis",
+    "arimannus",
+    "senexLangobardus"
+   ],
+   "sources": [
+    "PD",
+    "BELT",
+    "ROTILI",
+    "ISID"
+   ],
+   "certainty": "A/I"
+  },
+  "peasantHood": {
+   "garments": [
+    "knee tunic",
+    "belt (leather; hemp cord for slaves and beggars)",
+    "hood with shoulder cape",
+    "hose",
+    "boots"
+   ],
+   "belt": {
+    "tunic": "leather|cord"
+   },
+   "worn_by": [
+    "aldius",
+    "servus",
+    "puer",
+    "mendicus",
+    "faber",
+    "figulus",
+    "molendinarius",
+    "calcarius",
+    "peregrinus"
+   ],
+   "sources": [
+    "VA",
+    "MET_TUNIC",
+    "RAV",
+    "ROTH"
+   ],
+   "certainty": "I"
+  },
+  "peasantCloak": {
+   "garments": [
+    "shirt",
+    "leather belt",
+    "cloak",
+    "hose",
+    "boots"
+   ],
+   "belt": {
+    "shirt": "leather"
+   },
+   "worn_by": [
+    "aldius",
+    "puer",
+    "faber",
+    "aurifex",
+    "pistor",
+    "molendinarius"
+   ],
+   "sources": [
+    "VA",
+    "RAV"
+   ],
+   "certainty": "I"
+  },
+  "robe": {
+   "garments": [
+    "ankle-length tunic",
+    "belt (leather, cingulum cord or sash by role)",
+    "shoes"
+   ],
+   "belt": {
+    "longrobe": "leather|cord|sash"
+   },
+   "worn_by": [
+    "negotiator",
+    "notarius",
+    "medicus",
+    "presbyter",
+    "diaconus",
+    "graecus",
+    "iudaeus",
+    "afer"
+   ],
+   "sources": [
+    "OR1",
+    "VEST",
+    "RAV",
+    "SMA",
+    "ISID"
+   ],
+   "certainty": "A for the clergy's girdled alb; I for the others"
+  },
+  "robeCloak": {
+   "garments": [
+    "ankle-length tunic",
+    "belt",
+    "mantle (paenula/pallium)",
+    "shoes"
+   ],
+   "belt": {
+    "longrobe": "leather|cord|sash"
+   },
+   "worn_by": [
+    "negotiator",
+    "medicus",
+    "presbyter",
+    "peregrinus",
+    "graecus",
+    "iudaeus"
+   ],
+   "sources": [
+    "OR1",
+    "VEST",
+    "RAV",
+    "SMA"
+   ],
+   "certainty": "I"
+  },
+  "monk": {
+   "garments": [
+    "habit (tunica)",
+    "cord",
+    "cowl (cuculla)",
+    "shoes"
+   ],
+   "belt": {
+    "robe": "cord"
+   },
+   "worn_by": [
+    "monachus"
+   ],
+   "sources": [
+    "RB22",
+    "RB22b",
+    "ISID"
+   ],
+   "certainty": "A"
+  },
+  "monkBare": {
+   "garments": [
+    "habit",
+    "cord",
+    "shoes"
+   ],
+   "belt": {
+    "robe": "cord"
+   },
+   "worn_by": [
+    "monachus"
+   ],
+   "sources": [
+    "RB22"
+   ],
+   "certainty": "A"
+  },
+  "woman": {
+   "garments": [
+    "gown (long tunic, fitted bodice)",
+    "girdle (woven sash)",
+    "linen veil",
+    "shoes"
+   ],
+   "belt": {
+    "gown": "sash"
+   },
+   "worn_by": [
+    "langobarda",
+    "rustica",
+    "mulier",
+    "puella",
+    "lavandaria",
+    "textrix",
+    "sanctimonialis",
+    "graeca"
+   ],
+   "sources": [
+    "BELT",
+    "PD",
+    "RAV",
+    "SMA",
+    "ISID"
+   ],
+   "certainty": "I"
+  },
+  "womanShawl": {
+   "garments": [
+    "gown",
+    "girdle",
+    "veil",
+    "shoes"
+   ],
+   "belt": {
+    "gown": "sash"
+   },
+   "worn_by": [
+    "langobarda",
+    "rustica",
+    "mulier",
+    "anus",
+    "textrix",
+    "sanctimonialis",
+    "graeca"
+   ],
+   "sources": [
+    "BELT",
+    "RAV",
+    "SMA"
+   ],
+   "certainty": "I",
+   "note": "the v2 bodies have no separate shawl garment; this profile wears the veil only (open defect)"
+  }
+ },
+ "groups": {
+  "gasindus": {
+   "people": "Lombard",
+   "outfits": [
+    "soldierCloak",
+    "soldier"
+   ],
+   "belt": "leather",
+   "buckle": "bronze",
+   "fittings": "multi-part set with the arms; spatha; seax when not cloaked",
+   "sources": [
+    "BELT",
+    "MET",
+    "ROTILI",
+    "ISID"
+   ],
+   "certainty": "A"
+  },
+  "gastaldius": {
+   "people": "Lombard",
+   "outfits": [
+    "soldierCloak"
+   ],
+   "belt": "leather",
+   "buckle": "bronze",
+   "fittings": "multi-part set (beltSet)",
+   "sources": [
+    "BELT",
+    "ROTILI",
+    "ISID"
+   ],
+   "certainty": "A/I"
+  },
+  "sculdahis": {
+   "people": "Lombard",
+   "outfits": [
+    "soldierCloak"
+   ],
+   "belt": "leather",
+   "buckle": "bronze",
+   "fittings": "multi-part set (beltSet)",
+   "sources": [
+    "BELT",
+    "ROTILI",
+    "ISID"
+   ],
+   "certainty": "A/I"
+  },
+  "arimannus": {
+   "people": "Lombard",
+   "outfits": [
+    "soldier",
+    "soldierCloak"
+   ],
+   "belt": "leather",
+   "buckle": "bronze",
+   "fittings": "multi-part set with spatha and seax",
+   "sources": [
+    "BELT",
+    "CASSANO",
+    "ROTILI",
+    "ISID",
+    "ROTH"
+   ],
+   "certainty": "A"
+  },
+  "langobarda": {
+   "people": "Lombard",
+   "outfits": [
+    "woman",
+    "womanShawl"
+   ],
+   "belt": "sash",
+   "fittings": "disc brooch at the throat; belt pendants of the graves not modelled",
+   "sources": [
+    "BELT",
+    "PD",
+    "ISID"
+   ],
+   "certainty": "I"
+  },
+  "senexLangobardus": {
+   "people": "Lombard",
+   "outfits": [
+    "soldierCloak"
+   ],
+   "belt": "leather",
+   "buckle": "bronze",
+   "fittings": "multi-part set (beltSet)",
+   "sources": [
+    "BELT",
+    "PD",
+    "ISID"
+   ],
+   "certainty": "I"
+  },
+  "bulgarus": {
+   "people": "Bulgar settled by Romuald (HL V 29), dressed as a Lombard freeman",
+   "outfits": [
+    "soldier"
+   ],
+   "belt": "leather",
+   "buckle": "bronze",
+   "fittings": "with the arms: set, sword, seax",
+   "sources": [
+    "PD",
+    "ROTH"
+   ],
+   "certainty": "H"
+  },
+  "aldius": {
+   "people": "half-free, Lombard or Latin",
+   "outfits": [
+    "peasantHood",
+    "peasantCloak"
+   ],
+   "belt": "leather",
+   "buckle": "iron",
+   "sources": [
+    "VA",
+    "ROTH",
+    "RAV",
+    "ISID"
+   ],
+   "certainty": "I"
+  },
+  "rustica": {
+   "people": "Latin or Lombard countrywoman",
+   "outfits": [
+    "woman",
+    "womanShawl"
+   ],
+   "belt": "sash",
+   "sources": [
+    "BELT",
+    "RAV",
+    "ISID",
+    "SMA"
+   ],
+   "certainty": "I"
+  },
+  "servus": {
+   "people": "slave",
+   "outfits": [
+    "peasantHood"
+   ],
+   "belt": "cord",
+   "note": "hemp cord, worn and patched dress",
+   "sources": [
+    "ROTH",
+    "RB22",
+    "ISID"
+   ],
+   "certainty": "H"
+  },
+  "mulier": {
+   "people": "Latin townswoman",
+   "outfits": [
+    "woman",
+    "womanShawl"
+   ],
+   "belt": "sash",
+   "sources": [
+    "BELT",
+    "RAV",
+    "SMA",
+    "ISID"
+   ],
+   "certainty": "I"
+  },
+  "anus": {
+   "people": "old woman",
+   "outfits": [
+    "womanShawl"
+   ],
+   "belt": "sash",
+   "sources": [
+    "RAV",
+    "SMA",
+    "ISID"
+   ],
+   "certainty": "I"
+  },
+  "puer": {
+   "people": "boy",
+   "outfits": [
+    "peasantHood",
+    "peasantCloak"
+   ],
+   "belt": "leather",
+   "buckle": "iron",
+   "sources": [
+    "RAV",
+    "ROTH"
+   ],
+   "certainty": "I"
+  },
+  "puella": {
+   "people": "girl",
+   "outfits": [
+    "woman"
+   ],
+   "belt": "sash",
+   "sources": [
+    "RAV",
+    "SMA"
+   ],
+   "certainty": "I"
+  },
+  "mendicus": {
+   "people": "beggar",
+   "outfits": [
+    "peasantHood"
+   ],
+   "belt": "cord",
+   "sources": [
+    "ROTH",
+    "RB22"
+   ],
+   "certainty": "H"
+  },
+  "faber": {
+   "people": "smith",
+   "outfits": [
+    "peasantCloak",
+    "peasantHood"
+   ],
+   "belt": "leather",
+   "buckle": "iron",
+   "fittings": "leather apron tied at the belt",
+   "sources": [
+    "RAV",
+    "VA"
+   ],
+   "certainty": "I"
+  },
+  "aurifex": {
+   "people": "goldsmith",
+   "outfits": [
+    "peasantCloak"
+   ],
+   "belt": "leather",
+   "buckle": "iron",
+   "fittings": "apron",
+   "sources": [
+    "RAV",
+    "VA"
+   ],
+   "certainty": "I"
+  },
+  "figulus": {
+   "people": "potter",
+   "outfits": [
+    "peasantHood"
+   ],
+   "belt": "leather",
+   "buckle": "iron",
+   "fittings": "clay-stained apron",
+   "sources": [
+    "RAV",
+    "VA"
+   ],
+   "certainty": "I"
+  },
+  "pistor": {
+   "people": "baker",
+   "outfits": [
+    "peasantCloak"
+   ],
+   "belt": "leather",
+   "buckle": "iron",
+   "fittings": "linen apron",
+   "sources": [
+    "RAV",
+    "VA"
+   ],
+   "certainty": "I"
+  },
+  "molendinarius": {
+   "people": "miller",
+   "outfits": [
+    "peasantHood",
+    "peasantCloak"
+   ],
+   "belt": "leather",
+   "buckle": "iron",
+   "fittings": "linen apron",
+   "sources": [
+    "RAV",
+    "VA"
+   ],
+   "certainty": "I"
+  },
+  "calcarius": {
+   "people": "lime-burner",
+   "outfits": [
+    "peasantHood"
+   ],
+   "belt": "leather",
+   "buckle": "iron",
+   "sources": [
+    "RAV",
+    "VA"
+   ],
+   "certainty": "I"
+  },
+  "lavandaria": {
+   "people": "washerwoman",
+   "outfits": [
+    "woman"
+   ],
+   "belt": "sash",
+   "sources": [
+    "RAV",
+    "ISID"
+   ],
+   "certainty": "I"
+  },
+  "textrix": {
+   "people": "weaver",
+   "outfits": [
+    "woman",
+    "womanShawl"
+   ],
+   "belt": "sash",
+   "sources": [
+    "RAV",
+    "ISID"
+   ],
+   "certainty": "I"
+  },
+  "negotiator": {
+   "people": "Latin merchant",
+   "outfits": [
+    "robe",
+    "robeCloak"
+   ],
+   "belt": "leather",
+   "buckle": "iron",
+   "fittings": "scrip at the belt",
+   "sources": [
+    "RAV",
+    "SMA",
+    "ISID"
+   ],
+   "certainty": "I"
+  },
+  "notarius": {
+   "people": "Latin notary",
+   "outfits": [
+    "robe"
+   ],
+   "belt": "sash",
+   "sources": [
+    "SMA",
+    "RAV2",
+    "ISID"
+   ],
+   "certainty": "H"
+  },
+  "medicus": {
+   "people": "physician",
+   "outfits": [
+    "robe",
+    "robeCloak"
+   ],
+   "belt": "leather",
+   "buckle": "iron",
+   "fittings": "scrip",
+   "sources": [
+    "RAV",
+    "SMA"
+   ],
+   "certainty": "I"
+  },
+  "presbyter": {
+   "people": "priest",
+   "outfits": [
+    "robeCloak",
+    "robe"
+   ],
+   "belt": "cord",
+   "note": "white linen cingulum over the alb",
+   "sources": [
+    "OR1",
+    "VEST",
+    "SMA",
+    "ISID"
+   ],
+   "certainty": "A"
+  },
+  "diaconus": {
+   "people": "deacon",
+   "outfits": [
+    "robe"
+   ],
+   "belt": "cord",
+   "note": "white linen cingulum over the alb",
+   "sources": [
+    "OR1",
+    "VEST",
+    "SMA",
+    "ISID"
+   ],
+   "certainty": "A"
+  },
+  "monachus": {
+   "people": "monk",
+   "outfits": [
+    "monk",
+    "monkBare"
+   ],
+   "belt": "cord",
+   "note": "belt or cord (RB 22); hemp cord chosen",
+   "sources": [
+    "RB22",
+    "RB22b",
+    "ISID"
+   ],
+   "certainty": "A"
+  },
+  "sanctimonialis": {
+   "people": "nun of St Peter's",
+   "outfits": [
+    "woman",
+    "womanShawl"
+   ],
+   "belt": "sash",
+   "note": "dark girdle",
+   "sources": [
+    "RB22",
+    "SMA"
+   ],
+   "certainty": "I"
+  },
+  "peregrinus": {
+   "people": "pilgrim (Frankish, English, Lombard)",
+   "outfits": [
+    "robeCloak",
+    "peasantHood"
+   ],
+   "belt": "leather",
+   "buckle": "iron",
+   "fittings": "scrip, staff",
+   "sources": [
+    "WILL",
+    "ISID"
+   ],
+   "certainty": "I"
+  },
+  "graecus": {
+   "people": "Greek merchant from Taranto",
+   "outfits": [
+    "robeCloak",
+    "robe"
+   ],
+   "belt": "sash",
+   "sources": [
+    "BYZ",
+    "RAV2"
+   ],
+   "certainty": "H"
+  },
+  "graeca": {
+   "people": "Greek woman",
+   "outfits": [
+    "woman",
+    "womanShawl"
+   ],
+   "belt": "sash",
+   "sources": [
+    "BYZ",
+    "RAV2"
+   ],
+   "certainty": "H"
+  },
+  "iudaeus": {
+   "people": "Jewish dyer from Venosa, dressed like other townsmen",
+   "outfits": [
+    "robe",
+    "robeCloak"
+   ],
+   "belt": "leather",
+   "buckle": "iron",
+   "sources": [
+    "VENOSA",
+    "RAV"
+   ],
+   "certainty": "I"
+  },
+  "afer": {
+   "people": "African Latin refugee after 698",
+   "outfits": [
+    "robe"
+   ],
+   "belt": "sash",
+   "sources": [
+    "BYZ",
+    "RAV"
+   ],
+   "certainty": "H"
+  }
+ },
+ "note_sources": "Every group and outfit cites at least one source. Analogues (Ravenna, Rome, Egypt) show the dress of the wider late-antique and early-medieval Mediterranean, not Benevento itself; where a group's belt rests on them alone its certainty stays I or H."
 }
