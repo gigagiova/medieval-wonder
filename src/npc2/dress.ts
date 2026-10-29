@@ -35,7 +35,7 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
     meshes.push(m);
     const src = m.material as THREE.MeshStandardMaterial;
     const col = g.layer === 'tunic' ? dyes.tunic : g.layer === 'over' ? dyes.over : g.layer === 'head' ? dyes.head : g.layer === 'leg' ? dyes.leg : g.layer === 'shoe' || g.layer === 'belt' ? dyes.shoe : dyes.tunic;
-    if (g.layer === 'belt' && g.map !== 'color') { m.material = dyes.belt; return; }
+    if (g.layer === 'belt' && g.map !== 'color') { if (!dyes.belt.userData.bias) { layerBias(dyes.belt, LAYER_BIAS.belt); dyes.belt.userData.bias = true; } m.material = dyes.belt; return; }
     let mat: THREE.MeshStandardMaterial;
     // A persona's own cloth for tunic, overgarment and headcloth (src/npc/population.ts).
     const kind = (dyes.kinds && { tunic: dyes.kinds[0], over: dyes.kinds[1], head: dyes.kinds[2] }[g.layer]) || KIND[g.fabric];
@@ -59,9 +59,33 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
     inside(mat);
     // Hood and cowl: closed shells wound outwards (tools/npc2/derive.py), drawn one-sided.
     if (g.id === 'hood' || g.id === 'cowl') { mat.side = THREE.FrontSide; lining(mat, m.geometry); }
+    if (LAYER_BIAS[g.layer]) layerBias(mat, LAYER_BIAS[g.layer]);
     m.material = mat;
   });
   return new ClothingV2(meshes);
+}
+
+/**
+ * Layer depth bias: each outer layer is drawn as if a few millimetres nearer
+ * the eye than it is (moved along the view ray in view space, so the offset
+ * is in metres at any distance). Where a layer beneath comes within that
+ * distance of the one above, or a few millimetres through it, the upper one
+ * still wins the depth test, instead of the two cutting each other into a
+ * ragged, flickering seam. Larger crossings are the push's business
+ * (src/npc2/push.ts). The same idea as layered clothing's depth bias in game
+ * engines (Unreal Engine's Pixel Depth Offset; OpenGL's polygon offset, here
+ * in view-space metres rather than depth units). Shadow maps are drawn
+ * without it.
+ */
+const LAYER_BIAS: Record<string, number> = { tunic: 0.002, belt: 0.004, head: 0.005, over: 0.007 };
+function layerBias(m: THREE.Material, metres: number) {
+  const prev = m.onBeforeCompile, key = m.customProgramCacheKey();
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+      gl_Position = projectionMatrix * vec4(mvPosition.xyz + normalize(-mvPosition.xyz) * ${metres.toFixed(4)}, 1.0);`);
+  };
+  m.customProgramCacheKey = () => key + '-bias' + metres;
 }
 
 /**

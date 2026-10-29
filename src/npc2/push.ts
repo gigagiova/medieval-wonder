@@ -18,11 +18,11 @@ import type { OutfitV2 } from './kit';
 //
 // The audit (audit.ts) applies the same projection on the CPU (`userData.push`).
 
-export const MAX_CAPS = 16;
+export const MAX_CAPS = 18;
 const MARGIN = 0.008;
 
-interface CapDef { a: string; b: string; from?: number; extend?: number; bones: string[]; /** Quantile of the inner layers' distances taken as the radius (default: all of them). */ q?: number; /** Keep each cloth point on its own side of the limb, see SIDE. */ side?: boolean; /** Offsets (bind space, m) of the ends from the bones: a capsule across the trunk. */ ao?: [number, number, number]; bo?: [number, number, number]; /** Cloth skinned mostly (> half) to these bones is left alone by this capsule: a sleeve's own cuff by the hand's. */ own?: string[] }
-interface Cap { a: THREE.Bone; b: THREE.Bone; from: number; extend: number; r: number; r1: number; side: boolean; own: number[]; /** Ends as points in the bones' own frames (offset capsules), else the bone origins. */ la?: THREE.Vector3; lb?: THREE.Vector3 }
+interface CapDef { a: string; b: string; from?: number; extend?: number; bones: string[]; /** Quantile of the inner layers' distances taken as the radius (default: all of them). */ q?: number; /** Keep each cloth point on its own side of the limb, see SIDE. */ side?: boolean; /** Offsets (bind space, m) of the ends from the bones: a capsule across the trunk. */ ao?: [number, number, number]; bo?: [number, number, number]; /** Cloth skinned mostly (> half) to these bones is left alone by this capsule: a sleeve's own cuff by the hand's. */ own?: string[]; /** The bone whose motion gives a point its home side (default: a). A capsule across both legs takes the hips'. */ home?: string }
+interface Cap { a: THREE.Bone; b: THREE.Bone; from: number; extend: number; r: number; r1: number; side: boolean; own: number[]; /** The bone a cloth point's home side moves with. */ h: THREE.Bone; /** Ends as points in the bones' own frames (offset capsules), else the bone origins. */ la?: THREE.Vector3; lb?: THREE.Vector3 }
 
 // Which limbs each layer of garment is kept off.
 const LEGS: CapDef[] = [
@@ -51,22 +51,29 @@ const UPPER: CapDef[] = [
 // keep a cloak or a hood's cape outside the cloth gathered by the belt, the
 // belt itself and the chest beneath.
 const TRUNK: CapDef[] = [
-  { a: 'Spine', b: 'Spine', ao: [-0.09, 0, 0], bo: [0.09, 0, 0], bones: ['Hips', 'Spine'], q: 0.985, side: true },
-  { a: 'Spine2', b: 'Spine2', ao: [-0.09, -0.02, 0], bo: [0.09, -0.02, 0], bones: ['Spine1', 'Spine2'], q: 0.985, side: true },
+  { a: 'Spine', b: 'Spine', ao: [-0.09, 0, 0], bo: [0.09, 0, 0], bones: ['Hips', 'Spine'], side: true },
+  { a: 'Spine2', b: 'Spine2', ao: [-0.09, -0.02, 0], bo: [0.09, -0.02, 0], bones: ['Spine1', 'Spine2'], side: true },
 ];
 // Under a cloak: the skirt of the tunic or robe beneath, at the hips and
 // across both thighs (riding on them), so it cannot swing out through the
 // cloak's back and sides.
 const SKIRT: CapDef[] = [
-  { a: 'Hips', b: 'Hips', ao: [-0.09, -0.06, 0], bo: [0.09, -0.06, 0], bones: [], q: 0.985, side: true },
-  { a: 'LeftUpLeg', b: 'RightUpLeg', ao: [0, -0.22, 0], bo: [0, -0.22, 0], bones: [], q: 0.985, side: true },
+  { a: 'Hips', b: 'Hips', ao: [-0.09, -0.06, 0], bo: [0.09, -0.06, 0], bones: [], side: true },
+  { a: 'LeftUpLeg', b: 'RightUpLeg', ao: [0, -0.22, 0], bo: [0, -0.22, 0], bones: [], side: true, home: 'Hips' },
+  // A long robe's skirt, across both shins (riding on them).
+  { a: 'LeftLeg', b: 'RightLeg', ao: [0, -0.2, 0], bo: [0, -0.2, 0], bones: [], side: true, home: 'Hips' },
 ];
+// The yoke: a capsule along the line of the shoulders, through the base of
+// the neck. A cloak's collar or a hood's cape lies over it, on the robe's
+// shoulder cape and the tunic's neckline; without it they cut each other
+// into white and dark shards round the neck.
+const YOKE: CapDef = { a: 'LeftShoulder', b: 'RightShoulder', ao: [0, 0, 0], bo: [0, 0, 0], bones: [] };
 const BY_LAYER: Record<string, CapDef[]> = {
   // (Sleeves: the forearm only; round the upper arm the capsule would reach the chest's cloth.)
   tunic: [...LEGS, ...HANDS, ...ARMS.slice(0, 2)],
-  over: [...SHOULDERS, ...ARMS, ...HANDS, ...LEGS.slice(0, 4), ...TRUNK, ...SKIRT],
+  over: [...SHOULDERS, ...ARMS, ...HANDS, ...LEGS.slice(0, 4), ...TRUNK, ...SKIRT, YOKE],
   // A hood's shoulder cape over the tunic.
-  head: [...SHOULDERS, ...UPPER, TRUNK[1]],
+  head: [...SHOULDERS, ...UPPER, TRUNK[1], YOKE],
 };
 
 const GLSL_HEAD = `uniform vec4 uPushA[${MAX_CAPS}]; uniform vec4 uPushB[${MAX_CAPS}]; uniform float uPushR[${MAX_CAPS}]; uniform vec2 uPushX[${MAX_CAPS}];`;
@@ -236,7 +243,7 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
       r0 ||= r1; r1 ||= r0;
       const need = rs.map((x, k) => x / (r0 * (1 - ts[k]) + r1 * ts[k])).sort((x, y) => x - y);
       const kq = Math.max(need[Math.floor((need.length - 1) * (d.q ?? 1))], d.q ? 0 : 1);
-      caps.push({ a, b, from, extend, r: r0 * kq + MARGIN, r1: r1 * kq + MARGIN, own: (d.own ?? []).map((n) => skel.bones.indexOf(bone(n)!)).filter((k) => k >= 0).slice(0, 2), side: !!d.side, la: d.ao ? toLocal(a, pa) : undefined, lb: d.bo ? toLocal(b, pb) : undefined });
+      caps.push({ a, b, from, extend, r: r0 * kq + MARGIN, r1: r1 * kq + MARGIN, h: bone(d.home ?? d.a) ?? a, own: (d.own ?? []).map((n) => skel.bones.indexOf(bone(n)!)).filter((k) => k >= 0).slice(0, 2), side: !!d.side, la: d.ao ? toLocal(a, pa) : undefined, lb: d.bo ? toLocal(b, pb) : undefined });
     }
     if (!caps.length) continue;
     const A = new Float32Array(MAX_CAPS * 4), B = new Float32Array(MAX_CAPS * 4), R = new Float32Array(MAX_CAPS), X = new Float32Array(MAX_CAPS * 2);
@@ -278,10 +285,10 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
         const s0 = pa.clone().lerp(pb, c.from), s1 = pb.clone().add(pb.clone().sub(pa).multiplyScalar(c.extend));
         s0.toArray(s.A, i * 4); s.A[i * 4 + 3] = c.r; s.R[i] = c.r1;
         s1.toArray(s.B, i * 4);
-        const k = s.mesh.skeleton.bones.indexOf(c.a);
+        const k = s.mesh.skeleton.bones.indexOf(c.h);
         s.B[i * 4 + 3] = c.side && k >= 0 ? k + 1 : 0;
         // (For the audit's CPU copy: the bone's skinning matrix in the mesh's space.)
-        if (c.side && k >= 0) s.M[i].multiplyMatrices(s.mesh.bindMatrixInverse, _m.multiplyMatrices(c.a.matrixWorld, s.mesh.skeleton.boneInverses[k])).multiply(s.mesh.bindMatrix);
+        if (c.side && k >= 0) s.M[i].multiplyMatrices(s.mesh.bindMatrixInverse, _m.multiplyMatrices(c.h.matrixWorld, s.mesh.skeleton.boneInverses[k])).multiply(s.mesh.bindMatrix);
       });
     }
   };
