@@ -36,7 +36,7 @@ for (const [i, g] of list.entries()) {
       for (let k = 0; k < 45 + Math.round(frame * 30); k++) api.step(1 / 30);
     }, { anim, frame: +frame });
     for (const view of V) {
-      await page.evaluate(({ i, view, anim }) => {
+      await page.evaluate(({ i, view, anim, hide }) => {
         const api = window.__api, THREE = api.THREE, cam = api.camera;
         api.people.forEach((p, j) => { p.group.visible = j === i; for (const h of p.held) h.obj.visible = j === i; });
         const p = api.people[i];
@@ -58,8 +58,10 @@ for (const [i, g] of list.entries()) {
         else if (view === 'legs') at(1.6, 0.75, 1.6, 0, 0.5, 0, 34);
         else if (view === 'hands') { const l = b('LeftHand'), r = b('RightHand'); const m = l.clone().add(r).multiplyScalar(0.5); at(0.9, m.y + 0.35, 1.6, m.x - c.x, m.y, m.z - c.z, 34); }
         p.carry(0);
+        // HIDE=body,gown...: leave those meshes out (to tell a hole from a crossing).
+        if (hide) p.body.traverse((o) => { if (o.isMesh) { const n = o.userData.npc2 === 'body' ? 'body' : o.userData.garment; if (hide.split(',').includes(n)) o.visible = false; } });
         api.render();
-      }, { i, view, anim });
+      }, { i, view, anim, hide: process.env.HIDE ?? '' });
       const file = `${outdir}/${g.replace(':', '-')}_${anim}_${view}.png`;
       await page.screenshot({ path: file });
       tiles.push(file);

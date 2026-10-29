@@ -30,8 +30,10 @@ const LEGS: CapDef[] = [
   { a: 'LeftLeg', b: 'LeftFoot', bones: ['LeftLeg'], side: true }, { a: 'RightLeg', b: 'RightFoot', bones: ['RightLeg'], side: true },
   { a: 'LeftFoot', b: 'LeftToeBase', extend: 0.6, bones: ['LeftFoot', 'LeftToeBase'] }, { a: 'RightFoot', b: 'RightToeBase', extend: 0.6, bones: ['RightFoot', 'RightToeBase'] },
 ];
+// The hand's capsule must hold the closed fingers too (their bones count for its radius).
+const fingers = (s: string) => ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'].flatMap((f) => [1, 2, 3].map((k) => `${s}Hand${f}${k}`));
 const HANDS: CapDef[] = [
-  { a: 'LeftHand', b: 'LeftHandMiddle1', extend: 0.7, bones: ['LeftHand'] }, { a: 'RightHand', b: 'RightHandMiddle1', extend: 0.7, bones: ['RightHand'] },
+  { a: 'LeftHand', b: 'LeftHandMiddle1', extend: 0.7, bones: ['LeftHand', ...fingers('Left')], side: true }, { a: 'RightHand', b: 'RightHandMiddle1', extend: 0.7, bones: ['RightHand', ...fingers('Right')], side: true },
 ];
 const ARMS: CapDef[] = [
   { a: 'LeftForeArm', b: 'LeftHand', bones: ['LeftForeArm'], side: true }, { a: 'RightForeArm', b: 'RightHand', bones: ['RightForeArm'], side: true },
@@ -44,7 +46,8 @@ const UPPER: CapDef[] = [
   { a: 'LeftArm', b: 'LeftForeArm', bones: ['LeftArm'], side: true }, { a: 'RightArm', b: 'RightForeArm', bones: ['RightArm'], side: true },
 ];
 const BY_LAYER: Record<string, CapDef[]> = {
-  tunic: [...LEGS, ...HANDS],
+  // (Sleeves: the forearm only; round the upper arm the capsule would reach the chest's cloth.)
+  tunic: [...LEGS, ...HANDS, ...ARMS.slice(0, 2)],
   over: [...SHOULDERS, ...ARMS, ...HANDS, ...LEGS.slice(0, 4)],
   // A hood's shoulder cape over the tunic.
   head: [...SHOULDERS, ...UPPER],
@@ -66,7 +69,11 @@ const GLSL_HEAD = `uniform vec4 uPushA[${MAX_CAPS}]; uniform vec4 uPushB[${MAX_C
 // Fedkiw & Anderson, "Robust treatment of collisions, contact and friction
 // for cloth animation", SIGGRAPH 2002), reduced to capsules.
 // uPushB[i].w holds the capsule's bone index + 1 for SIDE capsules, else 0.
-const SIDE_DEPTH = 1.6;
+const SIDE_DEPTH = 5;
+// Points just beside the capsule (up to SIDE_WIDE radii off its axis
+// sideways) and behind it are brought forward to its side line too, so the
+// cloth between a carried point and its neighbours does not cut the limb.
+const SIDE_WIDE = 1.35;
 const GLSL_BODY = `
   for (int i = 0; i < ${MAX_CAPS}; i++) {
     float r = uPushA[i].w;
@@ -85,8 +92,8 @@ const GLSL_BODY = `
         float de = dot(d, e);
         vec3 lat = d - e * de;
         float ll = length(lat);
-        if (ll < r && de > -${SIDE_DEPTH.toFixed(2)} * r) {
-          float h = sqrt(r * r - ll * ll);
+        if (ll < ${SIDE_WIDE.toFixed(2)} * r && de > -${SIDE_DEPTH.toFixed(1)} * r) {
+          float h = sqrt(max(r * r - ll * ll, 0.0));
           if (de < h) transformed = c + lat + e * h;
         }
         continue;
@@ -116,8 +123,8 @@ function pushPoint(p: THREE.Vector3, rest: THREE.Vector3, A: Float32Array, B: Fl
         ex /= el; ey /= el; ez /= el;
         const de = dx * ex + dy * ey + dz * ez;
         const lx = dx - ex * de, ly = dy - ey * de, lz = dz - ez * de, ll = Math.hypot(lx, ly, lz);
-        if (ll < r && de > -SIDE_DEPTH * r) {
-          const h = Math.sqrt(r * r - ll * ll);
+        if (ll < SIDE_WIDE * r && de > -SIDE_DEPTH * r) {
+          const h = Math.sqrt(Math.max(r * r - ll * ll, 0));
           if (de < h) { p.x = cx + lx + ex * h; p.y = cy + ly + ey * h; p.z = cz + lz + ez * h; }
         }
         continue;

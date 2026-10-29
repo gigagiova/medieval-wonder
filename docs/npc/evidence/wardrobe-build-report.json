@@ -139,6 +139,14 @@
    "monk:robe": 82,
    "peasantHood:tunic": 95
   },
+  "garment_vertices_shown": {
+   "hose": 15,
+   "shoes": 12,
+   "robe": 15,
+   "longrobe": 636,
+   "tunic": 25,
+   "shirt": 586
+  },
   "body_unchanged": true
  },
  {
@@ -280,6 +288,12 @@
    "robeCloak": 137,
    "monk:robe": 72,
    "peasantHood:tunic": 171
+  },
+  "garment_vertices_shown": {
+   "shoes": 13,
+   "longrobe": 618,
+   "tunic": 83,
+   "shirt": 555
   },
   "body_unchanged": true
  },
@@ -423,6 +437,14 @@
    "monk:robe": 55,
    "peasantHood:tunic": 141
   },
+  "garment_vertices_shown": {
+   "boots": 6,
+   "shoes": 19,
+   "robe": 15,
+   "longrobe": 635,
+   "tunic": 62,
+   "shirt": 573
+  },
   "body_unchanged": true
  },
  {
@@ -565,6 +587,15 @@
    "monk:robe": 48,
    "peasantHood:tunic": 97
   },
+  "garment_vertices_shown": {
+   "hose": 3,
+   "boots": 6,
+   "shoes": 19,
+   "robe": 11,
+   "longrobe": 628,
+   "tunic": 50,
+   "shirt": 579
+  },
   "body_unchanged": true
  },
  {
@@ -606,6 +637,10 @@
    },
    "woman": 142,
    "womanShawl": 142
+  },
+  "garment_vertices_shown": {
+   "shoes": 6,
+   "gown": 11
   },
   "body_unchanged": true
  },
@@ -649,6 +684,7 @@
    "woman": 138,
    "womanShawl": 138
   },
+  "garment_vertices_shown": {},
   "body_unchanged": true
  }
 ]
