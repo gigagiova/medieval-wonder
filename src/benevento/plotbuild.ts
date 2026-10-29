@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { rng, type Builder } from '../builder';
+import { rng, DETAIL, type Builder } from '../builder';
 import type { MatName } from '../materials';
 import { Acc, reseedKit } from '../arch/kit';
 import { tiledGable, tiledLeanTo } from '../arch/roof';
@@ -20,6 +20,7 @@ export function buildPlan(b: Builder, plan: PlotPlan, seed = 1) {
   const r = rng(seed * 7 + 3);
   const R = (a: number, c: number) => a + (c - a) * r();
   const coll = b.mode === 'collide';
+  const fol = new Foliage(r);
   for (const h of plan.huts) hut(b, h);
   for (const w of plan.ruins) {
     reseedShapes(Math.floor(w.x * 131 + w.z * 17));
@@ -40,7 +41,19 @@ export function buildPlan(b: Builder, plan: PlotPlan, seed = 1) {
     const L = Math.hypot(row.b[0] - row.a[0], row.b[1] - row.a[1]);
     if (L < 1) continue;
     const ry = Math.atan2(row.b[0] - row.a[0], row.b[1] - row.a[1]);
-    flat(b, 'ground', 0.85, 0.2, L, (row.a[0] + row.b[0]) / 2, -0.1, (row.a[1] + row.b[1]) / 2, ry);
+    const mx = (row.a[0] + row.b[0]) / 2, mz = (row.a[1] + row.b[1]) / 2;
+    flat(b, 'ground', 0.95, 0.22, L, mx, -0.08, mz, ry);
+    // Boards along the bed's sides (the beds of the period's garden plans are edged and
+    // walked between: the St Gall plan, c. 820).
+    const cx = Math.cos(ry), sx = Math.sin(ry);
+    for (const sd of [-0.5, 0.5]) flat(b, 'wood', 0.05, 0.2, L, mx + cx * sd, -0.06, mz - sx * sd, ry, false, 0, R(-0.04, 0.04));
+    // Winter greens along the ridge (cabbages, beet, leeks): low clumps, now and then a gap.
+    if (DETAIL.mid) continue;
+    const ex = (row.b[0] - row.a[0]) / L, ez = (row.b[1] - row.a[1]) / L;
+    for (let t = 0.3; t < L - 0.2; t += R(0.42, 0.6)) {
+      if (r() < 0.12) continue;
+      fol.rosette(row.a[0] + ex * t + R(-0.08, 0.08), row.a[1] + ez * t + R(-0.08, 0.08), 0.12, R(0.28, 0.42));
+    }
   }
   // Vines on stakes, a pole tied along the row at shoulder height.
   for (const row of plan.vines) {
@@ -55,8 +68,16 @@ export function buildPlan(b: Builder, plan: PlotPlan, seed = 1) {
       // The vine: a gnarled stock leaning to its stake, a cane along the pole.
       flat(b, 'wood', 0.07, 1.25, 0.07, x + ez * 0.12, -0.1, z - ex * 0.12, R(0, 3), false, R(-0.18, 0.18), R(-0.18, 0.18));
       if (r() < 0.6) flat(b, 'wood', 0.03, 0.03, R(0.8, 1.3), x + ex * 0.4, 1.22, z + ez * 0.4, ry + R(-0.2, 0.2), false, R(-0.15, 0.15));
+      // The last leaves along the pole.
+      if (!DETAIL.mid) for (const k of [0.1, 0.6]) if (r() < 0.8) fol.leaves(x + ex * k, 1.15 + R(-0.1, 0.15), z + ez * k, R(0.3, 0.5), 9);
     }
   }
+  // Tussocks of grass and weeds on the unworked ground.
+  if (!DETAIL.mid) for (let i = 0; i < plan.tufts.length; i += 3) {
+    const s = plan.tufts[i + 2];
+    fol.tuft(plan.tufts[i], plan.tufts[i + 1], 0.32 * s, 5 + Math.floor(r() * 4));
+  }
+  fol.flush(b);
   for (const g of plan.graves) {
     const c = Math.cos(g.ry), s = Math.sin(g.ry);
     if (g.slab) flat(b, 'slab', 0.75, 0.12, 2.0, g.x, -0.04, g.z, g.ry);
@@ -96,6 +117,70 @@ export function buildPlan(b: Builder, plan: PlotPlan, seed = 1) {
       const u = R(-0.7, 0.7), v = R(-0.5, 0.5), m: MatName = r() < 0.4 ? 'marble' : 'block';
       flat(b, m, R(0.35, 0.7), R(0.2, 0.35), R(0.3, 0.5), sp.x + c * u + s * v, -0.05 + (i > 3 ? 0.3 : 0), sp.z - s * u + c * v, R(0, 3));
     }
+  }
+}
+
+/**
+ * Untextured foliage built from thin double-sided blades and leaves (no lumps: a solid clump
+ * reads as a rock). One geometry per plot; normals lean upwards so the blades take the sky
+ * light as grass does rather than going black on their shaded side.
+ */
+class Foliage {
+  private pos: number[] = [];
+  private nor: number[] = [];
+  constructor(private r: () => number) {}
+  private tri(a: number[], b: number[], c: number[]) {
+    // both faces; a soft, mostly upward normal
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    for (const sd of [1, -1]) {
+      const mx = nx * sd * 0.45, my = Math.abs(ny) * 0.45 + 0.75, mz = nz * sd * 0.45, ml = Math.hypot(mx, my, mz);
+      const q = sd > 0 ? [a, b, c] : [a, c, b];
+      for (const v of q) { this.pos.push(v[0], v[1], v[2]); this.nor.push(mx / ml, my / ml, mz / ml); }
+    }
+  }
+  /** A tussock: n blades fanning out from one root, up to h tall. */
+  tuft(x: number, z: number, h: number, n: number) {
+    const r = this.r;
+    for (let i = 0; i < n; i++) {
+      const a = r() * Math.PI * 2, lean = 0.15 + r() * 0.45, hh = h * (0.55 + 0.45 * r()), w = 0.025 + r() * 0.03;
+      const bx = x + Math.cos(a) * 0.05, bz = z + Math.sin(a) * 0.05;
+      const px = -Math.sin(a) * w, pz = Math.cos(a) * w;
+      this.tri([bx - px, -0.03, bz - pz], [bx + px, -0.03, bz + pz], [bx + Math.cos(a) * hh * lean, hh, bz + Math.sin(a) * hh * lean]);
+    }
+  }
+  /** Greens in a bed: a rosette of broad leaves splaying out low. */
+  rosette(x: number, z: number, y: number, s: number) {
+    const r = this.r, n = 5 + Math.floor(r() * 3);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + r() * 0.5, L = s * (0.7 + 0.5 * r()), w = s * 0.32;
+      const c = Math.cos(a), sn = Math.sin(a);
+      const tip = [x + c * L, y + L * (0.35 + 0.4 * r()), z + sn * L];
+      const m1 = [x + c * L * 0.5 - sn * w, y + L * 0.3, z + sn * L * 0.5 + c * w], m2 = [x + c * L * 0.5 + sn * w, y + L * 0.3, z + sn * L * 0.5 - c * w];
+      const base = [x, y, z];
+      this.tri(base, m1, tip); this.tri(base, tip, m2);
+    }
+  }
+  /** A spray of leaves (on the vines): n small leaves round a point. */
+  leaves(x: number, y: number, z: number, s: number, n: number) {
+    const r = this.r;
+    for (let i = 0; i < n; i++) {
+      const cx = x + (r() - 0.5) * s * 1.6, cy = y + (r() - 0.5) * s, cz = z + (r() - 0.5) * s * 1.6;
+      const a = r() * Math.PI * 2, t = (r() - 0.5) * 1.2, L = 0.1 + r() * 0.06;
+      const ex = Math.cos(a) * L, ez = Math.sin(a) * L, ey = t * L;
+      const fx = -Math.sin(a) * L * 0.6, fz = Math.cos(a) * L * 0.6;
+      this.tri([cx - ex, cy - ey, cz - ez], [cx + fx, cy + 0.03, cz + fz], [cx + ex, cy + ey, cz + ez]);
+      this.tri([cx - ex, cy - ey, cz - ez], [cx + ex, cy + ey, cz + ez], [cx - fx, cy - 0.02, cz - fz]);
+    }
+  }
+  flush(b: Builder) {
+    if (!this.pos.length) return;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
+    b.geo('leaf', g, 0, 0, 0, 0, false, 0, 0, true);
+    this.pos = []; this.nor = [];
   }
 }
 

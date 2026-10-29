@@ -364,7 +364,10 @@ function plot(b: Builder, p: PlotData) {
 function plotWalls(b: Builder, p: PlotData) {
   const r = rng(p.seed * 7 + 5);
   const P = p.pts, T = 0.45, n = P.length;
-  const h = 2.0 + r() * 0.6;
+  // Gardens, vines, orchards and meadows behind a dry-stone wall a little under eye height
+  // (a maceria); yards with huts, pens and ruins behind a taller one.
+  const low = p.kind === 'orto' || p.kind === 'vinea' || p.kind === 'pomarium' || p.kind === 'pratum' || p.kind === 'area' || p.kind === 'coemeterium';
+  const h = low ? 1.25 + r() * 0.3 : 2.0 + r() * 0.6;
   let cx = 0, cz = 0;
   for (const [x, z] of P) { cx += x / n; cz += z / n; }
   let gateK = -1, gl = 0;

@@ -73,10 +73,12 @@ export const MAT = {
   carvedMarble: 21,
   /** Image-textured charcoal bed for brazier fuel. */
   charcoal: 22,
+  /** Untextured foliage: winter greens in the beds, tussocks of grass, the last leaves on the vines (a noise between dark green and dry brown). */
+  leaf: 23,
 } as const;
 export type MatName = keyof typeof MAT;
 /** Materials merged into 'misc' in town chunks and landmark cells (their shading needs no textures). */
-export const SMALL: Partial<Record<MatName, true>> = { bone: true, iron: true, window: true, cloth: true, ember: true, horn: true, clay: true, bronze: true };
+export const SMALL: Partial<Record<MatName, true>> = { bone: true, iron: true, window: true, cloth: true, ember: true, horn: true, clay: true, bronze: true, leaf: true };
 
 /**
  * Per material: which texture set, metres per repeat, and gains. ALB scales

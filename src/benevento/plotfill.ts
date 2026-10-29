@@ -53,11 +53,13 @@ export interface PlotPlan {
   woodpiles: { x: number; z: number; ry: number }[];
   /** Spoil: blocks and broken marble stacked for reuse or the kiln. */
   spoil: { x: number; z: number; ry: number }[];
-  /** Scanned props (props.ts ids): crops, tools, vessels, weeds. */
+  /** Scanned props (props.ts ids): tools, vessels, a few weeds. */
   props: { id: string; x: number; z: number; ry: number; s: number }[];
+  /** Tussocks of grass and weeds on the unworked ground: x, z, size triples. */
+  tufts: number[];
 }
 
-const empty = (): PlotPlan => ({ huts: [], beds: [], vines: [], trees: [], pens: [], stacks: [], graves: [], ruins: [], middens: [], woodpiles: [], spoil: [], props: [] });
+const empty = (): PlotPlan => ({ huts: [], beds: [], vines: [], trees: [], pens: [], stacks: [], graves: [], ruins: [], middens: [], woodpiles: [], spoil: [], props: [], tufts: [] });
 
 /** The kinds that are given a plan here (courtyards and the small street gardens keep their own fill). */
 export const PLANNED: ReadonlySet<PlotKind> = new Set<PlotKind>(['orto', 'vinea', 'pratum', 'ruina', 'stabulum', 'pomarium', 'casalinum', 'calcaria', 'coemeterium', 'area']);
@@ -209,6 +211,21 @@ function makePlan(p: PlotInput): PlotPlan {
       if (s) prop(ids[Math.floor(rand() * ids.length)], s.x, s.z, ids[0].startsWith('grass') ? 0.9 : 2.6);
     }
   };
+  /** Tussocks over the free ground not taken by anything, `dens` per m². */
+  const tufts = (dens: number) => {
+    for (let i = 0; i < F.length; i += 3) {
+      if (rand() > dens) continue;
+      const x = F[i] + R(-0.5, 0.5), z = F[i + 1] + R(-0.5, 0.5);
+      if (clearAt(x, z) < 0.5) continue;
+      if (out.beds.length && onRow(x, z)) continue;
+      out.tufts.push(Math.round(x * 100) / 100, Math.round(z * 100) / 100, Math.round(R(0.6, 1.3) * 100) / 100);
+    }
+  };
+  const onRow = (x: number, z: number) => out.beds.some((r) => {
+    const dx = r.b[0] - r.a[0], dz = r.b[1] - r.a[1], L2 = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - r.a[0]) * dx + (z - r.a[1]) * dz) / L2));
+    return Math.hypot(r.a[0] + dx * t - x, r.a[1] + dz * t - z) < 0.7;
+  });
   if (p.well) take(p.well[0], p.well[1], 1.6);
 
   const big = area > 900, mid = area > 380;
@@ -219,17 +236,10 @@ function makePlan(p: PlotInput): PlotPlan {
       const h = mid && !p.open ? hut('shed', R(3.2, 4.2), R(2.4, 2.9)) : null;
       woodpile(h);
       near(h, ['wooden_bucket_01', 'wicker_basket_02', 'wooden_bucket_02'], 2);
-      trees(Math.min(5, Math.floor(area / 260)), 2.6);
+      trees(Math.min(8, Math.floor(area / 180)), 2.6);
       midden();
-      out.beds = rows(1.5, 1.0, 2.5, 60);
-      // Greens on a few beds (the scans are dense: a few per plot).
-      for (const r of out.beds.slice(0, 10)) {
-        const L = Math.hypot(r.b[0] - r.a[0], r.b[1] - r.a[1]);
-        for (let t = 0.6; t < L && out.props.length < 22; t += R(2.2, 3.6)) {
-          const f = t / L;
-          prop('weed_plant_02', r.a[0] + (r.b[0] - r.a[0]) * f, r.a[1] + (r.b[1] - r.a[1]) * f, R(1.3, 1.9));
-        }
-      }
+      out.beds = rows(1.6, 1.0, 2.5, 60);
+      tufts(0.08);
       break;
     }
     case 'vinea': {
@@ -239,6 +249,7 @@ function makePlan(p: PlotInput): PlotPlan {
       trees(Math.min(3, Math.floor(area / 500)), 2.4);
       out.vines = rows(2.0, 0.9, 3, 45);
       weeds(4);
+      tufts(0.12);
       break;
     }
     case 'pomarium': {
@@ -246,9 +257,10 @@ function makePlan(p: PlotInput): PlotPlan {
       // earth), grass under them, a shed.
       const h = mid && !p.open ? hut('shed', R(3, 3.8), R(2.2, 2.7)) : null;
       woodpile(h);
-      trees(Math.min(14, Math.max(2, Math.floor(area / 70))), 3.0, 'any');
+      trees(Math.min(18, Math.max(2, Math.floor(area / 55))), 3.2, 'any');
       if (big && rand() < 0.6) stack();
-      weeds(Math.min(12, Math.floor(area / 80)), ['grass_medium_02', 'weed_plant_02']);
+      weeds(Math.min(6, Math.floor(area / 160)), ['grass_medium_02', 'weed_plant_02']);
+      tufts(0.3);
       break;
     }
     case 'casalinum': {
@@ -272,7 +284,8 @@ function makePlan(p: PlotInput): PlotPlan {
       }
       midden();
       trees(Math.min(3, Math.floor(area / 400)), 2.6);
-      weeds(6);
+      weeds(4);
+      tufts(0.15);
       break;
     }
     case 'stabulum': {
@@ -292,7 +305,8 @@ function makePlan(p: PlotInput): PlotPlan {
       stack(); if (big) stack();
       midden();
       trees(Math.min(2, Math.floor(area / 600)), 2.6);
-      weeds(5);
+      weeds(3);
+      tufts(0.12);
       break;
     }
     case 'pratum':
@@ -304,8 +318,9 @@ function makePlan(p: PlotInput): PlotPlan {
       }
       stack(); if (mid) stack(); if (big) stack();
       if (mid && !p.open) { const h = hut('shed', R(3.4, 4.2), R(2.4, 2.8)); woodpile(h); }
-      trees(Math.min(6, Math.max(1, Math.floor(area / 220))), 2.8, 'any');
-      weeds(Math.min(14, Math.floor(area / 70)), ['grass_medium_02', 'weed_plant_02', 'nettle_plant']);
+      trees(Math.min(8, Math.max(1, Math.floor(area / 160))), 2.8, 'any');
+      weeds(Math.min(6, Math.floor(area / 150)), ['grass_medium_02', 'weed_plant_02', 'nettle_plant']);
+      tufts(0.35);
       break;
     }
     case 'ruina':
@@ -346,10 +361,11 @@ function makePlan(p: PlotInput): PlotPlan {
       }
       midden();
       trees(Math.min(2, Math.floor(area / 500)), 2.4);
-      for (let i = 0; i < Math.min(14, area / 60); i++) {
+      for (let i = 0; i < Math.min(5, area / 150); i++) {
         const q = pick(0.5, 'any', 10);
-        if (q) prop(rand() < 0.45 ? 'nettle_plant' : rand() < 0.6 ? 'rock_moss_set_02' : 'fern_02', q.x, q.z, rand() < 0.4 ? 0.6 : 2.8);
+        if (q) prop(rand() < 0.55 ? 'nettle_plant' : 'fern_02', q.x, q.z, 2.8);
       }
+      tufts(0.25);
       break;
     }
     case 'coemeterium': {
@@ -375,7 +391,8 @@ function makePlan(p: PlotInput): PlotPlan {
       trees(1, 2.6);
       const rest = rows(1.5, 1.2, 2.5, 14);
       out.beds = rest;
-      weeds(5, ['grass_medium_02', 'weed_plant_02']);
+      weeds(3, ['grass_medium_02', 'weed_plant_02']);
+      tufts(0.2);
       break;
     }
   }
