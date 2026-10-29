@@ -711,6 +711,24 @@ function townTexture(L: Layout): THREE.DataTexture {
     // (yards walled off the street keep its trodden earth)
     data[o + 1] = r.grid[k] === STREET ? (r.trod[k] ? 255 : 40) : r.trod[k] ? 200 : 0;
   }
+  // Sward (B, off the street): the turf of the open ground (plotfill.ts kinds).
+  const SWARD: Partial<Record<string, number>> = { pratum: 230, pomarium: 210, area: 190, vinea: 150, coemeterium: 200, ruina: 140, casalinum: 90, stabulum: 60, calcaria: 70, orto: 40 };
+  for (const p of L.plots) {
+    const v = SWARD[p.kind];
+    if (!v) continue;
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const [x, z] of p.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    for (let z = Math.floor(z0); z <= z1; z++) for (let x = Math.floor(x0); x <= x1; x++) {
+      const px = x + 0.5, pz = z + 0.5;
+      if (!inPoly(px, pz, p.pts)) continue;
+      // not on the trodden ways through the open ground
+      const k = r.idx(px, pz);
+      if (k >= 0 && r.trod[k]) continue;
+      const i = Math.floor(px - T.x0), j = Math.floor(pz - T.z0);
+      if (i < 0 || j < 0 || i >= T.w || j >= T.h) continue;
+      data[(j * T.w + i) * 4 + 2] = v;
+    }
+  }
   // Roads outside the walls: beaten earth, the Appia and the Traiana still paved in places.
   for (const rd of ROADS) {
     const paved = rd.name === 'Via Appia' || rd.name === 'Via Traiana';

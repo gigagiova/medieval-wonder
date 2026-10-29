@@ -219,12 +219,16 @@ export function buildForest(scene: THREE.Scene, b: Builder, o: ForestOpts): THRE
 
   // The gardens' trees: small and middling crowns (fruit and nut trees; the pack's younger
   // deciduous trees stand in for them, see docs/benevento/OPEN-GROUND.md).
+  // Their own kinds of the middling trees, drawn as impostors out to 160 m: the town is seen
+  // from its walls and towers over the roofs, and a garden's trees must not vanish at 95 m
+  // like the wood's in the fog.
+  const townKinds = SPECIES.medium.ids.filter((id) => pack.byId.has(id)).map((id) => trees.addKind({ tree: pack.byId.get(id)!, ends: SPECIES.medium.ends, far: 160 }));
   for (const t of opts.extra ?? []) {
-    const name = rand() < 0.25 ? 'small' : 'medium', sp = SPECIES[name], list = kinds[name];
+    const name = 'medium', sp = SPECIES[name], list = townKinds;
     if (!list.length) continue;
     const k = list[Math.floor(rand() * list.length)];
     const def = trees.treeDef(k);
-    const s = Math.min(sp.scale[1], Math.max(sp.scale[0], t.s * (name === 'small' ? 1.0 : 0.85)));
+    const s = Math.min(sp.scale[1], Math.max(sp.scale[0] * 0.8, t.s * 0.85));
     // No taller than a two-storey house: the crowns of old walnuts and figs, not of forest oaks.
     const sc = def.h * s > 10.5 ? 10.5 / def.h : s;
     const y = groundAt(t.x, t.z) - 0.12 - 0.04 * def.trunk * sc;

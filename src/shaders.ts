@@ -146,7 +146,7 @@ vec3 applyAtmos(vec3 col, vec3 wpos){
 export const surfaceGLSL = /* glsl */ `
 struct Surf { vec3 alb; float rough; float ao; vec3 nrm; vec3 emi; float h; float wet; };
 
-uniform sampler2D uTown; // R Roman paving, G street, B gutter, A terrain height
+uniform sampler2D uTown; // R Roman paving, G street, B gutter on the street / sward off it, A terrain height
 uniform vec4 uTownBox;   // x0, z0, 1/width, 1/depth (metres)
 uniform vec2 uTownH;     // terrain height range encoded in A
 vec4 townAt(vec2 xz){ return texture2D(uTown, (xz - uTownBox.xy) * uTownBox.zw); }
@@ -475,7 +475,18 @@ Surf surface(vec3 p, vec3 n){
   // Standing water after the day's rain: the gutters, puddles in the low
   // parts of the street and the mud, and a film in the gaps between stones.
   // Only these are wet (glossy); the stones' crowns stay dull.
-  float pud = smoothstep(0.62, 0.7, nz.g + (0.35 - m.b) * 0.5);
+  // Off the street, B is sward: the turf of the town's meadows, orchards and graveyards,
+  // close-cropped and worn through in patches to the mud.
+  float sward = tw.b * mud * (1.0 - under);
+  if (sward > 0.01) {
+    vec4 nz2 = texture2D(uNoise, p.xz * 0.21);
+    float tuft = smoothstep(0.3, 0.75, nz2.r * 0.7 + nz.r * 0.6 - 0.15 + sward * 0.35);
+    vec3 turf = mix(vec3(0.06, 0.08, 0.035), vec3(0.1, 0.115, 0.055), nz2.g) * (0.8 + 0.4 * nz.b);
+    s.alb = mix(s.alb, turf, sward * tuft);
+    s.rough = mix(s.rough, 1.0, sward * tuft);
+    s.nrm = normalize(mix(s.nrm, n, sward * tuft * 0.6));
+  }
+  float pud = smoothstep(0.62, 0.7, nz.g + (0.35 - m.b) * 0.5) * (1.0 - 0.8 * sward);
   float wet = clamp(tw.b * street + pud * (street * 0.8 + mud) + gap * street * 0.5, 0.0, 1.0) * (1.0 - under);
   s.alb *= 1.0 - 0.45*wet;
   s.rough = mix(s.rough, 0.22, wet);
