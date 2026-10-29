@@ -4,6 +4,9 @@ import { GEO_STREETS, GEO_PARCELS, GEO_STREET_AREAS, DECUMANUS, WALL700, BOUNDS,
 import { SITES, GATES, ROADS, EXPLORE_TARGETS, FIXED_EXPLORE_LOTS, siteToWorld, type ExploreKind } from './sites';
 import DENSITY from './layout-density.json';
 import type { Lot, BridgeSpec } from '../town';
+import { fastTerrain } from '../displace';
+import type { PlotKind } from './plotfill';
+export type { PlotKind } from './plotfill';
 
 // The town of AD 700 laid out on the owner's plan, which is the authority for
 // what was built and what was open (docs/benevento/HISTORY.md §6 and
@@ -60,10 +63,19 @@ export class Raster {
 }
 
 export interface Street { pts: V2[]; w: number; main: boolean; kind: 'lane' | 'road'; /** One of the plan's lanes. */ plan?: boolean }
-export type PlotKind = 'orto' | 'vinea' | 'pratum' | 'ruina' | 'stabulum' | 'cortis' | 'hortulus';
 export interface Plot { pts: P2[]; kind: PlotKind; seed: number; cx: number; cz: number;
   /** Edges (index k: pts[k]→pts[k+1]) that face a lane or open ground: a rubble wall stands on them. */
-  walls?: number[] }
+  walls?: number[];
+  /** Unwalled ground the lanes run through (a drawn cell joined to the lanes, a wide part of a lane space): things keep clear of the way. */
+  open?: boolean;
+  /** Free ground on a 1 m grid: x, z, clearance (see plotfill.ts). */
+  free?: number[];
+  /** A well of the layout standing in the plot. */
+  well?: P2;
+  /** The church beside a burial ground. */
+  church?: P2;
+  /** The plan's cell (tools/benevento/plan_trace.py id). */
+  src?: number }
 export interface TownLot extends Lot { id: number; explore?: { id: string; kind: ExploreKind }; parcel: number }
 export interface Well { x: number; z: number }
 export interface Layout {
@@ -75,6 +87,14 @@ export interface Layout {
   wells: Well[];
   squares: { x: number; z: number; r: number }[];
 }
+
+/**
+ * Cells over the open-ground threshold that the plan draws as plain long rectangles, 18-24 m by
+ * 45 m, set in rows of houses beside drawn courts: read as buildings (a hall, a church or a
+ * range), not as gardens. Plan-trace ids (tools/benevento/plan_trace.py); a hypothesis
+ * recorded in docs/benevento/OPEN-GROUND.md.
+ */
+export const PLAN_HALLS: ReadonlySet<number> = new Set([711, 774, 1182]);
 
 /** Kept for tools: the plan's drawn footprints are no longer narrowed or encroached on. */
 export const KEEP_OPEN: { x: number; z: number; r: number }[] = [];
@@ -160,6 +180,10 @@ export function layoutTown(seed = 700): Layout {
   // 2. The plan's cells (each a parcel id) and its lane spaces. They tile the town: each cell
   //    already owns its half of the ink lines round it.
   const parcels = GEO_PARCELS.filter((p) => p.in);
+  // The split-off wide parts of the lane spaces have ids above every cell drawn on the plan;
+  // a 'square' with a drawn cell's id is a closed cell whose outline has a gap (it joins two
+  // parts of the lane network): ground of its own, not lane (docs/benevento/OPEN-GROUND.md).
+  const lastDrawn = Math.max(...GEO_PARCELS.filter((p) => !p.sq).map((p) => p.src));
   for (const a of GEO_STREET_AREAS) if (!a.hole) r.fill(a.pts, (k) => { if (r.grid[k] === FREE) r.grid[k] = STREET; });
   for (const a of GEO_STREET_AREAS) if (a.hole) r.fill(a.pts, (k) => { if (r.grid[k] === STREET) r.grid[k] = FREE; });
   // Largest first, so a cell drawn inside another owns its own ground.
@@ -260,11 +284,8 @@ export function layoutTown(seed = 700): Layout {
     return tot ? res / tot : 1;
   };
   // Houses first (their raster marks decide which garden edges face a street).
-  parcels.forEach((p, n) => {
-    const pid = n + 1;
-    if (p.k !== 'house') return;
-    // A landmark precinct (or its floor) takes part of it: the landmark stands here instead.
-    if (reservedShare(p.pts) > 0.08) return;
+  /** One house on a drawn footprint (its own random draws from R/rnd). */
+  const makeHouse = (p: (typeof parcels)[number], pid: number, R: (a: number, b: number) => number, rnd: () => number) => {
     let pts = p.pts.map(([x, z]) => V(x, z));
     for (const tol of [0.3, 0.5, 0.75, 1.0, 1.4]) { pts = simplifyRing(p.pts.map(([x, z]) => V(x, z)), tol); if (pts.length <= 12) break; }
     if (pts.length < 3 || areaOf(pts) < 5) return;
@@ -290,23 +311,32 @@ export function layoutTown(seed = 700): Layout {
     const lot: TownLot = { id: lotId++, c, front: { a: c[0].clone(), b: c[1].clone(), out: fout }, h: Math.max(hs, R(4.5, 6)), street: Math.max(1.5, widthAt(mid, fout)), parcel: pid };
     // Along the decumanus the houses that mattered rise to two and three storeys.
     const km = r.idx(mid.x + fout.x * 2, mid.y + fout.y * 2);
-    if (km >= 0 && r.main[km] > 0 && lot.h < 7.2 && rand() < 0.45) lot.h = R(7.2, 10.5);
+    if (km >= 0 && r.main[km] > 0 && lot.h < 7.2 && rnd() < 0.45) lot.h = R(7.2, 10.5);
     lay.lots.push(lot);
+  };
+  const hallIds = new Map<(typeof parcels)[number], number>();
+  parcels.forEach((p, n) => {
+    const pid = n + 1;
+    // The halls drawn as plain long rectangles (PLAN_HALLS): their ground is marked now, their
+    // buildings are made after the rest (their own random stream, so nothing else moves).
+    if (PLAN_HALLS.has(p.src) && reservedShare(p.pts) <= 0.08) { hallIds.set(p, pid); r.fill(p.pts, (kk) => { if (r.grid[kk] !== OUTSIDE && r.grid[kk] !== RESERVED) r.grid[kk] = HOUSE; }); return; }
+    if (p.k !== 'house') return;
+    // A landmark precinct (or its floor) takes part of it: the landmark stands here instead.
+    if (reservedShare(p.pts) > 0.08) return;
+    makeHouse(p, pid, R, rand);
   });
   // Courtyards, gardens, pens and ruins: the courtyards are walled by the houses round them;
   // a garden's sides that face a lane or open ground get a rubble wall with a gate.
   parcels.forEach((p, n) => {
-    if (p.k === 'house' || p.sq) return;
+    if (p.k === 'house' || p.sq || PLAN_HALLS.has(p.src)) return;
     if (reservedShare(p.pts) > 0.3) return;
     let cx = 0, cz = 0;
     for (const [x, z] of p.pts) { cx += x / p.pts.length; cz += z / p.pts.length; }
-    let kind: PlotKind;
+    // (The kind of an open cell is settled after the houses one enters are chosen, in §6b;
+    // the draw stays here so the random stream of the rest of the layout is unchanged.)
+    let kind: PlotKind = 'pratum';
     if (p.k === 'court') kind = 'cortis';
-    else {
-      const v = rand();
-      kind = v < 0.42 ? 'orto' : v < 0.56 ? 'vinea' : v < 0.74 ? 'pratum' : v < 0.88 ? 'ruina' : 'stabulum';
-      if (p.a > 2500 && kind === 'stabulum') kind = 'pratum';
-    }
+    else void rand();
     const ring = p.pts.map(([x, z]) => V(x, z));
     const pts = simplifyRing(ring, 0.5).map((q) => [q.x, q.y] as P2);
     const walls: number[] = [];
@@ -327,7 +357,7 @@ export function layoutTown(seed = 700): Layout {
       }
       if (out >= 2) walls.push(k);
     }
-    lay.plots.push({ pts, kind, seed: Math.floor(rand() * 1e9), cx, cz, walls: walls.length ? walls : undefined });
+    lay.plots.push({ pts, kind, seed: Math.floor(rand() * 1e9), cx, cz, walls: walls.length ? walls : undefined, src: p.src });
     r.fill(p.pts, (kk) => { if (r.grid[kk] === FREE) r.grid[kk] = PLOT; });
     void n;
   });
@@ -455,6 +485,14 @@ export function layoutTown(seed = 700): Layout {
     lay.wells.push({ x, z });
   }
 
+  // 8b. The halls drawn as plain rectangles (PLAN_HALLS), on their own random stream.
+  {
+    const hr = rng(seed + 4111), HR = (a: number, b: number) => a + (b - a) * hr();
+    for (const [p, pid] of hallIds) makeHouse(p, pid, HR, hr);
+  }
+  // 8c. The open ground, filled as the period's towns filled it (docs/benevento/OPEN-GROUND.md).
+  openGround(lay, parcels, lastDrawn, reservedShare);
+
   // Worn ground: a band along every built front and every lane; the middle of
   // the wider street spaces of the plan is grass, trodden only where people go.
   {
@@ -484,4 +522,124 @@ export function layoutTown(seed = 700): Layout {
   for (const rd of ROADS) lay.streets.push({ pts: rd.pts.map(([x, z]) => V(x, z)), w: rd.w, main: false, kind: 'road' });
   void BOUNDS; void distPolyline;
   return lay;
+}
+
+// ---------------------------------------------------------------- the open ground
+const hash01 = (n: number) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+/**
+ * What each open cell of the plan holds (docs/benevento/OPEN-GROUND.md, HISTORY.md). The
+ * kind follows what the period's evidence ties to the place: a burial ground beside each
+ * church, Roman ruins and a lime-burners' yard by the Roman monuments, pens and orchards round
+ * the dukes' curtis, vines on the steep ground; elsewhere gardens, orchards, huts, pens and
+ * meadows in the proportions the comparisons suggest (a hypothesis, cell by cell). The drawn
+ * cells that open on the lanes and the larger wide parts of the lane spaces get unwalled
+ * ground: trees, hay, a threshing floor, clear of the ways through them.
+ */
+function openGround(lay: Layout, parcels: typeof GEO_PARCELS, lastDrawn: number, reservedShare: (pts: P2[]) => number) {
+  const r = lay.r;
+  // Lane centre lines (to keep the ways through open ground clear).
+  const segs: number[] = [];
+  for (const s of lay.streets) if (s.kind === 'lane') for (let k = 0; k < s.pts.length - 1; k++) segs.push(s.pts[k].x, s.pts[k].y, s.pts[k + 1].x, s.pts[k + 1].y, Math.min(s.w / 2, 2.0) + 1.1);
+  const laneClear = (x: number, z: number, x0: number, z0: number, x1: number, z1: number) => {
+    let m = Infinity;
+    for (let i = 0; i < segs.length; i += 5) {
+      const ax = segs[i], az = segs[i + 1], bx = segs[i + 2], bz = segs[i + 3];
+      if (Math.max(ax, bx) < x0 - 8 || Math.min(ax, bx) > x1 + 8 || Math.max(az, bz) < z0 - 8 || Math.min(az, bz) > z1 + 8) continue;
+      const dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
+      m = Math.min(m, Math.hypot(ax + dx * t - x, az + dz * t - z) - segs[i + 4]);
+    }
+    return m;
+  };
+  const freeOf = (pts: P2[], open: boolean) => {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const [x, z] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const out: number[] = [];
+    for (let z = Math.ceil(z0); z <= z1; z++) for (let x = Math.ceil(x0); x <= x1; x++) {
+      if (!inPoly(x, z, pts)) continue;
+      const g = r.at(x, z);
+      if (open ? g !== STREET : g !== PLOT && g !== FREE) continue;
+      // Off the plot's edge (its wall, or a house's door on open ground).
+      let c = distPolyline(x, z, pts, true) - (open ? 1.6 : 0.6);
+      if (open) c = Math.min(c, laneClear(x, z, x0, z0, x1, z1));
+      if (c < 0.3) continue;
+      out.push(x, z, Math.round(c * 10) / 10);
+    }
+    return out;
+  };
+  const centroid = (pts: P2[]): P2 => { let cx = 0, cz = 0; for (const [x, z] of pts) { cx += x / pts.length; cz += z / pts.length; } return [cx, cz]; };
+  const areaP = (pts: P2[]) => { let a = 0; for (let k = 0; k < pts.length; k++) { const p = pts[k], q = pts[(k + 1) % pts.length]; a += p[0] * q[1] - q[0] * p[1]; } return Math.abs(a) / 2; };
+  const simple = (pts: P2[]) => simplifyRing(pts.map(([x, z]) => V(x, z)), 0.5).map((q) => [q.x, q.y] as P2);
+
+  // The unwalled ground: drawn cells joined to the lanes, and the larger wide parts of the lane spaces.
+  for (const p of parcels) {
+    if (!p.sq || p.a < 350) continue;
+    if (reservedShare(p.pts) > 0.3) continue;
+    const drawn = p.src <= lastDrawn;
+    if (!drawn && p.a < 600) continue;
+    const pts = simple(p.pts), [cx, cz] = centroid(p.pts);
+    lay.plots.push({ pts, kind: 'pratum', seed: 900001 + p.src * 7919, cx, cz, open: true, src: p.src });
+  }
+
+  const churches: P2[] = [[SITES.episcopium.x, SITES.episcopium.z], [SITES.caballus.x, SITES.caballus.z]];
+  for (const l of lay.lots) if (l.explore?.kind === 'ecclesia') churches.push([(l.c[0].x + l.c[2].x) / 2, (l.c[0].y + l.c[2].y) / 2]);
+  const roman: P2[] = [SITES.forum, SITES.iseum, SITES.arcusSacramenti, SITES.castellumAquae].map((s) => [s.x, s.z] as P2);
+  const plots = lay.plots.filter((p) => p.kind !== 'cortis' && p.kind !== 'hortulus');
+  const info = plots.map((p) => {
+    const [cx, cz] = centroid(p.pts), A = areaP(p.pts);
+    let hmin = Infinity, hmax = -Infinity, dia = 0;
+    for (const [x, z] of p.pts) { const h = fastTerrain(x, z); hmin = Math.min(hmin, h); hmax = Math.max(hmax, h); dia = Math.max(dia, Math.hypot(x - cx, z - cz) * 2); }
+    return { p, cx, cz, A, slope: (hmax - hmin) / Math.max(8, dia), u: hash01((p.src ?? 0) + 0.37) };
+  });
+  const done = new Set<Plot>();
+  // 1. A burial ground beside each church: the nearest walled cell within 45 m of it.
+  for (const c of churches) {
+    let best: (typeof info)[number] | null = null, bd = 45;
+    for (const q of info) {
+      if (q.p.open || done.has(q.p)) continue;
+      const d = inPoly(c[0], c[1], q.p.pts) ? 0 : distPolyline(c[0], c[1], q.p.pts, true);
+      if (d < bd) { bd = d; best = q; }
+    }
+    if (best) { best.p.kind = 'coemeterium'; best.p.church = c; done.add(best.p); }
+  }
+  // 2. By the Roman monuments: ruins; the cell nearest the forum and the one nearest the
+  //    castellum are lime-burners' yards (the Calcarario of Rome, the kilns of Naples and Brescia).
+  for (const [k, m] of roman.entries()) {
+    let best: (typeof info)[number] | null = null, bd = Infinity;
+    for (const q of info) {
+      if (done.has(q.p)) continue;
+      const d = Math.hypot(q.cx - m[0], q.cz - m[1]);
+      if (d < 110 && !q.p.open) { if (d < bd) { bd = d; best = q; } }
+    }
+    if (best) { best.p.kind = k === 0 || k === 3 ? 'calcaria' : 'ruina'; done.add(best.p); }
+  }
+  for (const q of info) {
+    if (done.has(q.p)) continue;
+    const p = q.p, u = q.u;
+    if (p.open) {
+      // Ground the lanes run through: orchards and meadow, hay and threshing floors.
+      p.kind = p.src !== undefined && p.src <= lastDrawn ? (u < 0.45 ? 'pomarium' : u < 0.75 ? 'area' : 'pratum') : (u < 0.5 ? 'pomarium' : 'pratum');
+      continue;
+    }
+    const nearCurtis = Math.hypot(q.cx - SITES.curtis.x, q.cz - SITES.curtis.z) < 170;
+    const nearRoman = roman.some((m) => Math.hypot(q.cx - m[0], q.cz - m[1]) < 70);
+    if (nearRoman && u < 0.5) p.kind = 'ruina';
+    else if (nearCurtis) p.kind = u < 0.4 ? 'stabulum' : u < 0.75 ? 'pomarium' : 'orto';
+    else if (q.slope > 0.16) p.kind = u < 0.7 ? 'vinea' : 'pomarium';
+    else p.kind = u < 0.3 ? 'orto' : u < 0.44 ? 'pomarium' : u < 0.62 ? 'casalinum' : u < 0.74 ? 'stabulum' : u < 0.83 ? 'vinea' : u < 0.92 ? 'pratum' : 'ruina';
+    if (p.kind === 'stabulum' && q.A > 2600) p.kind = 'pratum';
+  }
+  // Free ground and wells.
+  for (const q of info) {
+    const p = q.p;
+    p.free = freeOf(p.pts, !!p.open);
+    if (p.open || !['orto', 'casalinum', 'stabulum', 'coemeterium'].includes(p.kind) || q.A < 450 || hash01((p.src ?? 0) * 3.1) > 0.6) continue;
+    const F = p.free;
+    for (let i = 0; i < F.length; i += 3) {
+      if (F[i + 2] < 2.6 || F[i + 2] > 4.5) continue;
+      if (lay.wells.some((w) => Math.hypot(w.x - F[i], w.z - F[i + 1]) < 30)) break;
+      lay.wells.push({ x: F[i], z: F[i + 1] });
+      p.well = [F[i], F[i + 1]];
+      break;
+    }
+  }
 }

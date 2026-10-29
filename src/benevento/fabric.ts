@@ -12,7 +12,9 @@ import { torch, brazier } from '../lights';
 import { WALL700, BOUNDS, insideness, GEO_TOWERS, type P2 } from './geo';
 import { GATES, SITES, siteToWorld } from './sites';
 import { REGISTERED_WALL_TOWERS } from './tower-sites';
-import type { Layout, Plot, PlotKind } from './layout';
+import type { Layout } from './layout';
+import { planPlot, PLANNED, type PlotInput } from './plotfill';
+import { buildPlan } from './plotbuild';
 import { buildInterior, interiorCollider } from './interiors';
 import { sortByCluster } from '../clusters';
 
@@ -82,7 +84,7 @@ export function lotForm(c: P2[], front: boolean, seed: number): { form?: 'tower'
 export interface WallPiece { a: P2; b: P2; out: P2; h: number; seed: number }
 export interface TowerSpec { id?: string; name?: string; radius?: number; visit?: P2; x: number; z: number; ox: number; oz: number; kind: 0 | 1 | 2; h: number; seed: number; roof: boolean; torch: boolean }
 export interface GateSpec { id: string; x: number; z: number; dx: number; dz: number; main: boolean; seed: number }
-export interface PlotData { pts: P2[]; kind: PlotKind; seed: number; walls?: number[] }
+export interface PlotData extends PlotInput { walls?: number[] }
 export interface Hole { pts: P2[] }
 export interface WellSpec { x: number; z: number; seed: number }
 export interface ChunkItems {
@@ -261,6 +263,11 @@ function plot(b: Builder, p: PlotData) {
   for (const [x, z] of P) { cx += x / P.length; cz += z / P.length; }
   // A garden of the plan with lanes or open ground beside it: rubble walls on those sides.
   if (p.walls) plotWalls(b, p);
+  // The open cells: what the period kept in them (plotfill.ts, docs/benevento/OPEN-GROUND.md).
+  if (PLANNED.has(p.kind)) {
+    buildPlan(b, planPlot(p), p.seed);
+    return;
+  }
   const fence = !p.walls && (p.kind === 'orto' || p.kind === 'stabulum' || p.kind === 'vinea');
   if (fence) {
     // Wattle on stakes, set a little inside the plot edge, with gaps for gates.
@@ -658,7 +665,7 @@ export function makeChunks(lay: Layout, holes: Hole[]): Map<number, ChunkItems> 
     });
   }
   for (const br of lay.bridges) get(br.x, br.z).bridges.push({ ...br, seed: 50000 + seed++ * 104729 });
-  for (const p of lay.plots) get(p.cx, p.cz).plots.push({ pts: p.pts, kind: p.kind, seed: p.seed, walls: p.walls });
+  for (const p of lay.plots) get(p.cx, p.cz).plots.push({ pts: p.pts, kind: p.kind, seed: p.seed, walls: p.walls, open: p.open, free: p.free, well: p.well, church: p.church });
   for (const w of lay.wells) get(w.x, w.z).wells.push({ x: w.x, z: w.z, seed: 70000 + seed++ * 31 });
   const wp = wallPlan();
   for (const p of wp.pieces) get((p.a[0] + p.b[0]) / 2, (p.a[1] + p.b[1]) / 2).walls.push(p);

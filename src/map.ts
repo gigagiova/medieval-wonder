@@ -238,7 +238,8 @@ function houses(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: num
 
 /** Gardens, vines, pens and ruins inside the walls: hatched patches with a pale wash. */
 function plots(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: number) => [number, number], k: number) {
-  const fill: Record<string, string> = { orto: 'rgba(120,150,70,0.22)', vinea: 'rgba(110,80,110,0.18)', pratum: 'rgba(140,160,90,0.16)', ruina: 'rgba(120,110,95,0.22)', stabulum: 'rgba(160,130,80,0.2)' };
+  const fill: Record<string, string> = { orto: 'rgba(120,150,70,0.22)', vinea: 'rgba(110,80,110,0.18)', pratum: 'rgba(140,160,90,0.16)', ruina: 'rgba(120,110,95,0.22)', stabulum: 'rgba(160,130,80,0.2)',
+    pomarium: 'rgba(95,135,70,0.24)', casalinum: 'rgba(150,120,85,0.22)', calcaria: 'rgba(170,165,150,0.25)', coemeterium: 'rgba(110,105,100,0.22)', area: 'rgba(170,150,90,0.18)' };
   ctx.save();
   for (const p of d.plots) {
     ctx.beginPath();

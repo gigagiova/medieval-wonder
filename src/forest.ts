@@ -32,6 +32,8 @@ export interface ForestOpts {
   bounds?: { x0: number; z0: number; x1: number; z1: number };
   /** Where scanned ground cover is worth placing (near where people walk). */
   cover?: (x: number, z: number) => boolean;
+  /** Trees planted where given (inside the town: the gardens' fruit and nut trees), small and middling ones. */
+  extra?: { x: number; z: number; s: number }[];
 }
 
 interface Sp {
@@ -213,6 +215,23 @@ export function buildForest(scene: THREE.Scene, b: Builder, o: ForestOpts): THRE
     else if (u < 0.72) order = ['medium', 'small'];
     else order = ['small'];
     for (const name of order) if (plant(name, x, z, wallNear)) break;
+  }
+
+  // The gardens' trees: small and middling crowns (fruit and nut trees; the pack's younger
+  // deciduous trees stand in for them, see docs/benevento/OPEN-GROUND.md).
+  for (const t of opts.extra ?? []) {
+    const name = rand() < 0.55 ? 'small' : 'medium', sp = SPECIES[name], list = kinds[name];
+    if (!list.length) continue;
+    const k = list[Math.floor(rand() * list.length)];
+    const def = trees.treeDef(k);
+    const s = Math.min(sp.scale[1], Math.max(sp.scale[0], t.s * (name === 'small' ? 1.0 : 0.85)));
+    // No taller than a two-storey house: the crowns of old walnuts and figs, not of forest oaks.
+    const sc = def.h * s > 9 ? 9 / def.h : s;
+    const y = groundAt(t.x, t.z) - 0.12 - 0.04 * def.trunk * sc;
+    const u = rand();
+    trees.add(k, t.x, y, t.z, sc, R(0, Math.PI * 2), R(0.85, 1.08), u < 0.45 ? 0 : u < 0.8 ? 1 : 2, R(0.2, 0.8));
+    mark(t.x, t.z, sp.room * sc);
+    prism(t.x, t.z, def.trunk * sc * 1.05);
   }
 
   commitProps(scene);
