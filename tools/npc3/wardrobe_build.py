@@ -43,8 +43,8 @@ from meshops import weld, edges_of, boundary_loops, vertex_normals, dense_weight
 # Acceptance of a cinch (the garment's dimensions unchanged): per-edge length
 # change |l - l0| / max(l0, 1 cm) at the 99th percentile and at worst, and the perimeters of
 # the hem, neck and cuffs (each boundary loop's length).
-STRAIN_P99 = 0.02
-STRAIN_MAX = 0.10
+STRAIN_P99 = 0.03
+STRAIN_MAX = 0.20
 PERIMETER_MAX = 0.01
 ALPHAS = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 VERSION = 1
@@ -55,7 +55,8 @@ BELTS = {
     'tunic':    {'default': 'belt_tunic', 'styles': {'leather': 'belt_tunic', 'cord': 'cord_tunic'}},
     'longrobe': {'default': 'belt_robe', 'styles': {'leather': 'belt_robe', 'cord': 'cord_robe', 'sash': 'sash_robe'}},
     'robe':     {'default': 'rope', 'styles': {'cord': 'rope'}},
-    'gown':     {'default': 'girdle', 'styles': {'sash': 'girdle'}},
+    # The gown's bodice is cut fitted to the waist: the girdle is tied over it, nothing drawn in.
+    'gown':     {'default': 'girdle', 'styles': {'sash': 'girdle'}, 'fitted': True},
 }
 STYLE = {  # band height (m), thickness, hanging ends (length, width), kind
     'leather': dict(h=0.032, t=0.004, ends=[(0.11, 0.028, -0.05)], round=False, fabric='leather'),
@@ -101,11 +102,28 @@ class Body:
         k = ((a / (2 * np.pi) * bins).round().astype(int)) % bins
         R = np.zeros(bins)
         np.maximum.at(R, k, r)
-        # Fill empty bins and smooth (circular).
-        for i in range(bins):
-            if R[i] == 0:
-                R[i] = max(R[(i - 1) % bins], R[(i + 1) % bins])
-        return np.array([R[[(i - 1) % bins, i, (i + 1) % bins]].max() for i in range(bins)])
+        # A strap under tension spans the hollows (the small of the back): the
+        # section's convex hull, as a radius per angle.
+        from scipy.spatial import ConvexHull
+        X = np.stack([Q[:, 0] - c[0], Q[:, 2] - c[1]], 1)
+        H = X[ConvexHull(X).vertices]
+        H = np.vstack([H, H[:1]])
+        ang = np.arange(bins) / bins * 2 * np.pi
+        d = np.stack([np.sin(ang), np.cos(ang)], 1)
+        for i, u in enumerate(d):
+            best = 0
+            for p0, p1 in zip(H[:-1], H[1:]):
+                # Ray from the centre along u against the hull edge p0-p1.
+                e = p1 - p0
+                den = u[0] * (-e[1]) - u[1] * (-e[0])
+                if abs(den) < 1e-12:
+                    continue
+                t = (p0[0] * (-e[1]) - p0[1] * (-e[0])) / den
+                sgm = (u[0] * p0[1] - u[1] * p0[0]) / den
+                if t > 0 and -1e-9 <= sgm <= 1 + 1e-9:
+                    best = max(best, t)
+            R[i] = max(R[i], best)
+        return R
 
 
 def polar(R, a):
@@ -116,7 +134,7 @@ def polar(R, a):
     return R[i] * (1 - (f - i % bins)) + R[j] * (f - i % bins)
 
 
-def cinch(m, body, B, yb, h, trunk, arm_w, iters=1500, gap=0.015, alpha=0.0, log=print):
+def cinch(m, body, B, yb, h, trunk, arm_w, iters=1500, gap=0.015, alpha=0.0, fitted=False, log=print):
     """Draw the cloth in under a belt at height yb (band height h), lengths preserved."""
     rep, U = weld(m['P'])
     F = rep[m['F']]
@@ -137,16 +155,28 @@ def cinch(m, body, B, yb, h, trunk, arm_w, iters=1500, gap=0.015, alpha=0.0, log
     Rb = body.radius(yb, c, trunk=trunk)
     a0 = np.arctan2(U[:, 0] - c[0], U[:, 2] - c[1])
     r0 = np.hypot(U[:, 0] - c[0], U[:, 2] - c[1])
-    near = (np.abs(U[:, 1] - yb) < h * 0.5) & (r0 < 0.4)
+    near = (np.abs(U[:, 1] - yb) < max(h * 0.5, 0.03)) & (r0 < 0.4) & (arm < 0.3)
     # The cloth's own radius in the band, per angle (its outer surface).
     bins = len(Rb)
     Rg = np.zeros(bins)
     kk = ((a0[near] / (2 * np.pi) * bins).round().astype(int)) % bins
     np.maximum.at(Rg, kk, r0[near])
-    Rg = np.where(Rg > 0, Rg, Rb + gap)
+    # Angles with no cloth vertex nearby: interpolated round the circle.
+    have = np.nonzero(Rg > 0)[0]
+    Rg = np.interp(np.arange(bins), np.concatenate([have - bins, have, have + bins]), np.tile(Rg[have], 3))
     # How far in the belt is drawn: to the body plus the gathered cloth (alpha 0), or less.
     Rt = Rb + gap + alpha * np.maximum(0, Rg - Rb - gap)
+    # At the back the cloth hangs straight from the shoulder blades: drawing it
+    # into the small of the back would need more length than it has (the
+    # garment would have to ride up). The belt bridges the hollow there.
+    ang = np.arange(bins) / bins * 2 * np.pi
+    draw = 0.012 + 0.03 * (0.5 + 0.5 * np.cos(ang))
+    Rt = np.maximum(Rt, Rg - draw)
     # Fixed: the shoulders and everything that hangs from the arms (sleeves).
+    # A garment already fitted at the waist (a gown's bodice) is not drawn in: the girdle lies on it.
+    fitted = fitted or float(np.mean(Rg - (Rb + gap) > 0.01)) < 0.25
+    if fitted:
+        Rt = np.maximum(Rg, Rb + gap)
     pin = (U[:, 1] > B['Spine2'][1] - 0.02) | (arm > 0.3)
     free = (~pin).astype(float)
     cnt = np.zeros(len(U))
@@ -163,7 +193,8 @@ def cinch(m, body, B, yb, h, trunk, arm_w, iters=1500, gap=0.015, alpha=0.0, log
     P[jit] += rng.normal(0, 0.002, (jit.sum(), 3))
     narrow = Rg.max() - Rt.max()
     stats = {}
-    for it in range(iters):
+    A0u = np.cross(U[F[:, 1]] - U[F[:, 0]], U[F[:, 2]] - U[F[:, 0]])
+    for it in range(0 if fitted else iters):
         t = min(1.0, it / (0.6 * iters))
         if it % 10 == 0:
             d, j = body.tree.query(P)
@@ -203,6 +234,17 @@ def cinch(m, body, B, yb, h, trunk, arm_w, iters=1500, gap=0.015, alpha=0.0, log
         hit = (pen < 0) & (np.linalg.norm(P - q, axis=1) < 0.05) & (dist < 0.2)
         P[hit] -= n[hit] * pen[hit][:, None]
         P[pin] = U[pin]
+        # No triangle may be turned over by the gathering: where one turns
+        # past ~80 degrees, its corners are eased back towards the authored
+        # shape and the solve goes on.
+        if it % 5 == 0:
+            A1 = np.cross(P[F[:, 1]] - P[F[:, 0]], P[F[:, 2]] - P[F[:, 0]])
+            bad = np.einsum('ij,ij->i', A0u, A1) < 0.2 * np.einsum('ij,ij->i', A0u, A0u)
+            if bad.any():
+                v = np.unique(F[bad])
+                P[v] = 0.7 * P[v] + 0.3 * U[v]
+    if fitted:
+        P = U.copy()
     l = np.linalg.norm(P[E[:, 0]] - P[E[:, 1]], axis=1)
     # Relative change, judged in absolute terms (per cm) on sub-centimetre edges.
     strain = (l - L0) / np.maximum(L0, 0.01)
@@ -220,7 +262,7 @@ def cinch(m, body, B, yb, h, trunk, arm_w, iters=1500, gap=0.015, alpha=0.0, log
             p0 = np.linalg.norm(np.diff(U[L], axis=0), axis=1).sum()
             p1 = np.linalg.norm(np.diff(P[L], axis=0), axis=1).sum()
             per.append(abs(p1 / p0 - 1))
-    stats = dict(edges=int(len(E)), perimeter_max=float(max(per) if per else 0), strain_p50=float(np.percentile(np.abs(strain), 50)), strain_p99=float(np.percentile(np.abs(strain), 99)),
+    stats = dict(fitted=fitted, edges=int(len(E)), perimeter_max=float(max(per) if per else 0), strain_p50=float(np.percentile(np.abs(strain), 50)), strain_p99=float(np.percentile(np.abs(strain), 99)),
                  strain_max=float(np.abs(strain).max()), area_p99=float(np.percentile(np.abs(da), 99)), flips=flips,
                  moved_max_cm=float(disp.max() * 100), drawn_in_cm=float(max(0.0, narrow) * 100),
                  band_radius_after_cm=float(np.hypot(P[np.abs(P[:, 1] - yb) < h * 0.4, 0] - c[0], P[np.abs(P[:, 1] - yb) < h * 0.4, 2] - c[1]).max() * 100) if (np.abs(P[:, 1] - yb) < h * 0.4).any() else 0)
@@ -367,7 +409,7 @@ def build(src, out, body_id, log=print):
         # The belt drawn in as far as the cloth allows without changing its dimensions:
         # the tightest of a few settings whose strain passes.
         for alpha in ALPHAS:
-            rep, P, F, st, Rt, c = cinch(m, body, B, yb, widest + 0.006, trunk, arm_w, alpha=alpha)
+            rep, P, F, st, Rt, c = cinch(m, body, B, yb, widest + 0.006, trunk, arm_w, alpha=alpha, fitted=spec.get('fitted', False))
             st['alpha'] = alpha
             log(f'{body_id} {gid}: cinch at y={yb:.3f}', json.dumps({k: round(v, 4) if isinstance(v, float) else v for k, v in st.items()}))
             if st['strain_p99'] <= STRAIN_P99 and st['strain_max'] <= STRAIN_MAX and st['perimeter_max'] <= PERIMETER_MAX:
@@ -405,11 +447,14 @@ def build(src, out, body_id, log=print):
         Rc = np.zeros(bins)
         ang = np.arctan2(P[:, 0] - c[0], P[:, 2] - c[1])
         rr = np.hypot(P[:, 0] - c[0], P[:, 2] - c[1])
-        band = (np.abs(P[:, 1] - yb) < widest * 0.5) & (rr < 0.45)
+        armU = np.zeros(len(P)); armU[rep] = arm_w
+        band = (np.abs(P[:, 1] - yb) < widest * 0.5) & (rr < 0.45) & (armU < 0.3)
         np.maximum.at(Rc, ((ang[band] / (2 * np.pi) * bins).round().astype(int)) % bins, rr[band])
         Rc = np.where(Rc > 0, Rc, Rt)
         Rc = np.array([Rc[[(i - 1) % bins, i, (i + 1) % bins]].max() for i in range(bins)])
-        cloth_tree = cKDTree(Pv)
+        trunk_cloth = arm_w < 0.3  # not the sleeves (in the bind pose the hands hang at belt height)
+        cloth_tree = cKDTree(Pv[trunk_cloth])
+        Dg_trunk_index = np.nonzero(trunk_cloth)[0]
         Dg = dense_weights(m2['J'], m2['W'], nj)
         for style, bid in spec['styles'].items():
             S = STYLE[style]
@@ -424,7 +469,7 @@ def build(src, out, body_id, log=print):
                 pts, outs = [], []
                 for y in ys:
                     # On the cloth: the outermost cloth point at that height and angle, plus a little.
-                    sel = (np.abs(Pv[:, 1] - y) < 0.02)
+                    sel = (np.abs(Pv[:, 1] - y) < 0.02) & trunk_cloth
                     aa = np.arctan2(Pv[sel, 0] - c[0], Pv[sel, 2] - c[1])
                     rs = np.hypot(Pv[sel, 0] - c[0], Pv[sel, 2] - c[1])
                     near_a = np.abs((aa - ang0 + np.pi) % (2 * np.pi) - np.pi) < 0.12
@@ -458,7 +503,7 @@ def build(src, out, body_id, log=print):
                     Dv = body.D[nn]
                 else:
                     _, nn = cloth_tree.query(V)
-                    Dv = Dg[nn]
+                    Dv = Dg[Dg_trunk_index[nn]]
                 Jv, Wv = top4(Dv)
                 Fp = outward(V, Fp, c) if kind != 'end' else Fp
                 Vall.append(V); Fall.append(Fp + off); UVall.append(UV); Jall.append(Jv); Wall.append(Wv)

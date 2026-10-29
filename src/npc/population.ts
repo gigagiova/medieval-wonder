@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { makePerson, registerOutfit, outfitBodies, outfitTailored, type Gear, type Look, type EquipHooks, type TownApi, type TownDirector, type Role, type Person } from '../npc';
 import * as Props from './props';
-import { makeApron, makeFibula, makeScrip, makeWorkProp, type WorkProp } from './population-props';
+import { makeApron, makeBuckle, makeFibula, makeScrip, makeWorkProp, type WorkProp } from './population-props';
+import type { BeltStyle } from '../npc2/kit';
 import { PEOPLE_LINES, type GroupId } from './lines-people';
 import type { ClipName } from './rig';
 import type { getMapData } from '../world';
@@ -85,7 +86,7 @@ const SKIN: Record<string, Skin> = {
   eastern: [0.5, 0.95, 0.3, 0.6], bulgar: [0.2, 0.55, 0.1, 0.3], pale: [0.05, 0.4, 0.05, 0.3],
 };
 
-type Extra = 'apronLeather' | 'apronBrown' | 'apronClay' | 'apronLinen' | 'apronDye' | 'fibula' | 'fibulaThroat' | 'scrip' | 'beltSet';
+type Extra = 'apronLeather' | 'apronBrown' | 'apronClay' | 'apronLinen' | 'apronDye' | 'fibula' | 'fibulaThroat' | 'scrip' | 'beltSet' | 'buckleBronze' | 'buckleIron';
 interface GroupDef {
   outfits: [string, Role][];
   title: string;
@@ -97,183 +98,225 @@ interface GroupDef {
   extras?: (r: () => number, outfit: string) => Extra[];
   beard?: [number, number]; grey?: [number, number]; hair?: number[];
   scale?: number; headScale?: number; speed?: number;
+  /**
+   * How they are girded (tools/npc3/wardrobe.json, docs/npc/WARDROBE.md):
+   * a leather strap (with a bronze buckle for Lombard men, iron for
+   * townsmen), a cord (a monk's rope, a priest's linen cingulum, a poor
+   * man's hemp), or a woven sash (women's girdle). Default: the outfit's.
+   */
+  belt?: BeltStyle; buckle?: 'bronze' | 'iron';
 }
 
 const tunicKinds = (k: Colors['kinds']) => k;
 const G: Record<GroupId, GroupDef> = {
   gasindus: {
+    belt: 'leather', buckle: 'bronze',
     outfits: [['soldierCloak', 'soldier'], ['soldier', 'soldier']], title: 'gasindius ducis', names: N.lombardM, skin: SKIN.lombard,
     dress: (r) => ({ tunic: pick(r, mix(P.redBright, P.woadDeep, P.weldBright)), over: pick(r, mix(P.woadDeep, P.madder, P.undyed)), head: pick(r, P.white), belt: 0x24170e, kinds: tunicKinds(['twill', 'felt', 'linen']) }),
     gear: (r) => ({ arms: true, cap: r() < 0.3 }), extras: (_r, o) => (o === 'soldierCloak' ? ['fibula'] : []),
     beard: [0.9, 1.3], hair: [0x3a2a1e, 0x4a3524, 0x5a4430, 0x2a1d15], speed: 1.25,
   },
   gastaldius: {
+    belt: 'leather', buckle: 'bronze',
     outfits: [['soldierCloak', 'soldier']], title: 'gastaldius', names: N.lombardM, skin: SKIN.lombard,
     dress: (r) => ({ tunic: pick(r, mix(P.redBright, P.weldBright)), over: pick(r, mix(P.woadDeep, P.brown)), head: pick(r, P.white), belt: 0x24170e, kinds: ['twill', 'felt', 'linen'] }),
     gear: () => ({ staff: true, cap: true }), extras: () => ['fibula', 'beltSet'], beard: [1, 1.3], grey: [0.25, 0.6], speed: 1.0,
   },
   sculdahis: {
+    belt: 'leather', buckle: 'bronze',
     outfits: [['soldierCloak', 'soldier']], title: 'sculdahis', names: N.lombardM, skin: SKIN.lombard,
     dress: (r) => ({ tunic: pick(r, mix(P.madder, P.woad)), over: pick(r, mix(P.brown, P.undyed)), head: pick(r, P.linen), belt: 0x2e1e12, kinds: ['twill', 'felt', 'linen'] }),
     gear: () => ({ staff: true, cap: true }), extras: () => ['fibula', 'beltSet'], beard: [1, 1.3], grey: [0.3, 0.7], speed: 1.0,
   },
   arimannus: {
+    belt: 'leather', buckle: 'bronze',
     outfits: [['soldier', 'soldier'], ['soldierCloak', 'soldier']], title: 'arimannus', names: N.lombardM, skin: SKIN.lombard,
     dress: (r) => ({ tunic: pick(r, mix(P.madder, P.woad, P.undyed)), over: pick(r, mix(P.undyed, P.woad)), head: pick(r, P.undyed), belt: 0x2e1e12, kinds: ['twill', 'felt', 'tabby'] }),
     gear: (r, o) => { const x = r(); return { arms: true, spear: true, helmet: x < 0.4 ? 'spangen' : x < 0.65 ? 'lamellar' : false, cap: x >= 0.65, shield: o === 'soldierCloak' ? 'arm' : 'back' }; },
     beard: [0.8, 1.3], speed: 1.3,
   },
   langobarda: {
+    belt: 'sash',
     outfits: [['woman', 'woman'], ['womanShawl', 'woman']], title: 'femina Langobarda', names: N.lombardF, skin: SKIN.lombard,
     dress: (r) => ({ tunic: pick(r, mix(P.redBright, P.weldBright, P.woadDeep)), over: pick(r, mix(P.woadDeep, P.madder, P.undyed)), head: pick(r, P.white), belt: pick(r, P.weldBright), beltKind: 'tabby', kinds: ['twill', 'twill', 'linen'] }),
     gear: (r) => ({ basket: r() < 0.3 }), extras: () => ['fibulaThroat'],
   },
   senexLangobardus: {
+    belt: 'leather', buckle: 'bronze',
     outfits: [['soldierCloak', 'soldier']], title: 'senex Langobardus', names: N.lombardM, skin: SKIN.lombard,
     dress: (r) => ({ tunic: pick(r, mix(P.madder, P.linen)), over: pick(r, mix(P.brown, P.undyed)), head: pick(r, P.linen), belt: 0x24170e, kinds: ['linen', 'felt', 'linen'] }),
     gear: (r) => ({ staff: true, cap: r() < 0.5 }), extras: () => ['fibula', 'beltSet'], beard: [1.1, 1.4], grey: [0.7, 0.9], speed: 0.8,
   },
   bulgarus: {
+    belt: 'leather', buckle: 'bronze',
     outfits: [['soldier', 'soldier']], title: 'Vulgar de Sepino', names: N.bulgar, skin: SKIN.bulgar,
     dress: (r) => ({ tunic: pick(r, mix(P.weld, P.madder)), over: pick(r, P.undyed), head: pick(r, P.undyed), belt: 0x24170e, kinds: ['twill', 'felt', 'tabby'] }),
     gear: () => ({ arms: true, cap: true }), beard: [0.6, 1.0], hair: [0x1c1510, 0x2a1d15], speed: 1.2,
   },
   aldius: {
+    belt: 'leather', buckle: 'iron',
     outfits: [['peasantHood', 'peasant'], ['peasantCloak', 'peasant']], title: 'aldius', names: [...N.lombardM, ...N.latinM], skin: SKIN.outdoor,
     dress: (r) => ({ tunic: pick(r, mix(P.undyed, P.undyed, P.madder, P.weld, P.woad)), over: pick(r, P.undyed), head: pick(r, mix(P.undyed, P.weld)), belt: 0x3a2618, kinds: ['tabby', 'felt', 'tabby'] }),
     gear: (r, o) => { const x = r(); return { cap: o === 'peasantCloak', sticks: o === 'peasantHood' && x < 0.35, bucket: x >= 0.4 && x < 0.6, basket: x >= 0.6 && x < 0.75 }; },
   },
   rustica: {
+    belt: 'sash',
     outfits: [['woman', 'woman'], ['womanShawl', 'woman']], title: 'rustica', names: [...N.latinF, ...N.lombardF], skin: SKIN.outdoor,
     dress: (r) => ({ tunic: pick(r, mix(P.undyed, P.madder, P.weld)), over: pick(r, P.undyed), head: pick(r, P.linen), belt: pick(r, P.undyed), beltKind: 'tabby', kinds: ['tabby', 'tabby', 'linen'] }),
     gear: (r) => { const x = r(); return { jar: x < 0.4, basket: x >= 0.4 }; },
   },
   servus: {
+    belt: 'cord',
     outfits: [['peasantHood', 'peasant']], title: 'servus', names: N.latinM, skin: SKIN.outdoor,
     dress: (r) => ({ tunic: pick(r, P.rag), over: pick(r, P.rag), head: pick(r, P.rag), belt: 0x3a2618, kinds: ['tabby', 'tabby', 'tabby'] }),
     gear: (r) => { const x = r(); return { sticks: x < 0.45, bucket: x >= 0.45 && x < 0.8 }; }, beard: [0, 0.9],
   },
   mulier: {
+    belt: 'sash',
     outfits: [['woman', 'woman'], ['womanShawl', 'woman']], title: 'mulier Beneventana', names: N.latinF, skin: SKIN.latin,
     dress: (r) => ({ tunic: pick(r, mix(P.madder, P.woad, P.undyed, P.weld)), over: pick(r, mix(P.undyed, P.woad)), head: pick(r, P.linen), belt: pick(r, mix(P.madder, P.weld, P.undyed)), beltKind: 'tabby', kinds: ['twill', 'twill', 'linen'] }),
     gear: (r) => { const x = r(); return { jar: x < 0.3, basket: x >= 0.3 && x < 0.65 }; },
   },
   anus: {
+    belt: 'sash',
     outfits: [['womanShawl', 'woman']], title: 'anus', names: [...N.latinF, ...N.lombardF], skin: SKIN.outdoor,
     dress: (r) => ({ tunic: pick(r, mix(P.brown, P.undyed)), over: pick(r, P.rag), head: pick(r, mix(P.undyed, P.linen)), belt: pick(r, P.undyed), beltKind: 'tabby', kinds: ['tabby', 'felt', 'linen'] }),
     gear: (r) => ({ staff: r() < 0.6 }), grey: [0.8, 0.95], speed: 0.75,
   },
   puer: {
+    belt: 'leather', buckle: 'iron',
     outfits: [['peasantHood', 'peasant'], ['peasantCloak', 'peasant']], title: 'puer', names: [...N.latinM, ...N.lombardM], skin: SKIN.latin,
     dress: (r) => ({ tunic: pick(r, mix(P.undyed, P.madder, P.weld)), over: pick(r, P.undyed), head: pick(r, P.undyed), belt: 0x3a2618, kinds: ['tabby', 'felt', 'tabby'] }),
     gear: () => ({}), beard: [0, 0], grey: [0, 0], scale: 0.62, headScale: 1.13, speed: 1.0,
   },
   puella: {
+    belt: 'sash',
     outfits: [['woman', 'woman']], title: 'puella', names: [...N.latinF, ...N.lombardF], skin: SKIN.latin,
     dress: (r) => ({ tunic: pick(r, mix(P.madder, P.weld, P.undyed)), over: pick(r, P.undyed), head: pick(r, P.linen), belt: pick(r, P.madder), beltKind: 'tabby', kinds: ['tabby', 'tabby', 'linen'] }),
     gear: () => ({}), grey: [0, 0], scale: 0.6, headScale: 1.13, speed: 0.95,
   },
   mendicus: {
+    belt: 'cord',
     outfits: [['peasantHood', 'peasant']], title: 'mendicus', names: N.latinM, skin: SKIN.outdoor,
     dress: (r) => ({ tunic: pick(r, P.rag), over: pick(r, P.rag), head: pick(r, P.rag), belt: 0x2a1a10, kinds: ['tabby', 'tabby', 'tabby'] }),
     gear: () => ({ staff: true }), beard: [1, 1.4], grey: [0.4, 0.8], speed: 0.7,
   },
   faber: {
+    belt: 'leather', buckle: 'iron',
     outfits: [['peasantCloak', 'peasant'], ['peasantHood', 'peasant']], title: 'faber ferrarius', names: [...N.latinM, ...N.lombardM], skin: SKIN.outdoor,
     dress: (r) => ({ tunic: pick(r, P.undyed), over: pick(r, P.undyed), head: pick(r, P.undyed), belt: 0x2a1a10, kinds: ['tabby', 'felt', 'tabby'] }),
     gear: (_r, o) => ({ cap: o === 'peasantCloak' }), extras: () => ['apronLeather'], beard: [0.9, 1.3],
   },
   aurifex: {
+    belt: 'leather', buckle: 'iron',
     outfits: [['peasantCloak', 'peasant']], title: 'aurifex', names: N.latinM, skin: SKIN.latin,
     dress: (r) => ({ tunic: pick(r, mix(P.madder, P.woad)), over: pick(r, P.undyed), head: pick(r, P.undyed), belt: 0x2a1a10, kinds: ['twill', 'felt', 'tabby'] }),
     gear: () => ({ cap: true }), extras: () => ['apronBrown'],
   },
   figulus: {
+    belt: 'leather', buckle: 'iron',
     outfits: [['peasantHood', 'peasant']], title: 'figulus', names: N.latinM, skin: SKIN.outdoor,
     dress: (r) => ({ tunic: pick(r, P.undyed), over: pick(r, P.undyed), head: pick(r, P.undyed), belt: 0x3a2618, kinds: ['tabby', 'felt', 'tabby'] }),
     extras: () => ['apronClay'], gear: () => ({}),
   },
   pistor: {
+    belt: 'leather', buckle: 'iron',
     outfits: [['peasantCloak', 'peasant']], title: 'pistor', names: N.latinM, skin: SKIN.latin,
     dress: (r) => ({ tunic: pick(r, P.linen), over: pick(r, P.undyed), head: pick(r, P.linen), belt: 0x3a2618, kinds: ['tabby', 'felt', 'linen'] }),
     gear: () => ({ cap: true }), extras: () => ['apronLinen'],
   },
   molendinarius: {
+    belt: 'leather', buckle: 'iron',
     outfits: [['peasantHood', 'peasant'], ['peasantCloak', 'peasant']], title: 'molinarius', names: [...N.latinM, ...N.lombardM], skin: SKIN.outdoor,
     dress: (r) => ({ tunic: pick(r, P.dust), over: pick(r, P.dust), head: pick(r, P.dust), belt: 0x5a4a38, kinds: ['tabby', 'felt', 'tabby'] }),
     gear: (_r, o) => ({ cap: o === 'peasantCloak' }), extras: () => ['apronLinen'],
   },
   calcarius: {
+    belt: 'leather', buckle: 'iron',
     outfits: [['peasantHood', 'peasant']], title: 'calcarius', names: N.latinM, skin: SKIN.outdoor,
     dress: (r) => ({ tunic: pick(r, P.lime), over: pick(r, P.lime), head: pick(r, P.lime), belt: 0x5a4a38, kinds: ['tabby', 'felt', 'tabby'] }),
     gear: (r) => ({ sticks: r() < 0.4 }),
   },
   lavandaria: {
+    belt: 'sash',
     outfits: [['woman', 'woman']], title: 'lavandaria', names: [...N.latinF, ...N.lombardF], skin: SKIN.outdoor,
     dress: (r) => ({ tunic: pick(r, mix(P.undyed, P.madder)), over: pick(r, P.undyed), head: pick(r, P.linen), belt: pick(r, P.undyed), beltKind: 'tabby', kinds: ['tabby', 'tabby', 'linen'] }),
     gear: () => ({}),
   },
   textrix: {
+    belt: 'sash',
     outfits: [['woman', 'woman'], ['womanShawl', 'woman']], title: 'textrix', names: [...N.latinF, ...N.lombardF], skin: SKIN.latin,
     dress: (r) => ({ tunic: pick(r, mix(P.weld, P.woad, P.madder)), over: pick(r, mix(P.woad, P.undyed)), head: pick(r, P.linen), belt: pick(r, P.redBright), beltKind: 'tabby', kinds: ['twill', 'twill', 'linen'] }),
     gear: () => ({}),
   },
   negotiator: {
+    belt: 'leather', buckle: 'iron',
     outfits: [['robe', 'monk'], ['robeCloak', 'monk']], title: 'negotiator', names: N.latinM, skin: SKIN.latin,
     dress: (r) => ({ tunic: pick(r, mix(P.madder, P.woad, P.weld)), over: pick(r, mix(P.undyed, P.woadDeep)), head: pick(r, P.linen), belt: pick(r, P.madder), beltKind: 'tabby', kinds: ['twill', 'felt', 'linen'] }),
     gear: (r) => ({ cap: r() < 0.4 }), extras: (r) => (r() < 0.6 ? ['scrip'] : []), beard: [0.7, 1.2], speed: 1.05,
   },
   notarius: {
+    belt: 'sash',
     outfits: [['robe', 'monk']], title: 'notarius', names: N.latinM, skin: SKIN.pale,
     dress: (r) => ({ tunic: pick(r, mix(P.linen, P.undyed)), over: pick(r, P.undyed), head: pick(r, P.linen), belt: pick(r, P.undyed), beltKind: 'tabby', kinds: ['linen', 'felt', 'linen'] }),
     gear: () => ({}), beard: [0, 0.8], speed: 1.0,
   },
   medicus: {
+    belt: 'leather', buckle: 'iron',
     outfits: [['robe', 'monk'], ['robeCloak', 'monk']], title: 'medicus', names: [...N.latinM, ...N.greekM], skin: SKIN.latin,
     dress: (r) => ({ tunic: pick(r, mix(P.woad, P.linen)), over: pick(r, P.undyed), head: pick(r, P.linen), belt: pick(r, P.undyed), beltKind: 'tabby', kinds: ['twill', 'felt', 'linen'] }),
     gear: () => ({}), extras: () => ['scrip'], beard: [0.8, 1.2], grey: [0.2, 0.6],
   },
   presbyter: {
+    belt: 'cord',
     outfits: [['robeCloak', 'monk'], ['robe', 'monk']], title: 'presbyter', prefix: 'Presbyter', names: N.latinM, skin: SKIN.pale,
     dress: (r) => ({ tunic: pick(r, P.white), over: pick(r, mix(P.brown, P.habit, P.madder)), head: pick(r, P.white), belt: pick(r, P.white), beltKind: 'linen', kinds: ['linen', 'felt', 'linen'] }),
     gear: () => ({}), beard: [0, 0], speed: 0.95,
   },
   diaconus: {
+    belt: 'cord',
     outfits: [['robe', 'monk']], title: 'diaconus', prefix: 'Diaconus', names: N.latinM, skin: SKIN.pale,
     dress: (r) => ({ tunic: pick(r, P.white), over: pick(r, P.white), head: pick(r, P.white), belt: pick(r, P.white), beltKind: 'linen', kinds: ['linen', 'linen', 'linen'] }),
     gear: () => ({}), beard: [0, 0], grey: [0, 0.2], speed: 1.0,
   },
   monachus: {
+    belt: 'cord',
     outfits: [['monk', 'monk'], ['monkBare', 'monk']], title: 'monachus', prefix: 'Frater', names: [...N.latinM, ...N.greekM.slice(0, 3)], skin: SKIN.pale,
     dress: (r) => ({ tunic: pick(r, P.habit), over: pick(r, P.habit), head: pick(r, P.habit), kinds: ['tabby', 'tabby', 'tabby'] }),
     gear: (r) => ({ lantern: r() < 0.3 }), beard: [0, 0], speed: 0.95,
   },
   sanctimonialis: {
+    belt: 'sash',
     outfits: [['woman', 'woman'], ['womanShawl', 'woman']], title: 'ancilla Dei', prefix: 'Soror', names: [...N.lombardF, ...N.latinF], skin: SKIN.pale,
     dress: (r) => ({ tunic: pick(r, mix(P.habit, P.brown)), over: pick(r, P.habit), head: pick(r, [0x1e1a18, 0x24201c, 0x2a2420]), belt: pick(r, P.habit), beltKind: 'tabby', kinds: ['tabby', 'felt', 'tabby'] }),
     gear: () => ({}), speed: 0.9,
   },
   peregrinus: {
+    belt: 'leather', buckle: 'iron',
     outfits: [['robeCloak', 'monk'], ['peasantHood', 'peasant']], title: 'peregrinus', names: N.pilgrim, skin: SKIN.pale,
     dress: (r) => ({ tunic: pick(r, P.undyed), over: pick(r, mix(P.brown, P.undyed)), head: pick(r, P.undyed), belt: 0x3a2618, kinds: ['tabby', 'felt', 'tabby'] }),
     gear: () => ({ staff: true }), extras: () => ['scrip'], beard: [0.7, 1.3], speed: 1.0,
   },
   graecus: {
+    belt: 'sash',
     outfits: [['robeCloak', 'monk'], ['robe', 'monk']], title: 'Graecus de Tarento', names: N.greekM, skin: SKIN.eastern,
     dress: (r) => ({ tunic: pick(r, mix(P.orchil, P.woad, P.weldBright)), over: pick(r, mix(P.madder, P.undyed, P.orchil)), head: pick(r, P.white), belt: pick(r, P.weldBright), beltKind: 'tabby', kinds: ['twill', 'twill', 'linen'] }),
     gear: () => ({}), extras: (r) => (r() < 0.5 ? ['scrip'] : []), beard: [1.0, 1.35], hair: [0x1c1510, 0x2a1d15, 0x22180f],
   },
   graeca: {
+    belt: 'sash',
     outfits: [['woman', 'woman'], ['womanShawl', 'woman']], title: 'Graeca', names: N.greekF, skin: SKIN.eastern,
     dress: (r) => ({ tunic: pick(r, mix(P.orchil, P.redBright)), over: pick(r, mix(P.orchil, P.woadDeep)), head: pick(r, P.white), belt: pick(r, P.weldBright), beltKind: 'tabby', kinds: ['twill', 'twill', 'linen'] }),
     gear: (r) => ({ basket: r() < 0.3 }),
   },
   iudaeus: {
+    belt: 'leather', buckle: 'iron',
     outfits: [['robe', 'monk'], ['robeCloak', 'monk']], title: 'Iudaeus', names: N.jewishM, skin: SKIN.eastern,
     dress: (r) => ({ tunic: pick(r, mix(P.woad, P.undyed, P.weld)), over: pick(r, mix(P.undyed, P.woadDeep)), head: pick(r, P.white), belt: pick(r, P.woad), beltKind: 'tabby', kinds: ['twill', 'felt', 'linen'] }),
     gear: () => ({}), extras: (r) => (r() < 0.5 ? ['apronDye'] : ['scrip']), beard: [1.0, 1.35], hair: [0x1c1510, 0x2a1d15, 0x3a2a1e],
   },
   afer: {
+    belt: 'sash',
     outfits: [['robe', 'monk']], title: 'Afer de Carthagine', names: N.african, skin: SKIN.eastern,
     dress: (r) => ({ tunic: pick(r, mix(P.linen, P.undyed)), over: pick(r, P.undyed), head: pick(r, P.linen), belt: pick(r, P.undyed), beltKind: 'tabby', kinds: ['linen', 'felt', 'linen'] }),
     gear: (r) => ({ staff: r() < 0.5 }), beard: [0.6, 1.1], hair: [0x1c1510, 0x22180f],
@@ -291,6 +334,7 @@ function equipExtras(list: Extra[], h: EquipHooks) {
       h.on('Spine2', f.obj, f.place);
     } else if (e === 'scrip') h.on('Hips', makeScrip(h.belt), new THREE.Matrix4());
     else if (e === 'beltSet') h.on('Hips', Props.makeBeltFittings(h.belt, h.rnd() * 10), new THREE.Matrix4());
+    else if (e === 'buckleBronze' || e === 'buckleIron') h.on('Hips', makeBuckle(h.belt, e === 'buckleBronze' ? 'bronze' : 'iron'), new THREE.Matrix4());
   }
 }
 
@@ -306,6 +350,7 @@ export function makeOfGroup(scene: THREE.Scene, id: GroupId, seed: number, o: { 
   const [outfitId, role] = g.outfits[pickI];
   const name = o.name ?? pick(r, g.names);
   const extras = g.extras?.(r, outfitId) ?? [];
+  if (g.belt === 'leather' && g.buckle) extras.push(g.buckle === 'bronze' ? 'buckleBronze' : 'buckleIron');
   const look: Look = {
     name: g.prefix ? `${g.prefix} ${name}` : name, title: g.title, lines: o.lines ?? PEOPLE_LINES[id],
     skin: { tan: span(r, [g.skin[0], g.skin[1]]), olive: span(r, [g.skin[2], g.skin[3]]) },
@@ -315,6 +360,7 @@ export function makeOfGroup(scene: THREE.Scene, id: GroupId, seed: number, o: { 
     beard: g.beard ? (g.beard[1] > 0 && r() < 0.85 ? span(r, g.beard) : g.beard[0]) : undefined,
     scale: g.scale ? g.scale * (0.92 + r() * 0.16) : undefined,
     headScale: g.headScale,
+    belt: g.belt,
     equip: extras.length ? (h) => equipExtras(extras, h) : undefined,
   };
   const gear = g.gear?.(r, outfitId);

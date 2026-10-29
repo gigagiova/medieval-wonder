@@ -12,11 +12,12 @@ import * as Props from './npc/props';
 import { makeStaff } from './npc/population-props';
 import { fabric, type FabricKind } from './npc/fabric';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
-import { loadV2, kitsV2, bodiesV2, outfitV2, type OutfitV2 } from './npc2/kit';
+import { loadV2, kitsV2, bodiesV2, outfitV2, type OutfitV2, type BeltStyle } from './npc2/kit';
 import { dressV2 } from './npc2/dress';
 import { makeSprings } from './npc2/springs';
 import { clampArmSwing } from './npc2/arms';
 import { makeGarmentClearance } from './npc2/clearance';
+import { makePush } from './npc2/push';
 import { makeBlink } from './npc/expression';
 
 /** Townsfolk v2 (src/npc2): MakeHuman bodies in modelled garments, the default; `?npc=v1` for the older bodies. */
@@ -165,7 +166,7 @@ const faces = new Map<string, { geo: THREE.BufferGeometry; map: THREE.Texture }>
 
 /** An outfit on a body, tailored on first use (0.2-0.7 s each); `outfit:body#face` with another face. */
 function outfitFor(key: string): Outfit {
-  if (NPC_V2 && kitsV2.has(key.split(':')[1])) return outfitV2(key.split(':')[0], key.split(':')[1]) as unknown as Outfit;
+  if (NPC_V2 && kitsV2.has(key.split(':')[1])) return outfitV2(key.split(':')[0], key.split(':')[1], key.split(':')[2] as BeltStyle | undefined) as unknown as Outfit;
   let o = outfits.get(key);
   if (!o && key.includes('#')) {
     const [base, fid] = key.split('#'), b = outfitFor(base), f = faces.get(fid)!;
@@ -241,6 +242,8 @@ export interface Look {
   colors?: { tunic: number; over: number; head: number; belt?: number; beltKind?: FabricKind; kinds?: [FabricKind, FabricKind, FabricKind] };
   /** Body scale against the body's own (children), and the head's scale on it. */
   scale?: number; headScale?: number;
+  /** v2: how they are girded, if not the outfit's default belt (tools/npc3/wardrobe.json). */
+  belt?: BeltStyle;
   equip?: (h: EquipHooks) => void;
 }
 export interface EquipHooks {
@@ -367,6 +370,8 @@ export class Person {
       tunic = dye(lc.tunic); over = dye(lc.over); head = dye(lc.head, 0.1);
       if (lc.belt !== undefined) belt = fabric(lc.beltKind ?? 'leather', dye(lc.belt));
     }
+    // A cord of no named cloth is hemp: its own twisted, unbleached look.
+    if (persona.belt === 'cord' && !lc?.beltKind) belt = matte(0x7e6e50, 0.95);
     // Coarse tabby homespun; twill for gowns and soldiers' tunics; fulled wool (felt) for cloaks; linen veils.
     const kinds: FabricKind[] = lc?.kinds ?? (role === 'monk' ? ['tabby', 'tabby', 'tabby'] : role === 'woman' ? ['twill', 'twill', 'linen'] : role === 'soldier' ? ['twill', 'felt', 'tabby'] : ['tabby', 'felt', 'tabby']);
     const mats = [fabric(kinds[0], tunic), fabric(kinds[1], over), belt, fabric(kinds[2], head)];
@@ -397,6 +402,7 @@ export class Person {
       ? dressV2(this.body, outfit as unknown as OutfitV2, { tunic, over, head, belt, leg: dye(pick(rnd, [...DYES.undyed, ...DYES.woad]), 0.3), shoe: new THREE.Color(0x8a7a6a).multiplyScalar(0.8 + rnd() * 0.3), kinds: lc?.kinds, role }) as unknown as Clothing
       : new Clothing(scene, outfit.garment, skel, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
     if (v2) this.springs = makeSprings(this.body, outfit as unknown as OutfitV2, this.scale, (n) => this.bones.get(n));
+    if (v2) this.push = makePush(this.body, outfit as unknown as OutfitV2, (n) => this.bones.get(n));
     this.cloaked = v2 && (outfit as unknown as OutfitV2).garments.some((g) => g.id === 'cloak');
 
     // Motion.
@@ -424,6 +430,8 @@ export class Person {
   walkSpeed = 1.2;
   /** v2: the cloth bones' spring update (src/npc2/springs.ts), and the time it steps. */
   private springs: ReturnType<typeof makeSprings> = null;
+  /** v2: garment vertices kept off the limbs beneath them, on the GPU (src/npc2/push.ts). */
+  private push: ReturnType<typeof makePush> = null;
   /** v2: wears a cloak, so carries the arms close (src/npc2/arms.ts). */
   private cloaked = false;
   private garmentClearance: ReturnType<typeof makeGarmentClearance> = null;
@@ -953,6 +961,7 @@ export class Person {
       if (this.dist < npcDebug.springDist) { this.springs.update(this.springDt); npcDebug.prof.springPeople++; } else this.springs.rest();
       npcDebug.prof.springs += performance.now() - t0;
     }
+    if (this.push) { this.body.updateMatrixWorld(true); this.push(); }
     return true;
   }
 
@@ -1151,7 +1160,7 @@ function cast(role: Role, o: { outfit?: number; body?: number; seed?: number; ge
   const v2b = NPC_V2 ? bodiesV2(id, OUTFITS[id].sex) : [];
   const bs: string[] = v2b.length ? v2b : OUTFITS[id].bodies;
   let key = `${id}:${bs[(o.body ?? Math.floor(rnd() * bs.length)) % bs.length]}`;
-  if (v2b.length) return { role, id, key, rnd, gear: o.gear, look: o.look };
+  if (v2b.length) return { role, id, key: key + (o.look?.belt ? ':' + o.look.belt : ''), rnd, gear: o.gear, look: o.look };
   for (const [fid, f] of Object.entries(FACES)) if (f.outfits.includes(id) && faces.has(fid) && (o.face ?? rnd() < f.share)) { key += '#' + fid; break; }
   return { role, id, key, rnd, gear: o.gear, look: o.look };
 }

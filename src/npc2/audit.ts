@@ -30,6 +30,9 @@ function posed(m: THREE.SkinnedMesh, bind = false) {
   for (const i of used) {
     if (bind) { P.set(i, v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld).clone()); N.set(i, w.fromBufferAttribute(n, i).transformDirection(m.matrixWorld).clone()); continue; }
     m.getVertexPosition(i, v);
+    const skinned = v.clone();
+    // (Garments kept off the limbs on the GPU, src/npc2/push.ts: the same projection here.)
+    (m.userData.push as ((p: THREE.Vector3) => void) | undefined)?.(v);
     // Normal: skin a point a millimetre out along it.
     w.fromBufferAttribute(p, i).addScaledVector(new THREE.Vector3().fromBufferAttribute(n, i), 0.001);
     const tmp = p.getX(i), ty = p.getY(i), tz = p.getZ(i);
@@ -37,7 +40,7 @@ function posed(m: THREE.SkinnedMesh, bind = false) {
     const q = m.getVertexPosition(i, new THREE.Vector3());
     p.setXYZ(i, tmp, ty, tz);
     P.set(i, v.clone().applyMatrix4(m.matrixWorld));
-    N.set(i, q.applyMatrix4(m.matrixWorld).sub(P.get(i)!).normalize());
+    N.set(i, q.sub(skinned).transformDirection(m.matrixWorld));
   }
   return { P, N };
 }
@@ -46,7 +49,7 @@ function shell(m: THREE.SkinnedMesh, bind = false) {
   const g = new THREE.BufferGeometry();
   const src = m.geometry, p = src.attributes.position, arr = new Float32Array(p.count * 3), v = new THREE.Vector3();
   for (let i = 0; i < p.count; i++) {
-    if (bind) v.fromBufferAttribute(p, i); else m.getVertexPosition(i, v);
+    if (bind) v.fromBufferAttribute(p, i); else { m.getVertexPosition(i, v); (m.userData.push as ((q: THREE.Vector3) => void) | undefined)?.(v); }
     v.applyMatrix4(m.matrixWorld);
     arr[i * 3] = v.x; arr[i * 3 + 1] = v.y; arr[i * 3 + 2] = v.z;
   }
