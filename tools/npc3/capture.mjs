@@ -38,7 +38,7 @@ for (const [i, g] of list.entries()) {
     for (const view of V) {
       await page.evaluate(({ i, view, anim }) => {
         const api = window.__api, THREE = api.THREE, cam = api.camera;
-        api.people.forEach((p, j) => p.group.visible = j === i);
+        api.people.forEach((p, j) => { p.group.visible = j === i; for (const h of p.held) h.obj.visible = j === i; });
         const p = api.people[i];
         const b = (n) => p.bone(n).getWorldPosition(new THREE.Vector3());
         const c = p.pos.clone();

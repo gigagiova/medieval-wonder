@@ -379,7 +379,7 @@ def facing(m, rep, U, F, loops, t=0.004, w=0.025):
     return dict(P=V, F=Fs, UV=np.array(UV), src=src)
 
 
-REACH, EDGE = 0.30, 0.10
+REACH, EDGE, CAPE_GAP = 0.30, 0.10, 0.06
 
 
 def ray_hits(O, Dn, V, F, reach):
@@ -436,6 +436,42 @@ def add_hidden(g, meta, names, B):
         H[new] |= (1 << bit)
         added[oid] = int(len(new))
     g.set_attr(bnode, 0, '_HIDE', H.astype(np.float32), 5126, 'SCALAR')
+    # Under a hood's shoulder cape or a cowl (skinned to the trunk, no spring
+    # bones, so it never swings open), the tunic's shoulders are covered for
+    # good: hidden there, as hide.py does for skin, so the tunic cannot poke
+    # through the cape when the shoulders move. Only well inside the cape
+    # (EDGE from its edges) and close under it (CAPE_GAP).
+    for oid, o in meta['outfits'].items():
+        bit = o['bit']
+        capes = [x for x in o['garments'] if x in ('hood', 'cowl') and not meta['garments'][x].get('chains')]
+        if not capes:
+            continue
+        Vs, Fs, edge_pts, off = [], [], [], 0
+        for x in capes:
+            m = g.mesh('G_' + x)
+            rep, U = weld(m['P']); F = rep[m['F']]
+            Vs.append(U); Fs.append(F + off); off += len(U)
+            for loop in boundary_loops(F):
+                edge_pts.append(U[loop])
+        V = np.concatenate(Vs); F = np.concatenate(Fs)
+        edge = cKDTree(np.concatenate(edge_pts)) if edge_pts else None
+        for x in o['garments']:
+            if meta['garments'][x]['layer'] != 'tunic':
+                continue
+            m = g.mesh('G_' + x)
+            rep, U = weld(m['P'])
+            Nw = vertex_normals(U, rep[m['F']])[rep]
+            Hm = m['HIDE'].astype(np.int64)
+            cand = np.nonzero(((Hm >> bit) & 1 == 0) & (m['P'][:, 1] > B['Spine1'][1]))[0]
+            if edge is not None and len(cand):
+                dd, _ = edge.query(m['P'][cand])
+                cand = cand[dd > EDGE * 0.8]
+            if not len(cand):
+                continue
+            hit = ray_hits(m['P'][cand], Nw[cand], V, F, CAPE_GAP)
+            Hm[cand[hit]] |= (1 << bit)
+            added[f'{oid}:{x}'] = int(hit.sum())
+            g.set_attr('G_' + x, 0, '_HIDE', Hm.astype(np.float32), 5126, 'SCALAR')
     return added
 
 
