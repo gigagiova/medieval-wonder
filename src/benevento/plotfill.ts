@@ -257,7 +257,7 @@ function makePlan(p: PlotInput): PlotPlan {
       // earth), grass under them, a shed.
       const h = mid && !p.open ? hut('shed', R(3, 3.8), R(2.2, 2.7)) : null;
       woodpile(h);
-      trees(Math.min(18, Math.max(2, Math.floor(area / 55))), 3.2, 'any');
+      trees(Math.min(18, Math.max(1, Math.floor(area / 55))), p.open ? 1.9 : 3.2, 'any');
       if (big && rand() < 0.6) stack();
       weeds(Math.min(6, Math.floor(area / 160)), ['grass_medium_02', 'weed_plant_02']);
       tufts(0.4);
@@ -318,7 +318,7 @@ function makePlan(p: PlotInput): PlotPlan {
       }
       stack(); if (mid) stack(); if (big) stack();
       if (mid && !p.open) { const h = hut('shed', R(3.4, 4.2), R(2.4, 2.8)); woodpile(h); }
-      trees(Math.min(8, Math.max(1, Math.floor(area / 160))), 2.8, 'any');
+      trees(Math.min(8, Math.max(1, Math.floor(area / 160))), p.open ? 1.9 : 2.8, 'any');
       weeds(Math.min(6, Math.floor(area / 150)), ['grass_medium_02', 'weed_plant_02', 'nettle_plant']);
       tufts(0.5);
       break;

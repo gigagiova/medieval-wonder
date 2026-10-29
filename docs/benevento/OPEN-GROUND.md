@@ -11,7 +11,7 @@ the game.
 ## 1. Cells checked against the drawing first
 
 Every open cell (59 large closed cells, the 9 "squares" that are closed cells joined to the
-lanes through a gap in their outline, and the 38 split-off wide lane parts over 400 m²) was
+lanes through a gap in their outline, and the split-off wide lane parts over 400 m²) was
 compared with the drawing (contact sheets of each cell on the plan; shape measures:
 rectangularity, ink inside the cell, how much of its rim is drawn line).
 
@@ -27,9 +27,40 @@ rectangularity, ink inside the cell, how much of its rim is drawn line).
   orchards, meadows, threshing floors. They stay unwalled because lanes run through them;
   nothing is put within 1.1 m + half a lane's width of a lane's centre line or 1.6 m of a
   house.
-- No other open cell has a building's shape; all keep their class. The split-off wide lane
-  parts stay lane ground; those of 600 m² or more get a few unwalled things at their edges
-  (trees, hay), clear of the ways through them.
+- No other open cell has a building's shape; all keep their class.
+
+### Streets: only the drawn corridors (retrace)
+
+On the drawing a street is a corridor between two lines, 2-6 m wide; nearly everything else
+is closed cells. The first trace kept as lane every part of the white lane space up to
+~10 m wide (`RW` = 5.2 px in `plan_trace.py`) and left the wider parts as bare "squares", so
+about half the walled area read as street. The retrace (`PLAN_RW` = 3.1, `PLAN_MIN_WIDE` =
+40 px²) keeps as lane only the parts whose white core is under ~6 m; every wider part of the
+lane space is split off as a cell of its own (it opens on a lane where the drawing leaves no
+line) and gets open-ground content: orchards, meadows with hay and threshing floors, and on
+the larger ones (≥ 500 m²) gardens and a hut or two, unwalled, with the ways through them
+kept clear (paths along the lane centre lines that cross them). Two side rules changed with
+it: the split-off parts at the edge of Civitas Nova are cut at the grey edge like the lanes
+(not dropped), and a small cell is merged into a lane as a "lane piece" only between two
+drawn corridors. The circuit moves by at most 6 m along the edge of Civitas Nova; towers,
+gates, Porta Aurea and the house footprints are unchanged; `check-plan-access.ts` passes
+(30 checks).
+
+Shares of the walled area (32.45 ha), `npx tsx tools/benevento/area_shares.ts`: the drawing is
+the traced cells (each owning half of the ink lines round it), the game the layout's raster:
+
+| | drawing, first trace | game before (29 Oct, start) | drawing, retrace | game now |
+|---|---|---|---|---|
+| buildings | 26.4% | 25.2% | 26.6% | 26.0% |
+| courtyards | 0.6% | 0.4% | 0.6% | 0.4% |
+| gardens and other closed open cells | 21.3% | 21.4% (bare) | 21.3% | 20.7% (filled) |
+| cells opening on a lane | 20.4% | — (bare street) | 30.4% | 29.2% (filled, unwalled) |
+| street | 31.3% | 50.2% | 21.2% | 20.8% |
+| landmark precincts | — | 2.8% | — | 2.8% |
+
+Buildings were not eroded: houses stand on the drawn footprints and share their party walls
+(a cell owns the half of each line next to it); what read as gaps between them were the
+over-wide lanes and bare squares.
 
 ## 2. What each cell holds
 
