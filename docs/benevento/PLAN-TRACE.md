@@ -35,15 +35,15 @@ earlier pipeline also cut:
 
 ## Reading the drawing
 
-- **Ink.** A pixel is ink when darker than ~72% of its paper: < 184 on white, < 101 in
-  the curtis wash (grey 141), < 115 in the Civitas Nova wash (grey 160). Faint
-  one-pixel lines have cores of 140-160; the former fixed threshold of 120 lost them,
-  and the blocks they closed leaked into the lanes.
+- **Ink.** A pixel is ink when darker than 150 on white, 101 in the curtis wash (grey
+  141), 115 in the Civitas Nova wash (grey 160). The former fixed 120 lost faint lines
+  (cores 140-160) so blocks leaked into the lanes; a looser 184 made strokes so wide
+  that the narrowest lanes (1-3 px of white) closed and the lane network fell apart.
 - **Washes.** A wash pixel is grey with no white paper within 2 px (anti-aliased line
   edges on white are grey too); pieces of 1,500 px or more, closed over 25 px gaps
   (dense line work interrupts the wash), holes filled.
 - **Line breaks.** Line ends whose stroke points at other ink within 2.6 px are joined
-  (240 joins).
+  (181 joins).
 - **Triangles 3 and 4.** The markers' thick strokes are removed. Each hides a stretch of
   the edge, which is taken as the straight line between the points where the visible
   edge enters and leaves the triangle: (912,161)-(946,180) under 3 (the north edge at
@@ -63,19 +63,22 @@ on the skeleton of each cell.
 | Rule | Class | Certainty |
 |---|---|---|
 | Long and thin: mean width < 7.5 px and length > 6× width, or width < 11 px and length > 12× width, or > 25,000 px² | lane | good: the drawing has no other long thin white spaces, except... |
-| ...a thin cell that rings other cells (filling it adds > 25% area) | building (a range round a court) | fair |
-| Wide parts of the lane spaces (> 5.2 px from both sides) 150-300 px² | square (lane ground) | fair |
-| Wide parts of the lane spaces ≥ 300 px² | open (garden): most look like blocks whose outline is broken in the drawing; they are kept unbuilt rather than invented | **hypothesis** |
+| ...a thin cell (< 7 px, < 1,200 px²) that rings other cells (filling it adds > 25% area) | building (a range round a court) | fair |
+| Wide parts of the lane spaces (> 5.2 px from both sides, ≥ 150 px²) | square: open lane ground (grass where not trodden). The large ones are probably blocks whose outline is broken in the drawing; they are neither built nor walled, so as not to invent buildings or cut lanes | **hypothesis** for the large ones |
+| Small narrow cell (≤ 160 px², ≤ 9 px wide) touching two separate lane pieces at its two ends | lane (a piece cut off by lines drawn across the lane) | fair |
+| Open cell that joins two otherwise separate parts of the lane network | square (a lane whose line has a gap has merged with the block beside it) | fair |
 | Enclosed cell ≤ 520 px² | building footprint | good for ordinary cells; a few small cells may be yards |
 | Enclosed cell > 520 px² | open space (garden, vineyard, meadow, pen or ruin; kind chosen at random) with rubble walls on the sides facing a lane or open ground | **hypothesis**: the drawing does not say whether a large undivided cell was built; the owner's instruction is to read large enclosed cells as open |
 | Cell touching no lane, ringed only by buildings, ≥ 100 px²; or the hole of one ring cell | courtyard | fair |
 | Cell touching no lane, < 100 px² | building (a back room) | fair |
 
-Result (traced, before landmark precincts take their ground): 691 building footprints
-(9.8 ha), 135 open cells (12.7 ha, of which 32 small squares are lane ground), 12
-courtyards, 11.6 km of lane centre lines, inside a circuit of 3.06 km enclosing 32.5 ha.
-In the game 675 houses stand on the footprints (the rest are under landmark precincts),
-plus 13 back rooms behind houses one can enter.
+Result: 672 building footprints, 59 gardens/open cells, 93 squares, 11 courtyards and
+14.5 km of lane centre lines (14.3 km of them one connected network) inside a circuit
+of 3.05 km enclosing 32.4 ha. In the game 653 houses (8.1 ha of roofs) stand on the
+footprints; the others lie under landmark precincts (curtis, episcopium, forum, Ad
+Caballum, Iseum, Castellum Aquae, Hortus), plus the back rooms behind houses one can
+enter. `tools/check-plan-access.ts` checks that every gate, every enterable door, the
+two burial stairs and the forum and Ad Caballum squares reach the main lane network.
 
 Known weak points: the classification is per cell, so a garden drawn with one inner line
 becomes two cells; rounded edges where a wide lane part was split off; ring buildings are
@@ -94,9 +97,9 @@ added in a lane. Lanes are as wide as drawn.
 **Houses one can enter** use the drawn front of a traced house and a rectangle as deep as
 the footprint allows; the footprint behind the rectangle stays a building of its own.
 Rectangle and back room cover ≥ 90% of the drawn footprint for most; where no such house
-is within 45 m of a target, ≥ 75%. Targets moved by up to ~85 m (the potter by Porta
-Rufina); San Pietro ad Forum is 66 m from its former point (no traced house within 30 m
-of it takes a church room). The Pacca and Triggio burial stairs follow the new host
+is within 45 m of a target, ≥ 75%. The houses one enters now stand 7-60 m from their
+former points (the potter by Porta Rufina is the farthest); San Pietro ad Forum is 37 m
+from its former point. The Pacca and Triggio burial stairs follow the new host
 fronts (`tools/benevento/anchor_burials.ts`); San Modesto stays where it was, outside the
 circuit, clear of every traced cell.
 
@@ -123,13 +126,13 @@ the Arch of Sacramento is 1.4 m from it.
 
 | Id | Plan px | Evidence | World offset from curtain |
 |---|---|---|---|
-| Biffa | (240.7,132.1) | small projection; OSM Torre della Biffa | 0.2 m |
-| N02 | (336,167) | small rectangular projection | 0.6 m |
-| N04 | (653,154) | small rectangle drawn on the line | 1.4 m |
-| N05 | (767,145) | pentagonal projection (drawn as round tower) | 2.7 m |
+| Biffa | (240.7,132.1) | small projection; OSM Torre della Biffa | 0.6 m |
+| N02 | (336,167) | small rectangular projection | 0.8 m |
+| N04 | (653,154) | small rectangle drawn on the line | 0.7 m |
+| N05 | (767,145) | pentagonal projection (drawn as round tower) | 2.3 m |
 | N06 | (843.9,134.4) | projection; OSM 1016982302 | 0.2 m |
-| N07 | (1047.9,172.4) | projection; OSM 480303640 | 0.1 m |
-| Panaro | (1205,216) | rounded NE corner; OSM 248001579 (registered, `tower-sites.ts`) | 2.8 m |
+| N07 | (1047.9,172.4) | projection; OSM 480303640 | 0.8 m |
+| Panaro | (1205,216) | rounded NE corner; OSM 248001579 (registered, `tower-sites.ts`) | 3.6 m |
 | E01 | (1209.5,359) | slight projection; OSM 1015674809 | 0.0 m |
 
 Not added: N03 (an elongated 28 × 7 m projection: a building on the wall; it is traced
@@ -142,7 +145,11 @@ towers.
 
 ## Gates
 
-Gates keep their former near-points and are snapped to the traced curtain. Porta Summa
-moves to (652,101), where the traced decumanus (the cheapest lane path near the line of
-Corso Garibaldi) meets the drawn east line; its 700 position "150 m west of the 10th-c.
-gate" (HISTORY.md §4) no longer has a wall to stand in once the east annex is drawn in.
+Each gate opens where a lane of the connected network reaches the traced curtain,
+nearest its former position. Porta Summa is put at the opening the plan draws in the
+east line beside the Rocca, (1233,477)-(1235,486) px, world (648,117): the circuit is
+closed across the opening and the gate cut into it. *Hypothesis*: the drawing does not
+label it; its 700 position "150 m west of the 10th-c. gate" (HISTORY.md §4) no longer
+has a wall to stand in once the east end is drawn in. The decumanus is the cheapest lane
+path between Porta S. Lorenzo and Porta Summa that stays near the line of Corso
+Garibaldi.
