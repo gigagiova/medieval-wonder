@@ -18,11 +18,11 @@ import type { OutfitV2 } from './kit';
 //
 // The audit (audit.ts) applies the same projection on the CPU (`userData.push`).
 
-export const MAX_CAPS = 12;
+export const MAX_CAPS = 16;
 const MARGIN = 0.008;
 
-interface CapDef { a: string; b: string; from?: number; extend?: number; bones: string[]; /** Quantile of the inner layers' distances taken as the radius (default: all of them). */ q?: number; /** Keep each cloth point on its own side of the limb, see SIDE. */ side?: boolean }
-interface Cap { a: THREE.Bone; b: THREE.Bone; from: number; extend: number; r: number; side: boolean }
+interface CapDef { a: string; b: string; from?: number; extend?: number; bones: string[]; /** Quantile of the inner layers' distances taken as the radius (default: all of them). */ q?: number; /** Keep each cloth point on its own side of the limb, see SIDE. */ side?: boolean; /** Offsets (bind space, m) of the ends from the bones: a capsule across the trunk. */ ao?: [number, number, number]; bo?: [number, number, number] }
+interface Cap { a: THREE.Bone; b: THREE.Bone; from: number; extend: number; r: number; side: boolean; /** Ends as points in the bones' own frames (offset capsules), else the bone origins. */ la?: THREE.Vector3; lb?: THREE.Vector3 }
 
 // Which limbs each layer of garment is kept off.
 const LEGS: CapDef[] = [
@@ -45,12 +45,28 @@ const SHOULDERS: CapDef[] = [
 const UPPER: CapDef[] = [
   { a: 'LeftArm', b: 'LeftForeArm', bones: ['LeftArm'], side: true }, { a: 'RightArm', b: 'RightForeArm', bones: ['RightArm'], side: true },
 ];
+// The trunk, as capsules lying across it (left to right) at the waist and
+// the chest: their section in plan is a stadium, close to the trunk's own
+// (wider than deep), where a capsule along the spine would be round. They
+// keep a cloak or a hood's cape outside the cloth gathered by the belt, the
+// belt itself and the chest beneath.
+const TRUNK: CapDef[] = [
+  { a: 'Spine', b: 'Spine', ao: [-0.09, 0, 0], bo: [0.09, 0, 0], bones: ['Hips', 'Spine'], q: 0.985, side: true },
+  { a: 'Spine2', b: 'Spine2', ao: [-0.09, -0.02, 0], bo: [0.09, -0.02, 0], bones: ['Spine1', 'Spine2'], q: 0.985, side: true },
+];
+// Under a cloak: the skirt of the tunic or robe beneath, at the hips and
+// across both thighs (riding on them), so it cannot swing out through the
+// cloak's back and sides.
+const SKIRT: CapDef[] = [
+  { a: 'Hips', b: 'Hips', ao: [-0.09, -0.06, 0], bo: [0.09, -0.06, 0], bones: [], q: 0.985, side: true },
+  { a: 'LeftUpLeg', b: 'RightUpLeg', ao: [0, -0.22, 0], bo: [0, -0.22, 0], bones: [], q: 0.985, side: true },
+];
 const BY_LAYER: Record<string, CapDef[]> = {
   // (Sleeves: the forearm only; round the upper arm the capsule would reach the chest's cloth.)
   tunic: [...LEGS, ...HANDS, ...ARMS.slice(0, 2)],
-  over: [...SHOULDERS, ...ARMS, ...HANDS, ...LEGS.slice(0, 4)],
+  over: [...SHOULDERS, ...ARMS, ...HANDS, ...LEGS.slice(0, 4), ...TRUNK, ...SKIRT],
   // A hood's shoulder cape over the tunic.
-  head: [...SHOULDERS, ...UPPER],
+  head: [...SHOULDERS, ...UPPER, TRUNK[1]],
 };
 
 const GLSL_HEAD = `uniform vec4 uPushA[${MAX_CAPS}]; uniform vec4 uPushB[${MAX_CAPS}];`;
@@ -74,6 +90,12 @@ const SIDE_DEPTH = 5;
 // sideways) and behind it are brought forward to its side line too, so the
 // cloth between a carried point and its neighbours does not cut the limb.
 const SIDE_WIDE = 1.35;
+// Only cloth that lay near the limb in the bind pose (home within SIDE_NEAR
+// radii of its axis) has a side to keep: a point of the shirt's front, far
+// from the forearm in the bind pose, would be carried round a forearm folded
+// across the belly to wherever its rigid "home" happened to swing. Such
+// points get the plain projection.
+const SIDE_NEAR = 3;
 const GLSL_BODY = `
   for (int i = 0; i < ${MAX_CAPS}; i++) {
     float r = uPushA[i].w;
@@ -87,7 +109,7 @@ const GLSL_BODY = `
       vec3 home = (bindMatrixInverse * getBoneMatrix(floor(uPushB[i].w - 0.5)) * bindMatrix * vec4(position, 1.0)).xyz;
       vec3 e = home - a - ab * (dot(home - a, ab) / ab2);
       float el = length(e);
-      if (el > 1e-4) {
+      if (el > 1e-4 && el < ${SIDE_NEAR.toFixed(1)} * r) {
         e /= el;
         float de = dot(d, e);
         vec3 lat = d - e * de;
@@ -119,7 +141,7 @@ function pushPoint(p: THREE.Vector3, rest: THREE.Vector3, A: Float32Array, B: Fl
       const hx = home.x - ax, hy = home.y - ay, hz = home.z - az, k = (hx * bx + hy * by + hz * bz) / bb;
       let ex = hx - bx * k, ey = hy - by * k, ez = hz - bz * k;
       const el = Math.hypot(ex, ey, ez);
-      if (el > 1e-4) {
+      if (el > 1e-4 && el < SIDE_NEAR * r) {
         ex /= el; ey /= el; ez /= el;
         const de = dx * ex + dy * ey + dz * ez;
         const lx = dx - ex * de, ly = dy - ey * de, lz = dz - ez * de, ll = Math.hypot(lx, ly, lz);
@@ -182,13 +204,17 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
       const a = bone(d.a), b = bone(d.b);
       if (!a || !b) continue;
       const pa = bindPos(a), pb = bindPos(b);
+      if (d.ao) pa.add(new THREE.Vector3(...d.ao));
+      if (d.bo) pb.add(new THREE.Vector3(...d.bo));
+      const toLocal = (bn: THREE.Bone, p: THREE.Vector3) => p.clone().applyMatrix4(skel.boneInverses[skel.bones.indexOf(bn)]);
       const from = d.from ?? 0, extend = d.extend ?? 0;
       const s0 = pa.clone().lerp(pb, from), s1 = pb.clone().add(pb.clone().sub(pa).multiplyScalar(extend));
       seg.subVectors(s1, s0);
       const rs: number[] = [];
-      for (const n of d.bones) {
-        const bb = bone(n);
-        for (const p of (bb && inner.get(bb)) ?? []) {
+      // A trunk capsule measures everything beneath it in a slab 5 cm either side of its axis, whatever the bone.
+      const pts = d.ao ? [...inner.values()].flat().filter((p) => Math.abs(p.y - s0.y) < 0.05) : d.bones.flatMap((n) => { const bb = bone(n); return (bb && inner.get(bb)) ?? []; });
+      {
+        for (const p of pts) {
           const t = THREE.MathUtils.clamp(q.subVectors(p, s0).dot(seg) / seg.lengthSq(), 0, 1);
           // Only what lies along the capsule's own length (not round its rounded ends).
           if (t <= 0 || t >= 1) continue;
@@ -197,7 +223,7 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
       }
       if (rs.length < 8) continue;
       rs.sort((x, y) => x - y);
-      caps.push({ a, b, from, extend, r: rs[Math.floor((rs.length - 1) * (d.q ?? 1))] + MARGIN, side: !!d.side });
+      caps.push({ a, b, from, extend, r: rs[Math.floor((rs.length - 1) * (d.q ?? 1))] + MARGIN, side: !!d.side, la: d.ao ? toLocal(a, pa) : undefined, lb: d.bo ? toLocal(b, pb) : undefined });
     }
     if (!caps.length) continue;
     const A = new Float32Array(MAX_CAPS * 4), B = new Float32Array(MAX_CAPS * 4);
@@ -230,8 +256,8 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
     for (const s of setups) {
       inv.copy(s.mesh.matrixWorld).invert();
       s.caps.forEach((c, i) => {
-        pa.setFromMatrixPosition(c.a.matrixWorld).applyMatrix4(inv);
-        pb.setFromMatrixPosition(c.b.matrixWorld).applyMatrix4(inv);
+        (c.la ? pa.copy(c.la).applyMatrix4(c.a.matrixWorld) : pa.setFromMatrixPosition(c.a.matrixWorld)).applyMatrix4(inv);
+        (c.lb ? pb.copy(c.lb).applyMatrix4(c.b.matrixWorld) : pb.setFromMatrixPosition(c.b.matrixWorld)).applyMatrix4(inv);
         const s0 = pa.clone().lerp(pb, c.from), s1 = pb.clone().add(pb.clone().sub(pa).multiplyScalar(c.extend));
         s0.toArray(s.A, i * 4); s.A[i * 4 + 3] = c.r;
         s1.toArray(s.B, i * 4);
