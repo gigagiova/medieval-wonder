@@ -218,7 +218,7 @@ function makePlan(p: PlotInput): PlotPlan {
       const x = F[i] + R(-0.5, 0.5), z = F[i + 1] + R(-0.5, 0.5);
       if (clearAt(x, z) < 0.5) continue;
       if (out.beds.length && onRow(x, z)) continue;
-      out.tufts.push(Math.round(x * 100) / 100, Math.round(z * 100) / 100, Math.round(R(0.6, 1.3) * 100) / 100);
+      out.tufts.push(Math.round(x * 100) / 100, Math.round(z * 100) / 100, Math.round(R(0.9, 2.0) * 100) / 100);
     }
   };
   const onRow = (x: number, z: number) => out.beds.some((r) => {
@@ -260,7 +260,7 @@ function makePlan(p: PlotInput): PlotPlan {
       trees(Math.min(18, Math.max(2, Math.floor(area / 55))), 3.2, 'any');
       if (big && rand() < 0.6) stack();
       weeds(Math.min(6, Math.floor(area / 160)), ['grass_medium_02', 'weed_plant_02']);
-      tufts(0.3);
+      tufts(0.4);
       break;
     }
     case 'casalinum': {
@@ -320,7 +320,7 @@ function makePlan(p: PlotInput): PlotPlan {
       if (mid && !p.open) { const h = hut('shed', R(3.4, 4.2), R(2.4, 2.8)); woodpile(h); }
       trees(Math.min(8, Math.max(1, Math.floor(area / 160))), 2.8, 'any');
       weeds(Math.min(6, Math.floor(area / 150)), ['grass_medium_02', 'weed_plant_02', 'nettle_plant']);
-      tufts(0.35);
+      tufts(0.5);
       break;
     }
     case 'ruina':
@@ -365,7 +365,7 @@ function makePlan(p: PlotInput): PlotPlan {
         const q = pick(0.5, 'any', 10);
         if (q) prop(rand() < 0.55 ? 'nettle_plant' : 'fern_02', q.x, q.z, 2.8);
       }
-      tufts(0.25);
+      tufts(0.4);
       break;
     }
     case 'coemeterium': {

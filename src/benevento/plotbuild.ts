@@ -27,10 +27,9 @@ export function buildPlan(b: Builder, plan: PlotPlan, seed = 1) {
     ruin(b, w.brick ? 'brick' : 'rubble', w.L, w.h, 0.62, w.x, -0.3, w.z, w.ry, 0.55, w.open, w.open ? 1.5 : 0);
   }
   for (const s of plan.stacks) {
-    // A haystack round a pole, its top thatched to a point.
-    b.geo('bone', new THREE.CylinderGeometry(s.r, s.r * 1.06, s.h * 0.55, 11, 1), s.x, s.h * 0.275 - 0.1, s.z, R(0, 3), true, R(-0.03, 0.03), R(-0.03, 0.03), true);
-    if (coll) continue;
-    b.geo('bone', new THREE.ConeGeometry(s.r * 1.08, s.h * 0.5, 11, 1), s.x, s.h * 0.55 + s.h * 0.25 - 0.12, s.z, R(0, 3), false, 0, 0, true);
+    // A haystack round a pole: a bulging drum of straw under a pointed top, ragged at the edges.
+    if (coll) { b.geo('straw', new THREE.CylinderGeometry(s.r, s.r, s.h * 0.6, 8, 1), s.x, s.h * 0.3 - 0.1, s.z, 0, true, 0, 0, true); continue; }
+    b.geo('straw', haystack(s.r, s.h, r), s.x, -0.12, s.z, R(0, 3), false, 0, 0, true);
     flat(b, 'wood', 0.08, s.h + 0.7, 0.08, s.x, -0.1, s.z, 0, false, R(-0.04, 0.04));
   }
   if (plan.kiln) kiln(b, plan.kiln.x, plan.kiln.z, plan.kiln.ry, R);
@@ -75,7 +74,7 @@ export function buildPlan(b: Builder, plan: PlotPlan, seed = 1) {
   // Tussocks of grass and weeds on the unworked ground.
   if (!DETAIL.mid) for (let i = 0; i < plan.tufts.length; i += 3) {
     const s = plan.tufts[i + 2];
-    fol.tuft(plan.tufts[i], plan.tufts[i + 1], 0.32 * s, 5 + Math.floor(r() * 4));
+    fol.tuft(plan.tufts[i], plan.tufts[i + 1], 0.3 * s, 5 + Math.floor(r() * 3));
   }
   fol.flush(b);
   for (const g of plan.graves) {
@@ -182,6 +181,31 @@ class Foliage {
     b.geo('leaf', g, 0, 0, 0, 0, false, 0, 0, true);
     this.pos = []; this.nor = [];
   }
+}
+
+/** A haystack: a lathe (bulging drum, pointed top) with every vertex pushed in or out a little. */
+function haystack(r0: number, h: number, r: () => number) {
+  const prof: THREE.Vector2[] = [];
+  const n = 9;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, y = t * h;
+    const rr = t < 0.55 ? r0 * (0.9 + 0.18 * Math.sin((t / 0.55) * Math.PI * 0.8)) : r0 * 1.0 * Math.pow(1 - (t - 0.55) / 0.45, 0.85);
+    prof.push(new THREE.Vector2(Math.max(0.02, rr), y));
+  }
+  const g = new THREE.LatheGeometry(prof, 14);
+  const p = g.attributes.position as THREE.BufferAttribute;
+  // Weld the seam's jitter: the same push for the same (angle, height) on both sides of the seam.
+  const push = new Map<string, number>();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    let an = Math.atan2(z, x); if (an < 0) an += Math.PI * 2;
+    const k = `${Math.round(an * 100) % 628}|${Math.round(y * 100)}`;
+    let f = push.get(k);
+    if (f === undefined) { f = 1 + (r() - 0.5) * 0.14; push.set(k, f); }
+    p.setXYZ(i, x * f, y + (y > 0.05 && y < h - 0.1 ? (r() - 0.5) * 0.06 : 0), z * f);
+  }
+  g.computeVertexNormals();
+  return g;
 }
 
 /** A timber hut (plank walls, shingled gable), a sunken-floored hut (low walls under a steep roof) or an open shed. */

@@ -160,7 +160,7 @@ float underAt(vec3 p){ return step(p.y, terrainY(p.xz) - 2.5); }
 #if MAT == 7 || MAT == 8 || MAT == 16 || MAT == 18 || MAT == 15
   #define SPEC_K 1.0
 #elif MAT == 20
-  #define SPEC_K ((abs(vMat - 6.0) < 0.5 || abs(vMat - 11.0) < 0.5 || abs(vMat - 17.0) < 0.5 || abs(vMat - 23.0) < 0.5) ? 0.1 : 1.0)
+  #define SPEC_K ((abs(vMat - 6.0) < 0.5 || abs(vMat - 11.0) < 0.5 || abs(vMat - 17.0) < 0.5 || abs(vMat - 23.0) < 0.5 || abs(vMat - 24.0) < 0.5) ? 0.1 : 1.0)
 #else
   #define SPEC_K 0.1
 #endif
@@ -299,7 +299,7 @@ vec3 tintTex(vec3 c, vec3 tint, float k){ return c * mix(vec3(1.0), tint, k); }
 
 // The small untextured materials (iron, horn, embers, shutters...): one function,
 // so that a single draw can carry all of them (MAT 20, the id per vertex).
-#if MAT == 6 || MAT == 7 || MAT == 8 || MAT == 11 || MAT == 15 || MAT == 16 || MAT == 17 || MAT == 18 || MAT == 20 || MAT == 23
+#if MAT == 6 || MAT == 7 || MAT == 8 || MAT == 11 || MAT == 15 || MAT == 16 || MAT == 17 || MAT == 18 || MAT == 20 || MAT == 23 || MAT == 24
 void smallSurf(int id, vec3 p, vec3 n, inout Surf s){
   if (id == 6) {
     float g = vnoise(p*40.);
@@ -346,6 +346,13 @@ void smallSurf(int id, vec3 p, vec3 n, inout Surf s){
     s.alb = mix(green, brown, dry * 0.8) * (0.6 + 0.55*g) * (0.8 + 0.35*f);
     s.rough = 1.0;
     s.ao = 0.6 + 0.4*f;
+  } else if (id == 24) {
+    // Weathered straw: stalks running down the stack (streaks long in y), greyed and darker
+    // where the rain has got in.
+    float st = vnoise(vec3(p.x*38., p.y*3., p.z*38.)), w = vnoise(p*1.3);
+    s.alb = mix(vec3(0.24,0.2,0.13), vec3(0.15,0.13,0.1), smoothstep(0.3, 0.8, w)) * (0.72 + 0.45*st);
+    s.rough = 1.0;
+    s.ao = 0.75 + 0.25*st;
   }
 }
 #endif
@@ -475,7 +482,7 @@ Surf surface(vec3 p, vec3 n){
   s.nrm = normalize(mix(s.nrm, n, smoothstep(0.5, 1.0, wet) * 0.8));
   s.wet = wet;
   s.alb *= 0.88 + 0.24*nz.b;
-#elif MAT == 6 || MAT == 7 || MAT == 8 || MAT == 11 || MAT == 15 || MAT == 16 || MAT == 17 || MAT == 18 || MAT == 23
+#elif MAT == 6 || MAT == 7 || MAT == 8 || MAT == 11 || MAT == 15 || MAT == 16 || MAT == 17 || MAT == 18 || MAT == 23 || MAT == 24
   smallSurf(MAT, p, n, s);
 #elif MAT == 20
   smallSurf(int(vMat + 0.5), p, n, s);
