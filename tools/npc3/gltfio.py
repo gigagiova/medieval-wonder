@@ -100,6 +100,10 @@ class Gltf:
         p = self.prims(node_name)[k]
         self._fill(p, m)
 
+    def set_attr(self, node_name, k, name, arr, ctype, kind):
+        """Replace one vertex attribute of a primitive (the others untouched)."""
+        self.prims(node_name)[k]['attributes'][name] = self._add_acc(arr, ctype, kind, 34962)
+
     def _fill(self, p, m):
         A = p.setdefault('attributes', {})
         A['POSITION'] = self._add_acc(m['P'].astype(np.float32), 5126, 'VEC3', 34962)

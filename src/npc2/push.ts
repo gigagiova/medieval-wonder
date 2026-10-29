@@ -18,10 +18,10 @@ import type { OutfitV2 } from './kit';
 //
 // The audit (audit.ts) applies the same projection on the CPU (`userData.push`).
 
-export const MAX_CAPS = 10;
+export const MAX_CAPS = 12;
 const MARGIN = 0.008;
 
-interface CapDef { a: string; b: string; from?: number; extend?: number; bones: string[] }
+interface CapDef { a: string; b: string; from?: number; extend?: number; bones: string[]; /** Quantile of the inner layers' distances taken as the radius (default: all of them). */ q?: number }
 interface Cap { a: THREE.Bone; b: THREE.Bone; from: number; extend: number; r: number }
 
 // Which limbs each layer of garment is kept off.
@@ -37,9 +37,17 @@ const ARMS: CapDef[] = [
   { a: 'LeftForeArm', b: 'LeftHand', bones: ['LeftForeArm'] }, { a: 'RightForeArm', b: 'RightHand', bones: ['RightForeArm'] },
   { a: 'LeftArm', b: 'LeftForeArm', from: 0.25, bones: ['LeftArm'] }, { a: 'RightArm', b: 'RightForeArm', from: 0.25, bones: ['RightArm'] },
 ];
+const SHOULDERS: CapDef[] = [
+  { a: 'LeftShoulder', b: 'LeftArm', from: 0.45, bones: ['LeftShoulder', 'LeftArm'], q: 0.97 }, { a: 'RightShoulder', b: 'RightArm', from: 0.45, bones: ['RightShoulder', 'RightArm'], q: 0.97 },
+];
+const UPPER: CapDef[] = [
+  { a: 'LeftArm', b: 'LeftForeArm', bones: ['LeftArm'] }, { a: 'RightArm', b: 'RightForeArm', bones: ['RightArm'] },
+];
 const BY_LAYER: Record<string, CapDef[]> = {
   tunic: [...LEGS, ...HANDS],
-  over: [...ARMS, ...HANDS, ...LEGS.slice(0, 4)],
+  over: [...SHOULDERS, ...ARMS, ...HANDS, ...LEGS.slice(0, 4)],
+  // A hood's shoulder cape over the tunic.
+  head: [...SHOULDERS, ...UPPER],
 };
 
 const GLSL_HEAD = `uniform vec4 uPushA[${MAX_CAPS}]; uniform vec4 uPushB[${MAX_CAPS}];`;
@@ -130,7 +138,7 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
       }
       if (rs.length < 8) continue;
       rs.sort((x, y) => x - y);
-      caps.push({ a, b, from, extend, r: rs[Math.floor(rs.length * 0.98)] + MARGIN });
+      caps.push({ a, b, from, extend, r: rs[Math.floor((rs.length - 1) * (d.q ?? 1))] + MARGIN });
     }
     if (!caps.length) continue;
     const A = new Float32Array(MAX_CAPS * 4), B = new Float32Array(MAX_CAPS * 4);
@@ -149,6 +157,7 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
       (mat as THREE.Material & { uniformsNeedUpdate: boolean }).uniformsNeedUpdate = true;
     };
     m.userData.push = (p: THREE.Vector3) => pushPoint(p, A, B);
+    m.userData.pushCaps = caps.map((c) => [c.a.name, c.b.name, +c.r.toFixed(3)]);
     setups.push({ mesh: m, caps, A, B });
   }
   if (!setups.length) return null;

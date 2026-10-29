@@ -48,7 +48,7 @@ Plastic is rarely specular in this game (world specular is already ~0):
 | Less metre-scale geometric displacement on masonry (bulge/lean kept) | smooth-normal dents read as moulded clay | free (load-time) | — | adopted |
 | River: two-fetch drifting ripples, mud-coloured shallows (no shoreline seam), Fresnel (Schlick F0 0.02) reflection of our own sky | invisible / plastic water | 2 fetches | — | adopted |
 | Skin: wrapped diffuse with a red-shifted terminator (cheap pre-integrated SSS) | waxy/plastic faces | a few ALU | NVIDIA [GPU Gems ch.16](https://developer.nvidia.com/gpugems/gpugems/part-iii-materials/chapter-16-real-time-approximations-subsurface-scattering); Penner, [Pre-Integrated Skin Shading](https://www.slideshare.net/slideshow/penner-preintegrated-skin-rendering-siggraph-2011-advances-in-realtime-rendering-course/13966747) | already in `src/npc/scan.ts`; tuned |
-| Cloth: rough dielectric base, energy-compensated Charlie sheen, subtle weave normals | bright artificial rims and exaggerated faceting | physical sheen ALU; no extra draw pass | [Three.js physical lighting](https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderChunk/lights_physical_pars_fragment.glsl.js); [Filament cloth model](https://github.com/google/filament/blob/main/shaders/src/surface_shading_model_cloth.fs) | implemented in `src/npc/fabric.ts`; [controlled comparison](npc-audit/README.md#material-control-comparison) |
+| Cloth: rough dielectric base, energy-compensated Charlie sheen, subtle weave normals | bright artificial rims and exaggerated faceting | physical sheen ALU; no extra draw pass | [Three.js physical lighting](https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderChunk/lights_physical_pars_fragment.glsl.js); [Filament cloth model](https://github.com/google/filament/blob/main/shaders/src/surface_shading_model_cloth.fs) | implemented in `src/npc/fabric.ts`; the controlled comparison (`docs/npc-audit/README.md`) was lost: it was never committed and the workspace that held it failed (see [docs/npc/WARDROBE.md](npc/WARDROBE.md#lost-work)) |
 
 ## Atmosphere
 
@@ -80,8 +80,14 @@ Plastic is rarely specular in this game (world specular is already ~0):
 
 ## Character reconstruction
 
-The [NPC audit](npc-audit/README.md) separates material effects from incorrect
-geometry and rigging. The [cloak research](npc-audit/CLOAKS.md) records retrieved
-Blender and NVIDIA guidance on textile patterns, clasps, draping, moving-body
-collision, motion constraints and simulation resolution. The replacement cloak
-must pass visual and phone-budget checks before it is described as adopted.
+The earlier NPC audit (`docs/npc-audit/README.md`) and cloak research
+(`docs/npc-audit/CLOAKS.md`) are lost: they were never committed and the workspace that held them failed (see [docs/npc/WARDROBE.md](npc/WARDROBE.md#lost-work)).
+What replaced them, with sources: [docs/npc/WARDROBE.md](npc/WARDROBE.md)
+(belts, necklines, cloth/body clearance, wrists) and
+[tools/npc3/wardrobe.json](../tools/npc3/wardrobe.json).
+
+| Technique | Fixes | Phone cost | Implementation | Status |
+|---|---|---|---|---|
+| Belt cinch by position-based cloth projection, edge lengths kept (Müller et al., [Position Based Dynamics](https://matthias-research.github.io/pages/publications/posBasedDyn.pdf), 2007; Macklin et al., [XPBD](https://matthias-research.github.io/pages/publications/XPBD.pdf), 2016) | a belt that floats on a loose tunic, or a belted tunic whose panels were reshaped | none (offline, `tools/npc3/wardrobe_build.py`) | home-made numpy solver | adopted |
+| Garment vertices pushed out of limb capsules after skinning (the capsule colliders of game cloth: [NVIDIA NvCloth](https://github.com/NVIDIAGameWorks/NvCloth), [Unity Cloth](https://docs.unity3d.com/Manual/class-Cloth.html)) | legs, feet, hands and arms through skirts, sleeves and cloaks | a few ALU per garment vertex; 12 capsule ends per person per frame on the CPU | `src/npc2/push.ts` | adopted |
+| Straight wrists: the hand on the forearm's line, grips solved for the elbow (twist/swing split as in [Unity Animation Rigging](https://docs.unity3d.com/Packages/com.unity.animation.rigging@1.3/manual/constraints/TwistCorrection.html)) | bent and broken wrists | a 48x13 search per gripping hand within 30 m | `src/npc.ts` (`grasp`, `straightWrists`) | adopted |

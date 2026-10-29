@@ -449,7 +449,7 @@ Lombard grave assemblages, as discussed in [PEOPLE.md](PEOPLE.md#the-dukes-peopl
 Paul the Deacon, *Historia Langobardorum* IV 22 describes earlier Lombard dress
 and hair from paintings; it does not supply a sewing pattern for these assets.
 Physics-based draping establishes mechanical plausibility, not historical proof.
-The [construction research](../npc-audit/CLOAKS.md) keeps those claims separate.
+The construction research that kept those claims separate (`docs/npc-audit/CLOAKS.md`) was lost with an uncommitted workspace and is not in this repository; see [../npc/WARDROBE.md](../npc/WARDROBE.md#lost-work).
 The later C-IPC mechanics fixture uses a 270-degree circular cut and four
 front attachment points. That cut and front fastening are also **H — hypotheses**;
 they are not evidence for a period clasp spanning its roughly 14 cm front gap.
@@ -582,7 +582,7 @@ See [INTERIOR-ANALOGUES.md](INTERIOR-ANALOGUES.md),
 
 **Attested elsewhere:** the [Met's fourth–seventh-century Kharga tunic](https://www.metmuseum.org/art/collection/search/475116) documents cross-shaped, folded and sewn construction; the [V&A's Egyptian tunic dated 670–870](https://collections.vam.ac.uk/item/O119593/tunic-unknown/) describes almost straight shirt-like tunics and belts gathering their folds. These are Egyptian sources, not direct Benevento finds.
 
-**Reconstruction hypothesis, not yet a production garment:** the NPC experiment uses separate flat front/back T panels, a straight torso, tapered sleeves and complete curved neck notches sized to the unchanged native body. Exact panel layout, neckline, sleeve slope and ease are authored choices. See [TUNIC-CUT-CONSTRUCTION.md](../npc-audit/TUNIC-CUT-CONSTRUCTION.md) for the source assessment and physical/visual acceptance limits.
+**Reconstruction hypothesis, not yet a production garment:** the NPC experiment uses separate flat front/back T panels, a straight torso, tapered sleeves and complete curved neck notches sized to the unchanged native body. Exact panel layout, neckline, sleeve slope and ease are authored choices. Its source assessment (`docs/npc-audit/TUNIC-CUT-CONSTRUCTION.md`) was lost with an uncommitted workspace, and that experimental garment never reached the game; see [../npc/WARDROBE.md](../npc/WARDROBE.md#lost-work).
 
 ## Porta Aurea: architectural and circuit correction
 
@@ -684,3 +684,29 @@ height and top/masonry are reconstructed; a modern mapped footprint alone does
 not establish the survival of every elevation in700. Other projections still
 need registration against the curtain. See [TOWERS.md](TOWERS.md) for completed
 and outstanding work, Civitas Nova exclusions and source attribution.
+
+
+## Belts and girdles by role (NPC wardrobe, 29 October 2026)
+
+Every townsperson now wears a belt suited to who they are; requirements,
+sources and certainty per group are in `tools/npc3/wardrobe.json` and
+[../npc/WARDROBE.md](../npc/WARDROBE.md).
+
+- **A — monks:** the Rule of Benedict (ch. 22) has monks sleep "clothed and
+  girded with belts or cords"; the game gives them a hemp cord.
+- **A — clergy:** the girdle (*cingulum*) over the linen alb is among the
+  vestments brought to the pope in *Ordo Romanus I*; priests and deacons wear
+  a white linen cord. Its exact form in Benevento is not documented (**I**).
+- **A — Lombard men:** belts with buckle, plate and strap end (the five-piece
+  set of the early 7th century, later multi-part sets) are common in Lombard
+  graves, including Benevento's; the seax hung from them. Bronze buckles and
+  the multi-part set are props; the seax is kept for armed men without a cloak.
+- **I — Latin townsmen:** a plain leather strap with an iron buckle; slaves and
+  beggars a hemp cord (**H**).
+- **I — women:** belts are attested for Lombard women in graves; a woven sash
+  (girdle) tied at the front is the inference for women whose fittings were
+  not metal and for Latin townswomen. The tied ends and their lengths are **H**.
+
+How the belts are fitted is an engineering choice, not evidence: the belt
+draws the tunic in by a physical solve that keeps every panel's dimensions
+(the cloth gathers); the gown's bodice is already fitted at the waist.

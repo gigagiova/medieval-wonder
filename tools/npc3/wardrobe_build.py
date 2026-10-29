@@ -273,7 +273,7 @@ def tube_ring(path, radius, h, t, round_, segs):
     """A closed band round `path` (n x 3, closed loop), outward normals in xz."""
     n = len(path)
     V, Fs, UV = [], [], []
-    prof = ([(np.cos(a) * t / 2, np.sin(a) * h / 2) for a in np.linspace(0, 2 * np.pi, 8, endpoint=False)] if round_
+    prof = ([(np.cos(a) * t / 2, np.sin(a) * h / 2) for a in np.linspace(0, 2 * np.pi, 6, endpoint=False)] if round_
             else [(-t / 2, -h / 2), (t / 2, -h / 2), (t / 2, h / 2), (-t / 2, h / 2)])
     m = len(prof)
     for i in range(n):
@@ -296,7 +296,7 @@ def strip(points, outs, width, t, round_):
     """A hanging end: a flat strap (or a round cord) down a polyline, offset outward."""
     V, Fs, UV = [], [], []
     k = len(points)
-    prof = ([(np.cos(a) * width / 2, np.sin(a) * width / 2) for a in np.linspace(0, 2 * np.pi, 6, endpoint=False)] if round_
+    prof = ([(np.cos(a) * width / 2, np.sin(a) * width / 2) for a in np.linspace(0, 2 * np.pi, 5, endpoint=False)] if round_
             else [(-width / 2, 0), (width / 2, 0), (width / 2, t), (-width / 2, t)])
     m = len(prof)
     for i in range(k):
@@ -379,6 +379,66 @@ def facing(m, rep, U, F, loops, t=0.004, w=0.025):
     return dict(P=V, F=Fs, UV=np.array(UV), src=src)
 
 
+REACH, EDGE = 0.30, 0.10
+
+
+def ray_hits(O, Dn, V, F, reach):
+    """For each ray (origin O, unit dir Dn), whether it meets a triangle of (V, F) within reach (Moller-Trumbore)."""
+    hit = np.zeros(len(O), bool)
+    v0, e1, e2 = V[F[:, 0]], V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]]
+    for s0 in range(0, len(O), 64):
+        o, d = O[s0:s0 + 64, None, :], Dn[s0:s0 + 64, None, :]
+        pv = np.cross(d, e2[None])
+        det = np.einsum('ijk,jk->ij', pv, e1)
+        ok = np.abs(det) > 1e-12
+        inv = np.where(ok, 1 / np.where(ok, det, 1), 0)
+        tv = o - v0[None]
+        u = np.einsum('ijk,ijk->ij', tv, pv) * inv
+        qv = np.cross(tv, e1[None])
+        v = np.einsum('ijk,ijk->ij', d, qv) * inv
+        t = np.einsum('ijk,jk->ij', qv, e2) * inv
+        h = ok & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > 0.002) & (t < reach)
+        hit[s0:s0 + 64] = h.any(1)
+    return hit
+
+
+def add_hidden(g, meta, names, B):
+    bnode = [n['name'] for n in g.j['nodes'] if n['name'].endswith('.body')][0]
+    b = g.mesh(bnode, 0)
+    rep_b, Ub = weld(b['P'])
+    N = vertex_normals(Ub, rep_b[b['F']])[rep_b]
+    neck_y = B['Neck'][1] - 0.06
+    H = b['HIDE'].astype(np.int64)
+    added = {}
+    for oid, o in meta['outfits'].items():
+        bit = o['bit']
+        gl = [x for x in o['garments'] if meta['garments'][x]['layer'] in ('tunic', 'over')]
+        if not gl:
+            continue
+        Vs, Fs, edge_pts, off = [], [], [], 0
+        for x in gl:
+            m = g.mesh('G_' + x)
+            rep, U = weld(m['P'])
+            F = rep[m['F']]
+            Vs.append(U); Fs.append(F + off); off += len(U)
+            for loop in boundary_loops(F):
+                edge_pts.append(U[loop])
+        V = np.concatenate(Vs); F = np.concatenate(Fs)
+        edge = cKDTree(np.concatenate(edge_pts)) if edge_pts else None
+        cand = np.nonzero(((H >> bit) & 1 == 0) & (b['P'][:, 1] < neck_y))[0]
+        if edge is not None:
+            d, _ = edge.query(b['P'][cand])
+            cand = cand[d > EDGE]
+        if not len(cand):
+            continue
+        hit = ray_hits(b['P'][cand], N[cand], V, F, REACH)
+        new = cand[hit]
+        H[new] |= (1 << bit)
+        added[oid] = int(len(new))
+    g.set_attr(bnode, 0, '_HIDE', H.astype(np.float32), 5126, 'SCALAR')
+    return added
+
+
 def build(src, out, body_id, log=print):
     g = Gltf(os.path.join(src, body_id + '.json'))
     meta = g.meta()
@@ -390,7 +450,27 @@ def build(src, out, body_id, log=print):
     body = Body(g, nj)
     trunk_bones = [names.index(n) for n in ('Hips', 'Spine', 'Spine1', 'Spine2', 'LeftUpLeg', 'RightUpLeg') if n in names]
     trunk = body.D[:, trunk_bones].sum(1) > 0.5
-    report = {'body': body_id, 'garments': {}}
+    report = {'body': body_id, 'garments': {}, 'seams': {}}
+    # Seams closed: a garment's vertices split along a texture seam (same
+    # place, different UVs) must move together, or the cloth opens along the
+    # seam when the joints bend (the gown's front split in the walk). Each
+    # such group gets one skin, the mean of its members'.
+    for gid in meta['garments']:
+        node = 'G_' + gid
+        if not any(n['name'] == node for n in g.j['nodes']):
+            continue
+        m = g.mesh(node)
+        rep, U = weld(m['P'])
+        D = dense_weights(m['J'], m['W'], nj)
+        S = np.zeros((len(U), nj)); cnt = np.zeros(len(U))
+        np.add.at(S, rep, D); np.add.at(cnt, rep, 1)
+        Dm = S[rep] / cnt[rep][:, None]
+        differ = int((np.abs(Dm - D).max(1) > 1e-3).sum())
+        if differ:
+            J, W = top4(Dm)
+            g.put_mesh(node, dict(m, J=J, W=W))
+        report['seams'][gid] = differ
+    log(f'{body_id}: seam vertices re-skinned', json.dumps(report['seams']))
     belts_meta = {}
     yb_default = B['Hips'][1] + 0.55 * (B['Spine1'][1] - B['Hips'][1])
     for gid, spec in BELTS.items():
@@ -442,7 +522,7 @@ def build(src, out, body_id, log=print):
         report['garments'][gid] = dict(st, belt_y=yb)
         # Belts for this garment.
         bins = len(Rt)
-        a = np.linspace(0, 2 * np.pi, 64, endpoint=False)
+        a = np.linspace(0, 2 * np.pi, 40, endpoint=False)
         # The belt's inner face on the cinched cloth (its outer surface in the band).
         Rc = np.zeros(bins)
         ang = np.arctan2(P[:, 0] - c[0], P[:, 2] - c[1])
@@ -460,7 +540,7 @@ def build(src, out, body_id, log=print):
             S = STYLE[style]
             r = polar(Rc, a) + 0.0015
             path = np.stack([c[0] + np.sin(a) * r, np.full(len(a), yb), c[1] + np.cos(a) * r], 1)
-            V, Fb, UV = tube_ring(path, r, S['h'], S['t'], S['round'], 64)
+            V, Fb, UV = tube_ring(path, r, S['h'], S['t'], S["round"], 40)
             parts = [(V, Fb, UV, 'ring')]
             # Hanging ends from the knot/buckle, down the front of the skirt.
             for (length, width, ang0) in S['ends']:
@@ -521,6 +601,16 @@ def build(src, out, body_id, log=print):
             meta['garments'][bid] = {'fabric': S['fabric'], 'layer': 'belt', 'depth': depth, 'style': style}
             report['garments'][gid].setdefault('belts', {})[bid] = dict(style=style, tris=int(len(Fb)))
         belts_meta[gid] = {'default': spec['default'], 'styles': spec['styles']}
+    # Hidden skin: body vertices well under a long garment that tools/npc2/hide.py
+    # left visible (a strip down the front of the shin under a gown pokes
+    # through the skirt as the leg strides). A vertex is added to an outfit's
+    # hidden set when the ray out along its normal meets one of the outfit's
+    # body garments within REACH and it lies more than EDGE from every open
+    # edge (hem, cuff, neckline) of those garments. Only ever adds; never the
+    # head or the neck (the accepted face is untouched).
+    hidden_added = add_hidden(g, meta, names, B)
+    report['hidden_added'] = hidden_added
+    log(f'{body_id}: body vertices newly hidden per outfit', json.dumps(hidden_added))
     # Outfits: every body garment now wears its default belt.
     for oid, o in meta['outfits'].items():
         gl = [x for x in o['garments'] if meta['garments'][x]['layer'] != 'belt']

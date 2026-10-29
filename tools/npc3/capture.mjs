@@ -54,6 +54,8 @@ for (const [i, g] of list.entries()) {
         // The neckline from above and in front, looking down into the collar.
         else if (view === 'neck') at(0.25, neck.y + 0.38, 0.55, neck.x - c.x, neck.y - 0.08, neck.z - c.z + 0.03, 30);
         else if (view === 'waist') at(0.55, hips.y + 0.15, 1.05, hips.x - c.x, hips.y + 0.05, hips.z - c.z, 30);
+        else if (view === 'feet') { const l = b('LeftFoot'); at(0.7, 0.45, 1.1, l.x - c.x - 0.1, 0.15, l.z - c.z, 34); }
+        else if (view === 'legs') at(1.6, 0.75, 1.6, 0, 0.5, 0, 34);
         else if (view === 'hands') { const l = b('LeftHand'), r = b('RightHand'); const m = l.clone().add(r).multiplyScalar(0.5); at(0.9, m.y + 0.35, 1.6, m.x - c.x, m.y, m.z - c.z, 34); }
         p.carry(0);
         api.render();
