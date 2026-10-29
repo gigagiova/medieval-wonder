@@ -80,18 +80,23 @@
   "VENOSA": {
    "cite": "Jewish inscriptions of Venosa (5th-9th c.): a deeply Latinized community; no evidence of distinctive dress in this period",
    "url": "https://www.jewishvirtuallibrary.org/venosa"
+  },
+  "RIEMEN": {
+   "cite": "Riemenzunge (strap end): the metal end-reinforcement of a belt or strap; multi-part belts of the early Middle Ages carry several strap ends, each on its own side strap",
+   "url": "https://de.wikipedia.org/wiki/Riemenzunge"
   }
  },
  "belt_styles": {
   "leather": {
    "geometry": "strap 3.2 cm high, 4 mm thick, round the cinched waist; tongue 11 cm hanging from the buckle at the front",
-   "fittings": "buckle prop at the front (src/npc/population-props.ts makeBuckle): bronze frame and plate for Lombard men, a plain iron frame for townsmen; Lombard office-holders add the multi-part set of plates and strap ends (props.ts makeBeltFittings)",
+   "fittings": "buckle at the front (src/npc/population-props.ts makeBuckle): bronze frame and plate for Lombard men, a plain iron frame for townsmen. Lombard office-holders and armed men add the multi-part set (src/npc/props.ts makeBeltFittings): a tapered bronze main strap end (4.5 cm) on the belt's tongue, four narrow leather side straps (8 mm) from small mounts, each ending in a slim strap end 3.6-4.4 cm long tapering from 9 mm to a 5 mm round tip, and a counter-plate at the back. The number of pendants varies in the graves; four is a choice (H), their form (narrow, tapered, metal-tipped) is attested (A).",
    "sources": [
     "BELT",
     "MET",
     "CASSANO",
     "ROTILI",
-    "ISID"
+    "ISID",
+    "RIEMEN"
    ],
    "certainty": "A for Lombard men (five-piece and multi-part sets); I for Latin townsmen's plain belts"
   },
@@ -395,7 +400,8 @@
     "BELT",
     "MET",
     "ROTILI",
-    "ISID"
+    "ISID",
+    "RIEMEN"
    ],
    "certainty": "A"
   },
@@ -410,7 +416,8 @@
    "sources": [
     "BELT",
     "ROTILI",
-    "ISID"
+    "ISID",
+    "RIEMEN"
    ],
    "certainty": "A/I"
   },
@@ -425,7 +432,8 @@
    "sources": [
     "BELT",
     "ROTILI",
-    "ISID"
+    "ISID",
+    "RIEMEN"
    ],
    "certainty": "A/I"
   },
@@ -443,7 +451,8 @@
     "CASSANO",
     "ROTILI",
     "ISID",
-    "ROTH"
+    "ROTH",
+    "RIEMEN"
    ],
    "certainty": "A"
   },
@@ -473,7 +482,8 @@
    "sources": [
     "BELT",
     "PD",
-    "ISID"
+    "ISID",
+    "RIEMEN"
    ],
    "certainty": "I"
   },
@@ -487,7 +497,8 @@
    "fittings": "with the arms: set, sword, seax",
    "sources": [
     "PD",
-    "ROTH"
+    "ROTH",
+    "RIEMEN"
    ],
    "certainty": "H"
   },
