@@ -21,8 +21,8 @@ import type { OutfitV2 } from './kit';
 export const MAX_CAPS = 16;
 const MARGIN = 0.008;
 
-interface CapDef { a: string; b: string; from?: number; extend?: number; bones: string[]; /** Quantile of the inner layers' distances taken as the radius (default: all of them). */ q?: number; /** Keep each cloth point on its own side of the limb, see SIDE. */ side?: boolean; /** Offsets (bind space, m) of the ends from the bones: a capsule across the trunk. */ ao?: [number, number, number]; bo?: [number, number, number] }
-interface Cap { a: THREE.Bone; b: THREE.Bone; from: number; extend: number; r: number; side: boolean; /** Ends as points in the bones' own frames (offset capsules), else the bone origins. */ la?: THREE.Vector3; lb?: THREE.Vector3 }
+interface CapDef { a: string; b: string; from?: number; extend?: number; bones: string[]; /** Quantile of the inner layers' distances taken as the radius (default: all of them). */ q?: number; /** Keep each cloth point on its own side of the limb, see SIDE. */ side?: boolean; /** Offsets (bind space, m) of the ends from the bones: a capsule across the trunk. */ ao?: [number, number, number]; bo?: [number, number, number]; /** Cloth skinned mostly (> half) to these bones is left alone by this capsule: a sleeve's own cuff by the hand's. */ own?: string[] }
+interface Cap { a: THREE.Bone; b: THREE.Bone; from: number; extend: number; r: number; r1: number; side: boolean; own: number[]; /** Ends as points in the bones' own frames (offset capsules), else the bone origins. */ la?: THREE.Vector3; lb?: THREE.Vector3 }
 
 // Which limbs each layer of garment is kept off.
 const LEGS: CapDef[] = [
@@ -33,7 +33,7 @@ const LEGS: CapDef[] = [
 // The hand's capsule must hold the closed fingers too (their bones count for its radius).
 const fingers = (s: string) => ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'].flatMap((f) => [1, 2, 3].map((k) => `${s}Hand${f}${k}`));
 const HANDS: CapDef[] = [
-  { a: 'LeftHand', b: 'LeftHandMiddle1', extend: 0.7, bones: ['LeftHand', ...fingers('Left')], side: true }, { a: 'RightHand', b: 'RightHandMiddle1', extend: 0.7, bones: ['RightHand', ...fingers('Right')], side: true },
+  { a: 'LeftHand', b: 'LeftHandMiddle1', extend: 0.7, bones: ['LeftHand', ...fingers('Left')], side: true, own: ['LeftForeArm', 'LeftHand'] }, { a: 'RightHand', b: 'RightHandMiddle1', extend: 0.7, bones: ['RightHand', ...fingers('Right')], side: true, own: ['RightForeArm', 'RightHand'] },
 ];
 const ARMS: CapDef[] = [
   { a: 'LeftForeArm', b: 'LeftHand', bones: ['LeftForeArm'], side: true }, { a: 'RightForeArm', b: 'RightHand', bones: ['RightForeArm'], side: true },
@@ -69,7 +69,7 @@ const BY_LAYER: Record<string, CapDef[]> = {
   head: [...SHOULDERS, ...UPPER, TRUNK[1]],
 };
 
-const GLSL_HEAD = `uniform vec4 uPushA[${MAX_CAPS}]; uniform vec4 uPushB[${MAX_CAPS}];`;
+const GLSL_HEAD = `uniform vec4 uPushA[${MAX_CAPS}]; uniform vec4 uPushB[${MAX_CAPS}]; uniform float uPushR[${MAX_CAPS}]; uniform vec2 uPushX[${MAX_CAPS}];`;
 // SIDE: a plain projection pushes a cloth point out of a capsule along the
 // nearest way, so cloth that a striding leg (or a swinging arm under a cloak)
 // has overtaken — the front of a skirt left behind the shin — is pushed
@@ -98,11 +98,16 @@ const SIDE_WIDE = 1.35;
 const SIDE_NEAR = 3;
 const GLSL_BODY = `
   for (int i = 0; i < ${MAX_CAPS}; i++) {
-    float r = uPushA[i].w;
-    if (r <= 0.0) continue;
+    if (uPushA[i].w <= 0.0) continue;
+    if (uPushX[i].x > 0.5) {
+      float ow = 0.0;
+      for (int k = 0; k < 4; k++) if (abs(skinIndex[k] - (uPushX[i].x - 1.0)) < 0.5 || abs(skinIndex[k] - (uPushX[i].y - 1.0)) < 0.5) ow += skinWeight[k];
+      if (ow > 0.5) continue;
+    }
     vec3 a = uPushA[i].xyz, ab = uPushB[i].xyz - a;
     float ab2 = max(dot(ab, ab), 1e-8);
     float t = clamp(dot(transformed - a, ab) / ab2, 0.0, 1.0);
+    float r = mix(uPushA[i].w, uPushR[i], t);
     vec3 c = a + ab * t;
     vec3 d = transformed - c;
     if (uPushB[i].w > 0.5) {
@@ -126,14 +131,15 @@ const GLSL_BODY = `
   }`;
 
 /** The same projection on the CPU, for the audit: p skinned, rest its bind position, both in the mesh's local space. */
-function pushPoint(p: THREE.Vector3, rest: THREE.Vector3, A: Float32Array, B: Float32Array, M: THREE.Matrix4[]) {
+function pushPoint(p: THREE.Vector3, rest: THREE.Vector3, A: Float32Array, B: Float32Array, R: Float32Array, X: Float32Array, own: (b: number) => number, M: THREE.Matrix4[]) {
   const home = new THREE.Vector3();
   for (let i = 0; i < MAX_CAPS; i++) {
-    const r = A[i * 4 + 3];
-    if (r <= 0) continue;
+    if (A[i * 4 + 3] <= 0) continue;
+    if (X[i * 2] > 0.5 && own(X[i * 2] - 1) + (X[i * 2 + 1] > 0.5 ? own(X[i * 2 + 1] - 1) : 0) > 0.5) continue;
     const ax = A[i * 4], ay = A[i * 4 + 1], az = A[i * 4 + 2];
     const bx = B[i * 4] - ax, by = B[i * 4 + 1] - ay, bz = B[i * 4 + 2] - az, bb = Math.max(bx * bx + by * by + bz * bz, 1e-8);
     const t = Math.min(1, Math.max(0, ((p.x - ax) * bx + (p.y - ay) * by + (p.z - az) * bz) / bb));
+    const r = A[i * 4 + 3] * (1 - t) + R[i] * t;
     const cx = ax + bx * t, cy = ay + by * t, cz = az + bz * t;
     const dx = p.x - cx, dy = p.y - cy, dz = p.z - cz;
     if (B[i * 4 + 3] > 0.5) {
@@ -193,7 +199,7 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
     }
     return by;
   };
-  const setups: { mesh: THREE.SkinnedMesh; caps: Cap[]; A: Float32Array; B: Float32Array; M: THREE.Matrix4[] }[] = [];
+  const setups: { mesh: THREE.SkinnedMesh; caps: Cap[]; A: Float32Array; B: Float32Array; R: Float32Array; M: THREE.Matrix4[] }[] = [];
   for (const m of meshes) {
     if (m.userData.npc2 !== 'garment') continue;
     const defs = BY_LAYER[layerOf.get(m.userData.garment as string) ?? ''];
@@ -210,7 +216,7 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
       const from = d.from ?? 0, extend = d.extend ?? 0;
       const s0 = pa.clone().lerp(pb, from), s1 = pb.clone().add(pb.clone().sub(pa).multiplyScalar(extend));
       seg.subVectors(s1, s0);
-      const rs: number[] = [];
+      const rs: number[] = [], ts: number[] = [];
       // A trunk capsule measures everything beneath it in a slab 5 cm either side of its axis, whatever the bone.
       const pts = d.ao ? [...inner.values()].flat().filter((p) => Math.abs(p.y - s0.y) < 0.05) : d.bones.flatMap((n) => { const bb = bone(n); return (bb && inner.get(bb)) ?? []; });
       {
@@ -218,34 +224,45 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
           const t = THREE.MathUtils.clamp(q.subVectors(p, s0).dot(seg) / seg.lengthSq(), 0, 1);
           // Only what lies along the capsule's own length (not round its rounded ends).
           if (t <= 0 || t >= 1) continue;
-          rs.push(p.distanceTo(q.copy(s0).addScaledVector(seg, t)));
+          rs.push(p.distanceTo(q.copy(s0).addScaledVector(seg, t))); ts.push(t);
         }
       }
       if (rs.length < 8) continue;
-      rs.sort((x, y) => x - y);
-      caps.push({ a, b, from, extend, r: rs[Math.floor((rs.length - 1) * (d.q ?? 1))] + MARGIN, side: !!d.side, la: d.ao ? toLocal(a, pa) : undefined, lb: d.bo ? toLocal(b, pb) : undefined });
+      // Tapered: a radius at each end (the wrist is narrower than the elbow,
+      // the ankle than the calf), the larger of what lies in each half, then
+      // both scaled until the line between them holds (the q quantile of) everything.
+      let r0 = 0, r1 = 0;
+      rs.forEach((x, k) => { if (ts[k] < 0.5) r0 = Math.max(r0, x); else r1 = Math.max(r1, x); });
+      r0 ||= r1; r1 ||= r0;
+      const need = rs.map((x, k) => x / (r0 * (1 - ts[k]) + r1 * ts[k])).sort((x, y) => x - y);
+      const kq = Math.max(need[Math.floor((need.length - 1) * (d.q ?? 1))], d.q ? 0 : 1);
+      caps.push({ a, b, from, extend, r: r0 * kq + MARGIN, r1: r1 * kq + MARGIN, own: (d.own ?? []).map((n) => skel.bones.indexOf(bone(n)!)).filter((k) => k >= 0).slice(0, 2), side: !!d.side, la: d.ao ? toLocal(a, pa) : undefined, lb: d.bo ? toLocal(b, pb) : undefined });
     }
     if (!caps.length) continue;
-    const A = new Float32Array(MAX_CAPS * 4), B = new Float32Array(MAX_CAPS * 4);
-    const uA = { value: Array.from({ length: MAX_CAPS }, () => new THREE.Vector4()) }, uB = { value: Array.from({ length: MAX_CAPS }, () => new THREE.Vector4()) };
+    const A = new Float32Array(MAX_CAPS * 4), B = new Float32Array(MAX_CAPS * 4), R = new Float32Array(MAX_CAPS), X = new Float32Array(MAX_CAPS * 2);
+    const uA = { value: Array.from({ length: MAX_CAPS }, () => new THREE.Vector4()) }, uB = { value: Array.from({ length: MAX_CAPS }, () => new THREE.Vector4()) }, uR = { value: R }, uX = { value: Array.from({ length: MAX_CAPS }, () => new THREE.Vector2()) };
     const M = Array.from({ length: MAX_CAPS }, () => new THREE.Matrix4());
     const mat = m.material as THREE.Material;
     const prev = mat.onBeforeCompile, key = mat.customProgramCacheKey();
     mat.onBeforeCompile = (sh, r) => {
       prev.call(mat, sh, r);
-      sh.uniforms.uPushA = uA; sh.uniforms.uPushB = uB;
+      sh.uniforms.uPushA = uA; sh.uniforms.uPushB = uB; sh.uniforms.uPushR = uR; sh.uniforms.uPushX = uX;
       sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${GLSL_HEAD}`)
         .replace('#include <skinning_vertex>', `#include <skinning_vertex>${GLSL_BODY}`);
     };
     mat.customProgramCacheKey = () => key + '-push';
     m.onBeforeRender = () => {
-      for (let i = 0; i < MAX_CAPS; i++) { uA.value[i].fromArray(A, i * 4); uB.value[i].fromArray(B, i * 4); }
+      for (let i = 0; i < MAX_CAPS; i++) { uA.value[i].fromArray(A, i * 4); uB.value[i].fromArray(B, i * 4); uX.value[i].fromArray(X, i * 2); }
       (mat as THREE.Material & { uniformsNeedUpdate: boolean }).uniformsNeedUpdate = true;
     };
-    const rest = new THREE.Vector3(), P = m.geometry.attributes.position;
-    m.userData.push = (p: THREE.Vector3, i: number) => pushPoint(p, rest.fromBufferAttribute(P, i), A, B, M);
-    m.userData.pushCaps = caps.map((c) => [c.a.name, c.b.name, +c.r.toFixed(3)]);
-    setups.push({ mesh: m, caps, A, B, M });
+    caps.forEach((c, i) => c.own.forEach((k, j) => { X[i * 2 + j] = k + 1; }));
+    const rest = new THREE.Vector3(), P = m.geometry.attributes.position, SJ = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight;
+    m.userData.push = (p: THREE.Vector3, i: number) => {
+      const own = (b: number) => { let w = 0; for (let k = 0; k < 4; k++) if (SJ.getComponent(i, k) === b) w += SW.getComponent(i, k); return w; };
+      return pushPoint(p, rest.fromBufferAttribute(P, i), A, B, R, X, own, M);
+    };
+    m.userData.pushCaps = caps.map((c) => [c.a.name, c.b.name, +c.r.toFixed(3), +c.r1.toFixed(3)]);
+    setups.push({ mesh: m, caps, A, B, R, M });
   }
   if (!setups.length) return null;
   const _m = new THREE.Matrix4();
@@ -259,7 +276,7 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
         (c.la ? pa.copy(c.la).applyMatrix4(c.a.matrixWorld) : pa.setFromMatrixPosition(c.a.matrixWorld)).applyMatrix4(inv);
         (c.lb ? pb.copy(c.lb).applyMatrix4(c.b.matrixWorld) : pb.setFromMatrixPosition(c.b.matrixWorld)).applyMatrix4(inv);
         const s0 = pa.clone().lerp(pb, c.from), s1 = pb.clone().add(pb.clone().sub(pa).multiplyScalar(c.extend));
-        s0.toArray(s.A, i * 4); s.A[i * 4 + 3] = c.r;
+        s0.toArray(s.A, i * 4); s.A[i * 4 + 3] = c.r; s.R[i] = c.r1;
         s1.toArray(s.B, i * 4);
         const k = s.mesh.skeleton.bones.indexOf(c.a);
         s.B[i * 4 + 3] = c.side && k >= 0 ? k + 1 : 0;
