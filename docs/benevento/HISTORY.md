@@ -691,7 +691,7 @@ Supersedes the parts of §3, §4 and §6 that describe the registration, the cir
 and the generated houses; details and rules in [PLAN-TRACE.md](PLAN-TRACE.md).
 
 - **Footprints (attested by the owner's plan; their AD 700 use is inferred).** Every
-  building outline drawn on the plan is one house on that footprint (688 traced; 650
+  building outline drawn on the plan is one house on that footprint (672 traced; 653
   stand, the rest lie under landmark precincts). The 6,019 procedural lots, the street
   encroachment of §6 and the procedural fill of large blocks are gone. The plan is a
   survey of the later town: reading its outlines as AD 700 houses is the owner's rule
