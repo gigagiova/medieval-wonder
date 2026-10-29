@@ -71,6 +71,33 @@ function outside(bvh: MeshBVH, p: THREE.Vector3, n: THREE.Vector3, reach: number
   return fn.dot(n) > 0.2;
 }
 
+/**
+ * Which vertices of a mesh are on its outer surface: in the bind pose, the
+ * normal points away from the axis of the vertex's main bone (bone to its
+ * first child). A shoe's lining, a garment's turned-in facing or a hem's
+ * inside face away from the limb: they can only be seen through an opening,
+ * never come out "through" a garment, so they are not counted. Cached.
+ */
+function outerSurface(m: THREE.SkinnedMesh) {
+  if (m.userData.auditOuter) return m.userData.auditOuter as Uint8Array;
+  const g = m.geometry, P = g.attributes.position, N = g.attributes.normal, J = g.attributes.skinIndex, W = g.attributes.skinWeight;
+  const sk = m.skeleton, at = (b: THREE.Bone) => new THREE.Vector3().setFromMatrixPosition(sk.boneInverses[sk.bones.indexOf(b)].clone().invert());
+  const ends = sk.bones.map((b) => { const h = at(b), c = b.children.find((x) => (x as THREE.Bone).isBone) as THREE.Bone | undefined; return [h, c && sk.bones.includes(c) ? at(c) : h.clone()]; });
+  const out = new Uint8Array(P.count), v = new THREE.Vector3(), n = new THREE.Vector3(), q = new THREE.Vector3(), ab = new THREE.Vector3();
+  for (let i = 0; i < P.count; i++) {
+    let best = 0, w = -1;
+    for (let k = 0; k < 4; k++) if (W.getComponent(i, k) > w) { w = W.getComponent(i, k); best = J.getComponent(i, k); }
+    const [a, b] = ends[best];
+    v.fromBufferAttribute(P, i).applyMatrix4(m.bindMatrix); n.fromBufferAttribute(N, i).transformDirection(m.bindMatrix);
+    ab.subVectors(b, a);
+    const t = ab.lengthSq() > 1e-10 ? THREE.MathUtils.clamp(q.subVectors(v, a).dot(ab) / ab.lengthSq(), 0, 1) : 0;
+    q.copy(a).addScaledVector(ab, t);
+    out[i] = n.dot(v.sub(q)) > 0 ? 1 : 0;
+  }
+  m.userData.auditOuter = out;
+  return out;
+}
+
 /** The bone with the largest skin weight on a vertex (where on the body a crossing is). */
 function mainBone(m: THREE.SkinnedMesh, i: number) {
   const J = m.geometry.attributes.skinIndex, W = m.geometry.attributes.skinWeight;
@@ -92,9 +119,10 @@ export function pokeAudit(body: THREE.Object3D, depthOf: (g: string) => number, 
     const bvhP = shell(outer.mesh), bvhB = shell(outer.mesh, true);
     for (const inner of L) {
       if (inner.depth >= outer.depth || inner === outer) continue;
-      const pp = posed(inner.mesh), pb = posed(inner.mesh, true);
+      const pp = posed(inner.mesh), pb = posed(inner.mesh, true), surf = outerSurface(inner.mesh);
       let k = 0;
       for (const [i, p] of pp.P) {
+        if (!surf[i]) continue;
         if (!outside(bvhP, p, pp.N.get(i)!, reach)) continue;
         if (outside(bvhB, pb.P.get(i)!, pb.N.get(i)!, reach)) continue;
         k++;

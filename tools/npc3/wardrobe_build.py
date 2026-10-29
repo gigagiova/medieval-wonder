@@ -530,6 +530,60 @@ def add_hidden(g, meta, names, B):
     return added
 
 
+def garment_hide_fix(g, meta, B, min_tris=6):
+    """Garment triangles that an outfit hides (tools/npc2/hide.py): those under
+    a cloak are shown again below the shoulder blades, because the cloak
+    swings open there in the walk and a hidden robe leaves the legs bare; and
+    isolated specks of hidden triangles (fewer than `min_tris` connected), which are holes
+    in plain view, are shown again."""
+    done = {}
+    for x, gm in meta['garments'].items():
+        node = 'G_' + x
+        if not any(n['name'] == node for n in g.j['nodes']):
+            continue
+        m = g.mesh(node)
+        H = m['HIDE'].astype(np.int64)
+        H0 = H.copy()
+        F = m['F']
+        for oid, o in meta['outfits'].items():
+            if x not in o['garments']:
+                continue
+            bit = 1 << o['bit']
+            if 'cloak' in o['garments'] and gm['layer'] == 'tunic':
+                H[(m['P'][:, 1] < B['Spine1'][1])] &= ~bit
+            hidden = np.nonzero(((H[F] & bit) != 0).all(1))[0]
+            if not len(hidden):
+                continue
+            # Connected groups of hidden triangles (through shared corners, welded by position).
+            rep, _ = weld(m['P'])
+            parent = {int(t): int(t) for t in hidden}
+            def find(a):
+                while parent[a] != a:
+                    parent[a] = parent[parent[a]]; a = parent[a]
+                return a
+            first = {}
+            for t in hidden:
+                for v in rep[F[t]]:
+                    v = int(v)
+                    if v in first:
+                        ra, rb = find(int(t)), find(first[v])
+                        if ra != rb:
+                            parent[ra] = rb
+                    else:
+                        first[v] = int(t)
+            groups = {}
+            for t in hidden:
+                groups.setdefault(find(int(t)), []).append(int(t))
+            for ts in groups.values():
+                if len(ts) < min_tris:
+                    H[np.unique(F[ts])] &= ~bit
+        changed = int((H != H0).sum())
+        if changed:
+            g.set_attr(node, 0, '_HIDE', H.astype(np.float32), 5126, 'SCALAR')
+            done[x] = changed
+    return done
+
+
 def build(src, out, body_id, log=print):
     g = Gltf(os.path.join(src, body_id + '.json'))
     meta = g.meta()
@@ -627,9 +681,11 @@ def build(src, out, body_id, log=print):
         cloth_tree = cKDTree(Pv[trunk_cloth])
         Dg_trunk_index = np.nonzero(trunk_cloth)[0]
         Dg = dense_weights(m2['J'], m2['W'], nj)
+        band_idx = np.nonzero((np.abs(Pv[:, 1] - yb) < widest * 0.5 + 0.01) & trunk_cloth)[0]
+        band_tree = cKDTree(Pv[band_idx])
         for style, bid in spec['styles'].items():
             S = STYLE[style]
-            r = polar(Rc, a) + 0.0015
+            r = polar(Rc, a) + 0.003
             path = np.stack([c[0] + np.sin(a) * r, np.full(len(a), yb), c[1] + np.cos(a) * r], 1)
             V, Fb, UV = tube_ring(path, r, S['h'], S['t'], S["round"], 40)
             parts = [(V, Fb, UV, 'ring')]
@@ -677,8 +733,11 @@ def build(src, out, body_id, log=print):
             off = 0
             for (V, Fp, UV, kind) in parts:
                 if kind == 'ring' or kind == 'knot':
-                    _, nn = body.tree.query(V)
-                    Dv = body.D[nn]
+                    # The skin of the cloth it lies on (the band, itself skinned
+                    # like the body there), so belt and cloth move as one and
+                    # the gathered cloth cannot come out over the strap.
+                    _, nn = band_tree.query(V, k=4)
+                    Dv = Dg[band_idx[nn]].mean(1)
                 else:
                     # One skin per cross-section (the cloth under the path
                     # point, averaged over its six nearest cloth vertices), so
@@ -715,6 +774,9 @@ def build(src, out, body_id, log=print):
     hidden_added = add_hidden(g, meta, names, B)
     report['hidden_added'] = hidden_added
     log(f'{body_id}: body vertices newly hidden per outfit', json.dumps(hidden_added))
+    shown = garment_hide_fix(g, meta, B)
+    report['garment_vertices_shown'] = shown
+    log(f'{body_id}: garment vertices shown again', json.dumps(shown))
     # Outfits: every body garment now wears its default belt.
     for oid, o in meta['outfits'].items():
         gl = [x for x in o['garments'] if meta['garments'][x]['layer'] != 'belt']
