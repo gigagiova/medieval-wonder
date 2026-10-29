@@ -50,14 +50,50 @@ Per-garment numbers: [`evidence/wardrobe-build-report.json`](evidence/wardrobe-b
 
 ## Cloth clearance at run time
 
-`src/npc2/push.ts` projects each garment vertex out of up to 12 capsules after
+`src/npc2/push.ts` projects each garment vertex out of up to 16 capsules after
 skinning, in the vertex shader (the capsule colliders of game cloth, NVIDIA
 NvCloth, Unity Cloth; here a projection, not a simulation). The capsules
-follow the bones; each radius is measured once per person from what actually
-lies beneath that garment in that outfit (visible skin and lower layers, e.g.
-the hose under a skirt, the shirt sleeves under a cloak) plus 8 mm. CPU cost:
-the capsule ends, once per animated frame. The audit applies the identical
-projection on the CPU.
+follow the bones; each is tapered (a radius at each end) and measured once
+per person from what actually lies beneath that garment in that outfit
+(visible skin and lower layers, e.g. the hose under a skirt, the shirt
+sleeves under a cloak) plus 8 mm. CPU cost: the capsule ends, once per
+animated frame. The audit applies the identical projection on the CPU.
+
+Which capsules, by layer:
+
+- body garments (tunic, shirt, robe, gown): shins, thighs, feet, hands (with
+  the closed fingers; a sleeve's own cuff is left alone) and forearms (in the
+  sleeve);
+- cloaks: shoulders, arms, hands, legs, and four capsules lying *across* the
+  trunk (chest, waist, hips, mid-thigh riding on both thighs), whose plan
+  section is a stadium like the trunk's, so the belted tunic, the belt and
+  the skirt beneath stay inside the cloak;
+- hood capes and veils: shoulders, upper arms, chest.
+
+**Keeping the cloth on its own side.** A plain projection pushes a point out
+the nearest way, so the front of a skirt that a striding shin has overtaken is
+pushed further behind it and the leg shows through. Each limb capsule
+therefore knows the side each cloth point belongs on: where the point would be
+if it had moved rigidly with the limb's bone since the bind pose. A point
+within 1.35 radii of the axis sideways and on the wrong side (up to 5 radii
+behind) is carried across to the surface on its own side. Only cloth that lay
+within 3 radii of the limb in the bind pose has a side (a shirt front far
+from the forearm in the bind pose gets the plain projection). This is the
+inside/outside history of cloth-body collision (Bridson, Fedkiw and Anderson,
+"Robust treatment of collisions, contact and friction for cloth animation",
+SIGGRAPH 2002), reduced to capsules.
+
+**Hidden parts.** `tools/npc2/hide.py` hid body and garment triangles under
+other layers. Two of those choices showed as holes in motion and are undone by
+the build: shins under long skirts (the shoe stood empty when the skirt swung
+up) and the tunic or robe below the shoulder blades under a cloak (the cloak
+swings open in the walk). Isolated specks of hidden garment triangles (fewer
+than six connected) are shown again.
+
+**Belts on the cloth.** The belt ring and knot take the skin of the cloth band
+they lie on (itself skinned like the body there), so belt and gathered cloth
+move as one. The cinch ends with no triangle turned over (a turned triangle
+showed as a dark speck under the cingulum).
 
 ## Measuring
 
@@ -65,9 +101,17 @@ projection on the CPU.
   the belt styles, each of idle, walk and talk is stepped through one full
   loop at 30 fps; every frame counts the visible vertices of an inner layer
   that have come out through an outer layer (`src/npc2/audit.ts`), per layer
-  pair, and the wrist bend of both hands.
+  pair, and the wrist bend of both hands. Only the inner layer's *outer
+  surface* counts (in the bind pose its normal points away from its bone's
+  axis): a shoe's lining or a garment's turned-in facing can only be seen
+  through an opening, never come out through a garment. A belt is crossed
+  only by what it girds (what lay within 6 cm under it in the bind pose), not
+  by a sleeve hanging over it. Bind-pose offenders (where cloth simply ends)
+  are left out, as before. `WHERE=1` lists the offenders by bone.
 - `tools/npc3/capture.mjs`: matched close-ups (front, side, back, neck, waist,
-  hands, feet) in each clip, for the old and the new build side by side.
+  hands, feet) in each clip; `HIDE=body` (or a garment's name) leaves meshes
+  out, to tell a hole in the cloth from a limb coming through it.
+- `tools/npc3/compare.py`: before/after contact sheets from two captures.
 
 Results and image paths: [`evidence/README.md`](evidence/README.md).
 
