@@ -153,3 +153,28 @@ label it; its 700 position "150 m west of the 10th-c. gate" (HISTORY.md §4) no 
 has a wall to stand in once the east end is drawn in. The decumanus is the cheapest lane
 path between Porta S. Lorenzo and Porta Summa that stays near the line of Corso
 Garibaldi.
+
+## Follow-up, 29 October 2026
+
+- **Open ground filled.** The large open cells and the drawn cells joined to the lanes now
+  hold gardens, vines, orchards, huts, pens, ruins, a lime-burners' yard and burial grounds;
+  three long rectangular cells are read as buildings (`PLAN_HALLS`). See
+  [OPEN-GROUND.md](OPEN-GROUND.md).
+- **The black `east_street` capture.** Its camera, (640, −12) at eye height, was chosen
+  in a lane of the old procedural layout. The trace puts house footprint 418 there
+  (lot 354, 81.5 m², 5.7 m tall), so the camera stood inside a closed house: the ground
+  under a house is masked out, and the light field (its height map has the roof over the
+  eye) occludes both the sky light and the key light inside, so every surface in view is
+  black. Not a lighting, fog or ground failure: from a lane 9 m away, (636.5, −20), the
+  same view renders normally (`open-ground/east_street_new.png`).
+- **Travel points.** `tools/check-travel-points.ts` checks every teleport, the spawn and the
+  street cameras against the house footprints, the open ground's huts, ruins and stacks and
+  the curtain. It found the *Castellum Aquae* teleport inside a traced house (lot 603);
+  `world.ts` now moves any travel point that lands in a building to the nearest open ground
+  at least a metre from a wall (`openSpot`).
+- **Porta Aurea.** `tools/check-aurea-curtain.ts`: the curtain pieces within 70 m of the
+  arch join end to end; the only free ends are the two that meet the arch's piers (5.0 m
+  and 5.1 m from its centre); no curtain sample lies inside a house. West of the arch the
+  traced curtain runs south-west, then south along x ≈ 371, then west: the houses left of
+  the arch in the high view (lots 19 and 31) stand inside it, 1.6 m and 9 m off its line,
+  and hide its lower part from inside the town. No wall was added.

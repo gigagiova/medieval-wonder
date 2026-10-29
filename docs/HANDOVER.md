@@ -3,6 +3,21 @@
 This is the state of `main` (fast-forwarded from `claude/medieval-town`) at handover. Read `AGENTS.md` for the rules and the build commands.
 
 
+## The open ground filled (29 October 2026)
+
+The plan's open cells are no longer bare: kitchen gardens with edged beds of greens, vine
+rows on stakes, orchards, groups of timber and sunken-floored huts, pens with sheds and hay,
+roofless Roman walls reused as enclosures, a lime-burners' yard by the forum and one by the
+Castellum Aquae, a small burial ground beside each church inside the walls, threshing floors
+and meadows on the unwalled ground the lanes run through. Research with sources and
+certainty flags: HISTORY.md, "The open ground inside the walls"; rules, counts, cost and
+evidence: [OPEN-GROUND.md](benevento/OPEN-GROUND.md). Code: `src/benevento/plotfill.ts`
+(plans), `plotbuild.ts` (geometry), `layout.ts` §8b-8c (kinds, free ground, the three
+`PLAN_HALLS` cells read as buildings). New untextured material `leaf` (MAT 23, in the misc
+draw). Checks: `tools/check-travel-points.ts` (no teleport, spawn or capture camera inside a
+building; `world.ts` `openSpot` moves any that land in one), `tools/check-aurea-curtain.ts`.
+The black `east_street` capture was a camera inside a traced house (PLAN-TRACE.md follow-up).
+
 ## The plan traced cell by cell (28 October 2026)
 
 The town now copies the owner's plan directly: every drawn building outline is a house
