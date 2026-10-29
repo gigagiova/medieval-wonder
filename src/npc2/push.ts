@@ -68,13 +68,14 @@ const SKIRT: CapDef[] = [
 // the neck. A cloak's collar or a hood's cape lies over it, on the robe's
 // shoulder cape and the tunic's neckline; without it they cut each other
 // into white and dark shards round the neck.
-const YOKE: CapDef = { a: 'LeftShoulder', b: 'RightShoulder', ao: [0, 0, 0], bo: [0, 0, 0], bones: [] };
+// (Cloth skinned to the neck or head, a collar or a hood round the throat, is left to them.)
+const YOKE: CapDef = { a: 'LeftShoulder', b: 'RightShoulder', ao: [0, 0, 0], bo: [0, 0, 0], bones: [], own: ['Neck', 'Head'] };
 const BY_LAYER: Record<string, CapDef[]> = {
   // (Sleeves: the forearm only; round the upper arm the capsule would reach the chest's cloth.)
   tunic: [...LEGS, ...HANDS, ...ARMS.slice(0, 2)],
   over: [...SHOULDERS, ...ARMS, ...HANDS, ...LEGS.slice(0, 4), ...TRUNK, ...SKIRT, YOKE],
   // A hood's shoulder cape over the tunic.
-  head: [...SHOULDERS, ...UPPER, TRUNK[1], YOKE],
+  head: [...SHOULDERS, ...UPPER, TRUNK[1]],
 };
 
 const GLSL_HEAD = `uniform vec4 uPushA[${MAX_CAPS}]; uniform vec4 uPushB[${MAX_CAPS}]; uniform float uPushR[${MAX_CAPS}]; uniform vec2 uPushX[${MAX_CAPS}];`;
