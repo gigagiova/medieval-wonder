@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { propMats } from './props';
+import { propMats, fittingBronze } from './props';
 import { matte } from './rig';
 import { fabric } from './fabric';
 import type { Garment, Measure } from './garment';
@@ -139,7 +139,7 @@ export function makeBuckle(b: Garment['belt'], metal: 'bronze' | 'iron') {
   // The frame's open side to his left; standing proud of the strap.
   g.translate(b.cx + 0.012, b.y, b.cz + r + 0.002);
   const o = new THREE.Group();
-  o.add(new THREE.Mesh(g, metal === 'bronze' ? m.bronze : m.darkIron));
+  o.add(new THREE.Mesh(g, metal === 'bronze' ? fittingBronze() : m.darkIron));
   return o;
 }
 

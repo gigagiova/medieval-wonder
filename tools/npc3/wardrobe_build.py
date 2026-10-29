@@ -47,7 +47,7 @@ STRAIN_P99 = 0.03
 STRAIN_MAX = 0.20
 PERIMETER_MAX = 0.01
 ALPHAS = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
-VERSION = 2
+VERSION = 3
 
 # Per body garment: which belts are made for it, and the default.
 BELTS = {
@@ -595,6 +595,8 @@ def build(src, out, body_id, log=print):
     body = Body(g, nj)
     trunk_bones = [names.index(n) for n in ('Hips', 'Spine', 'Spine1', 'Spine2', 'LeftUpLeg', 'RightUpLeg') if n in names]
     trunk = body.D[:, trunk_bones].sum(1) > 0.5
+    trunk_cols = np.zeros(nj)
+    trunk_cols[[names.index(n) for n in ('Hips', 'Spine', 'Spine1', 'Spine2') if n in names]] = 1
     report = {'body': body_id, 'garments': {}, 'seams': {}}
     # Seams closed: a garment's vertices split along a texture seam (same
     # place, different UVs) must move together, or the cloth opens along the
@@ -646,7 +648,16 @@ def build(src, out, body_id, log=print):
         Pv = P[rep]
         _, nearest = body.tree.query(Pv)
         s = (1 - smooth(np.abs(Pv[:, 1] - yb), widest * 0.5 + 0.01, 0.09))[:, None]
-        D = D * (1 - s) + body.D[nearest] * s
+        # Only the trunk's part of the body's skin: the belt girds the trunk.
+        # Taking the thighs' weights too made the skirt just below the belt
+        # follow the striding thigh while the hem followed its cloth bones,
+        # and the band between them folded over in the walk (dark specks
+        # and pale blotches near the hem).
+        Db = body.D[nearest] * trunk_cols[None, :]
+        tot = Db.sum(1, keepdims=True)
+        Db = np.where(tot > 0.2, Db / np.maximum(tot, 1e-9), D)
+        s = s * np.clip(tot / 0.2, 0, 1)
+        D = D * (1 - s) + Db * s
         J, W = top4(D)
         Nw = vertex_normals(P, F)[rep]
         m2 = dict(m, P=Pv, N=Nw, J=J, W=W)

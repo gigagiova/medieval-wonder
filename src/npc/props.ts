@@ -454,27 +454,68 @@ export function makeSeax() {
 }
 
 /**
- * The Lombard multi-part belt (vielteilige Gürtelgarnitur): small plates on
- * the belt and strap ends hanging from it. Built in bind space.
+ * Cast bronze for small dress fittings (buckles, belt mounts, strap ends):
+ * golden brown and only half metallic, so that without an environment map it
+ * reads as worn bronze in the dusk rather than as black.
+ */
+let FB: THREE.Material | null = null;
+export const fittingBronze = () => (FB ??= matte(0x8c6c3c, 0.45, 0.3, { side: THREE.DoubleSide }));
+
+/** A strap end (Riemenzunge): a tongue tapering to a rounded tip, top at the origin, hanging down -Y, face +Z. */
+function strapEnd(len: number, w0: number, w1: number, t: number) {
+  const sh = new THREE.Shape();
+  sh.moveTo(-w0 / 2, 0);
+  sh.lineTo(w0 / 2, 0);
+  sh.lineTo(w1 / 2, -(len - w1 / 2));
+  sh.absarc(0, -(len - w1 / 2), w1 / 2, 0, -Math.PI, true);
+  sh.lineTo(-w0 / 2, 0);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: t, bevelEnabled: false, curveSegments: 4 });
+  g.translate(0, 0, -t / 2);
+  return g;
+}
+
+/**
+ * The Lombard multi-part belt (vielteilige Gürtelgarnitur) of the 7th
+ * century: besides the buckle (makeBuckle), a few narrow side straps hang
+ * from small mounts on the belt, each ending in a slim metal strap end
+ * tapering to a rounded tip, and a counter-plate sits at the back. Graves of
+ * Lombard Italy (Castel Trosino, Nocera Umbra, Benevento's own) have such
+ * sets in bronze or silver-inlaid iron; the number of pendant strap ends
+ * varies, a handful being usual (tools/npc3/wardrobe.json: BELT, MET,
+ * CASSANO, ROTILI, RIEMEN). Four here, hung at the front and his left, clear
+ * of the sword. Built in bind space.
  */
 export function makeBeltFittings(b: Garment['belt'], seed: number) {
-  const m = propMats();
-  const plates: THREE.BufferGeometry[] = [], straps: THREE.BufferGeometry[] = [], tips: THREE.BufferGeometry[] = [];
-  const angles = [-1.35, -0.95, -0.55, 0.45, 0.85, 1.25, 2.6, 3.0, 3.4];
-  for (const a of angles) {
-    const r = b.r(a) + 0.004;
+  const m = propMats(), metal = fittingBronze();
+  const mounts: THREE.BufferGeometry[] = [], straps: THREE.BufferGeometry[] = [], tips: THREE.BufferGeometry[] = [];
+  const angles = [-0.45, 0.3, 0.68, 1.06];
+  angles.forEach((a, k) => {
+    const r = b.r(a) + 0.006;
     const x = b.cx + Math.sin(a) * r, z = b.cz + Math.cos(a) * r;
-    plates.push(at(new THREE.BoxGeometry(0.024, 0.03, 0.005), x, b.y, z, 0, a, 0));
+    // The mount through which the side strap is riveted to the belt.
+    mounts.push(at(new THREE.BoxGeometry(0.012, 0.02, 0.0025), x, b.y - 0.002, z, 0, a, 0));
+    const len = 0.045 + ((Math.sin(k * 2.3 + seed) + 1) / 2) * 0.02;
+    // The side strap: thin leather, hanging a little out over the skirt.
+    straps.push(at(new THREE.BoxGeometry(0.008, len, 0.002), x, b.y - 0.012 - len / 2, z + 0.0005, 0.08, a, 0));
+    // Its strap end: 3.6-4.4 cm, 9 mm at the top narrowing to a 5 mm round tip.
+    const te = strapEnd(0.036 + (k % 2) * 0.008, 0.009, 0.005, 0.0022);
+    const yTop = b.y - 0.012 - len + 0.004;
+    tips.push(at(te, x + Math.sin(a) * len * 0.08, yTop, z + Math.cos(a) * len * 0.08, 0.08, a, 0));
+  });
+  // The main strap end (Hauptriemenzunge) on the belt's own hanging tongue
+  // (tools/npc3/wardrobe_build.py hangs it 11 cm down at the front, angle -0.05):
+  // larger, 4.5 cm, 2.4 cm wide narrowing to a 1.6 cm round tip.
+  {
+    const a = -0.05, r = b.r(a) + 0.009;
+    tips.push(at(strapEnd(0.045, 0.024, 0.016, 0.0025), b.cx + Math.sin(a) * r, b.y - 0.066, b.cz + Math.cos(a) * r, 0.04, a, 0));
   }
-  for (const a of [-1.1, -0.7, 0.7, 1.1, 2.8, 3.2]) {
-    const r = b.r(a) + 0.007;
-    const x = b.cx + Math.sin(a) * r, z = b.cz + Math.cos(a) * r;
-    const len = 0.07 + ((Math.sin(a * 13 + seed) + 1) / 2) * 0.05;
-    straps.push(at(new THREE.BoxGeometry(0.012, len, 0.003), x, b.y - 0.015 - len / 2, z, 0.06, a, 0));
-    tips.push(at(new THREE.BoxGeometry(0.014, 0.022, 0.004), x, b.y - 0.02 - len, z + Math.cos(a) * 0.002, 0.06, a, 0));
+  // The counter-plate at the back.
+  {
+    const a = Math.PI, r = b.r(a) + 0.005;
+    mounts.push(at(strapEnd(0.03, 0.022, 0.016, 0.0025).rotateZ(Math.PI / 2), b.cx + Math.sin(a) * r, b.y, b.cz + Math.cos(a) * r, 0, a, 0));
   }
   const o = new THREE.Group();
-  o.add(new THREE.Mesh(merge(plates), m.bronze), new THREE.Mesh(merge(straps), m.leather), new THREE.Mesh(merge(tips), m.bronze));
+  o.add(new THREE.Mesh(merge(mounts), metal), new THREE.Mesh(merge(straps), m.leather), new THREE.Mesh(merge(tips), metal));
   return o;
 }
 
