@@ -34,14 +34,14 @@ const HANDS: CapDef[] = [
   { a: 'LeftHand', b: 'LeftHandMiddle1', extend: 0.7, bones: ['LeftHand'] }, { a: 'RightHand', b: 'RightHandMiddle1', extend: 0.7, bones: ['RightHand'] },
 ];
 const ARMS: CapDef[] = [
-  { a: 'LeftForeArm', b: 'LeftHand', bones: ['LeftForeArm'] }, { a: 'RightForeArm', b: 'RightHand', bones: ['RightForeArm'] },
-  { a: 'LeftArm', b: 'LeftForeArm', from: 0.25, bones: ['LeftArm'] }, { a: 'RightArm', b: 'RightForeArm', from: 0.25, bones: ['RightArm'] },
+  { a: 'LeftForeArm', b: 'LeftHand', bones: ['LeftForeArm'], side: true }, { a: 'RightForeArm', b: 'RightHand', bones: ['RightForeArm'], side: true },
+  { a: 'LeftArm', b: 'LeftForeArm', from: 0.25, bones: ['LeftArm'], side: true }, { a: 'RightArm', b: 'RightForeArm', from: 0.25, bones: ['RightArm'], side: true },
 ];
 const SHOULDERS: CapDef[] = [
-  { a: 'LeftShoulder', b: 'LeftArm', from: 0.45, bones: ['LeftShoulder', 'LeftArm'], q: 0.97 }, { a: 'RightShoulder', b: 'RightArm', from: 0.45, bones: ['RightShoulder', 'RightArm'], q: 0.97 },
+  { a: 'LeftShoulder', b: 'LeftArm', from: 0.45, bones: ['LeftShoulder', 'LeftArm'], q: 0.97, side: true }, { a: 'RightShoulder', b: 'RightArm', from: 0.45, bones: ['RightShoulder', 'RightArm'], q: 0.97, side: true },
 ];
 const UPPER: CapDef[] = [
-  { a: 'LeftArm', b: 'LeftForeArm', bones: ['LeftArm'] }, { a: 'RightArm', b: 'RightForeArm', bones: ['RightArm'] },
+  { a: 'LeftArm', b: 'LeftForeArm', bones: ['LeftArm'], side: true }, { a: 'RightArm', b: 'RightForeArm', bones: ['RightArm'], side: true },
 ];
 const BY_LAYER: Record<string, CapDef[]> = {
   tunic: [...LEGS, ...HANDS],

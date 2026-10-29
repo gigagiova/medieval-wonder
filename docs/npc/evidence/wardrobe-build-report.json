@@ -5,15 +5,15 @@
    "shirt": {
     "fitted": false,
     "edges": 6062,
-    "perimeter_max": 2.1214675659186888e-05,
+    "perimeter_max": 2.1135985463383022e-05,
     "strain_p50": 0.0,
-    "strain_p99": 0.012234103363160822,
-    "strain_max": 0.09691907115020411,
-    "area_p99": 0.057980775076058255,
-    "flips": 1,
-    "moved_max_cm": 2.2060520765090827,
+    "strain_p99": 0.015620376260181574,
+    "strain_max": 0.15267689496750664,
+    "area_p99": 0.05805298696679167,
+    "flips": 0,
+    "moved_max_cm": 2.2068556157918247,
     "drawn_in_cm": 1.9416077544844508,
-    "band_radius_after_cm": 15.108912380476337,
+    "band_radius_after_cm": 15.134636828430986,
     "alpha": 0.0,
     "facing_loops": 1,
     "facing_tris": 168,
@@ -21,34 +21,34 @@
     "belts": {
      "belt": {
       "style": "leather",
-      "tris": 578
+      "tris": 386
      }
     }
    },
    "tunic": {
     "fitted": false,
     "edges": 6241,
-    "perimeter_max": 0.00012690867027598252,
+    "perimeter_max": 9.363889694213867e-05,
     "strain_p50": 0.0,
-    "strain_p99": 0.029353282059313927,
-    "strain_max": 0.1531231776160223,
-    "area_p99": 0.18969684880525975,
-    "flips": 13,
-    "moved_max_cm": 3.2530968204957182,
-    "drawn_in_cm": 2.6449620569259813,
+    "strain_p99": 0.017315056174993515,
+    "strain_max": 0.14477409422397614,
+    "area_p99": 0.13533006608486176,
+    "flips": 0,
+    "moved_max_cm": 1.9513202905654907,
+    "drawn_in_cm": 2.088142155068637,
     "band_radius_after_cm": 53.37094382998649,
-    "alpha": 0.4,
+    "alpha": 0.6,
     "facing_loops": 3,
     "facing_tris": 768,
     "belt_y": 1.0284970965627287,
     "belts": {
      "belt_tunic": {
       "style": "leather",
-      "tris": 578
+      "tris": 386
      },
      "cord_tunic": {
       "style": "cord",
-      "tris": 1266
+      "tris": 688
      }
     }
    },
@@ -57,29 +57,29 @@
     "edges": 8501,
     "perimeter_max": 0.0,
     "strain_p50": 0.0,
-    "strain_p99": 0.016995048680701008,
-    "strain_max": 0.16428392401680877,
-    "area_p99": 0.16934488707621292,
-    "flips": 11,
-    "moved_max_cm": 2.727755061963292,
-    "drawn_in_cm": 2.49744600382181,
+    "strain_p99": 0.022984523326158524,
+    "strain_max": 0.13076001405715942,
+    "area_p99": 0.1716005504131317,
+    "flips": 0,
+    "moved_max_cm": 2.379021406173706,
+    "drawn_in_cm": 2.915835763861621,
     "band_radius_after_cm": 53.37094382998649,
-    "alpha": 0.5,
+    "alpha": 0.0,
     "facing_loops": 5,
     "facing_tris": 1752,
     "belt_y": 1.0284970965627287,
     "belts": {
      "belt_robe": {
       "style": "leather",
-      "tris": 578
+      "tris": 386
      },
      "cord_robe": {
       "style": "cord",
-      "tris": 1266
+      "tris": 688
      },
      "sash_robe": {
       "style": "sash",
-      "tris": 686
+      "tris": 494
      }
     }
    },
@@ -88,24 +88,56 @@
     "edges": 8501,
     "perimeter_max": 0.0,
     "strain_p50": 0.0,
-    "strain_p99": 0.009645557873044068,
-    "strain_max": 0.09521545055013382,
-    "area_p99": 0.09697758356107872,
-    "flips": 4,
-    "moved_max_cm": 1.9308221662801415,
-    "drawn_in_cm": 2.088142155068637,
+    "strain_p99": 0.023721426725387573,
+    "strain_max": 0.14050695300102234,
+    "area_p99": 0.15877799689769745,
+    "flips": 0,
+    "moved_max_cm": 2.0287253856658936,
+    "drawn_in_cm": 2.915835763861621,
     "band_radius_after_cm": 52.89831921811401,
-    "alpha": 0.6,
+    "alpha": 0.0,
     "facing_loops": 5,
     "facing_tris": 1752,
     "belt_y": 1.0284970965627287,
     "belts": {
      "rope": {
       "style": "cord",
-      "tris": 1266
+      "tris": 688
      }
     }
    }
+  },
+  "seams": {
+   "cowl": 19,
+   "hood": 16,
+   "hose": 0,
+   "boots": 0,
+   "shoes": 0,
+   "robe": 26,
+   "longrobe": 24,
+   "rope": 0,
+   "tunic": 24,
+   "shirt": 0,
+   "belt": 0,
+   "cloak": 0
+  },
+  "hidden_added": {
+   "shins_shown": {
+    "monk": 132,
+    "monkBare": 132,
+    "robe": 132,
+    "robeCloak": 132
+   },
+   "monk": 123,
+   "monkBare": 123,
+   "peasantHood": 40,
+   "peasantCloak": 62,
+   "soldier": 78,
+   "soldierCloak": 62,
+   "robe": 123,
+   "robeCloak": 104,
+   "monk:robe": 82,
+   "peasantHood:tunic": 95
   },
   "body_unchanged": true
  },
@@ -115,15 +147,15 @@
    "shirt": {
     "fitted": false,
     "edges": 6062,
-    "perimeter_max": 2.3512154331939428e-05,
+    "perimeter_max": 2.2138325933451775e-05,
     "strain_p50": 0.0,
-    "strain_p99": 0.022341203517762323,
-    "strain_max": 0.12493312437574715,
-    "area_p99": 0.07389431068627315,
-    "flips": 1,
-    "moved_max_cm": 3.055072677625187,
+    "strain_p99": 0.02620984450594889,
+    "strain_max": 0.10600333208097262,
+    "area_p99": 0.0718724272315239,
+    "flips": 0,
+    "moved_max_cm": 3.0087413643143703,
     "drawn_in_cm": 2.382723446279908,
-    "band_radius_after_cm": 15.497720248025438,
+    "band_radius_after_cm": 16.157730236922376,
     "alpha": 0.0,
     "facing_loops": 1,
     "facing_tris": 168,
@@ -131,34 +163,34 @@
     "belts": {
      "belt": {
       "style": "leather",
-      "tris": 578
+      "tris": 386
      }
     }
    },
    "tunic": {
     "fitted": false,
     "edges": 6241,
-    "perimeter_max": 0.00015596466279432786,
+    "perimeter_max": 0.00013768672943115234,
     "strain_p50": 0.0,
-    "strain_p99": 0.028847977435899133,
-    "strain_max": 0.1579449723041797,
-    "area_p99": 0.19006748225945813,
-    "flips": 13,
-    "moved_max_cm": 3.262747921595162,
-    "drawn_in_cm": 2.974060993269967,
+    "strain_p99": 0.029159430414438248,
+    "strain_max": 0.17337921261787415,
+    "area_p99": 0.19529907405376434,
+    "flips": 0,
+    "moved_max_cm": 2.2730109691619873,
+    "drawn_in_cm": 2.708219059222605,
     "band_radius_after_cm": 54.03669786231288,
-    "alpha": 0.3,
+    "alpha": 0.4,
     "facing_loops": 3,
     "facing_tris": 768,
     "belt_y": 1.052156530587923,
     "belts": {
      "belt_tunic": {
       "style": "leather",
-      "tris": 578
+      "tris": 386
      },
      "cord_tunic": {
       "style": "cord",
-      "tris": 1266
+      "tris": 688
      }
     }
    },
@@ -167,29 +199,29 @@
     "edges": 8501,
     "perimeter_max": 0.0,
     "strain_p50": 0.0,
-    "strain_p99": 0.02037529322125252,
-    "strain_max": 0.1814924869085516,
-    "area_p99": 0.1506004009942019,
-    "flips": 6,
-    "moved_max_cm": 2.785299023445048,
-    "drawn_in_cm": 2.288135304527411,
+    "strain_p99": 0.024255070835351944,
+    "strain_max": 0.18797004222869873,
+    "area_p99": 0.16610290110111237,
+    "flips": 0,
+    "moved_max_cm": 3.0225043296813965,
+    "drawn_in_cm": 2.974060993269967,
     "band_radius_after_cm": 54.03669786231288,
-    "alpha": 0.5,
+    "alpha": 0.0,
     "facing_loops": 5,
     "facing_tris": 1752,
     "belt_y": 1.052156530587923,
     "belts": {
      "belt_robe": {
       "style": "leather",
-      "tris": 578
+      "tris": 386
      },
      "cord_robe": {
       "style": "cord",
-      "tris": 1266
+      "tris": 688
      },
      "sash_robe": {
       "style": "sash",
-      "tris": 686
+      "tris": 494
      }
     }
    },
@@ -198,24 +230,56 @@
     "edges": 8501,
     "perimeter_max": 0.0,
     "strain_p50": 0.0,
-    "strain_p99": 0.012704447423472641,
-    "strain_max": 0.18331002369713073,
-    "area_p99": 0.09150895108881098,
-    "flips": 2,
-    "moved_max_cm": 2.1603794175796986,
-    "drawn_in_cm": 2.275744342749128,
+    "strain_p99": 0.01455960888415575,
+    "strain_max": 0.19851794838905334,
+    "area_p99": 0.12161959707736969,
+    "flips": 0,
+    "moved_max_cm": 2.5091488361358643,
+    "drawn_in_cm": 2.5550710029574653,
     "band_radius_after_cm": 54.03669786231288,
-    "alpha": 0.5,
+    "alpha": 0.3,
     "facing_loops": 5,
     "facing_tris": 1752,
     "belt_y": 1.052156530587923,
     "belts": {
      "rope": {
       "style": "cord",
-      "tris": 1266
+      "tris": 688
      }
     }
    }
+  },
+  "seams": {
+   "cowl": 12,
+   "hood": 12,
+   "hose": 0,
+   "boots": 0,
+   "shoes": 0,
+   "robe": 23,
+   "longrobe": 25,
+   "rope": 0,
+   "tunic": 24,
+   "shirt": 0,
+   "belt": 0,
+   "cloak": 0
+  },
+  "hidden_added": {
+   "shins_shown": {
+    "monk": 132,
+    "monkBare": 132,
+    "robe": 132,
+    "robeCloak": 132
+   },
+   "monk": 148,
+   "monkBare": 148,
+   "peasantHood": 58,
+   "peasantCloak": 87,
+   "soldier": 88,
+   "soldierCloak": 87,
+   "robe": 148,
+   "robeCloak": 137,
+   "monk:robe": 72,
+   "peasantHood:tunic": 171
   },
   "body_unchanged": true
  },
@@ -241,34 +305,34 @@
     "belts": {
      "belt": {
       "style": "leather",
-      "tris": 578
+      "tris": 386
      }
     }
    },
    "tunic": {
     "fitted": false,
     "edges": 6241,
-    "perimeter_max": 0.00019278474054584827,
+    "perimeter_max": 0.00022089481353759766,
     "strain_p50": 0.0,
-    "strain_p99": 0.02489874818305185,
-    "strain_max": 0.1761805846934819,
-    "area_p99": 0.14762685984301743,
-    "flips": 6,
-    "moved_max_cm": 2.52892989334524,
-    "drawn_in_cm": 2.12452495190463,
+    "strain_p99": 0.026090091094374657,
+    "strain_max": 0.18258710205554962,
+    "area_p99": 0.15048792958259583,
+    "flips": 0,
+    "moved_max_cm": 2.350353240966797,
+    "drawn_in_cm": 2.384421163284378,
     "band_radius_after_cm": 50.863346592863536,
-    "alpha": 0.6,
+    "alpha": 0.5,
     "facing_loops": 3,
     "facing_tris": 768,
     "belt_y": 1.018417076944983,
     "belts": {
      "belt_tunic": {
       "style": "leather",
-      "tris": 578
+      "tris": 386
      },
      "cord_tunic": {
       "style": "cord",
-      "tris": 1266
+      "tris": 688
      }
     }
    },
@@ -277,29 +341,29 @@
     "edges": 8501,
     "perimeter_max": 0.0,
     "strain_p50": 0.0,
-    "strain_p99": 0.019500327748385893,
-    "strain_max": 0.18870204872614807,
-    "area_p99": 0.12314089818886635,
-    "flips": 8,
-    "moved_max_cm": 2.7063709703249765,
-    "drawn_in_cm": 2.12452495190463,
+    "strain_p99": 0.026634952053427696,
+    "strain_max": 0.18392808735370636,
+    "area_p99": 0.11881259828805923,
+    "flips": 0,
+    "moved_max_cm": 2.57572865486145,
+    "drawn_in_cm": 3.0808778083545096,
     "band_radius_after_cm": 50.863346592863536,
-    "alpha": 0.6,
+    "alpha": 0.2,
     "facing_loops": 5,
     "facing_tris": 1752,
     "belt_y": 1.018417076944983,
     "belts": {
      "belt_robe": {
       "style": "leather",
-      "tris": 578
+      "tris": 386
      },
      "cord_robe": {
       "style": "cord",
-      "tris": 1266
+      "tris": 688
      },
      "sash_robe": {
       "style": "sash",
-      "tris": 686
+      "tris": 494
      }
     }
    },
@@ -308,11 +372,11 @@
     "edges": 8501,
     "perimeter_max": 0.0,
     "strain_p50": 0.0,
-    "strain_p99": 0.016528461811627017,
-    "strain_max": 0.12748519870725838,
-    "area_p99": 0.09347778058065369,
-    "flips": 3,
-    "moved_max_cm": 3.3903757817261466,
+    "strain_p99": 0.018054712563753128,
+    "strain_max": 0.11040648072957993,
+    "area_p99": 0.09438289701938629,
+    "flips": 0,
+    "moved_max_cm": 2.402641534805298,
     "drawn_in_cm": 2.104534572900987,
     "band_radius_after_cm": 50.56350300898499,
     "alpha": 0.5,
@@ -322,10 +386,42 @@
     "belts": {
      "rope": {
       "style": "cord",
-      "tris": 1266
+      "tris": 688
      }
     }
    }
+  },
+  "seams": {
+   "cowl": 8,
+   "hood": 6,
+   "hose": 0,
+   "boots": 0,
+   "shoes": 0,
+   "robe": 25,
+   "longrobe": 27,
+   "rope": 0,
+   "tunic": 29,
+   "shirt": 0,
+   "belt": 0,
+   "cloak": 0
+  },
+  "hidden_added": {
+   "shins_shown": {
+    "monk": 131,
+    "monkBare": 131,
+    "robe": 131,
+    "robeCloak": 131
+   },
+   "monk": 187,
+   "monkBare": 187,
+   "peasantHood": 94,
+   "peasantCloak": 52,
+   "soldier": 56,
+   "soldierCloak": 52,
+   "robe": 187,
+   "robeCloak": 161,
+   "monk:robe": 55,
+   "peasantHood:tunic": 141
   },
   "body_unchanged": true
  },
@@ -351,34 +447,34 @@
     "belts": {
      "belt": {
       "style": "leather",
-      "tris": 578
+      "tris": 386
      }
     }
    },
    "tunic": {
     "fitted": false,
     "edges": 6241,
-    "perimeter_max": 0.00022166761227970788,
+    "perimeter_max": 0.00025856494903564453,
     "strain_p50": 0.0,
-    "strain_p99": 0.026567257107054612,
-    "strain_max": 0.12053710353265952,
-    "area_p99": 0.20163633861594077,
-    "flips": 3,
-    "moved_max_cm": 2.9255209662412773,
-    "drawn_in_cm": 1.9298452923601273,
+    "strain_p99": 0.028299503028392792,
+    "strain_max": 0.17957067489624023,
+    "area_p99": 0.20164991915225983,
+    "flips": 0,
+    "moved_max_cm": 2.532907009124756,
+    "drawn_in_cm": 2.261711525405008,
     "band_radius_after_cm": 48.732859437703574,
-    "alpha": 0.5,
+    "alpha": 0.4,
     "facing_loops": 3,
     "facing_tris": 768,
     "belt_y": 0.9902853876011788,
     "belts": {
      "belt_tunic": {
       "style": "leather",
-      "tris": 578
+      "tris": 386
      },
      "cord_tunic": {
       "style": "cord",
-      "tris": 1266
+      "tris": 688
      }
     }
    },
@@ -387,29 +483,29 @@
     "edges": 8501,
     "perimeter_max": 0.0,
     "strain_p50": 0.0,
-    "strain_p99": 0.023913105475065696,
-    "strain_max": 0.16672205603352092,
-    "area_p99": 0.14354923206851863,
-    "flips": 7,
-    "moved_max_cm": 3.861031359692274,
-    "drawn_in_cm": 2.9254439914947747,
+    "strain_p99": 0.02999836578965187,
+    "strain_max": 0.1614418625831604,
+    "area_p99": 0.1306440383195877,
+    "flips": 0,
+    "moved_max_cm": 2.704177141189575,
+    "drawn_in_cm": 3.176120258934878,
     "band_radius_after_cm": 48.732859437703574,
-    "alpha": 0.2,
+    "alpha": 0.1,
     "facing_loops": 5,
     "facing_tris": 1752,
     "belt_y": 0.9902853876011788,
     "belts": {
      "belt_robe": {
       "style": "leather",
-      "tris": 578
+      "tris": 386
      },
      "cord_robe": {
       "style": "cord",
-      "tris": 1266
+      "tris": 688
      },
      "sash_robe": {
       "style": "sash",
-      "tris": 686
+      "tris": 494
      }
     }
    },
@@ -418,24 +514,56 @@
     "edges": 8501,
     "perimeter_max": 0.0,
     "strain_p50": 0.0,
-    "strain_p99": 0.01765223140266315,
-    "strain_max": 0.13875543107669067,
-    "area_p99": 0.10746765450760509,
-    "flips": 5,
-    "moved_max_cm": 3.161082244924688,
-    "drawn_in_cm": 2.9254439914947747,
+    "strain_p99": 0.020503345876932144,
+    "strain_max": 0.16503408551216125,
+    "area_p99": 0.12763740122318268,
+    "flips": 0,
+    "moved_max_cm": 2.9926564693450928,
+    "drawn_in_cm": 3.176120258934878,
     "band_radius_after_cm": 47.80849868562496,
-    "alpha": 0.2,
+    "alpha": 0.1,
     "facing_loops": 5,
     "facing_tris": 1752,
     "belt_y": 0.9902853876011788,
     "belts": {
      "rope": {
       "style": "cord",
-      "tris": 1266
+      "tris": 688
      }
     }
    }
+  },
+  "seams": {
+   "cowl": 5,
+   "hood": 2,
+   "hose": 0,
+   "boots": 0,
+   "shoes": 0,
+   "robe": 27,
+   "longrobe": 24,
+   "rope": 0,
+   "tunic": 31,
+   "shirt": 0,
+   "belt": 0,
+   "cloak": 0
+  },
+  "hidden_added": {
+   "shins_shown": {
+    "monk": 124,
+    "monkBare": 124,
+    "robe": 124,
+    "robeCloak": 124
+   },
+   "monk": 172,
+   "monkBare": 172,
+   "peasantHood": 84,
+   "peasantCloak": 46,
+   "soldier": 52,
+   "soldierCloak": 46,
+   "robe": 172,
+   "robeCloak": 144,
+   "monk:robe": 48,
+   "peasantHood:tunic": 97
   },
   "body_unchanged": true
  },
@@ -461,10 +589,23 @@
     "belts": {
      "girdle": {
       "style": "sash",
-      "tris": 686
+      "tris": 494
      }
     }
    }
+  },
+  "seams": {
+   "shoes": 0,
+   "gown": 0,
+   "veil": 0
+  },
+  "hidden_added": {
+   "shins_shown": {
+    "woman": 142,
+    "womanShawl": 142
+   },
+   "woman": 142,
+   "womanShawl": 142
   },
   "body_unchanged": true
  },
@@ -490,10 +631,23 @@
     "belts": {
      "girdle": {
       "style": "sash",
-      "tris": 686
+      "tris": 494
      }
     }
    }
+  },
+  "seams": {
+   "shoes": 0,
+   "gown": 0,
+   "veil": 0
+  },
+  "hidden_added": {
+   "shins_shown": {
+    "woman": 140,
+    "womanShawl": 140
+   },
+   "woman": 138,
+   "womanShawl": 138
   },
   "body_unchanged": true
  }
