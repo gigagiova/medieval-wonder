@@ -125,3 +125,13 @@ measurements under headless software rendering, not measured phone FPS.
 solid pier/curtain barriers and San Lorenzo. No new wall/lot overlap was
 introduced; contacts with lots1 and2 already existed in the baseline and are
 recorded explicitly rather than reported as newly fixed.
+
+## Superseded by registration v2 (28 October 2026)
+
+The plan-relative move of the arch to (389,−256.218) and the straightened samples 52–54
+are withdrawn. The curtain is now traced from the drawing itself (the north edge was no
+longer clipped at row 150, and the triangle's apex is not taken for the edge), and the
+registration matches the arch's OSM footprint centroid to the point where the drawn north
+edge passes under triangle 3 (the hidden stretch is taken as the straight line from
+(912,161) to (946,180)). Porta Aurea stands at (389.26,−225.58), its mapped position,
+2.1 m from the traced curtain, which meets its piers on both sides. See PLAN-TRACE.md.

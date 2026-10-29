@@ -3,6 +3,21 @@
 This is the state of `main` (fast-forwarded from `claude/medieval-town`) at handover. Read `AGENTS.md` for the rules and the build commands.
 
 
+## The plan traced cell by cell (28 October 2026)
+
+The town now copies the owner's plan directly: every drawn building outline is a house
+on that footprint (~650 standing), the large undivided cells are walled gardens and
+meadows, the lane spaces are the drawn lanes at their drawn widths, and the curtain is
+the drawn outer line less Civitas Nova (3.05 km, including the east end and Rocca that
+were cut before). The 6,019 procedural lots and the street-encroachment pass are gone.
+Registration v2 puts Porta Aurea back at its mapped position on the curtain; the
+procedural towers are replaced by the eight towers traced from the plan. Pipeline,
+rules, uncertainties and evidence: [PLAN-TRACE.md](benevento/PLAN-TRACE.md). Checks:
+`tools/check-plan-access.ts` (gates, doors and stairs reach the main lanes),
+`check-pacca-burials.ts`, `check-triggio-burials.ts`, `check-missing-churches.ts`,
+`check-panaro.ts`. The older notes below (tower increment, Porta Aurea correction,
+"all 6,019 footprints unchanged") describe the previous layout.
+
 ## Wall tower registration — first increment (28 October 2026)
 
 The owner explicitly wants every tower/projection traced from the plan, with

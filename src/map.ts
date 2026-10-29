@@ -220,6 +220,20 @@ function houses(ctx: CanvasRenderingContext2D, d: MapData, P: (x: number, z: num
   ctx.globalCompositeOperation = 'multiply';
   ctx.drawImage(wc, x0, y0, n * STEP * r.res * k, m * STEP * r.res * k);
   ctx.restore();
+  // Each house on its traced footprint, in a fine ink line over the wash.
+  ctx.save();
+  ctx.strokeStyle = 'rgba(59,42,26,0.5)';
+  ctx.fillStyle = 'rgba(176,112,72,0.22)';
+  ctx.lineWidth = Math.max(0.35, k * 0.18);
+  ctx.lineJoin = 'round';
+  for (const c of d.houses) {
+    ctx.beginPath();
+    c.forEach(([x, z], i) => { const [a, b] = P(x, z); if (i) ctx.lineTo(a, b); else ctx.moveTo(a, b); });
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /** Gardens, vines, pens and ruins inside the walls: hatched patches with a pale wash. */
