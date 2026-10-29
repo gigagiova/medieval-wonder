@@ -184,7 +184,9 @@ full-world approach views; the reported separate gap was not reproduced.
 The continuation record `npc-audit/CONTINUATION.md` and the NPC experiments it
 described were never committed and are lost; see [RECOVERY.md](RECOVERY.md).
 What the townsfolk work now stands on, and which of those experiments were not
-resumed, is in [npc/WARDROBE.md](npc/WARDROBE.md).
+resumed, is in [npc/WARDROBE.md](npc/WARDROBE.md). Open NPC defect: cloaks (and the
+mantles over robes) still cross the belted tunic or robe beneath them in the
+walk; numbers in [npc/evidence/README.md](npc/evidence/README.md).
 
 
 1. **Real-phone check.** No change since the latest performance pass has been checked on an iPhone. That pass measured, headless at 390×844:
