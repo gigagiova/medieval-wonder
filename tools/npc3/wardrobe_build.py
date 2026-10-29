@@ -445,8 +445,28 @@ def add_hidden(g, meta, names, B):
     neck_y = B['Neck'][1] - 0.06
     H = b['HIDE'].astype(np.int64)
     added = {}
+    # Shins under a long skirt are shown again (tools/npc2/hide.py hid them):
+    # when the skirt swings up in the stride, a hidden shin leaves the shoe
+    # standing empty with slivers of skin. The skirt is kept off the shins at
+    # run time by the leg capsules of src/npc2/push.ts instead. Skin inside
+    # the shoe (below its top, less 1 cm) stays hidden.
+    J = b['J'].astype(int); W = b['W']
+    main = J[np.arange(len(J)), W.argmax(1)]
+    shin_ids = [i for i, n in enumerate(names) if n.endswith('Leg') and not n.endswith('UpLeg')]
+    shin = np.isin(main, shin_ids)
+    shown = {}
+    for oid, o in meta['outfits'].items():
+        if not any(x in ('gown', 'robe', 'longrobe') for x in o['garments']):
+            continue
+        tops = [g.mesh('G_' + x)['P'][:, 1].max() for x in o['garments'] if x in ('shoes', 'boots')]
+        top = (min(tops) if tops else 0.0) - 0.01
+        sel = shin & (b['P'][:, 1] > top) & ((H >> o['bit']) & 1 == 1)
+        H[sel] &= ~(1 << o['bit'])
+        shown[oid] = int(sel.sum())
+    added['shins_shown'] = shown
     for oid, o in meta['outfits'].items():
         bit = o['bit']
+        long_skirt = any(x in ('gown', 'robe', 'longrobe') for x in o['garments'])
         gl = [x for x in o['garments'] if meta['garments'][x]['layer'] in ('tunic', 'over')]
         if not gl:
             continue
@@ -460,7 +480,7 @@ def add_hidden(g, meta, names, B):
                 edge_pts.append(U[loop])
         V = np.concatenate(Vs); F = np.concatenate(Fs)
         edge = cKDTree(np.concatenate(edge_pts)) if edge_pts else None
-        cand = np.nonzero(((H >> bit) & 1 == 0) & (b['P'][:, 1] < neck_y))[0]
+        cand = np.nonzero(((H >> bit) & 1 == 0) & (b['P'][:, 1] < neck_y) & ~(shin & long_skirt))[0]
         if edge is not None:
             d, _ = edge.query(b['P'][cand])
             cand = cand[d > EDGE]

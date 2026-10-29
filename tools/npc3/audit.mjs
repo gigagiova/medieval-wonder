@@ -21,7 +21,8 @@ const DEFAULT = [
   'arimannus:0', 'gasindus:0', 'sculdahis:0', 'aldius:0', 'aldius:1', 'servus:0', 'negotiator:0', 'negotiator:1',
   'presbyter:1', 'presbyter:0', 'monachus:0', 'monachus:1', 'langobarda:0', 'mulier:1', 'sanctimonialis:0',
 ];
-const [out = 'audit.json', groups = DEFAULT.join(','), anims = 'idle,walk,talk', fps = '30'] = process.argv.slice(2);
+const [out = 'audit.json', groupsArg, anims = 'idle,walk,talk', fps = '30'] = process.argv.slice(2);
+const groups = groupsArg || DEFAULT.join(',');
 const port = process.env.PORT ?? '5191';
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 640, height: 480 } });
