@@ -64,7 +64,23 @@ Contents (all low; nothing in an open cell is taller than a one-storey hut or a 
 Garden, vineyard, orchard, meadow and cemetery walls are dry-stone walls 1.25-1.55 m high
 (one sees over them); yards, pens and ruins keep walls of 2.0-2.6 m. No animals (no models).
 
-Counts (`npx tsx tools/benevento/open_ground_stats.ts`): COUNTS
+Counts (`npx tsx tools/benevento/open_ground_stats.ts`):
+
+| Kind | Cells (unwalled) | m² | Huts/sheds | Trees | Beds | Vine rows | Pens | Hay | Graves | Ruin walls | Kilns | Threshing floors | Wells |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| orto | 12 | 13,042 | 12 | 56 | 336 | | | | | | | | 6 |
+| vinea | 5 | 4,764 | 5 | 7 | | 82 | | | | | | | |
+| pomarium | 26 (18) | 29,744 | 8 | 101 | | | | 2 | | | | | |
+| casalinum | 7 | 6,799 | 14 | 10 | 24 | | 7 | | | | | | |
+| stabulum | 7 | 8,081 | 7 | 9 | | | 9 | 9 | | | | | 1 |
+| pratum | 19 (12) | 26,010 | 7 | 63 | | | | 36 | | | | 5 | |
+| area | 4 (4) | 10,637 | | 15 | | | | 9 | | | | 3 | |
+| ruina | 5 | 5,357 | 5 | 7 | | | | | | 20 | | | |
+| calcaria | 2 | 2,758 | 2 | 2 | | | | | | 8 | 2 | | |
+| coemeterium | 3 | 5,759 | | 3 | 43 | | | | 84 | | | | |
+| **total** | **90 (34)** | **112,951** | **60** | **273** | | | | | | | | | |
+
+Plus 656 houses (653 + the three halls).
 
 ## 3. Techniques and cost
 
