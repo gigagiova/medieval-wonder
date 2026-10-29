@@ -47,7 +47,7 @@ STRAIN_P99 = 0.03
 STRAIN_MAX = 0.20
 PERIMETER_MAX = 0.01
 ALPHAS = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
-VERSION = 1
+VERSION = 2
 
 # Per body garment: which belts are made for it, and the default.
 BELTS = {
@@ -245,6 +245,8 @@ def cinch(m, body, B, yb, h, trunk, arm_w, iters=1500, gap=0.015, alpha=0.0, fit
                 P[v] = 0.7 * P[v] + 0.3 * U[v]
     if fitted:
         P = U.copy()
+    else:
+        P = untangle(P, U, F, E, L0, cnt, free, pin)
     l = np.linalg.norm(P[E[:, 0]] - P[E[:, 1]], axis=1)
     # Relative change, judged in absolute terms (per cm) on sub-centimetre edges.
     strain = (l - L0) / np.maximum(L0, 0.01)
@@ -267,6 +269,39 @@ def cinch(m, body, B, yb, h, trunk, arm_w, iters=1500, gap=0.015, alpha=0.0, fit
                  moved_max_cm=float(disp.max() * 100), drawn_in_cm=float(max(0.0, narrow) * 100),
                  band_radius_after_cm=float(np.hypot(P[np.abs(P[:, 1] - yb) < h * 0.4, 0] - c[0], P[np.abs(P[:, 1] - yb) < h * 0.4, 2] - c[1]).max() * 100) if (np.abs(P[:, 1] - yb) < h * 0.4).any() else 0)
     return rep, P, F, stats, Rt, c
+
+
+def untangle(P, U, F, E, L0, cnt, free, pin, rounds=400):
+    """No triangle may end the solve turned over: a back-facing triangle is
+    culled at run time and leaves a hole in the cloth. Each round, the
+    vertices of every triangle that is turned over, or turned past ~84
+    degrees from its authored normal, and their neighbours, are eased back
+    towards the authored shape, then the edge lengths are projected again.
+    Stops when none is left (or after `rounds`)."""
+    A0 = np.cross(U[F[:, 1]] - U[F[:, 0]], U[F[:, 2]] - U[F[:, 0]])
+    a0 = np.einsum('ij,ij->i', A0, A0)
+    nb = [[] for _ in range(len(U))]
+    for a, b in E:
+        nb[a].append(b); nb[b].append(a)
+    for _ in range(rounds):
+        A1 = np.cross(P[F[:, 1]] - P[F[:, 0]], P[F[:, 2]] - P[F[:, 0]])
+        bad = np.einsum('ij,ij->i', A0, A1) < 0.1 * a0 ** 0.5 * np.linalg.norm(A1, axis=1)
+        if not bad.any():
+            break
+        v = set(np.unique(F[bad]).tolist())
+        for x in list(v):
+            v.update(nb[x])
+        v = np.array(sorted(v))
+        P[v] = 0.6 * P[v] + 0.4 * U[v]
+        for _ in range(3):
+            corr = np.zeros_like(P)
+            dv = P[E[:, 1]] - P[E[:, 0]]
+            l = np.linalg.norm(dv, axis=1)
+            k = ((l - L0) / np.maximum(l, 1e-9))[:, None] * dv * 0.5
+            np.add.at(corr, E[:, 0], k); np.add.at(corr, E[:, 1], -k)
+            P += corr / cnt[:, None] * free[:, None]
+        P[pin] = U[pin]
+    return P
 
 
 def tube_ring(path, radius, h, t, round_, segs):
@@ -528,7 +563,7 @@ def build(src, out, body_id, log=print):
             rep, P, F, st, Rt, c = cinch(m, body, B, yb, widest + 0.006, trunk, arm_w, alpha=alpha, fitted=spec.get('fitted', False))
             st['alpha'] = alpha
             log(f'{body_id} {gid}: cinch at y={yb:.3f}', json.dumps({k: round(v, 4) if isinstance(v, float) else v for k, v in st.items()}))
-            if st['strain_p99'] <= STRAIN_P99 and st['strain_max'] <= STRAIN_MAX and st['perimeter_max'] <= PERIMETER_MAX:
+            if st['strain_p99'] <= STRAIN_P99 and st['strain_max'] <= STRAIN_MAX and st['perimeter_max'] <= PERIMETER_MAX and st['flips'] == 0:
                 break
         else:
             raise SystemExit(f'{body_id} {gid}: no cinch within the strain limits')
@@ -593,9 +628,16 @@ def build(src, out, body_id, log=print):
                     if y == ys[0]:
                         rad = polar(Rc, np.array([ang0]))[0] + S['t'] + 0.002
                     o = np.array([np.sin(ang0), 0, np.cos(ang0)])
-                    pts.append(np.array([c[0], y, c[1]]) + o * rad); outs.append(o)
+                    pts.append(rad); outs.append(o)
+                # It hangs: never in nearer than the knot, over the folds it
+                # meets (the max of each point and its neighbours), smoothed,
+                # so it does not zigzag in and out of the pleats.
+                rad = np.maximum(np.array(pts), pts[0])
+                rad = np.maximum.reduce([rad, np.r_[rad[1:], rad[-1]], np.r_[rad[0], rad[:-1]]])
+                rad = np.maximum(rad, np.convolve(np.r_[rad[0], rad, rad[-1]], [0.25, 0.5, 0.25], 'valid'))
+                pts = [np.array([c[0], y, c[1]]) + o * r_ for y, o, r_ in zip(ys, outs, rad)]
                 Vs, Fs_, UVs = strip(np.array(pts), outs, width, S['t'], S['round'])
-                parts.append((Vs, Fs_, UVs, 'end'))
+                parts.append((Vs, Fs_, UVs, ('end', np.array(pts), len(Vs) // len(pts))))
             if style in ('cord', 'sash'):
                 # The knot: a small lump where the ends start.
                 ang0 = S['ends'][0][2] * 0.5 + S['ends'][-1][2] * 0.5
@@ -618,8 +660,14 @@ def build(src, out, body_id, log=print):
                     _, nn = body.tree.query(V)
                     Dv = body.D[nn]
                 else:
-                    _, nn = cloth_tree.query(V)
-                    Dv = Dg[Dg_trunk_index[nn]]
+                    # One skin per cross-section (the cloth under the path
+                    # point, averaged over its six nearest cloth vertices), so
+                    # the strap keeps its section as it swings.
+                    _, path_pts, per = kind
+                    _, nn = cloth_tree.query(path_pts, k=6)
+                    Dr = Dg[Dg_trunk_index[nn]].mean(1)
+                    Dv = np.repeat(Dr, per, axis=0)
+                    kind = 'end'
                 Jv, Wv = top4(Dv)
                 Fp = outward(V, Fp, c) if kind != 'end' else Fp
                 Vall.append(V); Fall.append(Fp + off); UVall.append(UV); Jall.append(Jv); Wall.append(Wv)
