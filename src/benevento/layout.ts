@@ -572,10 +572,9 @@ function openGround(lay: Layout, parcels: typeof GEO_PARCELS, lastDrawn: number,
 
   // The unwalled ground: drawn cells joined to the lanes, and the larger wide parts of the lane spaces.
   for (const p of parcels) {
-    if (!p.sq || p.a < 350) continue;
+    // Every wide part of the lane spaces is a cell of its own (only the drawn corridors are lane).
+    if (!p.sq || p.a < 60) continue;
     if (reservedShare(p.pts) > 0.3) continue;
-    const drawn = p.src <= lastDrawn;
-    if (!drawn && p.a < 600) continue;
     const pts = simple(p.pts), [cx, cz] = centroid(p.pts);
     lay.plots.push({ pts, kind: 'pratum', seed: 900001 + p.src * 7919, cx, cz, open: true, src: p.src });
   }
@@ -617,7 +616,8 @@ function openGround(lay: Layout, parcels: typeof GEO_PARCELS, lastDrawn: number,
     const p = q.p, u = q.u;
     if (p.open) {
       // Ground the lanes run through: orchards and meadow, hay and threshing floors.
-      p.kind = p.src !== undefined && p.src <= lastDrawn ? (u < 0.45 ? 'pomarium' : u < 0.75 ? 'area' : 'pratum') : (u < 0.5 ? 'pomarium' : 'pratum');
+      // Larger ones: also gardens and a hut or two (the ways through are kept clear).
+      p.kind = q.A >= 500 ? (u < 0.3 ? 'pomarium' : u < 0.5 ? 'orto' : u < 0.65 ? 'casalinum' : u < 0.8 ? 'area' : 'pratum') : (u < 0.5 ? 'pratum' : 'pomarium');
       continue;
     }
     const nearCurtis = Math.hypot(q.cx - SITES.curtis.x, q.cz - SITES.curtis.z) < 170;

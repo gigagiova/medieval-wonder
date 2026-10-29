@@ -1,7 +1,7 @@
 """Top-down map of the open ground's plans, in world metres (x east, z south).
 
 Usage: python tools/benevento/open_ground_map.py open_ground.json out.png [x0 z0 x1 z1 px_per_m] [cam x z yaw ...]
-Houses grey; walled cells by kind (legend); unwalled ground hatched; squares sand; lanes white;
+Houses grey; walled cells by kind (wall lines dark); unwalled cells paler; street ground white, lane centre lines and paths light grey;
 huts, sheds, ruin walls, kilns and stacks black; trees green dots; beds brown; vines purple;
 pens orange; graves white; threshing floors yellow; wells blue. Cameras: red wedges."""
 import json, sys, math
@@ -22,21 +22,18 @@ KIND = {  # BGR
     'stabulum': (90, 150, 190), 'casalinum': (100, 130, 170), 'ruina': (150, 150, 160), 'calcaria': (205, 205, 200),
     'coemeterium': (170, 160, 150), 'area': (120, 200, 210), 'cortis': (90, 170, 230), 'hortulus': (110, 170, 120)}
 cv2.fillPoly(img, [P(D['wall'])], (250, 250, 250))
-for q in D['squares']: cv2.fillPoly(img, [P(q)], (190, 225, 240))
-for s in D['streets']:
-    cv2.polylines(img, [P(s['pts'])], False, (255, 255, 255), max(1, int(min(s['w'], 4) * S * 0.5)))
 for p in D['plots']:
     col = KIND.get(p['kind'], (150, 190, 160))
     if p['open']:
-        m = np.zeros((H, W), np.uint8); cv2.fillPoly(m, [P(p['pts'])], 1)
-        hatch = np.zeros((H, W), np.uint8)
-        for k in range(-H, W, 6): cv2.line(hatch, (k, 0), (k + H, H), 1, 1)
-        img[(m > 0) & (hatch > 0)] = col
+        # unwalled: the same colour, a little paler, no wall line
+        cv2.fillPoly(img, [P(p['pts'])], tuple(int(c * 0.8 + 255 * 0.2) for c in col))
     else:
         cv2.fillPoly(img, [P(p['pts'])], col)
         n = len(p['pts'])
         for k in p['walls']:
             cv2.line(img, tuple(P([p['pts'][k]])[0]), tuple(P([p['pts'][(k + 1) % n]])[0]), (60, 60, 80), 2)
+for s in D['streets']:
+    cv2.polylines(img, [P(s['pts'])], False, (215, 215, 215), 1)
 for l in D['lots']: cv2.fillPoly(img, [P(l)], (125, 125, 125)); cv2.polylines(img, [P(l)], True, (80, 80, 80), 1)
 for p in D['plots']:
     for b in p['beds']: cv2.line(img, tuple(P([b[0]])[0]), tuple(P([b[1]])[0]), (50, 80, 120), 1)

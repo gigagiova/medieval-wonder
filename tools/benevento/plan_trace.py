@@ -196,7 +196,12 @@ for l in range(1, ncell):
 street_ids = [l for l in range(ncell) if kind[l] == 1]
 print('street comps', len(street_ids), 'largest', max(areas[street_ids]) / K / K)
 # Split the wide parts off the street components.
-RW = 5.2   # a lane is at most ~10 px wide on this plan
+# A lane of the drawing is a corridor between two lines, 2-6 px (~m) wide: anything with a
+# white core wider than 2*RW is a cell of its own that opens on the lanes (OPEN-GROUND.md).
+# (RW was 5.2 in the first trace: lanes up to ~10 m wide, which left wide street spaces.)
+import os
+RW = float(os.environ.get('PLAN_RW', 3.1))
+MIN_WIDE = float(os.environ.get('PLAN_MIN_WIDE', 40))
 st_mask = np.isin(cell, street_ids)
 core = (dist >= RW) & st_mask
 wide = cv2.dilate(core.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int(2 * RW * K) + 1,) * 2)) & st_mask
@@ -208,7 +213,7 @@ squares = set()
 for l in range(1, wn):
     mm = wlab == l
     a = mm.sum() / (K * K)
-    if a < 150: continue
+    if a < MIN_WIDE: continue
     cell[mm] = nxt
     # A wide part of the lane spaces: a square, or (when large) most likely a block whose
     # outline is broken in the drawing. Either way it stays open lane ground: never built
@@ -237,12 +242,12 @@ in_cn = np.bincount(full.ravel(), weights=cn.ravel().astype(np.float64), minleng
 dropped_cn = 0
 for l in range(1, ncell):
     if tot[l] and in_cn[l] > 0.5 * tot[l]:
-        if kind[l] != 1: dropped_cn += 1; kind[l] = 9
+        if kind[l] != 1 and l not in squares: dropped_cn += 1; kind[l] = 9
         else:
             # A lane running along the edge of Civitas Nova: keep only its part outside.
             full[(full == l) & (cn > 0)] = 0
 # A street component may run into Civitas Nova: cut it at the grey edge.
-for l in np.nonzero(kind == 1)[0]:
+for l in list(np.nonzero(kind == 1)[0]) + list(squares):
     full[(full == l) & (cn > 0)] = 0
 full[np.isin(full, np.nonzero(kind == 9)[0])] = 0
 print('cells dropped in Civitas Nova', dropped_cn)
@@ -290,7 +295,8 @@ for l in range(1, ncell):
 # Lines drawn across a lane (where two blocks' outlines meet) cut short pieces out of it. A
 # small narrow cell that touches two or more separate lane pieces is such a piece of lane,
 # not a building: it would otherwise plug the lane. Repeated so chains of pieces join up.
-street_like = lambda q: kind[q] == 1 or q in squares
+# (Only drawn lane corridors count: the wide parts split off the lanes are cells of their own.)
+street_like = lambda q: kind[q] == 1 or (q in squares and RW >= 5)
 lane_pieces = 0
 for _ in range(4):
     changed = 0
