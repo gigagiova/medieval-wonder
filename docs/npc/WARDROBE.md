@@ -68,7 +68,11 @@ Which capsules, by layer:
   trunk (chest, waist, hips, mid-thigh riding on both thighs), whose plan
   section is a stadium like the trunk's, so the belted tunic, the belt and
   the skirt beneath stay inside the cloak;
-- hood capes and veils: shoulders, upper arms, chest.
+- hood capes and veils: shoulders, upper arms, chest;
+- cloaks and hood capes also: the yoke, a capsule along the line of the shoulders
+  through the base of the neck (without it a cloak's collar and a robe's
+  shoulder cape cut each other into shards round the neck), and a capsule
+  across both shins for a long robe's skirt.
 
 **Keeping the cloth on its own side.** A plain projection pushes a point out
 the nearest way, so the front of a skirt that a striding shin has overtaken is
@@ -93,7 +97,37 @@ than six connected) are shown again.
 **Belts on the cloth.** The belt ring and knot take the skin of the cloth band
 they lie on (itself skinned like the body there), so belt and gathered cloth
 move as one. The cinch ends with no triangle turned over (a turned triangle
-showed as a dark speck under the cingulum).
+showed as a dark speck under the cingulum). The band takes only the trunk's
+part of the body's skin: with the thighs' weights too, the skirt just below
+the belt followed the striding thigh while the hem followed its cloth bones,
+and the band between folded over in the walk (dark specks and pale blotches
+near the hem).
+
+**Cloaks (src/npc2/springs.ts, src/npc2/layer.ts).** A cloak swings on its own
+cloth bones, coarse (its triangles span 5-8 cm), over a tunic gathered by a
+belt. Three things keep it outside:
+
+1. Its bones' tips are kept out of two upright capsules side by side from the
+   hips to the chest (in plan a stadium, like the trunk), sized from the
+   trunk cloth of the garments actually beneath (90th percentile distance,
+   plus 1 cm). The fixed round 13 cm trunk capsule let its front edges swing
+   in through the belted tunic in the walk.
+2. Each cloak vertex is bound once, in the bind pose, to the nearest point of
+   the garment beneath it (tunic, robe or belt; its position, normal and
+   skin). The vertex shader skins that point with the inner garment's own
+   bones and keeps the cloak vertex outside it by its bind-pose clearance
+   (4 mm to 3 cm).
+3. Each outer layer is drawn a few millimetres nearer the eye (view-space
+   depth bias: tunic 2 mm, belt 4 mm, hood and veil 5 mm, cloak 7 mm), so a
+   near-touch resolves in favour of the outer layer instead of a ragged seam.
+
+**The Lombard multi-part belt** (src/npc/props.ts makeBeltFittings): four
+narrow leather side straps from small mounts at the front and the left, each
+ending in a slim bronze strap end tapering to a rounded tip, a larger main
+strap end on the belt's own tongue, a counter-plate at the back. It was a row
+of nine plates and six blunt straps. Bronze fittings now read as bronze
+(a half-metallic golden brown) instead of black. Sources in
+`tools/npc3/wardrobe.json` (BELT, MET, CASSANO, ROTILI, RIEMEN).
 
 ## Measuring
 
