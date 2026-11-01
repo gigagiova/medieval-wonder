@@ -55,10 +55,10 @@ export const SITES: Record<string, SiteDef> = {
   // The cathedral of S. Maria (consecrated 15 Dec 600) with its atrium; the bishop's house and books.
   episcopium: { id: 'episcopium', name: 'Episcopium', x: -14, z: -98, rot: -0.618, lx: -14, lz: -48, flat: [26, 44], clear: 24,
     reserve: [[-24, -70], [-3, -70], [-3, -27], [-24, -27]],
-    // S. Maria (nave, aisle, apse) and the bishop's library beside it have their own slab floors.
-    // The nave's slab floor (world.ts church()) and the library's (library.ts),
-    // exactly: the town ground's mask adds 0.6 m, which lies under their walls.
-    // (The old single rectangle reached outside the walls and left holes there.)
+    // S. Maria's nave and the bishop's library beside it have their own slab floors: these are
+    // exactly those slabs (world.ts church(), library.ts); the town ground's mask adds 0.6 m,
+    // which lies under their walls. (The old single rectangle reached outside the walls, and
+    // the town ground was missing there: docs/HOLES-AUDIT.md.) The reserve keeps the precinct.
     floors: [[[-20.75, -63.6], [-13.85, -63.6], [-13.85, -41.4], [-20.75, -41.4]], [[-9.5, -63.3], [-6.3, -63.3], [-6.3, -44.7], [-9.5, -44.7]]] },
   // Roman cryptoporticus outside the walls: surviving covered public passages.
   // Exact AD 700 elevations and passage arrangement remain reconstruction hypotheses.

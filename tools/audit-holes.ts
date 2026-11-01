@@ -92,12 +92,22 @@ function fullSoup(it: ChunkItems) {
 }
 const itemAt = (i: number, j: number) => W.items.get(chunkKey(i, j));
 
+/** Every lot over each chunk (a traced footprint can span several chunks beyond its own). */
+const lotsOver = new Map<number, ChunkItems['lots']>();
+for (const c of W.items.values()) for (const l of c.lots) {
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const [x, z] of l.c) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  for (let i = Math.floor(x0 / CHUNK); i <= Math.floor(x1 / CHUNK); i++) for (let j = Math.floor(z0 / CHUNK); j <= Math.floor(z1 / CHUNK); j++) {
+    const k = chunkKey(i, j);
+    if (!lotsOver.has(k)) lotsOver.set(k, []);
+    lotsOver.get(k)!.push(l);
+  }
+}
 /** Lot footprints (houses one cannot enter) over a chunk, 0.5 m cells. */
 function footprintMask(it: ChunkItems) {
   const MR = CHUNK / 0.5, m = new Uint8Array(MR * MR);
-  for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
-    const n = itemAt(it.i + di, it.j + dj);
-    for (const l of n?.lots ?? []) {
+  {
+    for (const l of lotsOver.get(it.key) ?? []) {
       if (l.explore) continue;
       let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
       for (const [x, z] of l.c) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
