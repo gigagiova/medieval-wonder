@@ -64,6 +64,9 @@ export function tiledGable(b: Builder, acc: Acc, w: number, d: number, hr: numbe
       acc.quad('wood', pt(i, k, -0.1), pt(i + 1, k, -0.1), pt(i + 1, k + 1, -0.1), pt(i, k + 1, -0.1), P(0, 10, 0));
     }
     for (let i = 0; i < nx; i++) acc.quad('wood', pt(i, nz, 0), pt(i + 1, nz, 0), pt(i + 1, nz, -0.1), pt(i, nz, -0.1), P(0, top(0, 0) - 0.3, 0));
+    // ...and its two ends over the gables, so the boards are a closed slab.
+    for (const [i, ex] of [[0, -1], [nx, 1]] as const) for (let k = 0; k < nz; k++)
+      acc.quad('wood', pt(i, k, 0), pt(i, k + 1, 0), pt(i, k + 1, -0.1), pt(i, k, -0.1), P(-ex * W, top(0, 0) - 0.3, 0));
     if (o.shingle) {
       // Shingles: courses of split boards lapping down the slope, each course
       // a run of boards of uneven length with a ragged butt edge.
@@ -101,7 +104,7 @@ export function tiledGable(b: Builder, acc: Acc, w: number, d: number, hr: numbe
         const lift = 0.025;
         const p0 = P(lx, top(lx, z0) + lift, z0), p1 = P(lx, top(lx, z1) + 0.005, z1);
         up.set(0, 1, 0).addScaledVector(Z, s * tanA).normalize();
-        coppo(acc, 'roof', p0, p1, up, side, 0.088, 0.072, sg);
+        coppo(acc, 'roof', p0, p1, up, side, 0.088, 0.072, sg, k === nC - 1 ? 2 : 0);
       }
     }
     // Rafter ends under the eave.
@@ -160,7 +163,7 @@ export function tiledLeanTo(acc: Acc, len: number, run: number, hHigh: number, h
   for (let lx = -len / 2 + 0.15; lx < len / 2 - 0.1; lx += pitch + R(-0.02, 0.02)) {
     for (let k = 0; k < nC; k++) {
       const a = z0 + (run * k) / nC - 0.03, c = z0 + (run * (k + 1)) / nC + R(-0.03, 0.03) * (k === nC - 1 ? 1 : 0);
-      coppo(acc, 'roof', P(lx, yAt(a) + 0.03, a), P(lx, yAt(c) + 0.005, c), up, X, 0.085, 0.07);
+      coppo(acc, 'roof', P(lx, yAt(a) + 0.03, a), P(lx, yAt(c) + 0.005, c), up, X, 0.085, 0.07, 3, k === nC - 1 ? 2 : 0);
     }
   }
 }

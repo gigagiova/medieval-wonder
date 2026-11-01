@@ -274,12 +274,9 @@ export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: nu
     if (acc) {
       const seen = street && (k === 0 || k === 1 || k === n - 1);
       polyFaceTiles(acc, A, Q, ra, rq, yE, ridgeH, e, out, seen ? rowPitch : 0.55, seen ? seg : 2, seen ? 0.5 : 1.0);
-      // Boards under the overhang (seen from the lane), then the rafter ends
-      // under them, from the wall head out to the fascia.
-      const yS = (d: number) => h - d * pitch - 0.07;
-      const P3 = (q: V2, y: number) => new THREE.Vector3(q.x, y, q.y);
-      acc.quad('wood', P3(a.clone().addScaledVector(out, -0.12), yS(-0.12)), P3(q.clone().addScaledVector(out, -0.12), yS(-0.12)), P3(Q, yS(over)), P3(A, yS(over)), new THREE.Vector3((a.x + q.x) / 2, h + 3, (a.y + q.y) / 2));
-      // (Only on the street front: elsewhere nobody stands under them.)
+      // Rafter ends under the boards of the overhang (the boards themselves
+      // are the roof's whole underside, below), from the wall head out to the
+      // fascia. (Only on the street front: elsewhere nobody stands under them.)
       for (let u = R(0.15, 0.35); street && k === 0 && u < L - 0.1; u += R(0.48, 0.62)) {
         const w0 = a.clone().addScaledVector(e, u).addScaledVector(out, -0.1), w1 = a.clone().addScaledVector(e, u).addScaledVector(out, over - R(0.0, 0.08));
         const y0 = h + 0.1 * pitch - 0.08, y1 = h - (over - 0.04) * pitch - 0.08;
@@ -306,7 +303,14 @@ export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: nu
     const split = (p: THREE.Vector3, q: THREE.Vector3, r: THREE.Vector3, d: number): void => {
       const lpq = p.distanceToSquared(q), lqr = q.distanceToSquared(r), lrp = r.distanceToSquared(p);
       const mx = Math.max(lpq, lqr, lrp);
-      if (mx < lim * lim || d > 6) { acc.tri('roof', p, q, r); return; }
+      if (mx < lim * lim || d > 6) {
+        acc.tri('roof', p, q, r);
+        // The boards under the tiles, 7 cm down, facing down: the eaves seen
+        // from the lane, and no roof that one can see the sky through from
+        // below (its back faces are culled; docs/HOLES-AUDIT.md).
+        acc.tri('wood', p.clone().setY(p.y - 0.07), r.clone().setY(r.y - 0.07), q.clone().setY(q.y - 0.07));
+        return;
+      }
       if (mx === lpq) { const m = p.clone().add(q).multiplyScalar(0.5); split(p, m, r, d + 1); split(m, q, r, d + 1); }
       else if (mx === lqr) { const m = q.clone().add(r).multiplyScalar(0.5); split(p, q, m, d + 1); split(p, m, r, d + 1); }
       else { const m = r.clone().add(p).multiplyScalar(0.5); split(p, q, m, d + 1); split(m, q, r, d + 1); }
@@ -318,6 +322,13 @@ export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: nu
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.computeVertexNormals();
   b.add(g, 'roof', undefined, false, false);
+  // Its underside (see above).
+  const under: number[] = [];
+  for (let i = 0; i < pos.length; i += 9) under.push(pos[i], pos[i + 1] - 0.07, pos[i + 2], pos[i + 6], pos[i + 7] - 0.07, pos[i + 8], pos[i + 3], pos[i + 4] - 0.07, pos[i + 5]);
+  const gu = new THREE.BufferGeometry();
+  gu.setAttribute('position', new THREE.Float32BufferAttribute(under, 3));
+  gu.computeVertexNormals();
+  b.add(gu, 'wood', undefined, false, false);
 }
 
 /**
@@ -360,7 +371,7 @@ function polyFaceTiles(acc: Acc, A: V2, Q: V2, ra: V2, rq: V2, yE: number, yR: n
       const s0 = (sMax * k) / nC - (k ? 0.03 : 0), s1 = (sMax * (k + 1)) / nC;
       const q0 = p.clone().addScaledVector(inw, s0), q1 = p.clone().addScaledVector(inw, s1);
       const slip = rand() < 0.03 ? R(-0.12, 0.12) : 0;
-      coppo(acc, 'roof', new THREE.Vector3(q0.x + e.x * slip, yAt(q0) + 0.03, q0.y + e.y * slip), new THREE.Vector3(q1.x + e.x * slip, yAt(q1) + 0.01, q1.y + e.y * slip), up3, side, 0.085, 0.07, seg);
+      coppo(acc, 'roof', new THREE.Vector3(q0.x + e.x * slip, yAt(q0) + 0.03, q0.y + e.y * slip), new THREE.Vector3(q1.x + e.x * slip, yAt(q1) + 0.01, q1.y + e.y * slip), up3, side, 0.085, 0.07, seg, k === 0 ? 1 : 0);
     }
   }
   // Hip / ridge tiles: bigger coppi along the hip from A to ra.

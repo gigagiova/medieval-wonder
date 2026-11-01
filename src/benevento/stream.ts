@@ -276,14 +276,24 @@ export class FabricStream {
     const H: number[] = [];
     for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) H.push(Y(x0 + i * ST, z0 + j * ST));
     const inHole = (x: number, z: number) => s.holes.some((h) => inPoly2(x, z, h.pts, 3));
+    const isReady = (x: number, z: number) => {
+      const ci = Math.floor(x / CHUNK), cj = Math.floor(z / CHUNK);
+      return readyRect.some(([a, b]) => a === ci && b === cj);
+    };
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
       const x = x0 + i * ST, z = z0 + j * ST;
       if (x + ST <= BOUNDS.x0 || x >= BOUNDS.x1 || z + ST <= BOUNDS.z0 || z >= BOUNDS.z1) continue;
-      const ci = Math.floor((x + ST / 2) / CHUNK), cj = Math.floor((z + ST / 2) / CHUNK);
-      if (readyRect.some(([a, b]) => a === ci && b === cj)) continue;
+      if (isReady(x + ST / 2, z + ST / 2)) continue;
       if (inHole(x + ST / 2, z + ST / 2)) continue;
       const a = H[j * (N + 1) + i], b = H[j * (N + 1) + i + 1], c = H[(j + 1) * (N + 1) + i], d = H[(j + 1) * (N + 1) + i + 1];
       gp.push(x, a, z, x, c, z + ST, x + ST, b, z, x + ST, b, z, x, c, z + ST, x + ST, d, z + ST);
+      // A skirt (see ground() in fabric.ts) where a chunk drawn in detail
+      // begins: the stand-in is 4 m and 3 cm low, so its edge never meets theirs.
+      const sk = (px: number, pz: number, ha: number, qx: number, qz: number, hb: number) => gp.push(px, ha, pz, qx, hb, qz, qx, hb - 0.45, qz, px, ha, pz, qx, hb - 0.45, qz, px, ha - 0.45, pz);
+      if (isReady(x + ST / 2, z - ST / 2)) sk(x, z, a, x + ST, z, b);
+      if (isReady(x + ST / 2, z + ST * 1.5)) sk(x + ST, z + ST, d, x, z + ST, c);
+      if (isReady(x - ST / 2, z + ST / 2)) sk(x, z + ST, c, x, z, a);
+      if (isReady(x + ST * 1.5, z + ST / 2)) sk(x + ST, z, b, x + ST, z + ST, d);
     }
     // Into the town's shared buffers too (no draw calls of its own), by 32 m cluster.
     const cell: Cell = { key: 's' + s.key, under: false, box: new THREE.Box3(), meshes: [], visible: true, occluded: 0, range: 420, lod: true, clusters: newClusters() };

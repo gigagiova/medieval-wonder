@@ -257,7 +257,12 @@ export function planks(acc: Acc, m: MatName, f: Frame, u0: number, u1: number, v
 }
 
 /** A half-tube strip (a coppo course) between two points, radius tapering r0→r1, faces up. */
-export function coppo(acc: Acc, m: MatName, p0: V3, p1: V3, up: V3, side: V3, r0: number, r1: number, seg = 3) {
+/**
+ * A half-round cover tile from p0 to p1. `cap` 1 or 2 closes its mouth at p0
+ * or p1 (the eave course: seen from the lane, an open half-tube shows its
+ * culled inside and the sky through it), set 3 cm back into the tube.
+ */
+export function coppo(acc: Acc, m: MatName, p0: V3, p1: V3, up: V3, side: V3, r0: number, r1: number, seg = 3, cap: 0 | 1 | 2 = 0) {
   if (DETAIL.mid) return; // the underlay's tile texture carries the roof at mid distance
   const ring = (p: V3, r: number) => {
     const out: V3[] = [];
@@ -270,6 +275,13 @@ export function coppo(acc: Acc, m: MatName, p0: V3, p1: V3, up: V3, side: V3, r0
   const A = ring(p0, r0), B = ring(p1, r1);
   const below = v3().copy(p0).add(p1).multiplyScalar(0.5).addScaledVector(up, -1);
   for (let k = 0; k < seg; k++) acc.quad(m, A[k], A[k + 1], B[k + 1], B[k], below);
+  if (cap) {
+    const [R, p, q] = cap === 1 ? [A, p0, p1] : [B, p1, p0];
+    const back = v3().subVectors(q, p).normalize().multiplyScalar(0.03);
+    const mid = v3().copy(p0).add(p1).multiplyScalar(0.5);
+    const c = v3().copy(p).add(back);
+    for (let k = 0; k < seg; k++) acc.tri(m, c, R[k].clone().add(back), R[k + 1].clone().add(back), mid);
+  }
 }
 
 /**

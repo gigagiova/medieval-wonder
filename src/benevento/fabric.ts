@@ -505,12 +505,17 @@ function ground(b: Builder, it: ChunkItems) {
   const wells = it.wells.map((w) => ({ x: w.x, z: w.z, r: (0.55 + 0.95) / 2 }));
   const inWell = (x: number, z: number) => wells.some((w) => Math.hypot(x - w.x, z - w.z) < w.r);
   const MR = CHUNK / 0.5;
+  // A quad is hidden only if it is well inside a house: every mask cell its
+  // corners (and a quarter metre round them) fall in is under the house. (The
+  // test reaches as far as the quad does: the 2 m quads of the middle detail
+  // used to be judged by the central metre only and left holes by the walls.)
+  const reach = Math.ceil((st / 2 + 0.25) / 0.5);
   const masked = (x: number, z: number) => {
     if (!it.mask) return false;
     const i = Math.floor((x - x0) / 0.5), j = Math.floor((z - z0) / 0.5);
-    // A quad is hidden only if it is well inside a house (all four corners).
     const m = (a: number, c: number) => a >= 0 && c >= 0 && a < MR && c < MR && it.mask![c * MR + a] === 1;
-    return m(i - 1, j - 1) && m(i + 1, j - 1) && m(i - 1, j + 1) && m(i + 1, j + 1);
+    for (let dj = -reach; dj <= reach; dj += reach) for (let di = -reach; di <= reach; di += reach) if (!m(i + di, j + dj)) return false;
+    return true;
   };
   const idx: number[] = [];
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
@@ -520,6 +525,24 @@ function ground(b: Builder, it: ChunkItems) {
     idx.push(a, d, c, c, d, e);
   }
   if (!idx.length) return;
+  // Skirts (Ulrich, "Rendering massive terrains using chunked level of detail
+  // control", SIGGRAPH 2002): a strip hanging 0.4 m down from each border of
+  // the chunk, facing out. A neighbour drawn at another detail (full 0.64 m,
+  // middle 2 m, the 4 m stand-in) bends its border differently, up to ~0.2 m;
+  // the skirt of the farther chunk fills the slit, facing the eye.
+  const skirt: number[] = [], kept = new Set<number>();
+  for (let k = 0; k < idx.length; k += 6) kept.add(idx[k]);
+  const quadAt = (i: number, j: number) => kept.has(j * (n + 1) + i);
+  const nv = (n + 1) * (n + 1);
+  const extra: number[] = [];
+  const vert = (i: number, j: number, y: number) => { extra.push(x0 + i * st, y, z0 + j * st); return nv + extra.length / 3 - 1; };
+  for (let k = 0; k < n; k++) for (const [i0, j0, i1, j1, qi, qj, outFirst] of [
+    [k, 0, k + 1, 0, k, 0, true], [k + 1, n, k, n, k, n - 1, true], [0, k + 1, 0, k, 0, k, true], [n, k, n, k + 1, n - 1, k, true],
+  ] as [number, number, number, number, number, number, boolean][]) {
+    if (!quadAt(qi, qj) || !outFirst) continue;
+    const a = vert(i0, j0, 0), b = vert(i1, j1, 0), c = vert(i1, j1, -0.4), d = vert(i0, j0, -0.4);
+    skirt.push(a, b, c, a, c, d);
+  }
   // Snap the edge of each well's hole onto a circle hidden in its masonry.
   for (let k = 0; k < pos.length; k += 3) for (const w of wells) {
     const dx = pos[k] - w.x, dz = pos[k + 2] - w.z, d = Math.hypot(dx, dz);
@@ -530,6 +553,15 @@ function ground(b: Builder, it: ChunkItems) {
   g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   g.setIndex(idx);
   b.add(g, 'ground', undefined, false, true);
+  if (skirt.length) {
+    const sg = new THREE.BufferGeometry();
+    const sp = new Float32Array(nv * 3 + extra.length);
+    sp.set(extra, nv * 3);
+    sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+    sg.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(sp.length), 3));
+    sg.setIndex(skirt);
+    b.add(sg, 'ground', undefined, false, true);
+  }
 }
 
 /** Sides of a prism over a polygon as a bare triangle soup (collision proxies). */
@@ -688,25 +720,36 @@ export function makeChunks(lay: Layout, holes: Hole[]): Map<number, ChunkItems> 
       c.floorMask = m;
     }
   }
-  for (const c of map.values()) {
-    if (!c.lots.length) continue;
-    const MR = CHUNK / 0.5, m = new Uint8Array(MR * MR);
-    for (let j = 0; j < MR; j++) for (let i = 0; i < MR; i++) {
-      const x = c.i * CHUNK + (i + 0.5) * 0.5, z = c.j * CHUNK + (j + 0.5) * 0.5;
-      if (r.at(x, z) === 3) m[j * MR + i] = 1;
-    }
-    // Explorable houses keep their floors.
-    for (const l of c.lots) if (l.explore || l.form === 'ruin') {
+  // The ground is left out only under the houses actually built: each closed
+  // house's own footprint (its walls stand on that polygon and go 0.3 m below
+  // grade), wherever its chunk is. The layout raster's HOUSE code is not the
+  // same thing: it also covers the slivers and back yards between the lots of
+  // a block, and leaving the ground out there opened holes one could see from
+  // the lanes, through the gaps between houses and from any height
+  // (docs/HOLES-AUDIT.md). Explorable houses and ruins keep their floors.
+  {
+    const MR = CHUNK / 0.5;
+    for (const c0 of map.values()) for (const l of c0.lots) {
+      if (l.explore || l.form === 'ruin') continue;
       const P = l.c;
-      for (let j = 0; j < MR; j++) for (let i = 0; i < MR; i++) {
-        const x = c.i * CHUNK + (i + 0.5) * 0.5, z = c.j * CHUNK + (j + 0.5) * 0.5;
-        let ins = false;
-        for (let a = 0, q = P.length - 1; a < P.length; q = a++) if ((P[a][1] > z) !== (P[q][1] > z) && x < ((P[q][0] - P[a][0]) * (z - P[a][1])) / (P[q][1] - P[a][1]) + P[a][0]) ins = !ins;
-        if (ins) m[j * MR + i] = 0;
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (const [x, z] of P) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+      for (let ci = Math.floor(x0 / CHUNK); ci <= Math.floor(x1 / CHUNK); ci++) for (let cj = Math.floor(z0 / CHUNK); cj <= Math.floor(z1 / CHUNK); cj++) {
+        const c = map.get(chunkKey(ci, cj));
+        if (!c) continue;
+        const m = (c.mask ??= new Uint8Array(MR * MR));
+        const i0 = Math.max(0, Math.floor((x0 - ci * CHUNK) / 0.5)), i1 = Math.min(MR - 1, Math.floor((x1 - ci * CHUNK) / 0.5));
+        const j0 = Math.max(0, Math.floor((z0 - cj * CHUNK) / 0.5)), j1 = Math.min(MR - 1, Math.floor((z1 - cj * CHUNK) / 0.5));
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const x = ci * CHUNK + (i + 0.5) * 0.5, z = cj * CHUNK + (j + 0.5) * 0.5;
+          let ins = false;
+          for (let a = 0, q = P.length - 1; a < P.length; q = a++) if ((P[a][1] > z) !== (P[q][1] > z) && x < ((P[q][0] - P[a][0]) * (z - P[a][1])) / (P[q][1] - P[a][1]) + P[a][0]) ins = !ins;
+          if (ins) m[j * MR + i] = 1;
+        }
       }
     }
-    c.mask = m;
   }
+  void r;
   for (const c of map.values()) if (c.floorMask) {
     if (!c.mask) c.mask = c.floorMask;
     else for (let k = 0; k < c.mask.length; k++) c.mask[k] |= c.floorMask[k];

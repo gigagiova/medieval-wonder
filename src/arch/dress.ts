@@ -240,6 +240,18 @@ export function jar(acc: Acc, f: Frame, u: number, w: number, h: number, rad: nu
     const a = rings[j][i], b = rings[j][(i + 1) % seg], c = rings[j + 1][(i + 1) % seg], d = rings[j + 1][i];
     acc.quad('roof', a, b, c, d, ctr); // terracotta (the coppi's own material: no extra draw call)
   }
+  // The mouth is open: a lip, the inside of the neck going down into the
+  // dark, and a floor, so one looks into the jar, not through it (a lathe of
+  // one-sided faces has no inside: docs/HOLES-AUDIT.md). Faces point inwards.
+  const top = f.p(u, y0 + h, w), axis = (t: number) => f.p(u, y0 + t * h, w), drop = axis(0.62).sub(top);
+  const lip = rings[5].map((q) => top.clone().lerp(q, 0.72)), deep = lip.map((q) => q.clone().add(drop));
+  for (let i = 0; i < seg; i++) {
+    const i1 = (i + 1) % seg;
+    acc.quad('roof', rings[5][i], rings[5][i1], lip[i1], lip[i], axis(0.5)); // the lip faces up and out
+    const m = lip[i].clone().add(deep[i1]).multiplyScalar(0.5), beyond = m.clone().multiplyScalar(2).sub(axis(0.81)); // past the wall: faces turn in
+    acc.quad('roof', lip[i], lip[i1], deep[i1], deep[i], beyond);
+    acc.tri('roof', deep[i], deep[i1], axis(0.62), axis(0.0));
+  }
 }
 
 /** A two-wheeled handcart with its shafts down, parked along the wall. */
