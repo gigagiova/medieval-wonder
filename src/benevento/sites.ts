@@ -1,4 +1,4 @@
-import { baseHeight, WALL700, type P2 } from './geo';
+import { baseHeight, WALL700, GEO_STREETS, type P2 } from './geo';
 import { AUREA_CENTER } from './aurea-perimeter';
 
 // Places in Benevento, AD 700, registered to real ground (metres, x east,
@@ -46,9 +46,10 @@ export const SITES: Record<string, SiteDef> = {
   // Old Triggio San Modesto parcel, not the modern Rione Libertà church.
   sanctusModestus: { id: 'sanctusModestus', name: 'Sanctus Modestus', x: -22.98, z: 6.81, rot: 0,
     floors: [[[-4.62,-2.81],[-5.37,.74],[4.42,2.81],[5.17,-.74]]] },
-  // Street-side access beneath existing lot 965; no clearing or terrace change.
-  // Inspired by Triggio burial evidence; exact access/plan are reconstruction.
-  triggioBurials: { id: 'triggioBurials', name: 'Sepulcra Langobardorum', x: 55.21095214765282, z: -5.624150871697467, rot: -0.066292758 },
+  // Street-side access beneath a traced house front in Triggio (tools/benevento/anchor_burials.ts:
+  // the nearest front, 32 m from the former site, whose lane takes the stair); no clearing or
+  // terrace change. Inspired by Triggio burial evidence; exact access/plan are reconstruction.
+  triggioBurials: { id: 'triggioBurials', name: 'Sepulcra Langobardorum', x: 84.264, z: 8.645, rot: 1.238895 },
   // The dukes' residence in the old praetorium: planum curiae, today Piazza Piano di Corte.
   curtis: { id: 'curtis', name: 'Curtis Ducis', x: 506, z: -140, rot: GRID_ROT, lx: 40, lz: -23, flat: [24, 40], clear: 22 },
   // The cathedral of S. Maria (consecrated 15 Dec 600) with its atrium; the bishop's house and books.
@@ -82,7 +83,7 @@ export const SITES: Record<string, SiteDef> = {
   forum: { id: 'forum', name: 'Forum', x: -40, z: -168, rot: GRID_ROT, flat: [16, 30], clear: 18 },
   // The Roman castellum aquae on the height outside Porta Summa, where the Rocca dei Rettori will stand
   // (OSM: the Rocca at 41.1290 N, 14.7820 E); the aqueduct comes in from the east-south-east.
-  castellumAquae: { id: 'castellumAquae', name: 'Castellum Aquae', x: 622, z: 160, rot: 2.64, flat: [14, 30] },
+  castellumAquae: { id: 'castellumAquae', name: 'Castellum Aquae', x: 622, z: 160, rot: 2.64, flat: [14, 30], clear: 17 },
   hortusSophiae: { id: 'hortusSophiae', name: 'Hortus Curtis', x: 566, z: -16, rot: GRID_ROT, clear: 20 },
   // The little square before the curtis gate named after a Roman equestrian statue (Piazza Piano di
   // Corte: two fragments of an equestrian monument found there in 1920), with the church of
@@ -156,7 +157,7 @@ export interface Gate { id: string; name: string; at: P2; main: boolean; kind: '
  */
 const GATE_SPEC: { id: string; name: string; near: P2; main: boolean; kind: Gate['kind'] }[] = [
   { id: 'aurea', name: 'Porta Aurea', near: AUREA_CENTER, main: true, kind: 'arch' },
-  { id: 'summa', name: 'Porta Summa', near: [590, 80], main: true, kind: 'gate' },
+  { id: 'summa', name: 'Porta Summa', near: [647.7, 116.7], main: true, kind: 'gate' }, // the opening drawn in the east line by the Rocca
   { id: 'rufina', name: 'Porta Rufina', near: [168, 96], main: false, kind: 'gate' },
   { id: 'sacramenti', name: 'Arcus Sacramenti', near: [-76, -61], main: false, kind: 'arch' },
   { id: 'laurentii', name: 'Porta Sancti Laurentii', near: [-392, -332], main: true, kind: 'gate' },
@@ -164,7 +165,19 @@ const GATE_SPEC: { id: string; name: string; near: P2; main: boolean; kind: Gate
   { id: 'rectoris', name: 'Porta Rectoris', near: [196, -292], main: false, kind: 'gate' },
   { id: 'posterula', name: 'Posterula', near: [283, -287], main: false, kind: 'postern' },
 ];
-export const GATES: Gate[] = GATE_SPEC.map((g) => ({ id: g.id, name: g.name, main: g.main, kind: g.kind, at: g.kind === 'arch' ? g.near : onWall(g.near[0], g.near[1]).p }));
+/** A gate opens where one of the plan's lanes reaches the traced curtain: the lane end nearest
+ * the gate's recorded position (within 60 m) of the connected lane network, else the nearest point of the curtain. */
+function gateAt(near: P2): P2 {
+  let best: P2 | null = null, bd = 60;
+  for (const s of GEO_STREETS) if (s.net) for (const e of [s.pts[0], s.pts[s.pts.length - 1]]) {
+    const w = onWall(e[0], e[1]);
+    if (w.d > 3.5) continue;
+    const d = Math.hypot(w.p[0] - near[0], w.p[1] - near[1]);
+    if (d < bd) { bd = d; best = w.p; }
+  }
+  return best ?? onWall(near[0], near[1]).p;
+}
+export const GATES: Gate[] = GATE_SPEC.map((g) => ({ id: g.id, name: g.name, main: g.main, kind: g.kind, at: g.kind === 'arch' ? g.near : g.id === 'summa' ? onWall(g.near[0], g.near[1]).p : gateAt(g.near) }));
 
 // ---------------------------------------------------------------- roads outside the walls
 export interface Road { name: string; pts: P2[]; w: number }
@@ -183,7 +196,7 @@ export const ROADS: Road[] = [
   // South from Porta Rufina past the Lombard cemetery to the Sabato ford.
   { name: 'Via Rufina', w: 2.6, pts: [g('rufina'), [172, 140], [184, 200], [214, 252], [236, 320], [222, 420], [200, 520], [178, 610]] },
   // East from Porta Summa.
-  { name: 'Via Summa', w: 2.8, pts: [g('summa'), [618, 108], [646, 140], [700, 172], [790, 200], [900, 236]] },
+  { name: 'Via Summa', w: 2.8, pts: [g('summa'), [672, 106], [700, 128], [740, 168], [790, 200], [900, 236]] },
   // Down the riverside from Torre della Catena along the Sabato to the old walnut.
   { name: 'Semita Nucis', w: 1.8, pts: [[-517, -14], [-492, 40], [-470, 110], [-450, 200], [-418, 300], [-380, 400], [-345, 462]] },
   // The mill lane off the Leproso road.
@@ -250,8 +263,9 @@ export const EXPLORE_TARGETS: ExploreTarget[] = [
   { id: 'synagoga', kind: 'synagoga', near: [530, -80] },        // prayer room within an existing lot
 ];
 
-/** Existing final lots repurposed only after procedural street encroachment.
- * Selecting these in the earlier random pass would move unrelated footprints. */
-export const FIXED_EXPLORE_LOTS = [
-  { lot: 873, id: 'sanctusPetrusForum', kind: 'ecclesia' as ExploreKind },
+/** Worship rooms placed in the drawn footprint nearest a chosen point (after the
+ * houses above): San Pietro ad Forum by the former delle Monache site in Piazza
+ * Cardinal Pacca (docs/benevento/MISSING-CHURCHES.md, PIAZZA-PACCA.md). */
+export const FIXED_EXPLORE_LOTS: { near: P2; id: string; kind: ExploreKind }[] = [
+  { near: [-134.9, -149.5], id: 'sanctusPetrusForum', kind: 'ecclesia' },
 ];

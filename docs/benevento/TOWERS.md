@@ -83,3 +83,17 @@ not the initial city-side point which faced a nearby wall. The corrected
 [parchment](towers/world/map.png) were inspected. These draw counts are not
 measured phone FPS. This release intentionally does not claim the remaining
 procedural positions have been replaced with a complete historical inventory.
+
+## Traced circuit (28 October 2026)
+
+The curtain is now retraced from the drawing (PLAN-TRACE.md) and the registration uses
+four of the surviving towers above as control points, so the "15-25 m errors" listed here
+no longer apply: Biffa 0.6 m, OSM 1016982302 0.2 m, OSM 480303640 0.8 m, OSM 1015674809
+0.0 m and Panaro 3.6 m from the traced curtain line (centres; the bodies straddle it).
+The procedural 40-55 m towers are removed. The world builds only the eight towers traced
+from projections on the plan's outer line (table in PLAN-TRACE.md): Biffa, N02, N04, N05,
+N06, N07, Panaro, E01. N03 is a building on the wall (traced as a footprint), S01 a
+building corner. The late-antique tower by the Sacramento arch is 6.8 m outside the
+inferred edge under triangle 4 and is not added (it would be detached, or need an invented
+link). Torre della Catena stays a separate landmark; the Civitas Nova and Rocca towers are
+not part of the circuit of 700.
