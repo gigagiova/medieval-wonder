@@ -17,6 +17,7 @@ import { layoutTown, density, FREE, STREET, RESERVED, HOUSE, PLOT, type Layout }
 import { REGISTERED_WALL_TOWERS } from './benevento/tower-sites';
 import { makeChunks, buildChunk, wallPlan, CHUNK, lotForm, type Hole, type ChunkItems } from './benevento/fabric';
 import { FabricStream } from './benevento/stream';
+import { planPlot, plotSolids, PLANNED } from './benevento/plotfill';
 import * as M from './benevento/monuments';
 import { theatreView } from './benevento/theatrum';
 import { ponsLeprosus, PONS } from './benevento/pons';
@@ -43,6 +44,8 @@ const rand = rng(1327);
 const R = (a: number, b: number) => a + (b - a) * rand();
 
 let lay: Layout;
+/** For tools that call getTeleports() without building the world. */
+export function setLayoutForTools(l: Layout) { lay = l; solidCache = null; }
 let stream: FabricStream;
 
 /** Rotation that turns local +z into world direction (dx, dz). */
@@ -59,8 +62,45 @@ export const SPAWN_YAW = Math.atan2(AUREA_DIR[0], AUREA_DIR[1]);
 export const STAIR_ZONES: { x: number; z: number; r: number }[] = [];
 
 export interface Teleport { name: string; x: number; y: number; z: number; yaw: number }
-const tp = (name: string, x: number, z: number, lookX: number, lookZ: number): Teleport =>
-  ({ name, x, z, y: worldTerrain(x, z) + 2.2, yaw: Math.atan2(-(lookX - x), -(lookZ - z)) });
+const tp = (name: string, x0: number, z0: number, lookX: number, lookZ: number): Teleport => {
+  const [x, z] = openSpot(x0, z0);
+  return { name, x, z, y: worldTerrain(x, z) + 2.2, yaw: Math.atan2(-(lookX - x), -(lookZ - z)) };
+};
+/**
+ * A travel point never lands inside a building: a point the traced plan has put under a house
+ * (or a shed, hut or ruin wall of the open ground) moves to the nearest open ground at least
+ * a metre from any wall (tools/check-travel-points.ts).
+ */
+function openSpot(x: number, z: number): P2 {
+  if (!lay) return [x, z];
+  const r = lay.r;
+  const solid = (px: number, pz: number) => r.at(px, pz) === HOUSE || plotSolid(px, pz);
+  const free = (px: number, pz: number) => {
+    const g = r.at(px, pz);
+    if (g !== STREET && g !== PLOT) return false;
+    for (let a = 0; a < 8; a++) for (const d of [0.5, 1.0]) if (solid(px + Math.cos(a * 0.785) * d, pz + Math.sin(a * 0.785) * d)) return false;
+    return !solid(px, pz);
+  };
+  if (r.at(x, z) === OUTSIDE_CODE || free(x, z) || (!solid(x, z) && r.at(x, z) === RESERVED)) return [x, z];
+  for (let d = 0.5; d < 30; d += 0.5) for (let a = 0; a < 32; a++) {
+    const px = x + Math.cos((a / 32) * Math.PI * 2) * d, pz = z + Math.sin((a / 32) * Math.PI * 2) * d;
+    if (free(px, pz)) return [px, pz];
+  }
+  return [x, z];
+}
+const OUTSIDE_CODE = 4;
+let solidCache: { pts: P2[]; x0: number; z0: number; x1: number; z1: number }[] | null = null;
+function plotSolid(x: number, z: number) {
+  if (!solidCache) {
+    solidCache = [];
+    for (const p of lay.plots) if (PLANNED.has(p.kind)) for (const c of plotSolids(p)) {
+      let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+      for (const [px, pz] of c) { x0 = Math.min(x0, px); z0 = Math.min(z0, pz); x1 = Math.max(x1, px); z1 = Math.max(z1, pz); }
+      solidCache.push({ pts: c, x0, z0, x1, z1 });
+    }
+  }
+  return solidCache.some((c) => x >= c.x0 && x <= c.x1 && z >= c.z0 && z <= c.z1 && inPoly(x, z, c.pts));
+}
 const sw = (s: SiteDef, lx: number, lz: number) => siteToWorld(s, lx, lz);
 
 /** Places the map can send you to (y is eye height; the landing finds the floor). */
@@ -387,6 +427,8 @@ export function getMapData() {
     gates: GATES,
     streets: lay.streets.map((s) => ({ pts: s.pts, w: s.w, main: s.main, kind: s.kind })),
     plots: lay.plots.map((p) => ({ pts: p.pts, kind: p.kind })),
+    /** The traced building footprints, as built (the parchment inks them one by one). */
+    houses: lay.lots.map((l) => l.c.map((p) => [p.x, p.y] as P2)),
     landmarks,
     /** Quarters of the town and its surroundings, for placing people (see sites.ts DISTRICTS). */
     districts: DISTRICTS,
@@ -464,6 +506,8 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
     density: woodDensity,
     bounds: BOUNDS,
     cover: (x, z) => Math.abs(x - 50) < 760 && Math.abs(z + 80) < 480,
+    // Fruit and nut trees in the town's gardens, orchards and yards (plotfill.ts).
+    extra: lay.plots.flatMap((p) => PLANNED.has(p.kind) ? planPlot(p).trees : []),
   });
   buildPonteFratto(scene, b);
   await progress('Old stones in new walls', 0.79);
@@ -586,6 +630,10 @@ function distToPolyline(x: number, z: number, pts: P2[]) {
   return best;
 }
 function keepOut(x: number, z: number) {
+  // No trees against the outer face of the curtain (a defended wall keeps its foot clear),
+  // nor on the view from a registered tower's visiting point.
+  if (insideness(x, z) > 0.1) return true;
+  for (const t of REGISTERED_WALL_TOWERS) if (t.visit && Math.hypot(x - t.visit[0], z - t.visit[1]) < 9) return true;
   for (const r of ROADS) if (distToPolyline(x, z, r.pts) < r.w / 2 + 3.5) return true;
   for (const s of Object.values(SITES)) {
     const r = s.flat ? s.flat[1] + 4 : s.clear ? s.clear + 6 : 14;
@@ -641,6 +689,11 @@ function townProps(scene: THREE.Scene) {
     else P(u < 0.9 ? 'weed_plant_02' : 'nettle_plant', x, z, u * 13, 3);
   }
   for (const p of lay.plots) {
+    if (PLANNED.has(p.kind)) {
+      // The open cells' crops, tools, vessels and weeds (plotfill.ts).
+      for (const q of planPlot(p).props) if (propsLoaded(q.id as PropId)) P(q.id as PropId, q.x, q.z, q.ry, q.s);
+      continue;
+    }
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const [x, z] of p.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
     const n = Math.min(40, Math.round(((x1 - x0) * (z1 - z0)) / (p.kind === 'pratum' ? 18 : p.kind === 'cortis' ? 7 : 30)));
@@ -671,6 +724,24 @@ function townTexture(L: Layout): THREE.DataTexture {
     data[o] = r.main[k];
     // (yards walled off the street keep its trodden earth)
     data[o + 1] = r.grid[k] === STREET ? (r.trod[k] ? 255 : 40) : r.trod[k] ? 200 : 0;
+  }
+  // Sward (B, off the street): the turf of the open ground (plotfill.ts kinds).
+  const SWARD: Partial<Record<string, number>> = { pratum: 230, pomarium: 210, area: 190, vinea: 150, coemeterium: 200, ruina: 140, casalinum: 90, stabulum: 60, calcaria: 70, orto: 40 };
+  for (const p of L.plots) {
+    const v = SWARD[p.kind];
+    if (!v) continue;
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const [x, z] of p.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    for (let z = Math.floor(z0); z <= z1; z++) for (let x = Math.floor(x0); x <= x1; x++) {
+      const px = x + 0.5, pz = z + 0.5;
+      if (!inPoly(px, pz, p.pts)) continue;
+      // not on the trodden ways through the open ground
+      const k = r.idx(px, pz);
+      if (k >= 0 && r.trod[k]) continue;
+      const i = Math.floor(px - T.x0), j = Math.floor(pz - T.z0);
+      if (i < 0 || j < 0 || i >= T.w || j >= T.h) continue;
+      data[(j * T.w + i) * 4 + 2] = v;
+    }
   }
   // Roads outside the walls: beaten earth, the Appia and the Traiana still paved in places.
   for (const rd of ROADS) {

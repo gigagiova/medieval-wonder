@@ -32,6 +32,8 @@ export interface ForestOpts {
   bounds?: { x0: number; z0: number; x1: number; z1: number };
   /** Where scanned ground cover is worth placing (near where people walk). */
   cover?: (x: number, z: number) => boolean;
+  /** Trees planted where given (inside the town: the gardens' fruit and nut trees), small and middling ones. */
+  extra?: { x: number; z: number; s: number }[];
 }
 
 interface Sp {
@@ -213,6 +215,28 @@ export function buildForest(scene: THREE.Scene, b: Builder, o: ForestOpts): THRE
     else if (u < 0.72) order = ['medium', 'small'];
     else order = ['small'];
     for (const name of order) if (plant(name, x, z, wallNear)) break;
+  }
+
+  // The gardens' trees: small and middling crowns (fruit and nut trees; the pack's younger
+  // deciduous trees stand in for them, see docs/benevento/OPEN-GROUND.md).
+  // Their own kinds of the middling trees, drawn as impostors out to 160 m: the town is seen
+  // from its walls and towers over the roofs, and a garden's trees must not vanish at 95 m
+  // like the wood's in the fog.
+  const townKinds = SPECIES.medium.ids.filter((id) => pack.byId.has(id)).map((id) => trees.addKind({ tree: pack.byId.get(id)!, ends: SPECIES.medium.ends, far: 160 }));
+  for (const t of opts.extra ?? []) {
+    const name = 'medium', sp = SPECIES[name], list = townKinds;
+    if (!list.length) continue;
+    const k = list[Math.floor(rand() * list.length)];
+    const def = trees.treeDef(k);
+    const s = Math.min(sp.scale[1], Math.max(sp.scale[0] * 0.8, t.s * 0.85));
+    // No taller than a two-storey house: the crowns of old walnuts and figs, not of forest oaks.
+    const sc = def.h * s > 10.5 ? 10.5 / def.h : s;
+    const y = groundAt(t.x, t.z) - 0.12 - 0.04 * def.trunk * sc;
+    const u = rand();
+    // Tended trees in a sheltered town keep more of their leaves than the wood outside.
+    trees.add(k, t.x, y, t.z, sc, R(0, Math.PI * 2), R(0.85, 1.08), u < 0.7 ? 0 : 1, R(0.2, 0.8));
+    mark(t.x, t.z, sp.room * sc);
+    prism(t.x, t.z, def.trunk * sc * 1.05);
   }
 
   commitProps(scene);

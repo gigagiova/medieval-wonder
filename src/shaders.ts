@@ -146,7 +146,7 @@ vec3 applyAtmos(vec3 col, vec3 wpos){
 export const surfaceGLSL = /* glsl */ `
 struct Surf { vec3 alb; float rough; float ao; vec3 nrm; vec3 emi; float h; float wet; };
 
-uniform sampler2D uTown; // R Roman paving, G street, B gutter, A terrain height
+uniform sampler2D uTown; // R Roman paving, G street, B gutter on the street / sward off it, A terrain height
 uniform vec4 uTownBox;   // x0, z0, 1/width, 1/depth (metres)
 uniform vec2 uTownH;     // terrain height range encoded in A
 vec4 townAt(vec2 xz){ return texture2D(uTown, (xz - uTownBox.xy) * uTownBox.zw); }
@@ -160,7 +160,7 @@ float underAt(vec3 p){ return step(p.y, terrainY(p.xz) - 2.5); }
 #if MAT == 7 || MAT == 8 || MAT == 16 || MAT == 18 || MAT == 15
   #define SPEC_K 1.0
 #elif MAT == 20
-  #define SPEC_K ((abs(vMat - 6.0) < 0.5 || abs(vMat - 11.0) < 0.5 || abs(vMat - 17.0) < 0.5) ? 0.1 : 1.0)
+  #define SPEC_K ((abs(vMat - 6.0) < 0.5 || abs(vMat - 11.0) < 0.5 || abs(vMat - 17.0) < 0.5 || abs(vMat - 23.0) < 0.5 || abs(vMat - 24.0) < 0.5) ? 0.1 : 1.0)
 #else
   #define SPEC_K 0.1
 #endif
@@ -299,7 +299,7 @@ vec3 tintTex(vec3 c, vec3 tint, float k){ return c * mix(vec3(1.0), tint, k); }
 
 // The small untextured materials (iron, horn, embers, shutters...): one function,
 // so that a single draw can carry all of them (MAT 20, the id per vertex).
-#if MAT == 6 || MAT == 7 || MAT == 8 || MAT == 11 || MAT == 15 || MAT == 16 || MAT == 17 || MAT == 18 || MAT == 20
+#if MAT == 6 || MAT == 7 || MAT == 8 || MAT == 11 || MAT == 15 || MAT == 16 || MAT == 17 || MAT == 18 || MAT == 20 || MAT == 23 || MAT == 24
 void smallSurf(int id, vec3 p, vec3 n, inout Surf s){
   if (id == 6) {
     float g = vnoise(p*40.);
@@ -338,6 +338,21 @@ void smallSurf(int id, vec3 p, vec3 n, inout Surf s){
   } else if (id == 18) {
     s.alb = mix(vec3(0.09,0.06,0.03), vec3(0.06,0.09,0.07), smoothstep(0.4,0.7,vnoise(p*12.)));
     s.rough = 0.7;
+  } else if (id == 23) {
+    // Foliage seen at a few metres in the dusk: leaf-sized mottling between a dark winter
+    // green and dry brown, darker in the depths of a clump (no texture, no gloss).
+    float g = vnoise(p*9.), f = vnoise(p*31.), dry = smoothstep(0.35, 0.75, vnoise(p*0.7 + 3.1));
+    vec3 green = vec3(0.06,0.09,0.035), brown = vec3(0.12,0.09,0.05);
+    s.alb = mix(green, brown, dry * 0.8) * (0.6 + 0.55*g) * (0.8 + 0.35*f);
+    s.rough = 1.0;
+    s.ao = 0.6 + 0.4*f;
+  } else if (id == 24) {
+    // Weathered straw: stalks running down the stack (streaks long in y), greyed and darker
+    // where the rain has got in.
+    float st = vnoise(vec3(p.x*38., p.y*3., p.z*38.)), w = vnoise(p*1.3);
+    s.alb = mix(vec3(0.24,0.2,0.13), vec3(0.15,0.13,0.1), smoothstep(0.3, 0.8, w)) * (0.72 + 0.45*st);
+    s.rough = 1.0;
+    s.ao = 0.75 + 0.25*st;
   }
 }
 #endif
@@ -460,14 +475,25 @@ Surf surface(vec3 p, vec3 n){
   // Standing water after the day's rain: the gutters, puddles in the low
   // parts of the street and the mud, and a film in the gaps between stones.
   // Only these are wet (glossy); the stones' crowns stay dull.
-  float pud = smoothstep(0.62, 0.7, nz.g + (0.35 - m.b) * 0.5);
+  // Off the street, B is sward: the turf of the town's meadows, orchards and graveyards,
+  // close-cropped and worn through in patches to the mud.
+  float sward = tw.b * mud * (1.0 - under);
+  if (sward > 0.01) {
+    vec4 nz2 = texture2D(uNoise, p.xz * 0.21);
+    float tuft = smoothstep(0.3, 0.75, nz2.r * 0.7 + nz.r * 0.6 - 0.15 + sward * 0.35);
+    vec3 turf = mix(vec3(0.06, 0.08, 0.035), vec3(0.1, 0.115, 0.055), nz2.g) * (0.8 + 0.4 * nz.b);
+    s.alb = mix(s.alb, turf, sward * tuft);
+    s.rough = mix(s.rough, 1.0, sward * tuft);
+    s.nrm = normalize(mix(s.nrm, n, sward * tuft * 0.6));
+  }
+  float pud = smoothstep(0.62, 0.7, nz.g + (0.35 - m.b) * 0.5) * (1.0 - 0.8 * sward);
   float wet = clamp(tw.b * street + pud * (street * 0.8 + mud) + gap * street * 0.5, 0.0, 1.0) * (1.0 - under);
   s.alb *= 1.0 - 0.45*wet;
   s.rough = mix(s.rough, 0.22, wet);
   s.nrm = normalize(mix(s.nrm, n, smoothstep(0.5, 1.0, wet) * 0.8));
   s.wet = wet;
   s.alb *= 0.88 + 0.24*nz.b;
-#elif MAT == 6 || MAT == 7 || MAT == 8 || MAT == 11 || MAT == 15 || MAT == 16 || MAT == 17 || MAT == 18
+#elif MAT == 6 || MAT == 7 || MAT == 8 || MAT == 11 || MAT == 15 || MAT == 16 || MAT == 17 || MAT == 18 || MAT == 23 || MAT == 24
   smallSurf(MAT, p, n, s);
 #elif MAT == 20
   smallSurf(int(vMat + 0.5), p, n, s);

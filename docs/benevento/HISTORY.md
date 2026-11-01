@@ -685,6 +685,142 @@ not establish the survival of every elevation in700. Other projections still
 need registration against the curtain. See [TOWERS.md](TOWERS.md) for completed
 and outstanding work, Civitas Nova exclusions and source attribution.
 
+## The plan traced cell by cell — 28 October 2026
+
+Supersedes the parts of §3, §4 and §6 that describe the registration, the circuit
+and the generated houses; details and rules in [PLAN-TRACE.md](PLAN-TRACE.md).
+
+- **Footprints (attested by the owner's plan; their AD 700 use is inferred).** Every
+  building outline drawn on the plan is one house on that footprint (672 traced; 653
+  stand, the rest lie under landmark precincts). The 6,019 procedural lots, the street
+  encroachment of §6 and the procedural fill of large blocks are gone. The plan is a
+  survey of the later town: reading its outlines as AD 700 houses is the owner's rule
+  for the game, not a claim that these buildings stood in 700.
+- **Open ground (hypothesis).** Large undivided cells (> ~520 m²) are read as open:
+  gardens, vineyards, meadows, pens and ruins, walled where they face a lane. This fits
+  the "città ad isole" of the period (Brogiolo and Gelichi 1998), but the drawing itself
+  does not say what stood there. Wide parts of the lane spaces are open lane ground.
+- **Circuit (inferred).** The drawn outer line less Civitas Nova (3.05 km, 32.4 ha),
+  including the east end and the Rocca drawing that the earlier circuit cut off. The
+  opening drawn in the east line by the Rocca is taken as Porta Summa (hypothesis: it
+  replaces the earlier "150 m further west" position, for which the drawing has no wall).
+  The Castellum Aquae landmark now stands inside the circuit.
+- **Registration v2 (inferred).** Porta Aurea and the Arch of Sacramento are matched where
+  the plan's edges pass under their marker triangles, and four surviving towers mapped in
+  OSM (Biffa, ways 1016982302, 480303640, 1015674809) to the projections drawn on the outer
+  line. Porta Aurea is back at its mapped footprint, 2 m from the curtain.
+- **Towers (plan-traced; heights and tops are reconstruction).** Only eight: the
+  projections drawn on the outer line (TOWERS.md). The 40-55 m procedural towers are gone.
+
+## The open ground inside the walls — 29 October 2026
+
+The traced plan leaves about a fifth of the walled town in large undivided cells and wide
+lane spaces. Reconstruction choices and their implementation are in
+[OPEN-GROUND.md](OPEN-GROUND.md); the evidence they rest on is here. Flags: **attested**
+(a source says it of the place and time), **inferred** (attested nearby or a little later,
+carried over), **hypothesis** (our reconstruction choice).
+
+What the sources say open ground inside an early medieval Italian town held:
+
+- **Benevento: the countryside inside the walls (attested, secondary).** G. Bertelli
+  Buquicchio, "Benevento", *Enciclopedia dell'Arte Medievale* (Treccani 1992): early
+  medieval Benevento was "characterised by a strong penetration of the countryside into
+  it, partly as a result of the abandonment of some parts"; the town took shape "through
+  the reuse and transformation of classical buildings and the gradual occupation of areas
+  left free by abandonment and collapse"; building "both in masonry and in wood,
+  corresponding — the second above all — to the modest economic level of the time";
+  wooden houses (also with an upper floor), *cellarii* and *casaleni*. The late 6th-early
+  7th-c. circuit left the western Roman town outside, to be ruralised.
+- **Benevento: houses with yards and gardens (attested, just outside the walls, early 8th
+  c.).** The same entry: S. Sofia *a Ponticello* was founded under duke Romuald II
+  (706-731) on the land of one Wandulf, owner of "houses with *corti* and *orti*, a mill,
+  a bath, a plot of land and a *statio*" on the Via Traiana.
+- **Benevento: vineyards and empty plots inside the city (attested for 881, inferred for
+  700).** Two diplomas of prince Radelchis for S. Sofia, copied in the *Chronicon
+  Sanctae Sophiae* (Vat. lat. 4939, 12th c.; ed. J.-M. Martin 2000), as transcribed in the
+  Fiscus database (Univ. of Bologna, records by P. Massa): June 881, "*infra hanc nostram
+  Beneventanam civitatem, integram modicam terricellam cum integra vineola*" in the place
+  called *Fabrica*, from the heirless freeman Alahis
+  ([doc 1375](https://fiscus.unibo.it/en/documents/doc1375.html)); July 881, "*integram
+  casa cum terra bacua ... intus hanc Beneventanam civitatem, propinco ecclesia Sancti
+  Benedicti*" ([doc 1399](https://fiscus.unibo.it/en/documents/doc1399.html)). A small
+  vineyard and a house with *terra vacua* (open land) inside the walls, next to a church.
+- **Benevento: burials among Roman ruins in the centre (attested; date not published).**
+  Piazza Sabariani, 2025: walls and mosaic floors of a Roman *domus*, medieval burials
+  (skeletons in their pits) and sherds with the red-band painting read as Lombard, near
+  the church of S. Marco (P. Bocchino, *Il Mattino*, 4 April 2025). With the Triggio and
+  Pacca burials already in the game, burials in town are attested for Lombard Benevento;
+  their exact date and relation to a church are not.
+- **Naples: dark earth, fruit, greens, sheep (attested).** M. Rotili, "Archeologia e
+  storia dell'insediamento fra tarda antichità e alto medioevo" (summarising P. Arthur,
+  *Naples, from Roman Town to City-State*, 2002, pp. 40-56): dark earths over Roman levels
+  (formed as the drains failed and organic refuse was dumped) mark "vast cultivated
+  areas"; seeds of grape, plum, walnut and hazelnut in the dark earth of vico della Serpe
+  and via S. Paolo; cabbage and spinach in 8th-9th-c. layers at S. Patrizia; vegetables
+  "in all likelihood grown in urban *orti*"; from the 5th to the late 8th century sheep
+  and goats replace the pig as the animal most slaughtered — read as impoverishment and
+  ruralisation. At Carminiello ai Mannesi, rooms of a Roman bath were turned into a lime
+  kiln in the 5th century and the area was a dump from the 6th until the 8th, when rooms
+  were reused for crafts (summary of Arthur's excavation, *Kulturjam*).
+- **Rome: ruins, fields, quarries and tombs side by side (attested).** R. Meneghini and
+  R. Santangeli Valenzani (1993, p. 109, quoted by A. Costantini, *Anales de Arqueología
+  Cordobesa* 21-22, 2010-11): inhabited areas "alternated without a break with others,
+  uninhabited, used as quarries for materials or occupied by groups of tombs, throughout
+  the area within the Aurelian wall". A. Augenti, "Roma tra la tarda Antichità e l'alto
+  Medioevo", *Reti Medievali Rivista* 11 (2010): a town whose mesh loosens, "fields of
+  ruins or cultivated, or simply abandoned"; at Piazza Venezia a 6th-c. metalworking
+  site, then houses with burials, then in the 8th century a lime kiln (*calcara*), in the
+  quarter later called *Calcarario* after its kilns burning the spoils of the monuments;
+  another 8th-c. *calcara* in the exedra of the Crypta Balbi; from the 8th century burials
+  gather round the churches.
+- **Brescia: huts in the domus, kilns in the forum (attested).** G. P. Brogiolo, "Brescia
+  altomedievale alla luce dell'archeologia" (Ateneo di Brescia): in Lombard Brescia "the
+  many *domus* of the town are replaced by huts, by which burials and production are
+  found" (the servants of the royal curtis); two pottery kilns on the Capitolium's floor
+  and a house of post-holes and hearths; in the theatre a rubble dump, a brick kiln, then
+  inhumations; a lime kiln burning the ancient marbles; the basilica's marble floors under
+  "blackish organic earth" and burials; about a hundred burials of the late 6th-7th/8th c.
+  by poor houses and huts. Sunken-floored timber huts are taken by Brogiolo to belong to
+  the 6th-7th centuries (reported in the literature on *fondi di capanna*; the paper itself
+  could not be read).
+- **Rimini and the Adriatic towns (attested).** S. Gelichi, "From the Late Antique City to
+  the Early Medieval Town in Central and Northern Italy" (2021): at the *domus del
+  chirurgo* in Rimini a cemetery in the 6th century, then in the 7th houses again "with a
+  focus on the road, with outbuildings built behind". Gelichi in *A Companion to
+  Byzantine Italy* (Brill 2021): in Lombard and Byzantine towns alike, wood as building
+  material, beaten-earth floors, "the concentration of inhabited zones along the roadways
+  and the rare use of the internal areas of the old islets"; burials inside the city
+  (Rimini, Ravenna, Verona, Bologna); ruins used as burial grounds.
+- **Cultivation as a choice (attested, secondary).** C. Goodson, *Cultivating the City in
+  Early Medieval Italy* (Cambridge 2021), as reported by its reviewers (A. Dowling, H-Net
+  2022; Y. Marano, *Medieval Archaeology* 66, 2022): cultivation in towns was common from
+  the 5th/6th to the 10th/11th century, open agricultural spaces interspersed with houses,
+  and dark earth may reflect organised effort rather than neglect. The book itself could
+  not be read here.
+
+What the game puts in the open cells, and how sure it is:
+
+- That the plan's large open cells held gardens, small vineyards, fruit and nut trees,
+  pens, timber huts, roofless Roman walls, stone-robbing and lime-burning, middens, wells
+  and some burials: **inferred** (Benevento's own sources name *orti*, *corti*, a
+  *vineola*, *terra vacua*, wooden houses and *casaleni*; Naples, Rome and Brescia supply
+  the rest).
+- What each cell holds: **hypothesis**, cell by cell, ruled as follows. A burial ground
+  beside each church inside the walls (the cathedral, S. Pietro ad Forum, S. Petrus ad
+  Caballum): the nearest walled cell within 45 m (inferred from the shift of burials to
+  churches by the 8th c.; the Triggio and Pacca burials). Lime-burners' yards by the
+  forum and the Castellum Aquae, ruins by the Roman monuments (Rome, Naples, Brescia).
+  Pens and orchards round the dukes' curtis (the servants and stock of a curtis in
+  Brescia). Vines on the steep cells (hypothesis: the hillside). The rest: kitchen
+  gardens, orchards, groups of timber and sunken-floored huts (*casaleni*), pens,
+  meadows with hay and threshing floors.
+- Sheep and goats, pigs, hens: not shown (no animal models yet); their pens, sheds,
+  mangers, hay and dung heaps are.
+- Garden walls: dry-stone walls a little under eye height for gardens, vines and
+  orchards; taller walls round yards and pens. Beds edged with boards (the beds of the
+  St Gall plan, c. 820: inferred for the type, not for Benevento).
+- Trees: the tree models are deciduous oaks; in the town they stand in for walnut, plum,
+  apple and fig (Naples' seeds). A known inaccuracy of the model set, not a claim.
 
 ## Belts and girdles by role (NPC wardrobe, 29 October 2026)
 

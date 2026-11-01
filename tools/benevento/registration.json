@@ -3,28 +3,28 @@
   {
    "name": "Arch of Trajan",
    "plan_px": [
-    923,
-    185
+    923.0,
+    167.1
    ],
    "world_m": [
-    389.1,
-    -223.8
+    389.26,
+    -225.58
    ],
-   "affine_residual_m": 4.8,
-   "source": "OSM way 249... building \"Arco di Traiano\" centroid; plan triangle 3 centroid"
+   "affine_residual_m": 11.4,
+   "source": "OSM way 122652341 footprint centroid; plan north edge under triangle 3 (line (912,161)-(946,180) at x=923)"
   },
   {
    "name": "Arch of Sacramento",
    "plan_px": [
-    469,
-    425
+    469.0,
+    444.5
    ],
    "world_m": [
     -75.7,
     -60.6
    ],
-   "affine_residual_m": 7.1,
-   "source": "OSM building centroid; plan triangle 4 centroid"
+   "affine_residual_m": 18.1,
+   "source": "OSM building centroid; plan edge of Civitas Nova under triangle 4 (line (453,433)-(492,461) at x=469)"
   },
   {
    "name": "Roman theatre",
@@ -36,7 +36,7 @@
     -222.0,
     -23.0
    ],
-   "affine_residual_m": 15.6,
+   "affine_residual_m": 12.9,
    "source": "OSM cavea polygon 373842941 centre; plan semicircle \"2\" centre"
   },
   {
@@ -49,7 +49,7 @@
     623.0,
     148.0
    ],
-   "affine_residual_m": 19.1,
+   "affine_residual_m": 29.1,
    "source": "OSM way 480370253 centroid; plan SE castle"
   },
   {
@@ -62,7 +62,7 @@
     675.0,
     -149.0
    ],
-   "affine_residual_m": 18.2,
+   "affine_residual_m": 10.9,
    "source": "OSM building centroid; plan outline NE corner"
   },
   {
@@ -75,7 +75,7 @@
     -75.0,
     -318.0
    ],
-   "affine_residual_m": 21.8,
+   "affine_residual_m": 21.4,
    "source": "OSM highway \"Ponte Vanvitelli\" reaching the bluff; plan double line (north stub)"
   },
   {
@@ -88,39 +88,91 @@
     -504.0,
     -81.0
    ],
-   "affine_residual_m": 8.7,
+   "affine_residual_m": 14.4,
    "source": "OSM city_gate Port'Arsa; plan outline W tip"
+  },
+  {
+   "name": "Torre della Biffa",
+   "plan_px": [
+    240.65,
+    132.1
+   ],
+   "world_m": [
+    -285.41,
+    -377.9
+   ],
+   "affine_residual_m": 5.7,
+   "source": "OSM way 1015674808 centroid; projection on the plan north line"
+  },
+  {
+   "name": "North tower (OSM 1016982302)",
+   "plan_px": [
+    843.85,
+    134.4
+   ],
+   "world_m": [
+    314.49,
+    -286.22
+   ],
+   "affine_residual_m": 5.8,
+   "source": "OSM way 1016982302 centroid; projection on the plan north line"
+  },
+  {
+   "name": "North-east tower (OSM 480303640)",
+   "plan_px": [
+    1047.85,
+    172.4
+   ],
+   "world_m": [
+    528.57,
+    -211.78
+   ],
+   "affine_residual_m": 15.0,
+   "source": "OSM way 480303640 centroid; projection on the plan north line"
+  },
+  {
+   "name": "East tower (OSM 1015674809)",
+   "plan_px": [
+    1209.45,
+    358.95
+   ],
+   "world_m": [
+    666.01,
+    -9.44
+   ],
+   "affine_residual_m": 10.4,
+   "source": "OSM way 1015674809 centroid; plan east line (slight projection)"
   }
  ],
  "affine": [
   [
-   0.9764916424034646,
-   0.1548596925646266
+   0.9873588497654832,
+   0.15800249149023768
   ],
   [
-   -0.09928633780600755,
-   0.972548241826798
+   -0.09392873271550131,
+   0.9528806595418793
   ],
   [
-   -498.4528276821963,
-   -545.4979611303748
+   -504.86803470190677,
+   -541.9708566718954
   ]
  ],
- "affine_rms_m": 14.9,
+ "affine_rms_m": 15.5,
  "scale_m_per_px": [
-  0.989,
-  0.978
+  1.0,
+  0.957
  ],
- "rotation_deg": 9.0,
+ "rotation_deg": 9.1,
  "tps": {
   "P": [
    [
     923.0,
-    185.0
+    167.1
    ],
    [
     469.0,
-    425.0
+    444.5
    ],
    [
     322.0,
@@ -141,48 +193,80 @@
    [
     42.0,
     462.0
+   ],
+   [
+    240.65,
+    132.1
+   ],
+   [
+    843.85,
+    134.4
+   ],
+   [
+    1047.85,
+    172.4
+   ],
+   [
+    1209.45,
+    358.95
    ]
   ],
   "W": [
    [
-    -3.85110977773398e-06,
-    -1.3848220172325682e-05
+    -0.0006006956489611064,
+    0.0010512155229108673
    ],
    [
-    8.966454667115199e-05,
-    0.00015144396770951584
+    0.00012180125039186533,
+    -0.00019804347133284026
    ],
    [
-    5.537944930326706e-05,
-    -0.00020501262405450918
+    6.266953675347518e-05,
+    5.6028639528277916e-05
    ],
    [
-    -0.00012878515288863735,
-    1.853683739398479e-05
+    -0.00037642776923459435,
+    6.425644349320287e-05
    ],
    [
-    0.00013668721353346844,
-    -6.919041316107583e-06
+    -0.00036163257402270477,
+    8.476891248635156e-05
    ],
    [
-    -0.0001340895319905164,
-    -2.058676024270405e-05
+    -0.0002553837786377022,
+    0.00016974867645718595
    ],
    [
-    -1.500541485099985e-05,
-    7.638584068214587e-05
+    -5.108687600755363e-05,
+    3.5503218802454144e-05
    ],
    [
-    0.9851988244444458,
-    0.1402853851603332
+    8.692315837871988e-05,
+    -4.8727062572063236e-05
    ],
    [
-    -0.10733397786888776,
-    0.9677656733557397
+    0.0003191736619369014,
+    -0.0007132810852343047
    ],
    [
-    -466.1572316776527,
-    -607.1398352339835
+    0.00043921100680268467,
+    -0.00038705681796595163
+   ],
+   [
+    0.0006154480326000149,
+    -0.00011441297657317996
+   ],
+   [
+    0.9641938402234599,
+    0.13874190403639133
+   ],
+   [
+    -0.1354006971006848,
+    0.9793641060315713
+   ],
+   [
+    -353.6236862849379,
+    -599.1813244505149
    ]
   ]
  }
