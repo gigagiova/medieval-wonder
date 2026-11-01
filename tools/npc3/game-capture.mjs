@@ -1,11 +1,12 @@
 // Close-ups of real townsfolk in the built game (not a test rig).
 //
 //   npx vite build && npx vite preview --port 4181 &
-//   node tools/npc3/game-capture.mjs http://127.0.0.1:4181 <outdir> [at=Templum] [count=14] [warm=120]
+//   node tools/npc3/game-capture.mjs http://127.0.0.1:4181 <outdir> [places=Templum,Porta,Atrium] [count=15] [warm=10]
 //
 // Loads index.html?at=<place> (title overlay hidden), lets the population
-// fill in and run for `warm` frames, then for the `count` people nearest
-// the spawn point puts the player's camera 1.9 m in front of each and 1.9 m
+// fill in and run for `warm` frames, then at each place (a teleport name;
+// the first is the start) for its share of `count` people (walking and
+// talking ones first, then the nearest) puts the player's camera 1.9 m in front of each and 1.9 m
 // to the side, at eye height, looking at the chest, runs three frames (so
 // the person is in mid-stride or mid-gesture of their own clip, as in play)
 // and saves <outdir>/<k>-<group>-<view>.png and people.json (who, outfit,
@@ -14,7 +15,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
-const [base, out, at = 'Templum', count = '14', warm = '10'] = process.argv.slice(2);
+const [base, out, at = 'Templum,Porta,Atrium', count = '15', warm = '10'] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 540, height: 720 } });
@@ -30,34 +31,47 @@ const frames = async (n) => {
   const f0 = await page.evaluate(() => window.__frames);
   await page.waitForFunction((f) => window.__frames >= f, f0 + n, { timeout: 900000, polling: 500 });
 };
-await page.waitForFunction((c) => window.__npcDebug.people.length >= c, Math.min(+count + 2, 18), { timeout: 1200000, polling: 2000 }).catch(() => console.log('fewer people than asked'));
+await page.waitForFunction(() => window.__npcDebug.people.length >= 8, null, { timeout: 600000, polling: 2000 }).catch(() => console.log('fewer people than asked'));
 await frames(+warm);
-const list = await page.evaluate((count) => {
-  const d = window.__npcDebug, pl = window.__player;
-  return d.people.filter((p) => p.group.visible && p.pos.distanceTo(pl.pos) < 40)
-    .sort((a, b) => a.pos.distanceTo(pl.pos) - b.pos.distanceTo(pl.pos)).slice(0, count)
-    .map((p) => d.people.indexOf(p));
-}, +count);
 const meta = [];
-for (const [k, idx] of list.entries()) {
-  for (const view of ['front', 'side']) {
-    const info = await page.evaluate(({ idx, view }) => {
-      const p = window.__npcDebug.people[idx], pl = window.__player;
-      const f = { x: Math.sin(p.yaw), z: Math.cos(p.yaw) };
-      const dir = view === 'front' ? f : { x: f.z, z: -f.x };
-      const cam = { x: p.pos.x + dir.x * 1.9, y: p.pos.y + 1.35 * (p.scale ?? 1), z: p.pos.z + dir.z * 1.9 };
-      pl.pos.set(cam.x, cam.y, cam.z);
-      pl.vel?.set(0, 0, 0);
-      const dx = p.pos.x - cam.x, dz = p.pos.z - cam.z;
-      pl.yaw = Math.atan2(-dx, -dz);
-      pl.pitch = Math.atan2(p.pos.y + 0.95 * (p.scale ?? 1) - cam.y, Math.hypot(dx, dz));
-      return { title: p.title, outfit: p.outfit?.id, body: p.outfit?.body, w: Object.fromEntries(Object.entries(p.w ?? {}).map(([a, v]) => [a, +(+v).toFixed(2)])) };
-    }, { idx, view });
-    await frames(3);
-    const name = `${String(k).padStart(2, '0')}-${(info.title ?? 'x').replace(/\W+/g, '_')}-${view}.png`;
-    await page.screenshot({ path: `${out}/${name}`, timeout: 600000 });
-    meta.push({ k, view, file: name, ...info });
-    console.log(name, JSON.stringify(info));
+const places = at.split(',');
+let k = 0;
+for (const [pi, place] of places.entries()) {
+  if (pi > 0) {
+    await page.evaluate((place) => {
+      const t = window.__teleports().find((q) => q.name.toLowerCase().includes(place.toLowerCase()));
+      if (t) window.__teleport(t);
+    }, place);
+    await frames(+warm + 20);
+  }
+  // Moving people first (mid-walk, mid-talk), then the rest; nearest first.
+  const list = await page.evaluate(({ n, taken }) => {
+    const d = window.__npcDebug, pl = window.__player;
+    const busy = (p) => Math.max(p.w?.walk ?? 0, p.w?.talk ?? 0);
+    return d.people.filter((p) => p.group.visible && p.pos.distanceTo(pl.pos) < 150 && !taken.includes(p.name + p.title))
+      .sort((a, b) => (busy(b) > 0.5) - (busy(a) > 0.5) || a.pos.distanceTo(pl.pos) - b.pos.distanceTo(pl.pos)).slice(0, n)
+      .map((p) => d.people.indexOf(p));
+  }, { n: Math.ceil(+count / places.length), taken: meta.map((m) => m.key) });
+  for (const idx of list) {
+    for (const view of ['front', 'side']) {
+      const info = await page.evaluate(({ idx, view }) => {
+        const p = window.__npcDebug.people[idx], pl = window.__player;
+        const f = { x: Math.sin(p.yaw), z: Math.cos(p.yaw) };
+        const dir = view === 'front' ? f : { x: f.z, z: -f.x };
+        const cam = { x: p.pos.x + dir.x * 1.9, y: p.pos.y + 1.35 * (p.scale ?? 1), z: p.pos.z + dir.z * 1.9 };
+        const dx = p.pos.x - cam.x, dz = p.pos.z - cam.z;
+        // Through the game's own teleport (it lands on the floor and becomes the player's safe spot).
+        window.__teleport({ name: 'npc', x: cam.x, y: p.pos.y + 0.5, z: cam.z, yaw: Math.atan2(-dx, -dz) });
+        pl.pitch = Math.atan2(p.pos.y + 0.95 * (p.scale ?? 1) - pl.pos.y, Math.hypot(dx, dz));
+        return { key: p.name + p.title, name: p.name, title: p.title, outfit: p.outfit?.id, body: p.outfit?.body, w: Object.fromEntries(Object.entries(p.w ?? {}).map(([a, v]) => [a, +(+v).toFixed(2)])) };
+      }, { idx, view });
+      await frames(3);
+      const name = `${String(k).padStart(2, '0')}-${(info.title ?? 'x').replace(/\W+/g, '_')}-${view}.png`;
+      await page.screenshot({ path: `${out}/${name}`, timeout: 600000 });
+      meta.push({ k, view, place, file: name, ...info });
+      console.log(name, JSON.stringify(info));
+    }
+    k++;
   }
 }
 writeFileSync(`${out}/people.json`, JSON.stringify(meta, null, 1));

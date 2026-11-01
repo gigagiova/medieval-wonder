@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import type { OutfitV2 } from './kit';
-import { bindLayer, layerPoint, LAYER_HEAD, LAYER_BODY } from './layer';
 
 // Cloth kept outside the limbs it hangs over, per vertex, on the GPU.
 //
@@ -34,17 +33,17 @@ const LEGS: CapDef[] = [
 // The hand's capsule must hold the closed fingers too (their bones count for its radius).
 const fingers = (s: string) => ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'].flatMap((f) => [1, 2, 3].map((k) => `${s}Hand${f}${k}`));
 const HANDS: CapDef[] = [
-  { a: 'LeftHand', b: 'LeftHandMiddle1', extend: 0.7, bones: ['LeftHand', ...fingers('Left')], side: true, own: ['LeftForeArm', 'LeftHand'] }, { a: 'RightHand', b: 'RightHandMiddle1', extend: 0.7, bones: ['RightHand', ...fingers('Right')], side: true, own: ['RightForeArm', 'RightHand'] },
+  { a: 'LeftHand', b: 'LeftHandMiddle1', extend: 0.7, bones: ['LeftHand', ...fingers('Left')], own: ['LeftForeArm', 'LeftHand'] }, { a: 'RightHand', b: 'RightHandMiddle1', extend: 0.7, bones: ['RightHand', ...fingers('Right')], own: ['RightForeArm', 'RightHand'] },
 ];
 const ARMS: CapDef[] = [
-  { a: 'LeftForeArm', b: 'LeftHand', bones: ['LeftForeArm'], side: true }, { a: 'RightForeArm', b: 'RightHand', bones: ['RightForeArm'], side: true },
-  { a: 'LeftArm', b: 'LeftForeArm', from: 0.25, bones: ['LeftArm'], side: true }, { a: 'RightArm', b: 'RightForeArm', from: 0.25, bones: ['RightArm'], side: true },
+  { a: 'LeftForeArm', b: 'LeftHand', bones: ['LeftForeArm'] }, { a: 'RightForeArm', b: 'RightHand', bones: ['RightForeArm'] },
+  { a: 'LeftArm', b: 'LeftForeArm', from: 0.25, bones: ['LeftArm'] }, { a: 'RightArm', b: 'RightForeArm', from: 0.25, bones: ['RightArm'] },
 ];
 const SHOULDERS: CapDef[] = [
-  { a: 'LeftShoulder', b: 'LeftArm', from: 0.45, bones: ['LeftShoulder', 'LeftArm'], q: 0.97, side: true }, { a: 'RightShoulder', b: 'RightArm', from: 0.45, bones: ['RightShoulder', 'RightArm'], q: 0.97, side: true },
+  { a: 'LeftShoulder', b: 'LeftArm', from: 0.45, bones: ['LeftShoulder', 'LeftArm'], q: 0.97 }, { a: 'RightShoulder', b: 'RightArm', from: 0.45, bones: ['RightShoulder', 'RightArm'], q: 0.97 },
 ];
 const UPPER: CapDef[] = [
-  { a: 'LeftArm', b: 'LeftForeArm', bones: ['LeftArm'], side: true }, { a: 'RightArm', b: 'RightForeArm', bones: ['RightArm'], side: true },
+  { a: 'LeftArm', b: 'LeftForeArm', bones: ['LeftArm'] }, { a: 'RightArm', b: 'RightForeArm', bones: ['RightArm'] },
 ];
 // The trunk, as capsules lying across it (left to right) at the waist and
 // the chest: their section in plan is a stadium, close to the trunk's own
@@ -52,17 +51,14 @@ const UPPER: CapDef[] = [
 // keep a cloak or a hood's cape outside the cloth gathered by the belt, the
 // belt itself and the chest beneath.
 const TRUNK: CapDef[] = [
-  { a: 'Spine', b: 'Spine', ao: [-0.09, 0, 0], bo: [0.09, 0, 0], bones: ['Hips', 'Spine'], side: true },
-  { a: 'Spine2', b: 'Spine2', ao: [-0.09, -0.02, 0], bo: [0.09, -0.02, 0], bones: ['Spine1', 'Spine2'], side: true },
+  { a: 'Spine', b: 'Spine', ao: [-0.09, 0, 0], bo: [0.09, 0, 0], bones: ['Hips', 'Spine'] },
+  { a: 'Spine2', b: 'Spine2', ao: [-0.09, -0.02, 0], bo: [0.09, -0.02, 0], bones: ['Spine1', 'Spine2'] },
 ];
 // Under a cloak: the skirt of the tunic or robe beneath, at the hips and
 // across both thighs (riding on them), so it cannot swing out through the
 // cloak's back and sides.
 const SKIRT: CapDef[] = [
-  { a: 'Hips', b: 'Hips', ao: [-0.09, -0.06, 0], bo: [0.09, -0.06, 0], bones: [], side: true },
-  { a: 'LeftUpLeg', b: 'RightUpLeg', ao: [0, -0.22, 0], bo: [0, -0.22, 0], bones: [], side: true, home: 'Hips' },
-  // A long robe's skirt, across both shins (riding on them).
-  { a: 'LeftLeg', b: 'RightLeg', ao: [0, -0.2, 0], bo: [0, -0.2, 0], bones: [], side: true, home: 'Hips' },
+  { a: 'Hips', b: 'Hips', ao: [-0.09, -0.06, 0], bo: [0.09, -0.06, 0], bones: [] },
 ];
 // The yoke: a capsule along the line of the shoulders, through the base of
 // the neck. A cloak's collar or a hood's cape lies over it, on the robe's
@@ -71,8 +67,7 @@ const SKIRT: CapDef[] = [
 // (Cloth skinned to the neck or head, a collar or a hood round the throat, is left to them.)
 const YOKE: CapDef = { a: 'LeftShoulder', b: 'RightShoulder', ao: [0, 0, 0], bo: [0, 0, 0], bones: [], own: ['Neck', 'Head'] };
 const BY_LAYER: Record<string, CapDef[]> = {
-  // (Sleeves: the forearm only; round the upper arm the capsule would reach the chest's cloth.)
-  tunic: [...LEGS, ...HANDS, ...ARMS.slice(0, 2)],
+  tunic: [...LEGS, ...HANDS],
   over: [...SHOULDERS, ...ARMS, ...HANDS, ...LEGS.slice(0, 4), ...TRUNK, ...SKIRT, YOKE],
   // A hood's shoulder cape over the tunic.
   head: [...SHOULDERS, ...UPPER, TRUNK[1]],
@@ -105,7 +100,11 @@ const SIDE_WIDE = 1.35;
 // across the belly to wherever its rigid "home" happened to swing. Such
 // points get the plain projection.
 const SIDE_NEAR = 3;
+// No vertex is moved further than MAX_MOVE in all: a capsule may round the
+// cloth over a limb, never pull a spike out of it.
+const MAX_MOVE = 0.04;
 const GLSL_BODY = `
+  vec3 pushFrom = transformed;
   for (int i = 0; i < ${MAX_CAPS}; i++) {
     if (uPushA[i].w <= 0.0) continue;
     if (uPushX[i].x > 0.5) {
@@ -137,11 +136,12 @@ const GLSL_BODY = `
     }
     float l = length(d);
     if (l < r && l > 1e-5) transformed += d * (r / l - 1.0);
-  }`;
+  }
+  { vec3 mv = transformed - pushFrom; float ml = length(mv); if (ml > ${MAX_MOVE.toFixed(3)}) transformed = pushFrom + mv * (${MAX_MOVE.toFixed(3)} / ml); }`;
 
 /** The same projection on the CPU, for the audit: p skinned, rest its bind position, both in the mesh's local space. */
 function pushPoint(p: THREE.Vector3, rest: THREE.Vector3, A: Float32Array, B: Float32Array, R: Float32Array, X: Float32Array, own: (b: number) => number, M: THREE.Matrix4[]) {
-  const home = new THREE.Vector3();
+  const home = new THREE.Vector3(), from = p.clone();
   for (let i = 0; i < MAX_CAPS; i++) {
     if (A[i * 4 + 3] <= 0) continue;
     if (X[i * 2] > 0.5 && own(X[i * 2] - 1) + (X[i * 2 + 1] > 0.5 ? own(X[i * 2 + 1] - 1) : 0) > 0.5) continue;
@@ -170,6 +170,8 @@ function pushPoint(p: THREE.Vector3, rest: THREE.Vector3, A: Float32Array, B: Fl
     const l = Math.hypot(dx, dy, dz);
     if (l < r && l > 1e-5) { const q = r / l - 1; p.x += dx * q; p.y += dy * q; p.z += dz * q; }
   }
+  const mv = p.clone().sub(from), ml = mv.length();
+  if (ml > MAX_MOVE) p.copy(from).addScaledVector(mv, MAX_MOVE / ml);
   return p;
 }
 
@@ -248,11 +250,6 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
       caps.push({ a, b, from, extend, r: r0 * kq + MARGIN, r1: r1 * kq + MARGIN, h: bone(d.home ?? d.a) ?? a, own: (d.own ?? []).map((n) => skel.bones.indexOf(bone(n)!)).filter((k) => k >= 0).slice(0, 2), side: !!d.side, la: d.ao ? toLocal(a, pa) : undefined, lb: d.bo ? toLocal(b, pb) : undefined });
     }
     if (!caps.length) continue;
-    // A cloak or a hood's cape is also kept outside the garments beneath it (layer.ts).
-    const lay = layerOf.get(m.userData.garment as string);
-    const myDepth = depthOf.get(m.userData.garment as string) ?? 50;
-    const hasLayer = (lay === 'over' || lay === 'head') && bindLayer(m, meshes.filter((o) => o.userData.npc2 === 'garment' && o !== m
-      && (depthOf.get(o.userData.garment as string) ?? 50) < myDepth && ['tunic', 'belt'].includes(layerOf.get(o.userData.garment as string) ?? '')));
     const A = new Float32Array(MAX_CAPS * 4), B = new Float32Array(MAX_CAPS * 4), R = new Float32Array(MAX_CAPS), X = new Float32Array(MAX_CAPS * 2);
     const uA = { value: Array.from({ length: MAX_CAPS }, () => new THREE.Vector4()) }, uB = { value: Array.from({ length: MAX_CAPS }, () => new THREE.Vector4()) }, uR = { value: R }, uX = { value: Array.from({ length: MAX_CAPS }, () => new THREE.Vector2()) };
     const M = Array.from({ length: MAX_CAPS }, () => new THREE.Matrix4());
@@ -261,10 +258,10 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
     mat.onBeforeCompile = (sh, r) => {
       prev.call(mat, sh, r);
       sh.uniforms.uPushA = uA; sh.uniforms.uPushB = uB; sh.uniforms.uPushR = uR; sh.uniforms.uPushX = uX;
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${GLSL_HEAD}${hasLayer ? LAYER_HEAD : ''}`)
-        .replace('#include <skinning_vertex>', `#include <skinning_vertex>${GLSL_BODY}${hasLayer ? LAYER_BODY : ''}`);
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${GLSL_HEAD}`)
+        .replace('#include <skinning_vertex>', `#include <skinning_vertex>${GLSL_BODY}`);
     };
-    mat.customProgramCacheKey = () => key + (hasLayer ? '-pushL' : '-push');
+    mat.customProgramCacheKey = () => key + '-push';
     m.onBeforeRender = () => {
       for (let i = 0; i < MAX_CAPS; i++) { uA.value[i].fromArray(A, i * 4); uB.value[i].fromArray(B, i * 4); uX.value[i].fromArray(X, i * 2); }
       (mat as THREE.Material & { uniformsNeedUpdate: boolean }).uniformsNeedUpdate = true;
@@ -273,8 +270,7 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
     const rest = new THREE.Vector3(), P = m.geometry.attributes.position, SJ = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight;
     m.userData.push = (p: THREE.Vector3, i: number) => {
       const own = (b: number) => { let w = 0; for (let k = 0; k < 4; k++) if (SJ.getComponent(i, k) === b) w += SW.getComponent(i, k); return w; };
-      pushPoint(p, rest.fromBufferAttribute(P, i), A, B, R, X, own, M);
-      return hasLayer ? layerPoint(m, i, p) : p;
+      return pushPoint(p, rest.fromBufferAttribute(P, i), A, B, R, X, own, M);
     };
     m.userData.pushCaps = caps.map((c) => [c.a.name, c.b.name, +c.r.toFixed(3), +c.r1.toFixed(3)]);
     setups.push({ mesh: m, caps, A, B, R, M });
