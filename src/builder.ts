@@ -60,6 +60,8 @@ function wornBox(w: number, h: number, d: number, r: number, L: number) {
 export const DETAIL = { mid: false };
 
 /** Masonry never has knife edges: these materials get rounded, weathered arrises. */
+/** Materials whose pieces are thin cards, seen from both sides. */
+const THIN: Partial<Record<MatName, true>> = { leaf: true };
 const WORN: Partial<Record<MatName, number>> = { stone: 1, block: 1, bigstone: 1.3, rubble: 1.2, brick: 0.8, marble: 0.9, slab: 0.7, plaster: 1.1, rock: 1.4, ground: 1.4, clay: 0.6 };
 import { mat, MAT, SMALL, type MatName } from './materials';
 import { sortByCluster, newClusters, addClustered, type Clusters } from './clusters';
@@ -174,6 +176,9 @@ export class Builder {
       displace(geo, m);
     }
     if (geo.index) geo = geo.toNonIndexed();
+    // Blades and leaves are cards with no thickness: drawn from both sides
+    // (the one shared material is one-sided; see bothSides and docs/HOLES-AUDIT.md).
+    if (THIN[m]) geo = bothSides(geo);
     siteToWorldGeo(geo);
     this.lift(geo);
     if (!this.parts.has(m)) this.parts.set(m, []);

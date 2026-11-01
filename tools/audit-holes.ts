@@ -72,6 +72,16 @@ function first(list: BV[], o: THREE.Vector3, dir: THREE.Vector3, far: number): H
   return _h;
 }
 const LBV: BV = { bvh: LB.bvh, soup: L };
+const _r2 = new THREE.Ray();
+/** Is there a front-facing triangle within 2 cm of distance d along the ray? */
+function frontTwin(list: BV[], o: THREE.Vector3, dir: THREE.Vector3, d: number) {
+  _r2.origin.copy(o); _r2.direction.copy(dir);
+  for (const b of list) {
+    const hits = b.bvh.raycast(_r2, THREE.DoubleSide, Math.max(0, d - 0.02), d + 0.02) as THREE.Intersection[];
+    for (const h of hits) if (h.face!.normal.dot(dir) < 0) return true;
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------- chunk soups
 const full = new Map<number, Soup>();
@@ -195,7 +205,9 @@ function eyeAudit(it: ChunkItems, list: BV[], foot: Uint8Array) {
       const h = first(list, eo, d, RANGE);
       if (h) {
         const dot = h.nx * d.x + h.ny * d.y + h.nz * d.z;
-        if (dot > 0 && !h.soup.ds[h.tri]) {
+        // A back face with a front face in the same place (a surface given
+        // both sides, see bothSides()) is not seen: the front one is drawn.
+        if (dot > 0 && !h.soup.ds[h.tri] && !frontTwin(list, eo, d, h.d)) {
           back++; bx += d.x; bz += d.z;
           if (h.d < 1.0) near++;
           found.push({ tag: h.soup.tag[h.tri], mat: h.soup.mat[h.tri], p: [x + d.x * h.d, y + d.y * h.d, z + d.z * h.d, x, y, z] });
