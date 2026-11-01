@@ -134,8 +134,40 @@ Plus 666 houses (the traced footprints, the three halls, the back rooms of the h
   gutters only on the street) marks turf, 0.04-0.9 by kind; the ground shader mixes a dark
   olive turf, worn through in patches, into the mud there. No new texture, no new draw.
 
-BUDGET
+Rendering budget (headless Chromium, SwiftShader, 390×844, `?debug` HUD after the shot
+settles; triangles drawn / draw calls; before = the merged plan trace, 0afbe43; after = this
+branch with main 94992a6 merged). These are rendering-budget numbers, not phone frame rates.
+
+| View | before | after |
+|---|---|---|
+| aurea_street | 161k / 73 | 177k / 103 |
+| centre_street | 104k / 50 | 112k / 46 |
+| east_street (old camera, inside a house) | 107k / 58 | 116k / 54 |
+| east_street_new | 133k / 55 | 127k / 54 |
+| panaro_street | 64k / 46 | 68k / 54 |
+| orto / vinea / pomarium | 99k-153k / 56-64 | 102k-156k / 47-65 |
+| stabulum / casalinum / calcaria | 157k-187k / 49-74 | 160k-185k / 49-74 |
+| coemeterium (by the curtis) | 249k / 82 | 224k / 86 |
+| centre_high (aerial) | 219k / 47 | 260k / 49 |
+| east_high (aerial) | 222k / 56 | 207k / 54 |
+
+All street views stay under 350k triangles and 130 draw calls; the heaviest is
+aurea_street at 103 calls (+30): a mesh-count diff of that view shows ~20 more town
+cluster meshes and a second townsperson's garment set in view (NPC placement varies with the
+merged NPC work), plus the tree impostors and the `misc` foliage.
 
 ## 4. Evidence
 
-`docs/benevento/open-ground/`: EVIDENCE
+`docs/benevento/open-ground/`:
+
+- `map-town.png`, `map-centre.png`: top-down maps of what each cell holds
+  (`tools/benevento/open_ground_map.ts` + `.py`).
+- `cells-*.jpg`, `halls-on-plan.jpg`: every open cell on the drawing (the check of §1).
+- Before/after pairs from the plan-trace cameras: `aurea_street`, `aurea_high`, `north_high`,
+  `north_out`, `east_high`, `east_street`, `panaro_street`, `panaro_high`, `southeast_high`,
+  `centre_street`, `centre_high`; `east_street_new` (the east view from a lane, 9 m from the
+  old camera); one street-level view per kind (`orto`, `vinea`, `pomarium`, `pratum`,
+  `stabulum`, `casalinum`, `ruina`, `calcaria`, `coemeterium`, `area_open`); Porta Aurea
+  `aurea_out_w` (outside, the curtain west of the arch) and `aurea_top` (from above). The
+  "before" of the kind views is the same camera on the old layout, where the cell held
+  whatever the old random kind was.
