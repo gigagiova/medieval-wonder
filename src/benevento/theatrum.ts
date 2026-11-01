@@ -365,7 +365,7 @@ export function theatrum(b: Builder) {
 /**
  * A seat block with only what can be seen: its tread, its riser, the worn
  * nose between them (a bevel), both ends (seen at the stairs and the gaps),
- * its bed and, when the row behind is gone, its back. 14-16 triangles instead of a
+ * its bed and its back (seen from under the cavea too). 16 triangles instead of a
  * fully bevelled hexahedron's 44. Corners as Acc.hexa: bottom 0-3, top 4-7,
  * 0-1 the front (riser) edge.
  */
@@ -385,7 +385,9 @@ function seatBlock(acc: Acc, m: MatName, c: THREE.Vector3[], back: boolean) {
   // Ends: pentagons (fans from the bottom-back corner).
   acc.tri(m, c[3], c[0], f4, ctr); acc.tri(m, c[3], f4, t4, ctr); acc.tri(m, c[3], t4, c[7], ctr);
   acc.tri(m, c[2], c[1], f5, ctr); acc.tri(m, c[2], f5, t5, ctr); acc.tri(m, c[2], t5, c[6], ctr);
-  if (back) acc.quad(m, c[3], c[2], c[6], c[7], ctr);
+  // (Its back always: the cavea is seen from the passages under it too.)
+  void back;
+  acc.quad(m, c[3], c[2], c[6], c[7], ctr);
   // Its bed: seen from the passages under the cavea where the core is broken (docs/HOLES-AUDIT.md).
   acc.quad(m, c[0], c[1], c[2], c[3], ctr);
 }

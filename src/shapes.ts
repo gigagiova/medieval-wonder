@@ -59,6 +59,9 @@ function jaggedWall(L: number, h: number, depth: number, jag: number) {
   for (const [zz, flip] of [[depth / 2, false], [-depth / 2, true]] as const) {
     quadGrid((i, j) => [X(i), (tops[i] * j) / nv, zz], n, nv, flip);
   }
+  // Its bed: a ruin may stand on a terrace or a vault, seen from below
+  // (the theatre's upper walls from the passages under the cavea).
+  quadGrid((i, j) => [X(i), 0, -depth / 2 + depth * j], n, 1, false);
   // Broken top, then the two ends.
   quadGrid((i, j) => [X(i), tops[i], depth / 2 - depth * j], n, 1, false);
   quadGrid((i, j) => [-L / 2, (tops[0] * j) / nv, -depth / 2 + depth * i], 1, nv, false);
