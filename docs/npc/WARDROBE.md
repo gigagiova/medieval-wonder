@@ -59,25 +59,17 @@ per person from what actually lies beneath that garment in that outfit
 sleeves under a cloak) plus 8 mm. CPU cost: the capsule ends, once per
 animated frame. The audit applies the identical projection on the CPU.
 
-Which capsules, by layer:
+Which capsules, by layer (cloaks are left off for now, see below):
 
-- body garments (tunic, shirt, robe, gown): shins, thighs, feet, hands (with
-  the closed fingers; a sleeve's own cuff is left alone) and forearms (in the
-  sleeve);
-- cloaks: shoulders, arms, hands, legs, and four capsules lying *across* the
-  trunk (chest, waist, hips, mid-thigh riding on both thighs), whose plan
-  section is a stadium like the trunk's, so the belted tunic, the belt and
-  the skirt beneath stay inside the cloak;
-- hood capes and veils: shoulders, upper arms, chest;
-- cloaks and hood capes also: the yoke, a capsule along the line of the shoulders
-  through the base of the neck (without it a cloak's collar and a robe's
-  shoulder cape cut each other into shards round the neck), and a capsule
-  across both shins for a long robe's skirt.
+- body garments (tunic, shirt, robe, gown): shins, thighs, feet and hands (a
+  sleeve's own cuff is left alone);
+- hood capes and veils: shoulders, upper arms, chest.
 
 **Keeping the cloth on its own side.** A plain projection pushes a point out
 the nearest way, so the front of a skirt that a striding shin has overtaken is
-pushed further behind it and the leg shows through. Each limb capsule
-therefore knows the side each cloth point belongs on: where the point would be
+pushed further behind it and the leg shows through. The shin and thigh
+capsules under a skirt (only those)
+therefore know the side each cloth point belongs on: where the point would be
 if it had moved rigidly with the limb's bone since the bind pose. A point
 within 1.35 radii of the axis sideways and on the wrong side (up to 5 radii
 behind) is carried across to the surface on its own side. Only cloth that lay
@@ -103,23 +95,31 @@ the belt followed the striding thigh while the hem followed its cloth bones,
 and the band between folded over in the walk (dark specks and pale blotches
 near the hem).
 
-**Cloaks (src/npc2/springs.ts, src/npc2/layer.ts).** A cloak swings on its own
-cloth bones, coarse (its triangles span 5-8 cm), over a tunic gathered by a
-belt. Three things keep it outside:
+## Removed after the live-game review (1 November 2026)
 
-1. Its bones' tips are kept out of two upright capsules side by side from the
-   hips to the chest (in plan a stadium, like the trunk), sized from the
-   trunk cloth of the garments actually beneath (90th percentile distance,
-   plus 1 cm). The fixed round 13 cm trunk capsule let its front edges swing
-   in through the belted tunic in the walk.
-2. Each cloak vertex is bound once, in the bind pose, to the nearest point of
-   the garment beneath it (tunic, robe or belt; its position, normal and
-   skin). The vertex shader skins that point with the inner garment's own
-   bones and keeps the cloak vertex outside it by its bind-pose clearance
-   (4 mm to 3 cm).
-3. Each outer layer is drawn a few millimetres nearer the eye (view-space
-   depth bias: tunic 2 mm, belt 4 mm, hood and veil 5 mm, cloak 7 mm), so a
-   near-touch resolves in favour of the outer layer instead of a ragged seam.
+The owner saw the published build (94992a6) and found broken capes, twisted
+and glitchy arms and shapes growing out of bodies. Reproduced in the built
+game (`tools/npc3/game-capture.mjs`, real townsfolk in their own clips), the
+causes were mechanisms added here and earlier, and they are removed rather
+than patched:
+
+- **Arm IK for gear.** The spear, shield and sword-pommel holds searched a
+  grip roll every frame and reached the arm to it: the hand turned up to 75°
+  between frames and the forearm was rolled up to 140°. Now the arms keep
+  their clip; the spear rides in the closed right fist; the shield is slung
+  on the back; the left hand swings free.
+- **Cloaks.** On spring bones they flew out like sails and cut through the
+  tunic; without springs the tunic came through their backs. The cloak, its
+  springs, its colliders and the per-vertex layer binding (`layer.ts`) are
+  gone: the cloaked outfits are worn without it (`UNCLOAKED` in `src/npc.ts`)
+  until a cloak can be made that stays clean.
+- **Oversized push capsules.** Radii were the maximum distance of anything
+  beneath, so a boot's flare or a curled thumb gave 11-12 cm capsules that
+  pushed skirts into bulges. Now the 95th percentile, no finger bones, no
+  forearm capsule in sleeves, side carry only on the shins under skirts, and
+  no vertex moved more than 6 cm by the plain projection.
+- **Hose above the knee under a knee tunic** (never seen, but it showed
+  through the skirt in the stride) is dropped.
 
 **The Lombard multi-part belt** (src/npc/props.ts makeBeltFittings): four
 narrow leather side straps from small mounts at the front and the left, each
