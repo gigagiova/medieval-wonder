@@ -20,9 +20,13 @@ float seen(){
   float g = dy > 1e-4 ? (1.0 - exp(-dy)) / dy : 1.0;
   return exp(-${FOG.dens.toFixed(4)} * exp(-${FOG.b.toFixed(4)} * (uEye.y - uFogBase)) * L * g);
 }`;
-function debugMaterial(src: THREE.Material | null, kind: 'surface' | 'ref'): THREE.Material {
+function debugMaterial(src: THREE.Material | null, kind: 'surface' | 'ref', pass: 'front' | 'back' = 'front'): THREE.Material {
   const s = src as THREE.MeshStandardMaterial | null;
-  const m = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, toneMapped: false, fog: false });
+  // Two passes: front faces first, then back faces that are strictly nearer
+  // than what is drawn (depth LESS). A back face that coincides with a front
+  // face (a surface given both sides, see bothSides()) loses, as in the game.
+  const m = new THREE.MeshBasicMaterial({ side: pass === 'front' ? THREE.FrontSide : THREE.BackSide, toneMapped: false, fog: false });
+  if (pass === 'back') m.depthFunc = THREE.LessDepth;
   if (s && (s.alphaTest > 0 || s.transparent) && s.map) { m.map = s.map; m.alphaTest = Math.max(0.5, s.alphaTest); }
   const oneSided = kind === 'surface' && (!s || s.side === THREE.FrontSide);
   // Materials that move their vertices (wind in the vegetation, impostors,
@@ -45,10 +49,10 @@ function debugMaterial(src: THREE.Material | null, kind: 'surface' | 'ref'): THR
         vec3 grey = vec3(shade * 0.85, shade * 0.85, shade * 0.9);
         bool vis = seen() > 0.15;
         ${kind === 'ref' ? 'gl_FragColor = vec4(vis ? vec3(0.0, 1.0, 0.0) : grey, 1.0);'
-          : oneSided ? 'gl_FragColor = vec4((!gl_FrontFacing && vis) ? vec3(1.0, 0.0, 1.0) : grey, 1.0);'
+          : oneSided && pass === 'back' ? 'gl_FragColor = vec4(vis ? vec3(1.0, 0.0, 1.0) : grey, 1.0);'
           : 'gl_FragColor = vec4(grey, 1.0);'}`);
   };
-  m.customProgramCacheKey = () => `holes-${kind}-${oneSided}-${!!m.map}-${own ? own.customProgramCacheKey() : ''}`;
+  m.customProgramCacheKey = () => `holes-${kind}-${pass}-${oneSided}-${!!m.map}-${own ? own.customProgramCacheKey() : ''}`;
   if (own) (m as unknown as { defines: unknown }).defines = (own as unknown as { defines?: unknown }).defines;
   return m;
 }
@@ -67,11 +71,13 @@ export function initHolesView(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   for (const o of hide) o.visible = false;
   renderer.setClearColor(GREEN, 1);
   renderer.toneMapping = THREE.NoToneMapping;
+  const backOf = new WeakMap<THREE.Material, THREE.Material>();
   const swapOf = (m: THREE.Material) => {
     let d = swapped.get(m);
-    if (!d) { d = debugMaterial(m, 'surface'); swapped.set(m, d); swapped.set(d, d); }
+    if (!d) { d = debugMaterial(m, 'surface'); swapped.set(m, d); swapped.set(d, d); backOf.set(d, debugMaterial(m, 'surface', 'back')); }
     return d;
   };
+  const meshes: THREE.Mesh[] = [];
   // The reference ground: 2 m cells, 90 m round the camera, 0.6 m under the terrain.
   const N = 90, ST = 2;
   const refGeo = new THREE.BufferGeometry();
@@ -117,6 +123,9 @@ export function initHolesView(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
         // Fire, motes and other custom shaders: not surfaces.
         if (mats.some((m) => (m as THREE.ShaderMaterial).isShaderMaterial)) { o.visible = false; o.onBeforeRender = () => { o.visible = false; }; done.add(o); return; }
         mesh.material = Array.isArray(mesh.material) ? mats.map(swapOf) : swapOf(mats[0]);
+        mesh.userData.holesFront = mesh.material;
+        mesh.userData.holesBack = Array.isArray(mesh.material) ? mesh.material.map((q) => backOf.get(q)!) : backOf.get(mesh.material)!;
+        meshes.push(mesh);
         // Pool pages swap their geometry, not their material: once is enough.
         done.add(o);
       });
@@ -125,7 +134,14 @@ export function initHolesView(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
       uni.uEye.value.copy(camera.position);
       uni.uFogBase.value = fogBase();
       renderer.setRenderTarget(null);
+      for (const q of meshes) q.material = q.userData.holesFront;
       renderer.render(scene, camera);
+      for (const q of meshes) q.material = q.userData.holesBack;
+      const ac = renderer.autoClear, refVis = ref.visible, bVis = backdrop.visible;
+      renderer.autoClear = false; ref.visible = false; backdrop.visible = false;
+      renderer.render(scene, camera);
+      renderer.autoClear = ac; ref.visible = refVis; backdrop.visible = bVis;
+      for (const q of meshes) q.material = q.userData.holesFront;
     },
     count() {
       const gl = renderer.getContext();

@@ -102,4 +102,88 @@ saves every frame and a contact sheet per point.
 SwiftShader stability: a previous attempt that teleported to many places in
 one page crashed. Here the viewport is the phone's at pixel ratio 1, every move
 waits for `stream.ready` before a frame is drawn, the page is reloaded every
-4 points, and nothing else is rendered (no post-processing).
+4 points, and nothing else is rendered (no post-processing). No run crashed.
+
+`tools/holes/summarize-render.mjs before/render.json after/render.json` gives
+the totals over the same frames. A frame more than 40 % magenta is a camera
+standing inside a solid (the teleport lands on the ground inside a house one
+cannot enter, or a pier), as the geometry audit's skipped points; such frames
+are left out of both totals.
+
+## What the audits found, and the causes
+
+Classes, each traced to the code that makes it:
+
+1. **Ground left out between houses** (`fabric.ts makeChunks`). The ground of
+   a chunk was masked wherever the layout raster said HOUSE. The raster's
+   HOUSE also covers the slivers, courtyards and back yards between the lots
+   of a block that no house stands on, and, after the plan trace, cells round
+   traced footprints. There the ground simply was not drawn: holes seen
+   through the gaps between houses, from the lanes and from any height.
+2. **Middle-detail holes by the walls** (`fabric.ts ground`). A ground quad
+   was hidden when the 1 m round its centre was under a house. Right for the
+   0.64 m quads of full detail, wrong for the 2 m quads of the middle detail
+   (40–96 m): they were dropped while sticking a metre out of the house.
+3. **Seams between levels of detail** (`fabric.ts ground`, `stream.ts`). The
+   ground of full (0.64 m), middle (2 m) and stand-in (4 m, 3 cm low) chunks
+   is bent by the same field but sampled at different spacing, so their
+   borders part by up to 0.22 m (full/middle) and 0.75 m (middle/stand-in) on
+   steep ground: slits of sky along every chunk border at the detail
+   boundaries (all 6,450 tested borders were over 2 cm).
+4. **Landmark floor masks larger than the floors** (`sites.ts`, Codex's floor
+   masks): S. Maria's mask was one rectangle over the nave, aisle, library and
+   1.2 m beyond the walls; S. Pietro's the same. Only the nave and library
+   have slab floors, so the ground was missing in the aisle, outside the west
+   wall and round the apse: the two largest clusters of holes.
+5. **Roofs without an underside.** `town.ts polyRoof` (every house on a
+   footprint that is not a quad, and every tower house: most traced
+   footprints) laid tiles on a one-sided board surface with only a strip of
+   boards along each edge's overhang, with gaps at every corner; from below,
+   in the gaps and wherever the strip did not reach, one saw the sky through
+   the roof. `tiledLeanTo` houses stood open under the high side and the
+   raking ends of their roof (walls stop at the eaves height). The open mouths
+   of the half-round cover tiles at the eaves, the top course of lean-tos and
+   the ends of the ridge rows show their culled insides: slivers of sky. The
+   gable ends of the tiled boards were open slits.
+6. **Containers without insides.** The storage jars by the doors and on
+   balconies (`arch/dress.ts jar`) were an outer lathe open at the top: from
+   eye height one looked into the mouth and through the jar. The same for the
+   open cylinders of the library (box, mortar, crucibles), the palace's
+   bronze basin and the horn lanterns' horn and lid (`lights.ts`).
+7. **Theatre**: the cavea's core is a shell of treads and risers, seen from the
+   passages under it through the outer arches; its vaults were drawn from
+   inside only.
+8. **Leaf cards** (merged from main: the new garden beds, vines and tussocks
+   in `plotbuild.ts`): blades and leaves are single triangles in the one-sided
+   'leaf' material, invisible from behind.
+9. **World edge**: the coarse stand-in ground stopped at the world's bounds,
+   within the fog of a walker near the edge (Nux Sacra, 80 m from the north
+   edge).
+
+The props from glTF (Poly Haven pots, bowls, buckets, baskets, barrels) are
+all `doubleSided` in their files (audit E): their insides are drawn, with the
+outer texture. The one one-sided model, the Sketchfab cart, is closed where it
+can be seen (no back faces from the dome of viewpoints).
+
+## Fixes at the source
+
+| Class | Fix | Where | Cost |
+|---|---|---|---|
+| 1 | The ground is left out only under houses actually built: each closed house's own footprint polygon, rasterised into every chunk it covers (explorable houses and ruins keep their floors). | `fabric.ts makeChunks` | none |
+| 2 | A quad is hidden only if every mask cell its own corners (plus 0.25 m) fall in is under a house. | `fabric.ts ground` | none |
+| 3 | Skirts (Ulrich 2002, *Rendering massive terrains using chunked level of detail control*): a 0.8 m strip hanging from every chunk border, facing out; the stand-in ground gets the same where a detailed chunk begins. | `fabric.ts ground`, `stream.ts` | ~400 triangles per full chunk, ~130 per middle chunk |
+| 4 | Floor masks fitted to the slabs actually built (nave, library); the mask's 0.6 m margin lies under their walls. The reserve keeps the precinct free in the layout. | `sites.ts` | none |
+| 5 | polyRoof: a full underside of boards, 7 cm under the tile surface, facing down (the house's ceiling and the eaves' soffit in one), replacing the edge strips. Lean-to houses: the walls carried up under the slope. Cover tiles: the mouth closed at the eaves course, both ends of a lean-to's rows, both ends of ridge rows (`coppo(..., cap)`). Tiled gables: the board slab closed at the gable ends. | `town.ts`, `arch/roof.ts`, `arch/kit.ts` | polyRoof ~+30–60 triangles per house; caps 3 per capped tile |
+| 6 | Jars get a lip, an inner neck going down and a floor (faces inward). Open vessels and lantern shells go through `bothSides()` (the same surface again, wound the other way). | `arch/dress.ts`, `builder.ts`, `library.ts`, `palace.ts`, `lights.ts` | jars +3 triangles per segment; small |
+| 7 | The cavea core's treads and risers also facing the other way; vaults drawn inside and out. | `theatrum.ts` | ~+2,300 triangles |
+| 8 | The Builder draws every piece in a thin-card material ('leaf') from both sides. | `builder.ts` (`THIN`) | doubles leaf triangles |
+| 9 | The stand-in ground runs on to its super-chunk's edge (up to 96 m past the bounds). | `stream.ts` | a few hundred triangles at the edge |
+
+Why geometry rather than double-sided materials: the surface materials are
+shared by the whole town (one draw per material); `side: DoubleSide` on them
+would rasterise every back face of every closed wall and roof in the town.
+Apple GPUs remove hidden fragments before shading, but not the rasterisation
+and binning of the extra triangles, and coincident party walls of adjacent
+houses would z-fight. Each class is closed where it is open instead, at a cost
+of tens of triangles per house; double-sidedness is used only for thin cards
+and thin vessels, as geometry (`bothSides`), not as a material state.

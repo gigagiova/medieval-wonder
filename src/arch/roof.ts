@@ -158,6 +158,14 @@ export function tiledLeanTo(acc: Acc, len: number, run: number, hHigh: number, h
   const inside = P(0, yAt(0) - 4, 0);
   acc.quad('roof', P(-len / 2, yAt(z0), z0), P(len / 2, yAt(z0), z0), P(len / 2, yAt(z1), z1), P(-len / 2, yAt(z1), z1), inside);
   acc.quad('wood', P(-len / 2, yAt(z0) - 0.08, z0), P(len / 2, yAt(z0) - 0.08, z0), P(len / 2, yAt(z1) - 0.08, z1), P(-len / 2, yAt(z1) - 0.08, z1), P(0, yAt(0) + 4, 0));
+  // The four edges of the boards, so they are a closed slab: seen from below at
+  // a slant, the open edge showed the tiles' culled underside (docs/HOLES-AUDIT.md).
+  const corner = [P(-len / 2, 0, z0), P(len / 2, 0, z0), P(len / 2, 0, z1), P(-len / 2, 0, z1)];
+  const lz = [z0, z0, z1, z1], mid = P(0, yAt(0) - 0.04, 0);
+  for (let k = 0; k < 4; k++) {
+    const a = corner[k], c = corner[(k + 1) % 4], ya = yAt(lz[k]), yc = yAt(lz[(k + 1) % 4]);
+    acc.quad('wood', v3(a.x, ya, a.z), v3(c.x, yc, c.z), v3(c.x, yc - 0.08, c.z), v3(a.x, ya - 0.08, a.z), mid);
+  }
   const up = v3(0, 1, 0).addScaledVector(Z, (hHigh - hLow) / run).normalize();
   const nC = Math.max(1, Math.round(Math.hypot(run, hHigh - hLow) / 0.46));
   for (let lx = -len / 2 + 0.15; lx < len / 2 - 0.1; lx += pitch + R(-0.02, 0.02)) {
