@@ -22,7 +22,11 @@ export interface BodyMeta {
   nativeCharacter?: boolean;
   garments: Record<string, { fabric: string; layer: string; depth: number; map?: 'detail' | 'color' }>;
   outfits: Record<string, { garments: string[]; bit: number }>;
+  /** Belts made for each body garment (tools/npc3/wardrobe_build.py): the default, and one per style. */
+  belts?: Record<string, { default: string; styles: Partial<Record<BeltStyle, string>> }>;
 }
+/** How a person is girded (tools/npc3/wardrobe.json): a leather strap, a cord (rope or cingulum), a woven sash (girdle). */
+export type BeltStyle = 'leather' | 'cord' | 'sash';
 export interface KitV2 { id: string; sex: Sex; template: THREE.Object3D; motion: Motion; m: Measure; scale: number; meta: BodyMeta }
 export interface OutfitV2 {
   v2: true; id: string; body: string; sex: Sex; template: THREE.Object3D; m: Measure;
@@ -180,12 +184,18 @@ export function bodiesV2(outfit: string, sex: Sex) {
 }
 
 /** An outfit on a body: the body's template with that outfit's garments, hidden parts dropped. */
-export function outfitV2(id: string, body: string): OutfitV2 {
-  const key = id + ':' + body;
+export function outfitV2(id: string, body: string, belt?: BeltStyle): OutfitV2 {
+  const key = id + ':' + body + (belt ? ':' + belt : '');
   let o = outfitsV2.get(key);
   if (o) return o;
   const k = kitsV2.get(body)!;
-  const of = k.meta.outfits[id];
+  const base = k.meta.outfits[id];
+  // The person's own belt in place of the outfit's default, where one of that style was made for the garment.
+  const garments = base.garments.map((g) => {
+    for (const b of Object.values(k.meta.belts ?? {})) if (b.default === g && belt && b.styles[belt]) return b.styles[belt]!;
+    return g;
+  });
+  const of = { ...base, garments };
   const t = SkeletonUtils.clone(k.template);
   const drop: THREE.Object3D[] = [];
   t.traverse((x) => {

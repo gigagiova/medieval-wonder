@@ -30,13 +30,16 @@ registerPopulationOutfits();
 const t0 = performance.now();
 await loadNpcAssets();
 const loadMs = performance.now() - t0;
-const ids = (params.get('groups')?.split(',') ?? Object.keys(GROUPS)) as GroupId[];
+// A group may name its outfit: monachus:1 (index into its outfits).
+const entries = params.get('groups')?.split(',').map((g) => g.split(':')) ?? Object.keys(GROUPS).map((g) => [g]);
+const ids = entries.map(([g]) => g) as GroupId[];
 const seed = Number(params.get('seed') ?? 1);
 const gap = Number(params.get('gap') ?? 1.05);
 const makeMs: number[] = [];
 const people: Person[] = ids.map((id, i) => {
   const tm = performance.now();
-  const p = makeOfGroup(scene, id, seed * 1000 + i * 31, { outfit: params.has('outfit') ? Number(params.get('outfit')) : undefined }).person;
+  const own = entries[i][1];
+  const p = makeOfGroup(scene, id, seed * 1000 + i * 31, { outfit: own !== undefined ? Number(own) : params.has('outfit') ? Number(params.get('outfit')) : undefined }).person;
   makeMs.push(Math.round(performance.now() - tm));
   p.pos.set((i - (ids.length - 1) / 2) * gap, 0, 0);
   return p;
@@ -46,7 +49,8 @@ for (const [i, k] of (params.get('props')?.split(',') ?? []).entries()) {
   pr.position.set((i - 1) * 2.4, 0, -2.2);
   scene.add(pr);
 }
-const anim = params.get('anim') ?? 'idle', cam = params.get('cam') ?? 'front';
+let anim = params.get('anim') ?? 'idle';
+const cam = params.get('cam') ?? 'front';
 const focus = params.has('focus') ? Number(params.get('focus')) : -1;
 const step = (dt: number) => {
   for (const p of people) {
@@ -75,4 +79,11 @@ camera.position.copy(c).addScaledVector(dir, d).setY(h + 0.2);
 camera.lookAt(c.x, zoom ? 1.4 : focus >= 0 ? 1.2 : 0.85, c.z);
 renderer.render(scene, camera);
 (window as unknown as { __stats: unknown }).__stats = { loadMs: Math.round(loadMs), build: npcDebug.buildMs, makeMs, names: people.map((p) => `${p.name} · ${p.title}`), calls: renderer.info.render.calls, tris: renderer.info.render.triangles };
+// Audit and capture hooks (tools/npc3/capture.mjs): pose, step and re-render from a script.
+(window as unknown as { __api: unknown }).__api = {
+  THREE, scene, camera, renderer, people, npcDebug,
+  setAnim: (a: string) => { anim = a; },
+  step: (dt: number) => step(dt),
+  render: () => renderer.render(scene, camera),
+};
 (window as unknown as { __done: boolean }).__done = true;

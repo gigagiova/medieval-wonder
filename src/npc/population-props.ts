@@ -120,6 +120,29 @@ export function makeScrip(b: Garment['belt']) {
   return o;
 }
 
+/**
+ * The buckle of a leather belt, at the front: a D-shaped frame with its
+ * tongue and, behind it, the plate riveted to the strap. Lombard men's are
+ * bronze (often a set with plates and strap ends, makeBeltFittings); a
+ * Latin townsman's a plain iron frame. Bind space: hang on the hips at identity.
+ */
+export function makeBuckle(b: Garment['belt'], metal: 'bronze' | 'iron') {
+  const m = propMats();
+  const r = b.r(0) + 0.004;
+  const frame = new THREE.TorusGeometry(0.019, 0.0032, 4, 10, Math.PI);
+  frame.rotateZ(-Math.PI / 2);
+  const bar = new THREE.CylinderGeometry(0.0032, 0.0032, 0.038, 5);
+  const tongue = at(new THREE.BoxGeometry(0.019, 0.004, 0.003), 0.009, 0, 0.002);
+  const parts = [frame, bar, tongue];
+  if (metal === 'bronze') parts.push(at(new THREE.BoxGeometry(0.026, 0.03, 0.0025), -0.016, 0, -0.002));
+  const g = merge(parts);
+  // The frame's open side to his left; standing proud of the strap.
+  g.translate(b.cx + 0.012, b.y, b.cz + r + 0.002);
+  const o = new THREE.Group();
+  o.add(new THREE.Mesh(g, metal === 'bronze' ? m.bronze : m.darkIron));
+  return o;
+}
+
 // ------------------------------------------------------------------ set down in the street
 
 /** Things set down where people work: built at the origin, standing on y = 0, facing +Z. */
