@@ -67,7 +67,7 @@ Which capsules, by layer (cloaks are left off for now, see below):
 
 **Keeping the cloth on its own side.** A plain projection pushes a point out
 the nearest way, so the front of a skirt that a striding shin has overtaken is
-pushed further behind it and the leg shows through. The shin and thigh
+pushed further behind it and the leg shows through. The shin
 capsules under a skirt (only those)
 therefore know the side each cloth point belongs on: where the point would be
 if it had moved rigidly with the limb's bone since the bind pose. A point
