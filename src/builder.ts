@@ -382,6 +382,26 @@ export class Builder {
   }
 }
 
+/**
+ * An open shell (a cup, a bowl, a lantern's horn, a dome's lid) with its
+ * inside: the same surface again, wound the other way, normals turned. A
+ * one-sided open shell has no inside; seen into, it shows what is behind it
+ * (docs/HOLES-AUDIT.md). Thin things only: the two faces coincide.
+ */
+export function bothSides(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const a = g.index ? g.toNonIndexed() : g.clone();
+  for (const k of Object.keys(a.attributes)) if (k !== 'position' && k !== 'normal') a.deleteAttribute(k);
+  if (!a.attributes.normal) a.computeVertexNormals();
+  const b = a.clone();
+  const P = b.attributes.position.array as Float32Array, N = b.attributes.normal.array as Float32Array;
+  for (let i = 0; i < P.length; i += 9) for (let k = 0; k < 3; k++) {
+    let t = P[i + 3 + k]; P[i + 3 + k] = P[i + 6 + k]; P[i + 6 + k] = t;
+    t = N[i + 3 + k]; N[i + 3 + k] = N[i + 6 + k]; N[i + 6 + k] = t;
+  }
+  for (let i = 0; i < N.length; i++) N[i] = -N[i];
+  return mergeGeometries([a, b], false)!;
+}
+
 export function rng(seed: number) {
   let s = seed >>> 0;
   return () => {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Builder } from './builder';
+import { bothSides, type Builder } from './builder';
 import { field, fastTerrain, toWorldXZ } from './displace';
 
 // Period light sources (Lombard Italy, 6th-8th c.): pitch torches, iron
@@ -70,12 +70,12 @@ export function brazier(b: Builder, x: number, z: number, y = 0) {
  */
 export function hornLantern(b: Builder, x: number, y: number, z: number, under = false) {
   b.geo('bronze', new THREE.CylinderGeometry(0.1, 0.11, 0.03, 12), x, y - 0.15, z, 0, false);
-  b.geo('horn', new THREE.CylinderGeometry(0.095, 0.095, 0.26, 12, 1, true), x, y, z, 0, false);
+  b.geo('horn', bothSides(new THREE.CylinderGeometry(0.095, 0.095, 0.26, 12, 1, true)), x, y, z, 0, false);
   for (let i = 0; i < 3; i++) {
     const a = (i / 3) * Math.PI * 2;
     b.box('bronze', 0.015, 0.3, 0.015, x + Math.sin(a) * 0.1, y - 0.15, z + Math.cos(a) * 0.1, 0, false);
   }
-  b.geo('bronze', new THREE.SphereGeometry(0.1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), x, y + 0.13, z, 0, false);
+  b.geo('bronze', bothSides(new THREE.SphereGeometry(0.1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2)), x, y + 0.13, z, 0, false);
   b.geo('bronze', new THREE.TorusGeometry(0.04, 0.008, 4, 10), x, y + 0.27, z, 0, false);
   b.box('iron', 0.012, 0.5, 0.012, x, y + 0.29, z, 0, false);
   b.lamp('lantern', v(x, y, z), under);
