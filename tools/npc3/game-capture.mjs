@@ -62,6 +62,8 @@ for (const [pi, place] of places.entries()) {
         const dx = p.pos.x - cam.x, dz = p.pos.z - cam.z;
         // Through the game's own teleport (it lands on the floor and becomes the player's safe spot).
         window.__teleport({ name: 'npc', x: cam.x, y: p.pos.y + 0.5, z: cam.z, yaw: Math.atan2(-dx, -dz) });
+        // (No floor found there, e.g. under an arch: put the camera there directly.)
+        if (Math.hypot(pl.pos.x - cam.x, pl.pos.z - cam.z) > 1.5) { pl.pos.set(cam.x, cam.y, cam.z); pl.vel?.set(0, 0, 0); pl.yaw = Math.atan2(-dx, -dz); }
         pl.pitch = Math.atan2(p.pos.y + 0.95 * (p.scale ?? 1) - pl.pos.y, Math.hypot(dx, dz));
         return { key: p.name + p.title, name: p.name, title: p.title, outfit: p.outfit?.id, body: p.outfit?.body, w: Object.fromEntries(Object.entries(p.w ?? {}).map(([a, v]) => [a, +(+v).toFixed(2)])) };
       }, { idx, view });
