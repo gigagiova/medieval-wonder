@@ -179,7 +179,17 @@ export function buildHouse(b: Builder, lot: Lot) {
   const shingle = shU < (front ? 0.06 : h < 6 ? 0.3 : 0.12);
   const opts = { pitch: front ? 0.37 : 0.55, course: front ? 0.52 : 1.0, smoke: rand() < 0.18, gableMat: gm, shingle, sag: sagU < 0.3 ? sagU * 0.5 : 0, seg: front ? 3 : 2, street: front ? [front.out.x, front.out.y] as [number, number] : undefined };
   if (rand() < 0.16) {
-    tiledLeanTo(acc, lenU + 0.5, lenV + 0.6, h + lenV * 0.28, h - 0.15, centre.x, centre.y, ryOf(e) + (rand() < 0.5 ? 0 : Math.PI), opts.pitch);
+    const ryL = ryOf(e) + (rand() < 0.5 ? 0 : Math.PI), run = lenV + 0.6, hHigh = h + lenV * 0.28, hLow = h - 0.15;
+    tiledLeanTo(acc, lenU + 0.5, run, hHigh, hLow, centre.x, centre.y, ryL, opts.pitch);
+    // The walls carried up under the slope to its boards (high side and the
+    // two raking ends): without them the house stood open under its roof.
+    const zx = Math.sin(ryL), zz = Math.cos(ryL), mid = new THREE.Vector3(centre.x, h + 0.5, centre.y);
+    const under = (q: V2) => hHigh + (hLow - hHigh) * (((q.x - centre.x) * zx + (q.y - centre.y) * zz) + run / 2) / run - 0.08;
+    for (let k = 0; k < c.length; k++) {
+      const a = c[k], q = c[(k + 1) % c.length], ya = under(a), yq = under(q);
+      if (ya < h + 0.03 && yq < h + 0.03) continue;
+      acc.quad(gm, new THREE.Vector3(a.x, h - 0.05, a.y), new THREE.Vector3(q.x, h - 0.05, q.y), new THREE.Vector3(q.x, Math.max(h, yq), q.y), new THREE.Vector3(a.x, Math.max(h, ya), a.y), mid);
+    }
   } else if (lenU > lenV || rand() < 0.3) {
     tiledGable(b, acc, lenU, lenV, lenV * R(0.17, 0.26), centre.x, h, centre.y, ryOf(e), R(0.32, 0.55), opts);
   } else {
@@ -308,7 +318,9 @@ export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: nu
         // The boards under the tiles, 7 cm down, facing down: the eaves seen
         // from the lane, and no roof that one can see the sky through from
         // below (its back faces are culled; docs/HOLES-AUDIT.md).
-        acc.tri('wood', p.clone().setY(p.y - 0.07), r.clone().setY(r.y - 0.07), q.clone().setY(q.y - 0.07));
+        // (Not under the fascia strips, which are in the same list.)
+        const ny = (q.z - p.z) * (r.x - p.x) - (q.x - p.x) * (r.z - p.z);
+        if (Math.abs(ny) > 1e-4) acc.tri('wood', p.clone().setY(p.y - 0.07), r.clone().setY(r.y - 0.07), q.clone().setY(q.y - 0.07));
         return;
       }
       if (mx === lpq) { const m = p.clone().add(q).multiplyScalar(0.5); split(p, m, r, d + 1); split(m, q, r, d + 1); }
@@ -324,7 +336,7 @@ export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: nu
   b.add(g, 'roof', undefined, false, false);
   // Its underside (see above).
   const under: number[] = [];
-  for (let i = 0; i < pos.length; i += 9) under.push(pos[i], pos[i + 1] - 0.07, pos[i + 2], pos[i + 6], pos[i + 7] - 0.07, pos[i + 8], pos[i + 3], pos[i + 4] - 0.07, pos[i + 5]);
+  for (let i = 0; i < pos.length; i += 9) if (Math.abs((pos[i + 5] - pos[i + 2]) * (pos[i + 6] - pos[i]) - (pos[i + 3] - pos[i]) * (pos[i + 8] - pos[i + 2])) > 1e-4) under.push(pos[i], pos[i + 1] - 0.07, pos[i + 2], pos[i + 6], pos[i + 7] - 0.07, pos[i + 8], pos[i + 3], pos[i + 4] - 0.07, pos[i + 5]);
   const gu = new THREE.BufferGeometry();
   gu.setAttribute('position', new THREE.Float32BufferAttribute(under, 3));
   gu.computeVertexNormals();

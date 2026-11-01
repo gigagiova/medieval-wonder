@@ -526,10 +526,11 @@ function ground(b: Builder, it: ChunkItems) {
   }
   if (!idx.length) return;
   // Skirts (Ulrich, "Rendering massive terrains using chunked level of detail
-  // control", SIGGRAPH 2002): a strip hanging 0.4 m down from each border of
+  // control", SIGGRAPH 2002): a strip hanging 0.8 m down from each border of
   // the chunk, facing out. A neighbour drawn at another detail (full 0.64 m,
-  // middle 2 m, the 4 m stand-in) bends its border differently, up to ~0.2 m;
-  // the skirt of the farther chunk fills the slit, facing the eye.
+  // middle 2 m, the 4 m stand-in) bends its border differently, up to ~0.75 m on
+  // the steepest slopes (tools/audit-holes.ts, seams): the skirt of the farther
+  // chunk fills the slit, facing the eye.
   const skirt: number[] = [], kept = new Set<number>();
   for (let k = 0; k < idx.length; k += 6) kept.add(idx[k]);
   const quadAt = (i: number, j: number) => kept.has(j * (n + 1) + i);
@@ -540,7 +541,7 @@ function ground(b: Builder, it: ChunkItems) {
     [k, 0, k + 1, 0, k, 0, true], [k + 1, n, k, n, k, n - 1, true], [0, k + 1, 0, k, 0, k, true], [n, k, n, k + 1, n - 1, k, true],
   ] as [number, number, number, number, number, number, boolean][]) {
     if (!quadAt(qi, qj) || !outFirst) continue;
-    const a = vert(i0, j0, 0), b = vert(i1, j1, 0), c = vert(i1, j1, -0.4), d = vert(i0, j0, -0.4);
+    const a = vert(i0, j0, 0), b = vert(i1, j1, 0), c = vert(i1, j1, -0.8), d = vert(i0, j0, -0.8);
     skirt.push(a, b, c, a, c, d);
   }
   // Snap the edge of each well's hole onto a circle hidden in its masonry.

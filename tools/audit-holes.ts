@@ -198,7 +198,7 @@ function eyeAudit(it: ChunkItems, list: BV[], foot: Uint8Array) {
         if (dot > 0 && !h.soup.ds[h.tri]) {
           back++; bx += d.x; bz += d.z;
           if (h.d < 1.0) near++;
-          found.push({ tag: h.soup.tag[h.tri], mat: h.soup.mat[h.tri], p: [x + d.x * h.d, y + d.y * h.d, z + d.z * h.d] });
+          found.push({ tag: h.soup.tag[h.tri], mat: h.soup.mat[h.tri], p: [x + d.x * h.d, y + d.y * h.d, z + d.z * h.d, x, y, z] });
         }
         continue;
       }
@@ -272,7 +272,21 @@ log('eye chunks', eyeSet.size);
 const run = QUICK ? allItems.filter((it) => eyeSet.has(it.key) && Math.hypot((it.i + 0.5) * CHUNK - 30, (it.j + 0.5) * CHUNK + 60) < 260) : allItems;
 
 // A and B over every chunk (full detail chunks are kept for C where needed).
-let seamMax = 0, seamN = 0, seamOver = 0, seamMaxMid = 0, seamOverMid = 0;
+let seamMax = 0, seamN = 0, seamOver = 0, seamMaxMid = 0, seamOverMid = 0, seamOpen = 0;
+/** Deepest skirt (m) hanging under each of a chunk's four borders (W, E, S, N), from its ground triangles. */
+function skirts(s: Soup, x0: number, z0: number) {
+  const d = [0, 0, 0, 0];
+  for (let t = 0; t < s.n; t++) {
+    if (MAT_NAME[s.mat[t]] !== 'ground') continue;
+    const o9 = t * 9;
+    let xs = 0, zs = 0, ymin = Infinity, ymax = -Infinity;
+    for (let k = 0; k < 3; k++) { xs += s.pos[o9 + k * 3] / 3; zs += s.pos[o9 + k * 3 + 2] / 3; ymin = Math.min(ymin, s.pos[o9 + k * 3 + 1]); ymax = Math.max(ymax, s.pos[o9 + k * 3 + 1]); }
+    if (ymax - ymin < 0.3) continue;
+    const ex = [xs - x0, x0 + CHUNK - xs, zs - z0, z0 + CHUNK - zs];
+    for (let k = 0; k < 4; k++) if (Math.abs(ex[k]) < 0.6) d[k] = Math.max(d[k], ymax - ymin);
+  }
+  return d;
+}
 const seamRows: number[][] = [];
 let done = 0;
 const footCache = new Map<number, Uint8Array>();
@@ -286,9 +300,14 @@ for (const it of run) {
   openShells(sf);
   // Seams on the chunk's west and north edges (each edge once): full|mid and mid|coarse stand-in.
   const x0 = it.i * CHUNK, z0 = it.j * CHUNK;
+  const skF = skirts(sf, x0, z0), skM = skirts(sm, x0, z0);
   for (const [dx, dz] of [[1, 0], [0, 1]]) {
     const g1 = seamGap(x0, z0, dx, dz, CHUNK / Math.round(CHUNK / 0.64), 2);
     const g2 = seamGap(x0, z0, dx, dz, 2, 4, -0.03);
+    // The edge along x is the chunk's south border (index 2), along z its west (0).
+    const side = dx ? 2 : 0;
+    // Open unless the skirts of both levels reach deeper than the gap.
+    if (!(Math.min(skF[side], skM[side]) > Math.max(g1, g2) + 0.02)) seamOpen++;
     seamN++; seamMax = Math.max(seamMax, g1); if (g1 > 0.02) seamOver++;
     seamMaxMid = Math.max(seamMaxMid, g2); if (g2 > 0.02) seamOverMid++;
     if (seamRows.length < 20000 && (g1 > 0.02 || g2 > 0.02)) seamRows.push([x0, z0, dx, dz, +g1.toFixed(3), +g2.toFixed(3)]);
@@ -383,7 +402,7 @@ const summary = {
   when: new Date().toISOString(), quick: QUICK,
   groundPointsTested: groundPoints,
   groundHoles: holeCount,
-  lodSeams: { edges: seamN, fullVsMidMaxGap: +seamMax.toFixed(3), fullVsMidOver2cm: seamOver, midVsCoarseMaxGap: +seamMaxMid.toFixed(3), midVsCoarseOver2cm: seamOverMid },
+  lodSeams: { edges: seamN, fullVsMidMaxGap: +seamMax.toFixed(3), fullVsMidOver2cm: seamOver, midVsCoarseMaxGap: +seamMaxMid.toFixed(3), midVsCoarseOver2cm: seamOverMid, edgesNotCoveredBySkirts: seamOpen },
   eyes: { standingPoints: eyes.length, skippedInsideSolid: eyesInside, rays: eyeRays, backFaceRays: backRays, seeThroughGroundRays: holeRays,
     backFacePerMille: +(1000 * backRays / Math.max(1, eyeRays)).toFixed(3), seeThroughPerMille: +(1000 * holeRays / Math.max(1, eyeRays)).toFixed(3),
     eyesWithBackFaces: eyes.filter((e) => e.back > 0).length, eyesWithSeeThrough: eyes.filter((e) => e.hole > 0).length },

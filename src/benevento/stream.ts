@@ -289,7 +289,7 @@ export class FabricStream {
       gp.push(x, a, z, x, c, z + ST, x + ST, b, z, x + ST, b, z, x, c, z + ST, x + ST, d, z + ST);
       // A skirt (see ground() in fabric.ts) where a chunk drawn in detail
       // begins: the stand-in is 4 m and 3 cm low, so its edge never meets theirs.
-      const sk = (px: number, pz: number, ha: number, qx: number, qz: number, hb: number) => gp.push(px, ha, pz, qx, hb, qz, qx, hb - 0.45, qz, px, ha, pz, qx, hb - 0.45, qz, px, ha - 0.45, pz);
+      const sk = (px: number, pz: number, ha: number, qx: number, qz: number, hb: number) => gp.push(px, ha, pz, qx, hb, qz, qx, hb - 0.8, qz, px, ha, pz, qx, hb - 0.8, qz, px, ha - 0.8, pz);
       if (isReady(x + ST / 2, z - ST / 2)) sk(x, z, a, x + ST, z, b);
       if (isReady(x + ST / 2, z + ST * 1.5)) sk(x + ST, z + ST, d, x, z + ST, c);
       if (isReady(x - ST / 2, z + ST / 2)) sk(x, z + ST, c, x, z, a);

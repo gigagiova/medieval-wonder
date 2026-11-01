@@ -125,7 +125,7 @@ export function tiledGable(b: Builder, acc: Acc, w: number, d: number, hr: numbe
   }
   for (let i = 0; i < nR && !o.shingle; i++) {
     const a = -W / 2 + (W * i) / nR - 0.03, c = -W / 2 + (W * (i + 1)) / nR;
-    coppo(acc, 'roof', P(a, top(a, 0) + 0.04, 0), P(c, top(c, 0) + 0.02, 0), Y, Z, 0.12, 0.105);
+    coppo(acc, 'roof', P(a, top(a, 0) + 0.04, 0), P(c, top(c, 0) + 0.02, 0), Y, Z, 0.12, 0.105, 3, ((i === 0 ? 1 : 0) | (i === nR - 1 ? 2 : 0)) as 0 | 1 | 2 | 3);
   }
   // Purlins and the ridge beam poking out of both gables.
   for (const ex of [-1, 1]) {
@@ -162,8 +162,9 @@ export function tiledLeanTo(acc: Acc, len: number, run: number, hHigh: number, h
   const nC = Math.max(1, Math.round(Math.hypot(run, hHigh - hLow) / 0.46));
   for (let lx = -len / 2 + 0.15; lx < len / 2 - 0.1; lx += pitch + R(-0.02, 0.02)) {
     for (let k = 0; k < nC; k++) {
-      const a = z0 + (run * k) / nC - 0.03, c = z0 + (run * (k + 1)) / nC + R(-0.03, 0.03) * (k === nC - 1 ? 1 : 0);
-      coppo(acc, 'roof', P(lx, yAt(a) + 0.03, a), P(lx, yAt(c) + 0.005, c), up, X, 0.085, 0.07, 3, k === nC - 1 ? 2 : 0);
+      // (The top course starts on the boards, not past them: seen from below its end showed.)
+      const a = z0 + (run * k) / nC + (k ? -0.03 : 0.02), c = z0 + (run * (k + 1)) / nC + R(-0.03, 0.03) * (k === nC - 1 ? 1 : 0);
+      coppo(acc, 'roof', P(lx, yAt(a) + 0.03, a), P(lx, yAt(c) + 0.005, c), up, X, 0.085, 0.07, 3, ((k === 0 ? 1 : 0) | (k === nC - 1 ? 2 : 0)) as 0 | 1 | 2 | 3);
     }
   }
 }

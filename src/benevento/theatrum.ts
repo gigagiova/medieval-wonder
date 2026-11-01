@@ -110,6 +110,11 @@ export function theatrum(b: Builder) {
       // Tread of the core (faces up) and its riser (faces the orchestra).
       acc.quad('rubble', P(r0, a0, yb), P(r1, a0, yb), P(r1, a1, yb), P(r0, a1, yb), below);
       acc.quad('rubble', P(r0, a0, yp), P(r0, a1, yp), P(r0, a1, yb), P(r0, a0, yb), P(r0 + 5, (a0 + a1) / 2, yp));
+      // The same faces turned the other way: the core is a shell, and from the
+      // passages under the cavea (through the outer arches) one looks up at
+      // its back, which one-sided faces do not have (docs/HOLES-AUDIT.md).
+      acc.quad('rubble', P(r0, a0, yb), P(r1, a0, yb), P(r1, a1, yb), P(r0, a1, yb), v3(0, 50, 0));
+      acc.quad('rubble', P(r0, a0, yp), P(r0, a1, yp), P(r0, a1, yb), P(r0, a0, yb), P(r0 - 5, (a0 + a1) / 2, yp));
     }
   }
 
@@ -395,6 +400,8 @@ function vault(b: Builder, m: MatName, len: number, r: number, x: number, y: num
   }
   for (let i = 0; i < nr.length; i++) nr[i] = -nr[i];
   b.geo(m, n, x, y, z, ry, false);
+  // Its extrados too: the half cylinder is seen from above where the seats are gone.
+  b.geo(m, g.toNonIndexed(), x, y, z, ry, false);
 }
 
 /** A good place to stand: on the lower walkway, looking across the cavea. */
