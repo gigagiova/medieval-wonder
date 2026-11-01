@@ -33,6 +33,7 @@ import { R_IN } from './benevento/stream';
 import { OcclusionBuffer, chunkPrisms, indexLotsFrom, OCC_RANGE } from './occlusion';
 import { setKtx2Renderer } from './ktx2';
 import { perfT, perfAdd, perfFrame, perfStats, initHud, gpuBegin, gpuEnd } from './perf';
+import { initHolesView, type HolesView } from './holesview';
 
 const params = new URLSearchParams(location.search);
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -664,7 +665,7 @@ function frame() {
   if (!params.has('shot')) adaptResolution(rawDt);
   perfAdd('misc', pt); pt = perfT();
   gpuBegin();
-  composer.render(dt);
+  if (holesView) holesView.render(); else composer.render(dt);
   gpuEnd();
   perfAdd('render', pt);
   if (captureNext && frames > 12) { captureNext = false; (window as unknown as { __shot: string }).__shot = renderer.domElement.toDataURL('image/png'); }
@@ -677,6 +678,11 @@ function frame() {
 // Benchmarks: restart the frame loop after a ?shot run has finished.
 let running = true, captureNext = false, fixedTime: number | null = null;
 Object.assign(window, { __THREE: THREE, __cells: cells, __cullStats: cullStats, __fixTime: (v: number | null) => { fixedTime = v; }, __renderer: renderer, __perf: perfStats, __resume: (n = 12, capture = false) => { captureNext = capture; (window as unknown as { __done: boolean }).__done = false; frames = 12 - n; if (!running) { running = true; requestAnimationFrame(frame); } } });
+// ?holes: the render audit's debug view (see holesview.ts and docs/HOLES-AUDIT.md).
+const holesView: HolesView | null = params.has('holes')
+  ? initHolesView(renderer, scene, camera, () => shared.uFogBase.value, [sky], STAIR_ZONES)
+  : null;
+Object.assign(window, { __holes: () => { if (!holesView) return null; holesView.render(); return holesView.count(); } });
 const debugHud = params.has('debug');
 if (debugHud) initHud(renderer, scene);
 // ?at=<teleport name>[&yaw=..&pitch=..]: start at a named place (also for screenshots).

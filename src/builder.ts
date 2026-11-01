@@ -60,6 +60,8 @@ function wornBox(w: number, h: number, d: number, r: number, L: number) {
 export const DETAIL = { mid: false };
 
 /** Masonry never has knife edges: these materials get rounded, weathered arrises. */
+/** Materials whose pieces are thin cards, seen from both sides. */
+const THIN: Partial<Record<MatName, true>> = { leaf: true };
 const WORN: Partial<Record<MatName, number>> = { stone: 1, block: 1, bigstone: 1.3, rubble: 1.2, brick: 0.8, marble: 0.9, slab: 0.7, plaster: 1.1, rock: 1.4, ground: 1.4, clay: 0.6 };
 import { mat, MAT, SMALL, type MatName } from './materials';
 import { sortByCluster, newClusters, addClustered, type Clusters } from './clusters';
@@ -174,6 +176,9 @@ export class Builder {
       displace(geo, m);
     }
     if (geo.index) geo = geo.toNonIndexed();
+    // Blades and leaves are cards with no thickness: drawn from both sides
+    // (the one shared material is one-sided; see bothSides and docs/HOLES-AUDIT.md).
+    if (THIN[m]) geo = bothSides(geo);
     siteToWorldGeo(geo);
     this.lift(geo);
     if (!this.parts.has(m)) this.parts.set(m, []);
@@ -380,6 +385,27 @@ export class Builder {
     this.colliders.length = 0;
     return { collider: new THREE.Mesh(col), cells };
   }
+}
+
+/**
+ * An open shell (a cup, a bowl, a lantern's horn, a dome's lid) with its
+ * inside: the same surface again, wound the other way, normals turned. A
+ * one-sided open shell has no inside; seen into, it shows what is behind it
+ * (docs/HOLES-AUDIT.md). Thin things only: the two faces coincide.
+ */
+export function bothSides(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const a = g.index ? g.toNonIndexed() : g.clone();
+  for (const k of Object.keys(a.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') a.deleteAttribute(k);
+  if (!a.attributes.normal) a.computeVertexNormals();
+  const b = a.clone();
+  // Swap the second and third corner of every triangle, in every attribute.
+  for (const attr of Object.values(b.attributes)) {
+    const A = attr.array as Float32Array, s = attr.itemSize;
+    for (let i = 0; i < A.length; i += 3 * s) for (let k = 0; k < s; k++) { const t = A[i + s + k]; A[i + s + k] = A[i + 2 * s + k]; A[i + 2 * s + k] = t; }
+  }
+  const N = b.attributes.normal.array as Float32Array;
+  for (let i = 0; i < N.length; i++) N[i] = -N[i];
+  return mergeGeometries([a, b], false)!;
 }
 
 export function rng(seed: number) {

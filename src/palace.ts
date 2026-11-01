@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Builder, rng } from './builder';
+import { Builder, rng, bothSides } from './builder';
 import type { MatName } from './materials';
 import { shared } from './materials';
 import { noiseGLSL, atmosGLSL } from './shaders';
@@ -461,7 +461,7 @@ export function buildPalace(b: Builder, scene: THREE.Scene): void {
   b.box('iron', 0.05, 1.0, 0.05, hearth.x - 0.7, 0, hearth.z, 0, false);
   b.box('iron', 0.05, 1.0, 0.05, hearth.x + 0.7, 0, hearth.z, 0, false);
   b.box('iron', 1.5, 0.05, 0.05, hearth.x, 0.98, hearth.z, 0, false);
-  b.geo('bronze', new THREE.SphereGeometry(0.26, 12, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), hearth.x + 0.05, 0.62, hearth.z, 0, false);
+  b.geo('bronze', bothSides(new THREE.SphereGeometry(0.26, 12, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2)), hearth.x + 0.05, 0.62, hearth.z, 0, false);
   // The dais and the gastald's seat at the east end, under a hanging.
   b.box('slab', 2.0, 0.38, 5.2, 45.5, -0.15, -32.5, 0.01);
   b.box('wood', 0.75, 0.08, 0.7, 45.75, 0.68, -32.5, 0, false);

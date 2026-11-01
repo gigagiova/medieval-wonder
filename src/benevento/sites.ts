@@ -55,8 +55,11 @@ export const SITES: Record<string, SiteDef> = {
   // The cathedral of S. Maria (consecrated 15 Dec 600) with its atrium; the bishop's house and books.
   episcopium: { id: 'episcopium', name: 'Episcopium', x: -14, z: -98, rot: -0.618, lx: -14, lz: -48, flat: [26, 44], clear: 24,
     reserve: [[-24, -70], [-3, -70], [-3, -27], [-24, -27]],
-    // S. Maria (nave, aisle, apse) and the bishop's library beside it have their own slab floors.
-    floors: [[[-22.2, -68], [-5.3, -68], [-5.3, -40.4], [-22.2, -40.4]]] },
+    // S. Maria's nave and the bishop's library beside it have their own slab floors: these are
+    // exactly those slabs (world.ts church(), library.ts); the town ground's mask adds 0.6 m,
+    // which lies under their walls. (The old single rectangle reached outside the walls, and
+    // the town ground was missing there: docs/HOLES-AUDIT.md.) The reserve keeps the precinct.
+    floors: [[[-20.75, -63.6], [-13.85, -63.6], [-13.85, -41.4], [-20.75, -41.4]], [[-9.5, -63.3], [-6.3, -63.3], [-6.3, -44.7], [-9.5, -44.7]]] },
   // Roman cryptoporticus outside the walls: surviving covered public passages.
   // Exact AD 700 elevations and passage arrangement remain reconstruction hypotheses.
   quadraginta: { id: 'quadraginta', name: 'Porticus Romanae', x: -548, z: -392, rot: 0.32, lx: -37, lz: -70, flat: [44, 70] },
@@ -64,7 +67,7 @@ export const SITES: Record<string, SiteDef> = {
   thermae: { id: 'thermae', name: 'Thermae', x: -419, z: -140, rot: 0.38, lx: -33, lz: 24, flat: [24, 42] },
   // Nunnery of St Peter outside the walls, founded by Theuderada (wife of Romuald I) beyond the Sabato on the Appia.
   sanctusPetrus: { id: 'sanctusPetrus', name: 'Sanctus Petrus extra muros', x: -858, z: -6, rot: -0.9, lx: -16, lz: -50, flat: [30, 50],
-    floors: [[[-22.2, -68], [-9.4, -68], [-9.4, -40.4], [-22.2, -40.4]]] },
+    floors: [[[-20.75, -63.6], [-13.85, -63.6], [-13.85, -41.4], [-20.75, -41.4]]] },
   theatrum: { id: 'theatrum', name: 'Theatrum', x: -229, z: -8, rot: 0, flat: [52, 74] },
   amphitheatrum: { id: 'amphitheatrum', name: 'Amphitheatrum', x: -593, z: -214, rot: 0.5, flat: [56, 80] },
   arcusTraiani: { id: 'arcusTraiani', name: 'Porta Aurea', x: AUREA_CENTER[0], z: AUREA_CENTER[1], rot: -Math.atan2(24, 18), flat: [9, 22] },

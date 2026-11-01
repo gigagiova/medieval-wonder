@@ -474,11 +474,15 @@ function holes(): Hole[] {
 }
 const xz = ([x, z]: P2) => ({ x, z });
 
-export async function buildWorld(scene: THREE.Scene, progress: Progress = noProgress) {
-  const S = SITES;
-  await progress('Surveying the Lombard walls', 0.02);
+/** Lay out the town (once per page) and the stair openings in its ground; also used by the offline audits. */
+export function initLayout() {
   lay = layoutTown();
-  const hl = holes();
+  return { lay, holes: holes() };
+}
+
+export async function buildWorld(scene: THREE.Scene, progress: Progress = noProgress) {
+  await progress('Surveying the Lombard walls', 0.02);
+  const { holes: hl } = initLayout();
   const items = makeChunks(lay, hl);
   await progress('Pacing out the lanes', 0.08);
   // Collision of the whole town at once: cheap proxies only.
@@ -493,46 +497,7 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
 
   // Landmarks, built in full in their own frames.
   const b = new Builder();
-  const at = async (label: string, frac: number, s: SiteDef, fn: (g: THREE.Group) => void) => {
-    await progress(label, frac);
-    setSite(s);
-    const g = siteGroup(scene, s);
-    siteGroups[s.id] = g;
-    try { fn(g); } finally { setSite(null); }
-  };
-  await at("At the dukes' curtis", 0.2, S.curtis, (g) => buildPalace(b, g as unknown as THREE.Scene));
-  await at('In the bishop\'s church', 0.26, S.episcopium, (g) => { church(b); markReadable('calix', -17.0, 1.1, -62.4); buildLibrary(b, g as unknown as THREE.Scene); });
-  await at('Among the Roman galleries of the Santi Quaranta', 0.32, S.quadraginta, () => quadragintaRuins(b));
-  await at('Beneath the houses of Triggio', 0.36, S.triggioBurials, () => buildTriggioBurials(b));
-  await at('Burials by Sanctus Petrus', 0.365, PACCA_SITE, () => buildPaccaBurials(b));
-  await at('At Sanctus Modestus in Triggio', 0.37, S.sanctusModestus, () => buildSanModesto(b));
-  await at('In the old baths', 0.4, S.thermae, (g) => buildBaths(b, g as unknown as THREE.Scene));
-  await at('At the nuns of St Peter', 0.45, S.sanctusPetrus, () => { church(b); nunnery(b); });
-  await at('Under the Arch of Trajan', 0.5, S.arcusTraiani, () => M.arcusTraiani(b));
-  await addTrajanReliefs(siteGroups.arcusTraiani);
-  await at('At the forum', 0.52, S.arcusSacramenti, () => M.arcusSacramenti(b));
-  await at('At the forum', 0.53, { ...S.forum, x: S.forum.x - 9, z: S.forum.z - 7, lx: 21, lz: 6 }, () => temple(b));
-  await at('At the forum', 0.54, S.forum, () => M.forumMarket(b));
-  await at('In the theatre', 0.56, S.theatrum, () => M.theatrum(b));
-  await at('Among the stones of the amphitheatre', 0.6, S.amphitheatrum, () => M.amphitheatrum(b));
-  await at('Under the Torre della Catena', 0.63, S.turrisCatenae, () => M.turrisCatenae(b));
-  await at('At S. Ilario', 0.65, S.sanctusHilarius, () => M.sanctusHilarius(b));
-  await at('Among the ruins of the Iseum', 0.67, S.iseum, () => M.iseum(b));
-  await at('By the old horse', 0.675, S.caballus, () => M.adCaballum(b));
-  await at('Among the Lombard graves', 0.69, S.necropolis, () => M.necropolis(b));
-  await at('By the old walnut', 0.7, S.nux, () => M.nux(b));
-  await at('At the mill', 0.71, S.molendinum, () => M.molendinum(b));
-  await at("In the dukes' orchard", 0.72, S.hortusSophiae, () => M.cisterna(b));
-  await at('At the water-castle', 0.73, S.castellumAquae, () => M.castellumAquae(b));
-  await progress('Over the rivers', 0.74);
-  ponsLeprosus(b);
-  M.bridge(b, [-73, -326], [-100, -424], 6.0, 4.5, 'block', 12);
-  // Readables in the houses one can enter.
-  for (const l of lay.lots) if (l.explore) {
-    const a = interiorAnchors({ c: l.c.map((p) => [p.x, p.y] as P2), front: { a: [l.front!.a.x, l.front!.a.y], b: [l.front!.b.x, l.front!.b.y], out: [l.front!.out.x, l.front!.out.y] }, h: l.h, street: 2, seed: 1000 + l.id * 7919, explore: l.explore });
-    markReadableWorld(explorableLore(l.explore!.id), a.read[0], a.read[1], a.read[2]);
-  }
-  await progress('Water in the valleys', 0.76);
+  await buildLandmarks(scene, b, progress);
   buildRivers(scene);
   await progress('The scrub grows dark', 0.78);
   buildForest(scene, bc, {
@@ -556,6 +521,55 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
   const lamps = b.lamps;
   stream = new FabricStream(scene, items, cells, lamps, hl);
   return { collider, cells, lamps, flames: b.flames, props: b.props, townTex: townTexture(lay), stream };
+}
+
+/**
+ * The landmarks (built in full in their own frames), the bridges and the
+ * readables of the explorable houses. Needs layoutTown() to have run (buildWorld
+ * does it); exported for the offline geometry audits (tools/audit-holes.ts).
+ */
+export async function buildLandmarks(scene: THREE.Scene, b: Builder, progress: Progress = noProgress, opts: { reliefs?: boolean } = {}) {
+  const S = SITES;
+  const at = async (label: string, frac: number, s: SiteDef, fn: (g: THREE.Group) => void) => {
+    await progress(label, frac);
+    setSite(s);
+    const g = siteGroup(scene, s);
+    siteGroups[s.id] = g;
+    try { fn(g); } finally { setSite(null); }
+  };
+  await at("At the dukes' curtis", 0.2, S.curtis, (g) => buildPalace(b, g as unknown as THREE.Scene));
+  await at('In the bishop\'s church', 0.26, S.episcopium, (g) => { church(b); markReadable('calix', -17.0, 1.1, -62.4); buildLibrary(b, g as unknown as THREE.Scene); });
+  await at('Among the Roman galleries of the Santi Quaranta', 0.32, S.quadraginta, () => quadragintaRuins(b));
+  await at('Beneath the houses of Triggio', 0.36, S.triggioBurials, () => buildTriggioBurials(b));
+  await at('Burials by Sanctus Petrus', 0.365, PACCA_SITE, () => buildPaccaBurials(b));
+  await at('At Sanctus Modestus in Triggio', 0.37, S.sanctusModestus, () => buildSanModesto(b));
+  await at('In the old baths', 0.4, S.thermae, (g) => buildBaths(b, g as unknown as THREE.Scene));
+  await at('At the nuns of St Peter', 0.45, S.sanctusPetrus, () => { church(b); nunnery(b); });
+  await at('Under the Arch of Trajan', 0.5, S.arcusTraiani, () => M.arcusTraiani(b));
+  if (opts.reliefs !== false) await addTrajanReliefs(siteGroups.arcusTraiani);
+  await at('At the forum', 0.52, S.arcusSacramenti, () => M.arcusSacramenti(b));
+  await at('At the forum', 0.53, { ...S.forum, x: S.forum.x - 9, z: S.forum.z - 7, lx: 21, lz: 6 }, () => temple(b));
+  await at('At the forum', 0.54, S.forum, () => M.forumMarket(b));
+  await at('In the theatre', 0.56, S.theatrum, () => M.theatrum(b));
+  await at('Among the stones of the amphitheatre', 0.6, S.amphitheatrum, () => M.amphitheatrum(b));
+  await at('Under the Torre della Catena', 0.63, S.turrisCatenae, () => M.turrisCatenae(b));
+  await at('At S. Ilario', 0.65, S.sanctusHilarius, () => M.sanctusHilarius(b));
+  await at('Among the ruins of the Iseum', 0.67, S.iseum, () => M.iseum(b));
+  await at('By the old horse', 0.675, S.caballus, () => M.adCaballum(b));
+  await at('Among the Lombard graves', 0.69, S.necropolis, () => M.necropolis(b));
+  await at('By the old walnut', 0.7, S.nux, () => M.nux(b));
+  await at('At the mill', 0.71, S.molendinum, () => M.molendinum(b));
+  await at("In the dukes' orchard", 0.72, S.hortusSophiae, () => M.cisterna(b));
+  await at('At the water-castle', 0.73, S.castellumAquae, () => M.castellumAquae(b));
+  await progress('Over the rivers', 0.74);
+  ponsLeprosus(b);
+  M.bridge(b, [-73, -326], [-100, -424], 6.0, 4.5, 'block', 12);
+  // Readables in the houses one can enter.
+  for (const l of lay.lots) if (l.explore) {
+    const a = interiorAnchors({ c: l.c.map((p) => [p.x, p.y] as P2), front: { a: [l.front!.a.x, l.front!.a.y], b: [l.front!.b.x, l.front!.b.y], out: [l.front!.out.x, l.front!.out.y] }, h: l.h, street: 2, seed: 1000 + l.id * 7919, explore: l.explore });
+    markReadableWorld(explorableLore(l.explore!.id), a.read[0], a.read[1], a.read[2]);
+  }
+  await progress('Water in the valleys', 0.76);
 }
 
 // ---------------------------------------------------------------- ground collision

@@ -110,6 +110,11 @@ export function theatrum(b: Builder) {
       // Tread of the core (faces up) and its riser (faces the orchestra).
       acc.quad('rubble', P(r0, a0, yb), P(r1, a0, yb), P(r1, a1, yb), P(r0, a1, yb), below);
       acc.quad('rubble', P(r0, a0, yp), P(r0, a1, yp), P(r0, a1, yb), P(r0, a0, yb), P(r0 + 5, (a0 + a1) / 2, yp));
+      // The same faces turned the other way: the core is a shell, and from the
+      // passages under the cavea (through the outer arches) one looks up at
+      // its back, which one-sided faces do not have (docs/HOLES-AUDIT.md).
+      acc.quad('rubble', P(r0, a0, yb), P(r1, a0, yb), P(r1, a1, yb), P(r0, a1, yb), v3(0, 50, 0));
+      acc.quad('rubble', P(r0, a0, yp), P(r0, a1, yp), P(r0, a1, yb), P(r0, a0, yb), P(r0 - 5, (a0 + a1) / 2, yp));
     }
   }
 
@@ -359,8 +364,8 @@ export function theatrum(b: Builder) {
 
 /**
  * A seat block with only what can be seen: its tread, its riser, the worn
- * nose between them (a bevel), both ends (seen at the stairs and the gaps)
- * and, when the row behind is gone, its back. 12-14 triangles instead of a
+ * nose between them (a bevel), both ends (seen at the stairs and the gaps),
+ * its bed and, when the row behind is gone, its back. 14-16 triangles instead of a
  * fully bevelled hexahedron's 44. Corners as Acc.hexa: bottom 0-3, top 4-7,
  * 0-1 the front (riser) edge.
  */
@@ -381,6 +386,8 @@ function seatBlock(acc: Acc, m: MatName, c: THREE.Vector3[], back: boolean) {
   acc.tri(m, c[3], c[0], f4, ctr); acc.tri(m, c[3], f4, t4, ctr); acc.tri(m, c[3], t4, c[7], ctr);
   acc.tri(m, c[2], c[1], f5, ctr); acc.tri(m, c[2], f5, t5, ctr); acc.tri(m, c[2], t5, c[6], ctr);
   if (back) acc.quad(m, c[3], c[2], c[6], c[7], ctr);
+  // Its bed: seen from the passages under the cavea where the core is broken (docs/HOLES-AUDIT.md).
+  acc.quad(m, c[0], c[1], c[2], c[3], ctr);
 }
 
 /** A barrel vault (half cylinder seen from inside) along local x, rotated ry. */
@@ -395,6 +402,8 @@ function vault(b: Builder, m: MatName, len: number, r: number, x: number, y: num
   }
   for (let i = 0; i < nr.length; i++) nr[i] = -nr[i];
   b.geo(m, n, x, y, z, ry, false);
+  // Its extrados too: the half cylinder is seen from above where the seats are gone.
+  b.geo(m, g.toNonIndexed(), x, y, z, ry, false);
 }
 
 /** A good place to stand: on the lower walkway, looking across the cavea. */

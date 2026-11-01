@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { Builder, rng } from './builder';
+import { Builder, rng, bothSides } from './builder';
 import { mat, shared, type MatName } from './materials';
 import { noiseGLSL, atmosGLSL } from './shaders';
 import { field } from './displace';
@@ -690,7 +690,7 @@ function satchel(b: Builder, parts: Parts, wallX: number, y: number, z: number, 
 function capsa(parts: Parts, x: number, z: number, anchor: Anchor) {
   const a = anchor(x, 0.2, z);
   const pm = M(x + a.x, a.y, z + a.z, R(0, 3));
-  parts.add('wood', new THREE.CylinderGeometry(0.2, 0.21, 0.42, 16, 1, true), pm.clone().multiply(M(0, 0.21, 0)));
+  parts.add('wood', bothSides(new THREE.CylinderGeometry(0.2, 0.21, 0.42, 16, 1, true)), pm.clone().multiply(M(0, 0.21, 0)));
   parts.add('wood', new THREE.CylinderGeometry(0.2, 0.2, 0.03, 16), pm.clone().multiply(M(0, 0.015, 0)));
   for (let i = 0; i < 7; i++) {
     const ang = rand() * Math.PI * 2, r = R(0, 0.12);
@@ -887,10 +887,10 @@ function cabinet(b: Builder, parts: Parts, group: THREE.Group, anchor: Anchor) {
   b.box('wood', 0.62, 0.05, 1.7, tx, ty - 0.05, tz, -0.03);
   for (const [dx, dz] of [[-0.25, -0.75], [0.25, -0.78], [-0.24, 0.76], [0.26, 0.74]]) b.box('wood', 0.06, ty - 0.05, 0.06, tx + dx, 0, tz + dz, 0, false);
   // Mortar and pestle, crucibles, scales, mineral lumps, quicksilver.
-  put('stone', new THREE.CylinderGeometry(0.11, 0.08, 0.12, 14, 1, true), tx - 0.05, ty + 0.06, tz - 0.55);
+  put('stone', bothSides(new THREE.CylinderGeometry(0.11, 0.08, 0.12, 14, 1, true)), tx - 0.05, ty + 0.06, tz - 0.55);
   put('stone', new THREE.CylinderGeometry(0.08, 0.08, 0.02, 14), tx - 0.05, ty + 0.01, tz - 0.55);
   put('stone', new THREE.CylinderGeometry(0.02, 0.03, 0.22, 8), tx - 0.02, ty + 0.15, tz - 0.53, 0, 0.5, 0.3);
-  for (let i = 0; i < 3; i++) put('clay', new THREE.CylinderGeometry(0.045, 0.028, 0.07, 9, 1, true), tx + R(-0.15, 0.1), ty + 0.035, tz - 0.25 + i * 0.12);
+  for (let i = 0; i < 3; i++) put('clay', bothSides(new THREE.CylinderGeometry(0.045, 0.028, 0.07, 9, 1, true)), tx + R(-0.15, 0.1), ty + 0.035, tz - 0.25 + i * 0.12);
   put('bronze', bx(0.4, 0.012, 0.012, 0, 0, 0), tx - 0.1, ty + 0.42, tz + 0.15);
   put('bronze', new THREE.CylinderGeometry(0.01, 0.012, 0.42, 6), tx - 0.1, ty + 0.21, tz + 0.15);
   for (const s of [-1, 1]) {
