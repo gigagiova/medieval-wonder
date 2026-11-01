@@ -116,7 +116,16 @@ function footprintMask(it: ChunkItems) {
       for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (inPoly(it.i * CHUNK + (i + 0.5) * 0.5, it.j * CHUNK + (j + 0.5) * 0.5, l.c)) m[j * MR + i] = 1;
     }
   }
-  return m;
+  // Close one-cell gaps: a cell on the shared edge of two lots (a party wall)
+  // can fall in neither polygon, though both houses stand round it.
+  const out = m.slice();
+  for (let j = 1; j < MR - 1; j++) for (let i = 1; i < MR - 1; i++) {
+    if (m[j * MR + i]) continue;
+    let n = 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) n += m[(j + dj) * MR + i + di];
+    if (n >= 6) out[j * MR + i] = 1;
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- A. ground holes
@@ -139,7 +148,8 @@ function groundAudit(it: ChunkItems, s: Soup, lod: 'full' | 'mid', foot: Uint8Ar
     const ex = x - it.i * CHUNK, ez = z - it.j * CHUNK;
     if (ex < 0.45 || ez < 0.45 || ex > CHUNK - 0.45 || ez > CHUNK - 0.45) continue;
     if (lod === 'full') groundPoints++;
-    const stair = it.holes.some((h) => inPoly(x, z, h.pts));
+    // Stair openings and well shafts go down on purpose: the floor is deeper there.
+    const stair = it.holes.some((h) => inPoly(x, z, h.pts)) || it.wells.some((q) => Math.hypot(x - q.x, z - q.z) < 1.0);
     const t = fastTerrain(x, z);
     o.set(x, t + 0.8, z);
     const h = first(list, o, down, stair ? 14 : 2.3);
@@ -228,7 +238,9 @@ function eyeAudit(it: ChunkItems, list: BV[], foot: Uint8Array) {
       // Nothing hit going down: does the ray pass below the terrain within range?
       for (let s = 0.5; s <= RANGE; s += 0.5) {
         const px = x + d.x * s, py = y + d.y * s, pz = z + d.z * s;
-        if (py < fastTerrain(px, pz) - 0.05) { hole++; hx += d.x; hz += d.z; sh.push([px, pz]); break; }
+        // (Against the ground as drawn, bumps included: outside the walls they reach 0.5 m.)
+        if (s > RANGE - 3) break;
+        if (py < fastTerrain(px, pz) + field(px, 0, pz, 'ground', fv).y - 0.15) { hole++; hx += d.x; hz += d.z; sh.push([px, pz]); break; }
       }
     }
     // The eye is inside a solid (a tower, a thick wall, the cavea's mass): not a place to stand.
