@@ -550,11 +550,6 @@ export class Person {
       const yL = new THREE.Vector3(0, Math.cos(0.6), 0).addScaledVector(tL, Math.sin(0.6)).addScaledVector(nL, -0.1).normalize();
       const zL = nL.clone().addScaledVector(yL, -nL.dot(yL)).normalize();
       const spatha = Props.makeSpatha(), qS = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(yL.clone().cross(zL), yL, zL));
-      // Walking or standing, his left hand rests over the pommel, the fingers
-      // curled across it (round the hilt's crosswise axis, local X) and the
-      // wrist straight: a hand round the near-upright grip itself would need
-      // the forearm level with the hip, out of reach with the wrist unbent.
-      if (g.shield !== 'arm') this.leftGrip = { obj: spatha, at: new THREE.Vector3(0, 0.118, 0), axis: new THREE.Vector3(1, 0, 0), depth: 0.024, always: false, slide: 0.05, f0: new THREE.Vector3(0.15, -1, 0.35).normalize() };
       on('Hips', spatha, Props.placeAt(new THREE.Vector3(belt.cx + Math.sin(aL) * rL, belt.y - 0.01, belt.cz + Math.cos(aL) * rL - 0.02), qS));
       // The scramasax hangs flat against his right hip, behind the spear
       // hand, its point slanting down and back (under a cloak, out of sight).
@@ -566,7 +561,10 @@ export class Person {
     if (g.shield) {
       const paint = new THREE.Color(pick(r, [0x7a3a2a, 0x8a7c64, 0x46505e, 0x6e6040, 0x7e5236]));
       const s = Props.makeShield(paint);
-      if (g.shield === 'back') {
+      // Slung on his back, in town: a shield carried in the hanging fist swung
+      // across his face whenever he gestured, and an arm-held one needs an IK
+      // that twisted the forearm (see holdGear).
+      if (g.shield === 'back' || g.shield === 'arm') {
         const sp = m.bone('Spine2');
         on('Spine2', s, Props.placeAt(new THREE.Vector3(sp.x, sp.y - 0.06, sp.z - 0.21), new THREE.Quaternion().setFromEuler(new THREE.Euler(0.14, Math.PI, 0.05))));
       } else {
@@ -796,60 +794,65 @@ export class Person {
     return out.copy(h).lerp(m, 0.6).addScaledVector(P, depth * this.scale);
   }
 
+  /** Close a hand into a fist (from the bind pose's straight fingers), as round a bar along the knuckles. */
+  private closeFist(side: 'Left' | 'Right') {
+    const B = (n: string) => this.bones.get(side + n);
+    const i1 = B('HandIndex1'), p1 = B('HandPinky1');
+    if (!i1 || !p1) return;
+    const sgn = side === 'Right' ? -1 : 1;
+    const kw = i1.getWorldPosition(new THREE.Vector3()).sub(p1.getWorldPosition(_v)).normalize();
+    for (const f of ['Index', 'Middle', 'Ring', 'Pinky']) [1.25, 1.5, 0.9].forEach((ang, j) => {
+      const b = B(`Hand${f}${j + 1}`);
+      if (!b) return;
+      b.quaternion.copy(this.bindLocal(b));
+      b.updateMatrixWorld(true);
+      b.parent!.getWorldQuaternion(_q).invert();
+      b.quaternion.copy(_q.multiply(_q2.setFromAxisAngle(kw, ang * -sgn).multiply(b.getWorldQuaternion(_q3))));
+      b.updateMatrixWorld(true);
+    });
+  }
+
   /**
-   * Soldiers' hands on their arms. The right holds the spear upright at his
-   * side, forearm forward, the shaft through the fist: walking it is carried,
-   * standing its butt rests on the ground and the hand slides up the shaft.
-   * The left holds the shield's grip, or rests on the sword's hilt (but for
-   * talking, when it is free to gesture). The rest of the body keeps its clip.
+   * Soldiers' gear in their hands, with no arm IK: the arms keep their clip
+   * (walking, they swing; standing, they hang), and the gear goes where the
+   * fist is. The right fist closes round the spear or staff, held upright
+   * through it; standing, its butt rests on the ground. The left fist holds
+   * the shield's grip behind the boss: the shield's face is the back of the
+   * hand, its grip along the knuckles, so it rides on the hanging fist,
+   * outside the leg. (An earlier version reached the arms to fixed holds by
+   * IK, searching the grip's roll each frame: the solution jumped between
+   * frames and the forearm was rolled up to 80 degrees, twisting the elbow.
+   * The hand on the sword's pommel went with it: the left hand of an armed
+   * man without a shield now swings free.)
    */
   private holdGear() {
     this.group.updateMatrixWorld(true);
-    const sc = this.scale / this.kit.scale, walk = THREE.MathUtils.clamp(this.w.walk ?? 0, 0, 1);
-    // Body frame: x to his left, y up, z forward (bind units).
-    const toW = (x: number, y: number, z: number, out = new THREE.Vector3()) => out.set(x, y, z).multiplyScalar(this.scale).applyAxisAngle(UP, this.yaw).add(this.pos);
-    const dir = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyAxisAngle(UP, this.yaw).normalize();
-    if (this.leftGrip) {
-      const g = this.leftGrip, k = g.always ? 1 : 1 - THREE.MathUtils.clamp(this.w.talk ?? 0, 0, 1);
-      if (k > 0.001 && g.follow) {
-        // The shield goes where his hanging fist is (but out clear of the
-        // thigh), its grip fore and aft through the fist, its face out.
-        const hips = this.bones.get('Hips')!.getWorldPosition(new THREE.Vector3());
-        const left = dir(1, 0, 0), K = dir(0, -0.08, 1);
-        const fist = this.fistAt('Left', g.depth, new THREE.Vector3());
-        const out = fist.clone().sub(hips).dot(left), want = 0.31 * this.scale;
-        if (out < want) fist.addScaledVector(left, want - out);
-        this.grasp('Left', fist, K, dir(g.f0.x, g.f0.y, g.f0.z), g.slide, g.depth, 1);
-        const at = this.fistAt('Left', g.depth, new THREE.Vector3());
-        const face = left.clone().addScaledVector(K, -left.dot(K)).normalize();
-        const R = new THREE.Matrix4().makeBasis(K.clone().cross(face), K, face);
-        const q = new THREE.Quaternion().setFromRotationMatrix(R);
-        const pos = at.sub(g.at.clone().multiplyScalar(sc).applyQuaternion(q));
-        g.obj.parent!.updateMatrixWorld(true);
-        new THREE.Matrix4().compose(pos, q, _v.setScalar(sc)).premultiply(g.obj.parent!.matrixWorld.clone().invert()).decompose(g.obj.position, g.obj.quaternion, g.obj.scale);
-      } else if (k > 0.001) {
-        g.obj.updateMatrixWorld(true);
-        const q = g.obj.getWorldQuaternion(new THREE.Quaternion());
-        const K = g.axis.clone().applyQuaternion(q).normalize();
-        const target = g.obj.localToWorld(g.at.clone());
-        // The fist over the pommel, the wrist straight; it may slide a little along the bar.
-        this.grasp('Left', target, K, dir(g.f0.x, g.f0.y, g.f0.z), g.slide, g.depth, k);
-      }
+    const sc = this.scale / this.kit.scale;
+    const g = this.leftGrip;
+    if (g && g.follow) {
+      this.closeFist('Left');
+      const B = (n: string) => this.bones.get('Left' + n)!;
+      const h = B('Hand').getWorldPosition(new THREE.Vector3()), mid = B('HandMiddle1').getWorldPosition(new THREE.Vector3());
+      const F = mid.clone().sub(h).normalize();
+      const K = B('HandIndex1').getWorldPosition(new THREE.Vector3()).sub(B('HandPinky1').getWorldPosition(_v));
+      K.addScaledVector(F, -K.dot(F)).normalize();
+      // The palm faces F x K for the left hand; the shield's face the other way.
+      const face = F.clone().cross(K).negate();
+      const at = this.fistAt('Left', g.depth, new THREE.Vector3());
+      const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(K.clone().cross(face), K, face));
+      const pos = at.sub(g.at.clone().multiplyScalar(sc).applyQuaternion(q));
+      g.obj.parent!.updateMatrixWorld(true);
+      new THREE.Matrix4().compose(pos, q, _v.setScalar(sc)).premultiply(g.obj.parent!.matrixWorld.clone().invert()).decompose(g.obj.position, g.obj.quaternion, g.obj.scale);
     }
     if (this.spear) {
+      this.closeFist('Right');
       const hand = this.bones.get('RightHand')!;
-      // A hint of the clip's own movement in where the hand is held.
-      const T = toW(-0.25, THREE.MathUtils.lerp(1.04, 1.01, walk), THREE.MathUtils.lerp(0.11, 0.2, walk)).lerp(hand.getWorldPosition(_v), 0.15);
-      // The fist round the shaft (knuckles stacked up it, palm to the leg), the
-      // fingers and forearm forward and a little in, the wrist straight; the
-      // fist may slide up or down the shaft to where the elbow falls naturally.
+      const walk = THREE.MathUtils.clamp(this.w.walk ?? 0, 0, 1);
       const tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.02, this.yaw, -0.05, 'YXZ'));
-      const axis = _v3.set(0, 1, 0).applyQuaternion(tilt);
-      const F = dir(0.18, 0, 1);
-      this.grasp('Right', T.addScaledVector(F, 0.06 * this.scale), axis.clone(), F, 0.12, 0.03, 1);
       const grip = this.fistAt('Right', 0.03, new THREE.Vector3());
-      // Standing, the butt (0.8 m below the grip) is on the ground.
-      grip.addScaledVector(axis, -(1 - walk) * (grip.y - this.pos.y - 0.805 * sc) / axis.y);
+      // The butt (0.8 m below the grip) never below the ground; standing it rests there.
+      const rest = this.pos.y + 0.805 * sc;
+      grip.y = walk < 0.5 ? rest : Math.max(grip.y, rest);
       const m = new THREE.Matrix4().compose(grip, tilt, _v.setScalar(sc)).premultiply(hand.matrixWorld.clone().invert());
       m.decompose(this.spear.position, this.spear.quaternion, this.spear.scale);
     }
@@ -928,7 +931,6 @@ export class Person {
     if (this.cloaked && this.dist < 30) clampArmSwing(this.body, (n) => this.bones.get(n));
     if (this.dist < 30) this.garmentClearance?.(THREE.MathUtils.clamp(this.w.walk ?? 0, 0, 1));
     if (this.grip) this.holdLantern();
-    if (this.spear || this.leftGrip) this.holdGear();
     if (this.skirt) this.swingSkirt();
     // Head and neck turn towards whatever holds their attention.
     let target = this.look.target;
@@ -954,6 +956,7 @@ export class Person {
     if (this.load.jar || this.load.basket) this.poseLoad();
     if (this.carryHalf && this.role === 'peasant') this.holdOut();
     this.straightWrists();
+    if (this.spear || this.leftGrip) this.holdGear();
     this.swing?.();
     if (this.springs) {
       // Cloth bones swing only near the camera (npcDebug.springDist); further off they hang still.
@@ -1153,10 +1156,21 @@ export class Person {
 
 /** Who a person will be: their outfit (by key), dice and gear, decided before they are dressed. */
 interface Casting { role: Role; key: string; id: OutfitId; rnd: () => number; gear?: Gear; look?: Look }
+/**
+ * Cloaks are left off the v2 townsfolk for now: on the shipped bodies a cloak
+ * either flapped like a sail and tore through the tunic beneath (on spring
+ * bones) or let the tunic poke through its back (without them), and hiding
+ * the tunic under it left holes when it swung open. Their outfits are worn
+ * without it (the same tunic, belt, hose and boots, or robe and belt) until
+ * a cloak can be made that stays clean. docs/npc/WARDROBE.md.
+ */
+export const UNCLOAKED: Record<string, string> = NPC_V2 ? { soldierCloak: 'soldier', peasantCloak: 'soldier', robeCloak: 'robe' } : {};
+
 function cast(role: Role, o: { outfit?: number; body?: number; seed?: number; gear?: Gear; face?: boolean; outfitId?: string; look?: Look } = {}): Casting {
   const rnd = mulberry(o.seed ?? rngSeed++ * 7919);
   const ids = ROLE_OUTFITS[role];
-  const id = (o.outfitId as OutfitId | undefined) ?? ids[(o.outfit ?? Math.floor(rnd() * ids.length)) % ids.length];
+  const id0 = (o.outfitId as OutfitId | undefined) ?? ids[(o.outfit ?? Math.floor(rnd() * ids.length)) % ids.length];
+  const id = (UNCLOAKED[id0] ?? id0) as OutfitId;
   const v2b = NPC_V2 ? bodiesV2(id, OUTFITS[id].sex) : [];
   const bs: string[] = v2b.length ? v2b : OUTFITS[id].bodies;
   let key = `${id}:${bs[(o.body ?? Math.floor(rnd() * bs.length)) % bs.length]}`;

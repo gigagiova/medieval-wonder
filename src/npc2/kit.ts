@@ -216,6 +216,23 @@ export function outfitV2(id: string, body: string, belt?: BeltStyle): OutfitV2 {
       g.setIndex(keep);
       g.deleteAttribute('_hide');
     }
+    // The hose above the knee under a knee-length tunic: never seen (the skirt
+    // covers it), and when a stride pressed the thigh into the skirt it showed
+    // through as dark patches. Only the part hanging from the shins is kept.
+    if (m.userData.garment === 'hose' && of.garments.some((x) => x === 'shirt' || x === 'tunic')) {
+      // By skinning, not height (the mesh's units are its own): triangles all of
+      // whose corners hang mostly from the hips or a thigh.
+      const J = g.attributes.skinIndex, W = g.attributes.skinWeight, bones = m.skeleton.bones;
+      const upper = (i: number) => { let w = 0; for (let k = 0; k < 4; k++) if (/(Hips|UpLeg)$/.test(bones[J.getComponent(i, k)]?.name ?? '')) w += W.getComponent(i, k); return w > 0.6; };
+      {
+        const ix = g.index!, keep: number[] = [];
+        for (let i = 0; i < ix.count; i += 3) {
+          const a = ix.getX(i), b = ix.getX(i + 1), c = ix.getX(i + 2);
+          if (!(upper(a) && upper(b) && upper(c))) keep.push(a, b, c);
+        }
+        g.setIndex(keep);
+      }
+    }
     // The bind pose, for the weave (fabric.ts lays it in metres on the rest shape).
     if (m.userData.npc2 === 'garment') {
       g.setAttribute('rest', g.attributes.position);

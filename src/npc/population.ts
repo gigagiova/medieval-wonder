@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makePerson, registerOutfit, outfitBodies, outfitTailored, type Gear, type Look, type EquipHooks, type TownApi, type TownDirector, type Role, type Person } from '../npc';
+import { makePerson, registerOutfit, outfitBodies, outfitTailored, UNCLOAKED, type Gear, type Look, type EquipHooks, type TownApi, type TownDirector, type Role, type Person } from '../npc';
 import * as Props from './props';
 import { makeApron, makeBuckle, makeFibula, makeScrip, makeWorkProp, type WorkProp } from './population-props';
 import type { BeltStyle } from '../npc2/kit';
@@ -345,11 +345,13 @@ export function makeOfGroup(scene: THREE.Scene, id: GroupId, seed: number, o: { 
   // Tailoring a new outfit/body pairing takes a few tenths of a second (on first use, src/npc.ts):
   // mostly reuse pairings already made, so a walk through town stalls only a handful of times.
   let pickI = (o.outfit ?? Math.floor(r() * g.outfits.length)) % g.outfits.length, body: number | undefined;
-  const ready = g.outfits.flatMap(([id], i) => outfitBodies(id).map((b, bi) => ({ i, bi, ok: outfitTailored(`${id}:${b}`) }))).filter((q) => q.ok);
+  const ready = g.outfits.flatMap(([id], i) => outfitBodies(UNCLOAKED[id] ?? id).map((b, bi) => ({ i, bi, ok: outfitTailored(`${UNCLOAKED[id] ?? id}:${b}`) }))).filter((q) => q.ok);
   if (o.outfit === undefined && ready.length && r() < 0.85) { const q = ready[Math.floor(r() * ready.length)]; pickI = q.i; body = q.bi; }
-  const [outfitId, role] = g.outfits[pickI];
+  const [outfitId0, role] = g.outfits[pickI];
+  // (Cloaks left off for now, src/npc.ts UNCLOAKED; so is the brooch that pinned one.)
+  const outfitId = UNCLOAKED[outfitId0] ?? outfitId0;
   const name = o.name ?? pick(r, g.names);
-  const extras = g.extras?.(r, outfitId) ?? [];
+  const extras = (g.extras?.(r, outfitId) ?? []).filter((e) => e !== 'fibula' || outfitId === outfitId0);
   if (g.belt === 'leather' && g.buckle) extras.push(g.buckle === 'bronze' ? 'buckleBronze' : 'buckleIron');
   const look: Look = {
     name: g.prefix ? `${g.prefix} ${name}` : name, title: g.title, lines: o.lines ?? PEOPLE_LINES[id],

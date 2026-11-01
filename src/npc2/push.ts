@@ -26,14 +26,12 @@ interface Cap { a: THREE.Bone; b: THREE.Bone; from: number; extend: number; r: n
 
 // Which limbs each layer of garment is kept off.
 const LEGS: CapDef[] = [
-  { a: 'LeftUpLeg', b: 'LeftLeg', from: 0.35, bones: ['LeftUpLeg'], side: true }, { a: 'RightUpLeg', b: 'RightLeg', from: 0.35, bones: ['RightUpLeg'], side: true },
+  { a: 'LeftUpLeg', b: 'LeftLeg', from: 0.35, bones: ['LeftUpLeg'] }, { a: 'RightUpLeg', b: 'RightLeg', from: 0.35, bones: ['RightUpLeg'] },
   { a: 'LeftLeg', b: 'LeftFoot', bones: ['LeftLeg'], side: true }, { a: 'RightLeg', b: 'RightFoot', bones: ['RightLeg'], side: true },
   { a: 'LeftFoot', b: 'LeftToeBase', extend: 0.6, bones: ['LeftFoot', 'LeftToeBase'] }, { a: 'RightFoot', b: 'RightToeBase', extend: 0.6, bones: ['RightFoot', 'RightToeBase'] },
 ];
-// The hand's capsule must hold the closed fingers too (their bones count for its radius).
-const fingers = (s: string) => ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'].flatMap((f) => [1, 2, 3].map((k) => `${s}Hand${f}${k}`));
 const HANDS: CapDef[] = [
-  { a: 'LeftHand', b: 'LeftHandMiddle1', extend: 0.7, bones: ['LeftHand', ...fingers('Left')], own: ['LeftForeArm', 'LeftHand'] }, { a: 'RightHand', b: 'RightHandMiddle1', extend: 0.7, bones: ['RightHand', ...fingers('Right')], own: ['RightForeArm', 'RightHand'] },
+  { a: 'LeftHand', b: 'LeftHandMiddle1', extend: 0.7, bones: ['LeftHand'], own: ['LeftForeArm', 'LeftHand'] }, { a: 'RightHand', b: 'RightHandMiddle1', extend: 0.7, bones: ['RightHand'], own: ['RightForeArm', 'RightHand'] },
 ];
 const ARMS: CapDef[] = [
   { a: 'LeftForeArm', b: 'LeftHand', bones: ['LeftForeArm'] }, { a: 'RightForeArm', b: 'RightHand', bones: ['RightForeArm'] },
@@ -100,9 +98,10 @@ const SIDE_WIDE = 1.35;
 // across the belly to wherever its rigid "home" happened to swing. Such
 // points get the plain projection.
 const SIDE_NEAR = 3;
-// No vertex is moved further than MAX_MOVE in all: a capsule may round the
-// cloth over a limb, never pull a spike out of it.
-const MAX_MOVE = 0.04;
+// No vertex is moved further than MAX_MOVE in all by the plain projection: a
+// capsule may round the cloth over a limb, never pull a spike out of it. (A
+// skirt carried across a striding shin, SIDE, is a move it means to make.)
+const MAX_MOVE = 0.06;
 const GLSL_BODY = `
   vec3 pushFrom = transformed;
   for (int i = 0; i < ${MAX_CAPS}; i++) {
@@ -129,7 +128,7 @@ const GLSL_BODY = `
         float ll = length(lat);
         if (ll < ${SIDE_WIDE.toFixed(2)} * r && de > -${SIDE_DEPTH.toFixed(1)} * r) {
           float h = sqrt(max(r * r - ll * ll, 0.0));
-          if (de < h) transformed = c + lat + e * h;
+          if (de < h) { vec3 to = c + lat + e * h; pushFrom += to - transformed; transformed = to; }
         }
         continue;
       }
@@ -162,7 +161,7 @@ function pushPoint(p: THREE.Vector3, rest: THREE.Vector3, A: Float32Array, B: Fl
         const lx = dx - ex * de, ly = dy - ey * de, lz = dz - ez * de, ll = Math.hypot(lx, ly, lz);
         if (ll < SIDE_WIDE * r && de > -SIDE_DEPTH * r) {
           const h = Math.sqrt(Math.max(r * r - ll * ll, 0));
-          if (de < h) { p.x = cx + lx + ex * h; p.y = cy + ly + ey * h; p.z = cz + lz + ez * h; }
+          if (de < h) { const tx = cx + lx + ex * h, ty = cy + ly + ey * h, tz = cz + lz + ez * h; from.x += tx - p.x; from.y += ty - p.y; from.z += tz - p.z; p.set(tx, ty, tz); }
         }
         continue;
       }
@@ -246,7 +245,9 @@ export function makePush(body: THREE.Object3D, outfit: OutfitV2, bone: (n: strin
       rs.forEach((x, k) => { if (ts[k] < 0.5) r0 = Math.max(r0, x); else r1 = Math.max(r1, x); });
       r0 ||= r1; r1 ||= r0;
       const need = rs.map((x, k) => x / (r0 * (1 - ts[k]) + r1 * ts[k])).sort((x, y) => x - y);
-      const kq = Math.max(need[Math.floor((need.length - 1) * (d.q ?? 1))], d.q ? 0 : 1);
+      // (The 95th percentile by default: a few outlying vertices, a boot's flared top, a
+      // curled thumb, made capsules of 11-12 cm that pushed the cloth into bulges.)
+      const kq = need[Math.floor((need.length - 1) * (d.q ?? 0.95))];
       caps.push({ a, b, from, extend, r: r0 * kq + MARGIN, r1: r1 * kq + MARGIN, h: bone(d.home ?? d.a) ?? a, own: (d.own ?? []).map((n) => skel.bones.indexOf(bone(n)!)).filter((k) => k >= 0).slice(0, 2), side: !!d.side, la: d.ao ? toLocal(a, pa) : undefined, lb: d.bo ? toLocal(b, pb) : undefined });
     }
     if (!caps.length) continue;
