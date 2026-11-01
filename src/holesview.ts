@@ -6,9 +6,9 @@ import { FOG } from './fogcull';
 // docs/HOLES-AUDIT.md). Every material is swapped for a flat one drawn on
 // both sides: front faces grey, back faces of one-sided materials pure
 // magenta (they are culled in the game: there one sees through them). The
-// clear colour is pure green, and a copy of the terrain 0.6 m under the real
-// ground is drawn pure green within 90 m, so a hole in the ground shows green
-// wherever it is. Both markers give way to grey where the game's fog would
+// clear colour is pure green, a fog-grey sphere 120 m out stands for the
+// fog, and a copy of the terrain 0.6 m under the real ground is drawn pure
+// green within 90 m, so a hole in the ground shows green wherever it is. Both markers give way to grey where the game's fog would
 // leave less than 15 % of a surface's colour (FOG, as in fogcull.ts).
 
 const MAGENTA = new THREE.Color(1, 0, 1), GREEN = new THREE.Color(0, 1, 0);
@@ -83,6 +83,14 @@ export function initHolesView(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   const ref = new THREE.Mesh(refGeo, debugMaterial(null, 'ref'));
   ref.frustumCulled = false;
   scene.add(ref);
+  // The fog: past 120 m nothing of a surface is left (fogcull.ts), so a grey
+  // sphere there, drawn behind everything, stands for it; the clear colour
+  // (green) shows only where there is neither a surface nor the fog.
+  const backdrop = new THREE.Mesh(new THREE.SphereGeometry(120, 24, 12), new THREE.MeshBasicMaterial({ color: 0x8a8d92, side: THREE.BackSide, toneMapped: false, fog: false }));
+  backdrop.frustumCulled = false;
+  backdrop.renderOrder = -10;
+  scene.add(backdrop);
+  done.add(backdrop);
   done.add(ref);
   let refAt = '';
   const moveRef = () => {
@@ -113,6 +121,7 @@ export function initHolesView(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
         done.add(o);
       });
       moveRef();
+      backdrop.position.copy(camera.position);
       uni.uEye.value.copy(camera.position);
       uni.uFogBase.value = fogBase();
       renderer.setRenderTarget(null);
