@@ -47,10 +47,10 @@ export function callTag(): number {
     const f = c.getFileName() ?? '';
     if (!f || PLUMBING.test(f)) continue;
     const name = `${short(f)}#${c.getFunctionName() ?? c.getMethodName() ?? '?'}`;
-    if (!helper) helper = name;
+    if (!helper && !/\/arch\/kit\.ts/.test(f)) helper = name;
     if (!HELPERS.test(f)) { owner = name; break; }
   }
-  const key = owner === helper || !owner ? (owner || helper || '?') : `${owner} > ${helper}`;
+  const key = !helper || owner === helper || !owner ? (owner || helper || "?") : `${owner} > ${helper}`;
   let id = siteCache.get(key);
   if (id === undefined) { id = tagId(key); siteCache.set(key, id); }
   return id;

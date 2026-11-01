@@ -113,6 +113,11 @@ function groundAudit(it: ChunkItems, s: Soup, lod: 'full' | 'mid', foot: Uint8Ar
     if (foot[j * MR + i]) continue; // inside a house one cannot enter: not walkable, not seen
     const x = it.i * CHUNK + (i + 0.2 + 0.6 * ((i * 7 + j * 3) % 5) / 4) * 0.5, z = it.j * CHUNK + (j + 0.2 + 0.6 * ((j * 7 + i * 3) % 5) / 4) * 0.5;
     if (x < BOUNDS.x0 || x > BOUNDS.x1 || z < BOUNDS.z0 || z > BOUNDS.z1) continue;
+    // The field bends the ground sideways by up to ~0.3 m, so a chunk's own
+    // ground does not reach its square's very edge (its neighbour's does: same
+    // border vertices). Edges are checked by the seam test (B) instead.
+    const ex = x - it.i * CHUNK, ez = z - it.j * CHUNK;
+    if (ex < 0.45 || ez < 0.45 || ex > CHUNK - 0.45 || ez > CHUNK - 0.45) continue;
     if (lod === 'full') groundPoints++;
     const stair = it.holes.some((h) => inPoly(x, z, h.pts));
     const t = fastTerrain(x, z);
@@ -204,7 +209,8 @@ function eyeAudit(it: ChunkItems, list: BV[], foot: Uint8Array) {
         if (py < fastTerrain(px, pz) - 0.05) { hole++; hx += d.x; hz += d.z; sh.push([px, pz]); break; }
       }
     }
-    if (near > NR * 0.15) { eyesInside++; continue; } // the eye is inside a solid (a wall end, a pier): not a place to stand
+    // The eye is inside a solid (a tower, a thick wall, the cavea's mass): not a place to stand.
+    if (near > NR * 0.15 || back > NR * 0.4) { eyesInside++; continue; }
     eyeRays += NR; backRays += back; holeRays += hole;
     for (const q of found) { const st = statOf(q.tag, q.mat); st.back++; if (st.pts.length < 40) st.pts.push(q.p.map((v) => +v.toFixed(2))); }
     for (const p of sh) if (sightHoles.length < 200000) sightHoles.push(p);
@@ -385,6 +391,17 @@ const summary = {
     boundaryEdges: rows.reduce((a, r) => a + r.boundaryEdges, 0) },
 };
 writeFileSync(join(OUT, 'report.json'), JSON.stringify({ summary, byModule: Object.fromEntries([...bySrcModule].sort((a, b) => b[1].backHits - a[1].backHits)), sources: rows, assets, worstEyes: worst, seams: seamRows.slice(0, 2000), holes: holePts.filter((h) => h.lod === 'full').slice(0, 5000) }, null, 1));
+// A lattice of standing points (one per 40 m cell, in and around the town) for the render audit.
+{
+  const seen = new Set<string>(), grid: { id: string; x: number; y: number; z: number }[] = [];
+  for (const e of eyes) {
+    const k = `${Math.floor(e.x / 40)},${Math.floor(e.z / 40)}`;
+    if (seen.has(k) || !(insideness(e.x, e.z) > 0.3 || Object.values(SITES).some((s) => Math.hypot(e.x - s.x, e.z - s.z) < 40))) continue;
+    seen.add(k);
+    grid.push({ id: `g${grid.length}`, x: e.x, y: e.y, z: e.z });
+  }
+  writeFileSync(join(OUT, 'grid.json'), JSON.stringify(grid, null, 1));
+}
 writeFileSync(join(OUT, 'views.json'), JSON.stringify(worst.slice(0, 40).map((e) => ({ x: e.x, y: e.y, z: e.z, yaw: e.back >= e.hole * 3 ? e.yawBack : e.yawHole, back: e.back, hole: e.hole })), null, 1));
 log(JSON.stringify(summary, null, 1));
 
