@@ -282,7 +282,9 @@ export class FabricStream {
     };
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
       const x = x0 + i * ST, z = z0 + j * ST;
-      if (x + ST <= BOUNDS.x0 || x >= BOUNDS.x1 || z + ST <= BOUNDS.z0 || z >= BOUNDS.z1) continue;
+      // (The stand-in runs on past the world's bounds to the edge of its super-chunk:
+      // within the fog of a walker near the edge, the ground used to stop in a cliff of nothing.)
+      if (x + ST <= BOUNDS.x0 - 96 || x >= BOUNDS.x1 + 96 || z + ST <= BOUNDS.z0 - 96 || z >= BOUNDS.z1 + 96) continue;
       if (isReady(x + ST / 2, z + ST / 2)) continue;
       if (inHole(x + ST / 2, z + ST / 2)) continue;
       const a = H[j * (N + 1) + i], b = H[j * (N + 1) + i + 1], c = H[(j + 1) * (N + 1) + i], d = H[(j + 1) * (N + 1) + i + 1];
