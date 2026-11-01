@@ -365,7 +365,8 @@ export function makeOfGroup(scene: THREE.Scene, id: GroupId, seed: number, o: { 
     belt: g.belt,
     equip: extras.length ? (h) => equipExtras(extras, h) : undefined,
   };
-  const gear = g.gear?.(r, outfitId);
+  // (Gear as chosen for the outfit as cast: a smith in a cloak keeps his cap without it.)
+  const gear = g.gear?.(r, outfitId0);
   // Children never get the older scanned face; the old may.
   const face = g.scale ? false : g.grey && g.grey[0] >= 0.4 ? true : undefined;
   const p = makePerson(scene, role, { outfitId, body, seed: Math.floor(r() * 1e9), gear, look, face });
