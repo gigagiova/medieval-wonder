@@ -395,14 +395,15 @@ export class Builder {
  */
 export function bothSides(g: THREE.BufferGeometry): THREE.BufferGeometry {
   const a = g.index ? g.toNonIndexed() : g.clone();
-  for (const k of Object.keys(a.attributes)) if (k !== 'position' && k !== 'normal') a.deleteAttribute(k);
+  for (const k of Object.keys(a.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') a.deleteAttribute(k);
   if (!a.attributes.normal) a.computeVertexNormals();
   const b = a.clone();
-  const P = b.attributes.position.array as Float32Array, N = b.attributes.normal.array as Float32Array;
-  for (let i = 0; i < P.length; i += 9) for (let k = 0; k < 3; k++) {
-    let t = P[i + 3 + k]; P[i + 3 + k] = P[i + 6 + k]; P[i + 6 + k] = t;
-    t = N[i + 3 + k]; N[i + 3 + k] = N[i + 6 + k]; N[i + 6 + k] = t;
+  // Swap the second and third corner of every triangle, in every attribute.
+  for (const attr of Object.values(b.attributes)) {
+    const A = attr.array as Float32Array, s = attr.itemSize;
+    for (let i = 0; i < A.length; i += 3 * s) for (let k = 0; k < s; k++) { const t = A[i + s + k]; A[i + s + k] = A[i + 2 * s + k]; A[i + 2 * s + k] = t; }
   }
+  const N = b.attributes.normal.array as Float32Array;
   for (let i = 0; i < N.length; i++) N[i] = -N[i];
   return mergeGeometries([a, b], false)!;
 }
