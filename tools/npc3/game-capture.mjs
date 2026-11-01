@@ -37,18 +37,25 @@ const meta = [];
 const places = at.split(',');
 let k = 0;
 for (const [pi, place] of places.entries()) {
-  if (pi > 0) {
-    await page.evaluate((place) => {
-      const t = window.__teleports().find((q) => q.name.toLowerCase().includes(place.toLowerCase()));
-      if (t) window.__teleport(t);
-    }, place);
-    await frames(+warm + 20);
-  }
+  // Every place, the first too (?at= alone can leave the player at the spawn when
+  // the teleport finds no floor): through the teleport, else set directly; then
+  // the population fills in round the player.
+  const went = await page.evaluate((place) => {
+    const ts = window.__teleports();
+    const t = ts.find((q) => q.name.toLowerCase() === place.toLowerCase()) ?? ts.find((q) => q.name.toLowerCase().includes(place.toLowerCase()));
+    if (!t) return null;
+    const pl = window.__player;
+    window.__teleport(t);
+    if (Math.hypot(pl.pos.x - t.x, pl.pos.z - t.z) > 3) { pl.pos.set(t.x, (t.y ?? window.__groundY(t.x, t.z)) + 1.65, t.z); pl.vel?.set(0, 0, 0); }
+    return [t.name, Math.round(pl.pos.x), Math.round(pl.pos.z)];
+  }, place);
+  console.log('place', place, JSON.stringify(went));
+  await frames(+warm);
   // Moving people first (mid-walk, mid-talk), then the rest; nearest first.
   const list = await page.evaluate(({ n, taken }) => {
     const d = window.__npcDebug, pl = window.__player;
     const busy = (p) => Math.max(p.w?.walk ?? 0, p.w?.talk ?? 0);
-    return d.people.filter((p) => p.group.visible && p.pos.distanceTo(pl.pos) < 150 && !taken.includes(p.name + p.title))
+    return d.people.filter((p) => p.group.visible && p.pos.distanceTo(pl.pos) < 45 && !taken.includes(p.name + p.title))
       .sort((a, b) => (busy(b) > 0.5) - (busy(a) > 0.5) || a.pos.distanceTo(pl.pos) - b.pos.distanceTo(pl.pos)).slice(0, n)
       .map((p) => d.people.indexOf(p));
   }, { n: Math.ceil(+count / places.length), taken: meta.map((m) => m.key) });
