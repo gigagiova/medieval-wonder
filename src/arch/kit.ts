@@ -260,7 +260,7 @@ export function planks(acc: Acc, m: MatName, f: Frame, u0: number, u1: number, v
 /**
  * A half-round cover tile from p0 to p1. `cap` 1 or 2 closes its mouth at p0
  * or p1 (3: both) (the eave course: seen from the lane, an open half-tube shows its
- * culled inside and the sky through it), set 3 cm back into the tube.
+ * culled inside and the sky through it), flush with its end (set back, its culled inside showed as a crescent).
  */
 export function coppo(acc: Acc, m: MatName, p0: V3, p1: V3, up: V3, side: V3, r0: number, r1: number, seg = 3, cap: 0 | 1 | 2 | 3 = 0) {
   if (DETAIL.mid) return; // the underlay's tile texture carries the roof at mid distance
@@ -279,7 +279,7 @@ export function coppo(acc: Acc, m: MatName, p0: V3, p1: V3, up: V3, side: V3, r0
   for (const end of [1, 2] as const) {
     if (!(cap & end)) continue;
     const [R, p, q] = end === 1 ? [A, p0, p1] : [B, p1, p0];
-    const back = v3().subVectors(q, p).normalize().multiplyScalar(Math.min(0.03, p.distanceTo(q) * 0.2));
+    const back = v3().subVectors(q, p).normalize().multiplyScalar(Math.min(0.004, p.distanceTo(q) * 0.2));
     const mid = v3().copy(p0).add(p1).multiplyScalar(0.5);
     const c = v3().copy(p).add(back);
     for (let k = 0; k < seg; k++) acc.tri(m, c, R[k].clone().add(back), R[k + 1].clone().add(back), mid);
