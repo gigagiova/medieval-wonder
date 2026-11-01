@@ -76,7 +76,7 @@ kinds:
 | Within 170 m of the dukes' curtis | pens, orchards, gardens | hypothesis (the servants and stock of a curtis: Brescia) |
 | Steep cells (slope > 0.16) | *vinea* (or orchard) | hypothesis |
 | Elsewhere, by a per-cell hash | *orto* 30%, *pomarium* 14%, *casalinum* 18%, *stabulum* 12%, *vinea* 9%, *pratum* 9%, *ruina* 8% | hypothesis (proportions) |
-| Unwalled ground | *pomarium*, *area* (threshing floor and hay), *pratum* | hypothesis |
+| Unwalled cells (opening on a lane) | under 500 m²: meadow or a few fruit trees; 500 m² and more: orchard 30%, garden 20%, huts 15%, threshing floor and hay 15%, meadow 20% | hypothesis |
 
 Contents (all low; nothing in an open cell is taller than a one-storey hut or a tree):
 
@@ -99,19 +99,19 @@ Counts (`npx tsx tools/benevento/open_ground_stats.ts`):
 
 | Kind | Cells (unwalled) | m² | Huts/sheds | Trees | Beds | Vine rows | Pens | Hay | Graves | Ruin walls | Kilns | Threshing floors | Wells |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| orto | 12 | 13,042 | 12 | 56 | 336 | | | | | | | | 6 |
-| vinea | 5 | 4,764 | 5 | 7 | | 82 | | | | | | | |
-| pomarium | 26 (18) | 29,744 | 8 | 101 | | | | 2 | | | | | |
-| casalinum | 7 | 6,799 | 14 | 10 | 24 | | 7 | | | | | | |
+| orto | 20 (8) | 22,053 | 12 | 68 | 432 | | | | | | | | 6 |
+| vinea | 5 | 4,764 | 5 | 7 | | 89 | | | | | | | |
+| pomarium | 84 (76) | 48,666 | 8 | 216 | | | | 3 | | | | | |
+| casalinum | 14 (7) | 14,004 | 20 | 14 | 32 | | 10 | | | | | | |
 | stabulum | 7 | 8,081 | 7 | 9 | | | 9 | 9 | | | | | 1 |
-| pratum | 19 (12) | 26,010 | 7 | 63 | | | | 36 | | | | 5 | |
-| area | 4 (4) | 10,637 | | 15 | | | | 9 | | | | 3 | |
+| pratum | 74 (67) | 32,717 | 7 | 59 | | | | 42 | | | | 3 | |
+| area | 13 (13) | 19,283 | | 29 | | | | 19 | | | | 3 | |
 | ruina | 5 | 5,357 | 5 | 7 | | | | | | 20 | | | |
-| calcaria | 2 | 2,758 | 2 | 2 | | | | | | 8 | 2 | | |
-| coemeterium | 3 | 5,759 | | 3 | 43 | | | | 84 | | | | |
-| **total** | **90 (34)** | **112,951** | **60** | **273** | | | | | | | | | |
+| calcaria | 2 | 2,758 | 2 | 3 | | | | | | 8 | 2 | | |
+| coemeterium | 3 | 5,759 | | 3 | 42 | | | | 84 | | | | |
+| **total** | **227 (171)** | **163,442** | **66** | **415** | | | | | | | | | |
 
-Plus 656 houses (653 + the three halls).
+Plus 666 houses (the traced footprints, the three halls, the back rooms of the houses one enters).
 
 ## 3. Techniques and cost
 
@@ -128,6 +128,11 @@ Plus 656 houses (653 + the three halls).
 - Trees: the town's fruit and nut trees go into the existing tree field (batched meshes,
   impostors further out: no new draw calls); the oak models stand in for them (see HISTORY).
 - Scanned props in the cells are limited to a handful per cell.
+- The town's trees are their own kinds in the tree field, drawn as impostors out to 160 m
+  (the wood's fade at 95 m), so gardens keep their trees in the views over the roofs.
+- Sward: off the street, the blue channel of the town texture (unused there: it carries the
+  gutters only on the street) marks turf, 0.04-0.9 by kind; the ground shader mixes a dark
+  olive turf, worn through in patches, into the mud there. No new texture, no new draw.
 
 BUDGET
 

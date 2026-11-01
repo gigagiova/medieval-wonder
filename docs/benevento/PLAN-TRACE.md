@@ -64,7 +64,7 @@ on the skeleton of each cell.
 |---|---|---|
 | Long and thin: mean width < 7.5 px and length > 6× width, or width < 11 px and length > 12× width, or > 25,000 px² | lane | good: the drawing has no other long thin white spaces, except... |
 | ...a thin cell (< 7 px, < 1,200 px²) that rings other cells (filling it adds > 25% area) | building (a range round a court) | fair |
-| Wide parts of the lane spaces (> 5.2 px from both sides, ≥ 150 px²) | square: open lane ground (grass where not trodden). The large ones are probably blocks whose outline is broken in the drawing; they are neither built nor walled, so as not to invent buildings or cut lanes | **hypothesis** for the large ones |
+| Wide parts of the lane spaces (> 3.1 px from both sides, ≥ 40 px²; 5.2 px and 150 px² in the first trace) | a cell opening on the lanes: unwalled open ground with content (OPEN-GROUND.md), the ways through kept clear. Only the drawn corridors stay street | **hypothesis** for what they hold |
 | Small narrow cell (≤ 160 px², ≤ 9 px wide) touching two separate lane pieces at its two ends | lane (a piece cut off by lines drawn across the lane) | fair |
 | Open cell that joins two otherwise separate parts of the lane network | square (a lane whose line has a gap has merged with the block beside it) | fair |
 | Enclosed cell ≤ 520 px² | building footprint | good for ordinary cells; a few small cells may be yards |
