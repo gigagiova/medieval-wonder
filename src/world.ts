@@ -432,11 +432,15 @@ function holes(): Hole[] {
 }
 const xz = ([x, z]: P2) => ({ x, z });
 
-export async function buildWorld(scene: THREE.Scene, progress: Progress = noProgress) {
-  const S = SITES;
-  await progress('Surveying the Lombard walls', 0.02);
+/** Lay out the town (once per page) and the stair openings in its ground; also used by the offline audits. */
+export function initLayout() {
   lay = layoutTown();
-  const hl = holes();
+  return { lay, holes: holes() };
+}
+
+export async function buildWorld(scene: THREE.Scene, progress: Progress = noProgress) {
+  await progress('Surveying the Lombard walls', 0.02);
+  const { holes: hl } = initLayout();
   const items = makeChunks(lay, hl);
   await progress('Pacing out the lanes', 0.08);
   // Collision of the whole town at once: cheap proxies only.
@@ -451,6 +455,37 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
 
   // Landmarks, built in full in their own frames.
   const b = new Builder();
+  await buildLandmarks(scene, b, progress);
+  buildRivers(scene);
+  await progress('The scrub grows dark', 0.78);
+  buildForest(scene, bc, {
+    inside: (x, z) => insideness(x, z) > 0.35,
+    keepOut,
+    density: woodDensity,
+    bounds: BOUNDS,
+    cover: (x, z) => Math.abs(x - 50) < 760 && Math.abs(z + 80) < 480,
+  });
+  buildPonteFratto(scene, b);
+  await progress('Old stones in new walls', 0.79);
+  await buildSpolia(scene, b, [b, bc], lay);
+  townProps(scene);
+  await progress('The fog gathers', 0.8);
+  const { collider: landCol, cells } = b.build(scene);
+  // One collider: the landmarks and the whole town's proxies.
+  const colGeos = [landCol.geometry, ...bc.colliders];
+  const collider = new THREE.Mesh(mergeGeometries(colGeos.filter((g) => g.attributes.position.count > 0), false)!);
+  const lamps = b.lamps;
+  stream = new FabricStream(scene, items, cells, lamps, hl);
+  return { collider, cells, lamps, flames: b.flames, props: b.props, townTex: townTexture(lay), stream };
+}
+
+/**
+ * The landmarks (built in full in their own frames), the bridges and the
+ * readables of the explorable houses. Needs layoutTown() to have run (buildWorld
+ * does it); exported for the offline geometry audits (tools/audit-holes.ts).
+ */
+export async function buildLandmarks(scene: THREE.Scene, b: Builder, progress: Progress = noProgress, opts: { reliefs?: boolean } = {}) {
+  const S = SITES;
   const at = async (label: string, frac: number, s: SiteDef, fn: (g: THREE.Group) => void) => {
     await progress(label, frac);
     setSite(s);
@@ -467,7 +502,7 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
   await at('In the old baths', 0.4, S.thermae, (g) => buildBaths(b, g as unknown as THREE.Scene));
   await at('At the nuns of St Peter', 0.45, S.sanctusPetrus, () => { church(b); nunnery(b); });
   await at('Under the Arch of Trajan', 0.5, S.arcusTraiani, () => M.arcusTraiani(b));
-  await addTrajanReliefs(siteGroups.arcusTraiani);
+  if (opts.reliefs !== false) await addTrajanReliefs(siteGroups.arcusTraiani);
   await at('At the forum', 0.52, S.arcusSacramenti, () => M.arcusSacramenti(b));
   await at('At the forum', 0.53, { ...S.forum, x: S.forum.x - 9, z: S.forum.z - 7, lx: 21, lz: 6 }, () => temple(b));
   await at('At the forum', 0.54, S.forum, () => M.forumMarket(b));
@@ -491,27 +526,6 @@ export async function buildWorld(scene: THREE.Scene, progress: Progress = noProg
     markReadableWorld(explorableLore(l.explore!.id), a.read[0], a.read[1], a.read[2]);
   }
   await progress('Water in the valleys', 0.76);
-  buildRivers(scene);
-  await progress('The scrub grows dark', 0.78);
-  buildForest(scene, bc, {
-    inside: (x, z) => insideness(x, z) > 0.35,
-    keepOut,
-    density: woodDensity,
-    bounds: BOUNDS,
-    cover: (x, z) => Math.abs(x - 50) < 760 && Math.abs(z + 80) < 480,
-  });
-  buildPonteFratto(scene, b);
-  await progress('Old stones in new walls', 0.79);
-  await buildSpolia(scene, b, [b, bc], lay);
-  townProps(scene);
-  await progress('The fog gathers', 0.8);
-  const { collider: landCol, cells } = b.build(scene);
-  // One collider: the landmarks and the whole town's proxies.
-  const colGeos = [landCol.geometry, ...bc.colliders];
-  const collider = new THREE.Mesh(mergeGeometries(colGeos.filter((g) => g.attributes.position.count > 0), false)!);
-  const lamps = b.lamps;
-  stream = new FabricStream(scene, items, cells, lamps, hl);
-  return { collider, cells, lamps, flames: b.flames, props: b.props, townTex: townTexture(lay), stream };
 }
 
 // ---------------------------------------------------------------- ground collision
