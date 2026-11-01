@@ -187,3 +187,96 @@ and binning of the extra triangles, and coincident party walls of adjacent
 houses would z-fight. Each class is closed where it is open instead, at a cost
 of tens of triangles per house; double-sidedness is used only for thin cards
 and thin vessels, as geometry (`bothSides`), not as a material state.
+
+## Before and after
+
+Before: `main` at cd9bc69 (plan trace and open-ground fill merged) with only
+the audit instrumentation added. After: this branch merged with that `main`.
+Same tools, same views. Files: `docs/holes-audit/before/`, `after/`
+(`report.json`, `holes-map.png`, `holes-map-town.png`, `render.json`,
+`budget.jsonl`), `render-summary.json`, and `pairs/` (each image is before on
+the left, after on the right, same view).
+
+### Geometry audit (whole world)
+
+| | before | after |
+|---|---|---|
+| Ground points tested (0.5 m) | 11,678,702 | 11,678,702 |
+| Ground holes, full detail (open / under raster HOUSE but outside a house / deliberate openings) | 1,366 / 1,021 / 16 | 20 / 0 / 16 |
+| Ground holes, middle detail | 3,446 / 1,312 / 30 | 291 / 23 / 30 |
+| Chunk borders whose LOD seam is not covered by skirts (of 6,450; max gap 0.22 m full/middle, 0.75 m middle/stand-in) | 6,023 | 0 |
+| Standing points / rays | 43,229 / 5.19 M | 43,290 / 5.19 M |
+| Rays meeting a back face (per mille) | 7,313 (1.41) | 2,777 (0.53) |
+| Standing points that see a back face | 2,926 | 1,611 |
+| Rays seeing through the ground within 32 m | 1,229 | 1,018 |
+| Sources with open boundaries / seen from behind | 200 / 73 | 178 / 61 |
+
+Biggest sources seen from behind, before → after (rays): theatre cavea core
+2,577 → 0; polyRoof boards (`town.ts#split`) 1,163 → 324; hipped-roof tiles
+(`polyFaceTiles`) 1,125 → 824; theatre seats 379 → 191; lean-to roofs of
+houses 212 → 40; huts' lean-tos (plotbuild) 159 → 31; theatre vaults 120 → 0;
+gable boards of huts 84 → 0.
+
+### Render audit (34 standing points × 8 views, 390×844)
+
+Over the same 258 frames (22 frames whose camera the teleport put inside a
+solid left out of both):
+
+| | before | after |
+|---|---|---|
+| Magenta pixels (back faces seen) | 1,673,124 | 563,939 (−66 %) |
+| Green pixels below the horizon (ground holes) | 314,100 | 1,878 (−99.4 %) |
+| Frames with green | 17 | 4 |
+| Frames with more than 100 magenta pixels | 106 | 93 |
+
+Worst frames, before → after (magenta / green): Nux Sacra by the north edge
+`w05_y180_p-30` 0/162,957 → 2/0; under the theatre cavea `w00_y90_p22`
+125,666 → 2,671, `w02_y90_p-30` 114,565 → 12,419, `w02_y0_p22` 101,199 →
+351, `w04_y0_p-30` 89,468 → 17,702; town eaves `g098_y-90_p22` and
+`g126_y90_p-30` (see `pairs/`). The render runs predate the last change
+(tile caps flush with the tile end instead of 3 cm back, which left a
+magenta crescent in each capped tile mouth in `g098`); that change is not in
+these numbers.
+
+### Rendering budget (`?debug` numbers, 390×844, headless; not phone fps)
+
+| View | before tris / calls | after tris / calls |
+|---|---|---|
+| Curtis Ducis | 296,491 / 147 | 293,650 / 147 |
+| Episcopium | 249,253 / 88 | 259,695 / 88 |
+| Forum | 236,114 / 97 | 264,828 / 97 |
+| Porta Aurea | 155,967 / 132 | 159,995 / 132 |
+| Theatrum | 93,790 / 78 | 101,563 / 78 |
+| Town (−60, −290) | 108,349 / 94 | 110,313 / 94 |
+| Town (40, −200) | 87,662 / 51 | 94,367 / 51 |
+| Town (200, −180) | 222,853 / 48 | 224,835 / 48 |
+
+No fix adds a material or a draw call; triangles grow by up to 12 % (Forum,
++29k), all views under 350k. Curtis Ducis (147) and Porta Aurea (132) were
+already over ~130 draw calls on `main` before this work.
+
+## What is left
+
+- **Hipped-roof tiles** (`polyFaceTiles`, 824 rays) and some polyRoof boards
+  (324): tiles at the hips and eaves of traced footprints still show slivers
+  of their insides from below. Not fully diagnosed.
+- **Curtain wall** (`fabric.ts curtain > ruin`, 580 rays): mostly standing
+  points against or inside the thick wall where curtain pieces overlap; not
+  fully diagnosed.
+- **Theatre seats** (191) where blocks lie over gaps in the core.
+- **Huts' lean-tos** in `plotbuild.ts` (map agent's file) stand open under
+  their high side, as the houses did; the house fix (`town.ts`, walls carried
+  up under the slope) was not copied into plotbuild.
+- **Sightlines through the ground** fell only from 1,229 to 1,018 rays.
+  Most are outside the walls on rough ground: the test compares against the
+  field-bent ground height, and some remaining cases may be test noise.
+- **Middle detail** keeps 291 open hole points, mostly at house corners where
+  2 m quads cannot follow the footprint. They are 40–96 m away, in fog.
+- **Porta Gloriosa** (`w11`): the camera ends up in the gate masonry, and
+  that frame is 30 % magenta in both runs.
+- **glTF props** are double-sided in their files: their insides draw the
+  outer texture, lit from the other side. They no longer show through, but a
+  dark inner texture would look better.
+- **sites.ts floors** now feed `layout.ts` §2 too (as RESERVED raster). The
+  smaller polygons do not change the layout: the episcopium's `reserve`
+  covers it, and S. Pietro lies outside the walls.
