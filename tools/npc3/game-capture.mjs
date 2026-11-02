@@ -55,9 +55,10 @@ for (const [pi, place] of places.entries()) {
   // Moving people first (mid-walk, mid-talk), then the rest; nearest first.
   const list = await page.evaluate(({ n, taken }) => {
     const d = window.__npcDebug, pl = window.__player;
-    const busy = (p) => Math.max(p.w?.walk ?? 0, p.w?.talk ?? 0);
-    return d.people.filter((p) => p.group.visible && p.pos.distanceTo(pl.pos) < 45 && !taken.includes(p.name + p.title))
-      .sort((a, b) => (busy(b) > 0.5) - (busy(a) > 0.5) || a.pos.distanceTo(pl.pos) - b.pos.distanceTo(pl.pos)).slice(0, n)
+    // Walking people first (the captures had too few), then talking, then the nearest.
+    const busy = (p) => ((p.w?.walk ?? 0) > 0.4 ? 2 : 0) + ((p.w?.talk ?? 0) > 0.5 ? 1 : 0);
+    return d.people.filter((p) => p.group.visible && p.pos.distanceTo(pl.pos) < 70 && !taken.includes(p.name + p.title))
+      .sort((a, b) => busy(b) - busy(a) || a.pos.distanceTo(pl.pos) - b.pos.distanceTo(pl.pos)).slice(0, n)
       .map((p) => d.people.indexOf(p));
   }, { n: Math.ceil(+count / places.length), taken: meta.map((m) => m.key) });
   for (const idx of list) {
