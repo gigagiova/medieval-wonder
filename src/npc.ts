@@ -12,7 +12,7 @@ import * as Props from './npc/props';
 import { makeStaff } from './npc/population-props';
 import { fabric, type FabricKind } from './npc/fabric';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
-import { loadV2, kitsV2, bodiesV2, outfitV2, NPC_B, type OutfitV2, type BeltStyle } from './npc2/kit';
+import { loadV2, kitsV2, bodiesV2, outfitV2, NPC_B, neckTint, type OutfitV2, type BeltStyle } from './npc2/kit';
 import { dressV2 } from './npc2/dress';
 import { makeSprings } from './npc2/springs';
 import { clampArmSwing } from './npc2/arms';
@@ -342,7 +342,10 @@ export class Person {
         const c = (mat as THREE.MeshStandardMaterial).clone();
         c.color.multiply(tone);
         c.userData = { ...mat.userData, uBeard: { value: beard } };
-        return withAtmos(c, { skin: true, scan: !!mat.userData.scan });
+        const w = withAtmos(c, { skin: true, scan: !!mat.userData.scan });
+        // (clone() drops onBeforeCompile: the baked neck tone goes back on.)
+        if (mat.userData.neckTint) neckTint(w);
+        return w;
       };
       m.material = Array.isArray(m.material) ? m.material.map(re) : re(m.material);
     });

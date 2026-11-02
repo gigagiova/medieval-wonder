@@ -134,8 +134,24 @@ function prep(t: THREE.Object3D, native: boolean) {
       // (The shared skin shader lays its pores on the normal map's UVs: a flat one where the body has none.)
       if (!src.normalMap) src.normalMap = flatNormal;
       m.material = skinMaterial(src);
+      // Track B: the neck and throat toned to the face (tools/npcb/bake.py neck_tint).
+      if (m.geometry.getAttribute('_tint')) neckTint(m.material as THREE.Material);
     }
   });
+}
+
+/** Multiply the skin's colour by the baked per-vertex `_tint` (1 on the face, the face's tone over the neck's below the jaw). */
+export function neckTint(m: THREE.Material) {
+  m.userData.neckTint = true;
+  const prev = m.onBeforeCompile, key = m.customProgramCacheKey();
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 _tint; varying vec3 vTint;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvTint = _tint;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vTint;')
+      .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= vTint;');
+  };
+  m.customProgramCacheKey = () => key + '-tint';
 }
 
 /**

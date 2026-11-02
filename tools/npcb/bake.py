@@ -663,6 +663,46 @@ class Body:
         self.label_trees = {l: (cKDTree(U[self.label == l]), np.nonzero(self.label == l)[0]) for l in range(3)}
 
 
+def sample_tex(g, src, prim, UV):
+    """Linear colour (0..1) of a primitive's base-colour texture at the given UVs (nearest texel)."""
+    from PIL import Image
+    mat = g.j['materials'][prim['material']]
+    t = mat['pbrMetallicRoughness']['baseColorTexture']['index']
+    uri = g.j['images'][g.j['textures'][t]['source']]['uri']
+    im = np.asarray(Image.open(os.path.join(src, uri)).convert('RGB')).astype(np.float64) / 255
+    H, W = im.shape[:2]
+    x = np.clip((UV[:, 0] % 1) * W, 0, W - 1).astype(int)
+    y = np.clip((UV[:, 1] % 1) * H, 0, H - 1).astype(int)
+    return im[y, x] ** 2.2
+
+
+def neck_tint(g, src, body, B, log):
+    """Skin under the jaw (neck, throat, the chest in a neckline) toned to the face: per-vertex
+    factors, the face's mean colour over that region's mean, ramping in over 5 cm below the
+    jaw. The face (above the jaw) keeps 1, so the accepted face is as it was. Returns the
+    factors for the skin and the head primitives."""
+    sk, hd = body.prims
+    head_y = B['Head'][1]
+    face = (hd['P'][:, 1] > head_y + 0.03) & (hd['P'][:, 1] < head_y + 0.09) & (hd['N'][:, 2] > 0.5)
+    c_face = sample_tex(g, src, g.j['meshes'][g.node(next(n['name'] for n in g.j['nodes'] if n['name'].endswith('.body')))['mesh']]['primitives'][1], hd['UV'][face]).mean(0)
+    prims = g.j['meshes'][g.node(next(n['name'] for n in g.j['nodes'] if n['name'].endswith('.body')))['mesh']]['primitives']
+    jaw = head_y + 0.005
+    def ramp(P):
+        return np.clip((jaw - P[:, 1]) / 0.05, 0, 1)
+    below_h = ramp(hd['P']) > 0.5
+    below_s = (sk['P'][:, 1] > B['Spine2'][1] - 0.05) & (sk['P'][:, 1] < jaw)
+    # Each primitive toned separately (the head mesh's band under the jaw and the body's throat
+    # are painted differently): its own mean under the jaw against the face's.
+    out = []
+    for m, prim, sel in ((sk, prims[0], below_s), (hd, prims[1], below_h)):
+        c = sample_tex(g, src, prim, m['UV'][sel]).mean(0)
+        ratio = c_face / np.maximum(c, 1e-4)
+        log(f'  neck tint: face {np.round(c_face ** (1 / 2.2), 3)}, region {np.round(c ** (1 / 2.2), 3)}, factor {np.round(ratio, 3)}')
+        f = ramp(m['P'])[:, None]
+        out.append(1 + (ratio[None] - 1) * f)
+    return out
+
+
 def build(src, out, body_id, log=print):
     t0 = time.time()
     g = Gltf(os.path.join(src, body_id + '.json'))
@@ -733,6 +773,10 @@ def build(src, out, body_id, log=print):
     skin_prim = j['meshes'][g.node(bnode)['mesh']]['primitives']
     shared_skin = {k: v for k, v in skin_prim[0]['attributes'].items() if k != '_HIDE'}
     shared_head = {k: v for k, v in skin_prim[1]['attributes'].items() if k != '_HIDE'}
+    if meta.get('sex') == 'woman':
+        ts, th = neck_tint(g, src, body, Bpos, log)
+        shared_skin['_TINT'] = acc(ts.astype(np.float32), 5126, 'VEC3')
+        shared_head['_TINT'] = acc(th.astype(np.float32), 5126, 'VEC3')
     head_idx = skin_prim[1]['indices']
     gacc = {}
     for x, p in pieces.items():
