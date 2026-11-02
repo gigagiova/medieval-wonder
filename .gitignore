@@ -3,3 +3,4 @@ dist
 tools/.cache
 tools/preview
 .claude
+__pycache__/

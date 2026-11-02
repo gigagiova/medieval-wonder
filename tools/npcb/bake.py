@@ -192,6 +192,22 @@ class Piece:
         P0, F0 = m['P'], m['F'].copy()
         rep, U = weld(P0, 1e-5)
         Fw = rep[F0]
+        # 0. Straight edges: a hem or rim cut through the mesh (a knee tunic cut from a robe, a
+        # hood's lower edge) is a saw of single triangles, each with two open edges, that show
+        # as shards in the stride. Those ears are peeled off, a few rows, on large shells only.
+        comp0 = components(Fw, len(U))
+        big = np.bincount(comp0[Fw[:, 0]], minlength=comp0.max() + 1) > 200
+        self.ears = 0
+        for _ in range(3):
+            E = np.sort(np.stack([Fw[:, [0, 1]], Fw[:, [1, 2]], Fw[:, [2, 0]]], 1), 2)
+            key = E[..., 0] * len(U) + E[..., 1]
+            uk, cnt = np.unique(key, return_counts=True)
+            openE = np.isin(key, uk[cnt == 1]).sum(1)
+            ear = (openE >= 2) & big[comp0[Fw[:, 0]]]
+            if not ear.any():
+                break
+            self.ears += int(ear.sum())
+            F0, Fw = F0[~ear], Fw[~ear]
         # 1. Outward, per connected piece.
         comp = components(Fw, len(U))
         fn = np.cross(U[Fw[:, 1]] - U[Fw[:, 0]], U[Fw[:, 2]] - U[Fw[:, 0]])
@@ -208,6 +224,37 @@ class Piece:
                 N0[verts] = -N0[verts]
                 flipped += 1
         Fw = rep[F0]
+        # Linings and facings: a shell lying wholly just inside another shell of the same
+        # garment (a hem lining, a collar facing) is dropped. Every open edge gets its own
+        # turned-in band below, and these inner shells came out under the hem in the stride.
+        bd = body.tree.query(U)[0]
+        lined = 0
+        sizes = np.bincount(comp, minlength=comp.max() + 1)
+        for c in np.unique(comp):
+            vs = np.nonzero(comp == c)[0]
+            others = np.nonzero((comp != c) & (sizes[comp] > sizes[c]))[0]
+            if not len(others) or len(vs) < 3:
+                continue
+            d, k = cKDTree(U[others]).query(U[vs])
+            if (d < 0.035).mean() >= 0.9 and np.median(bd[vs]) < np.median(bd[others[k]]):
+                tri = comp[Fw[:, 0]] == c
+                F0, Fw = F0[~tri], Fw[~tri]
+                lined += int(tri.sum())
+        # An inner shell (an under-skirt tube inside a knee tunic) that the garment's other
+        # shells cover for the most part goes whole: its rim came out below the hem in the stride.
+        Nw = vertex_normals(U, Fw)
+        sizes = np.bincount(comp[Fw[:, 0]], minlength=comp.max() + 1)
+        for c in np.unique(comp[Fw[:, 0]]):
+            tri = comp[Fw[:, 0]] == c
+            if sizes[c] >= sizes.max() or sizes[c] < 20:
+                continue
+            vs = np.unique(Fw[tri])
+            others = Fw[~tri]
+            # (Straight out along the normal, within 12 cm: a short tube lets slanted rays out.)
+            if ray_hits(U[vs] + Nw[vs] * 0.001, Nw[vs], U, others, 0.12).mean() >= 0.8:
+                F0, Fw = F0[~tri], Fw[~tri]
+                lined += int(tri.sum())
+        self.lined = lined
         Nw = vertex_normals(U, Fw)
         # Authored normals agree with the winding.
         bad = np.einsum('ij,ij->i', N0, Nw[rep]) < 0
@@ -216,6 +263,7 @@ class Piece:
         self.m, self.P0, self.F0, self.N0, self.rep, self.U, self.Fw, self.comp = m, P0, F0, N0, rep, U, Fw, comp
         self.body, self.names, self.bmap, self.legs, self.crotch_y = body, names, bmap, legs, crotch_y
         self.bodyd = body.tree.query(U)[0]
+        self.knee_y = body.knee_y
         self.Nw = Nw
         self.push = np.zeros(len(U))
 
@@ -265,7 +313,9 @@ class Piece:
                 b = np.exp(-(dr - np.minimum(dl, dr)) / SKIRT_SIGMA)
                 Wleg = (a[:, None] * body.D[legs[2][kl]] + b[:, None] * body.D[legs[3][kr]]) / (a + b)[:, None]
                 Wpel = np.zeros_like(W0); Wpel[:, self.names.index('Hips')] = 1
-                f = (LEG_AT_HEM * t ** 1.5)[:, None]
+                # (Short skirts, above the knee, follow the thighs as before: the pelvis blend is for long ones.)
+                long_ = hem < self.knee_y
+                f = ((LEG_AT_HEM * t ** 1.5) if long_ else np.clip(t / 0.3, 0, 1))[:, None]
                 Wsk = Wpel * (1 - f) + Wleg * f
                 g = (np.clip(t / 0.15, 0, 1) * (1 - conf))[:, None] * skirt[:, None]
                 W0 = W0 * (1 - g) + Wsk * g
@@ -306,7 +356,9 @@ class Piece:
             if not srcP:
                 continue
             P = np.concatenate(srcP); Ws = np.concatenate(srcW)
-            d, k = cKDTree(P).query(U[vs], 3)
+            kk = min(3, len(P))
+            d, k = cKDTree(P).query(U[vs], kk)
+            d, k = d.reshape(len(vs), kk), k.reshape(len(vs), kk)
             on = d[:, 0] < LAYER_NEAR
             # Nearer to that cloth than to the skin (or the skin is not under it).
             on &= d[:, 0] < self.bodyd[vs] + 0.003
@@ -355,15 +407,39 @@ class Piece:
             copy[bv] = nv + np.arange(len(bv))
             self.src = np.concatenate([self.src, bv])
             P.append(P0[bv] - Nw[rep[bv]] * THICK)
-            # (Shaded with the outer face's normal: the rim between them then has no dark crease.)
-            N.append(N0[bv]); UV.append(m['UV'][bv]); Wd.append(W[rep[bv]])
+            N.append(-N0[bv]); UV.append(m['UV'][bv]); Wd.append(W[rep[bv]])
             # The inside is the cloth in its own shadow.
-            shade.append(np.full(len(bv), 0.75))
+            shade.append(np.full(len(bv), 0.8))
             Fo.append(copy[F0[band_t]][:, [0, 2, 1]])
             # The rim: each open edge (as the outer face winds it) joined to its copy.
             first = {}
             for i in range(nv):
                 first.setdefault(int(rep[i]), i)
+            bset = {tuple(e) for e in bedges}
+            # The rim has its own corners, shaded with the normal of the edge itself (along
+            # the cloth, away from it), so it reads as the cloth's thickness and not as a
+            # dark crease between the outer face and the inside.
+            bnd = np.zeros(len(U), bool); bnd[bverts] = True
+            nb_sum = np.zeros_like(U); nb_cnt = np.zeros(len(U))
+            for i0, i1 in Eu:
+                if not bnd[i1]:
+                    nb_sum[i0] += U[i1]; nb_cnt[i0] += 1
+                if not bnd[i0]:
+                    nb_sum[i1] += U[i0]; nb_cnt[i1] += 1
+            T = U - nb_sum / np.maximum(nb_cnt, 1)[:, None]
+            T -= Nw * np.einsum('ij,ij->i', T, Nw)[:, None]
+            T /= np.linalg.norm(T, axis=1, keepdims=True) + 1e-12
+            rv = {}
+            extraP, extraN, extraUV, extraW, extraS, extraSrc = [], [], [], [], [], []
+            base = nv + len(bv)
+            def rim_vert(src_i, inner):
+                k = (src_i, inner)
+                if k not in rv:
+                    rv[k] = base + len(extraP)
+                    extraP.append(P0[src_i] - Nw[rep[src_i]] * (THICK if inner else 0))
+                    extraN.append(T[rep[src_i]]); extraUV.append(m['UV'][src_i]); extraW.append(W[rep[src_i]])
+                    extraS.append(0.9 if inner else 1.0); extraSrc.append(src_i)
+                return rv[k]
             bset = {tuple(e) for e in bedges}
             rim = []
             for f in F0[band_t]:
@@ -371,9 +447,13 @@ class Piece:
                     a, b = int(f[e]), int(f[(e + 1) % 3])
                     key = tuple(sorted((int(rep[a]), int(rep[b]))))
                     if key in bset and copy[a] >= 0 and copy[b] >= 0:
-                        rim += [(b, a, copy[a]), (b, copy[a], copy[b])]
+                        A, B, A2, B2 = rim_vert(a, 0), rim_vert(b, 0), rim_vert(a, 1), rim_vert(b, 1)
+                        rim += [(B, A, A2), (B, A2, B2)]
             if rim:
                 Fo.append(np.array(rim))
+                P.append(np.array(extraP)); N.append(np.array(extraN)); UV.append(np.array(extraUV))
+                Wd.append(np.array(extraW)); shade.append(np.array(extraS))
+                self.src = np.concatenate([self.src, np.array(extraSrc)])
         self.P = np.concatenate(P); self.N = np.concatenate(N); self.UV = np.concatenate(UV)
         Dfull = np.concatenate(Wd)
         self.J, self.W = top4(Dfull)
@@ -444,7 +524,7 @@ def inflate(pieces, worn_with, depth, log=print):
         log(f'  clearance round {rnd}: ' + ', '.join(f'{x} {np.percentile(q.push, 99) * 1000:.0f}/{q.push.max() * 1000:.0f}mm' for x, q in pieces.items() if q.push.any()))
 
 
-def tuck(p, tunics, neck):
+def tuck(p, tunics, neck, reach=0.02):
     """A hood, cowl or veil worn with a tunic or robe goes into its collar: the head
     cloth inside the collar (within 2 cm outside the collar's own radius) and below its
     rim is cut away, so what shows there is the collar's finished edge, not the two
@@ -465,7 +545,7 @@ def tuck(p, tunics, neck):
     C = p.U[p.Fw].mean(1)
     rc = np.hypot(C[:, 0] - neck[0], C[:, 2] - neck[2])
     kc = ((np.arctan2(C[:, 0] - neck[0], C[:, 2] - neck[2]) / (2 * np.pi) * bins).round().astype(int)) % bins
-    cut = np.isfinite(top[kc]) & (C[:, 1] < top[kc] - 0.005) & (rc < rad[kc] + 0.02)
+    cut = np.isfinite(top[kc]) & (C[:, 1] < top[kc] - 0.005) & (rc < rad[kc] + reach)
     if cut.any():
         F0 = p.F0[~cut]
         p.F0, p.Fw = F0, p.rep[F0]
@@ -494,6 +574,8 @@ class Body:
         self.label = np.zeros(len(U), int)
         self.label[np.isin(main, arm('Left'))] = 1
         self.label[np.isin(main, arm('Right'))] = 2
+        knees = [i for i, n in enumerate(names) if n in ('LeftLeg', 'RightLeg')]
+        self.knee_y = float(np.median(U[np.isin(main, knees), 1].max())) if np.isin(main, knees).any() else 0.5
         self.label_trees = {l: (cKDTree(U[self.label == l]), np.nonzero(self.label == l)[0]) for l in range(3)}
 
 
@@ -539,7 +621,8 @@ def build(src, out, body_id, log=print):
         if meta['garments'][x]['layer'] == 'head':
             tunics = [pieces[y] for y in worn_with[x] if meta['garments'][y]['layer'] == 'tunic']
             if tunics and all(any(meta['garments'][y]['layer'] == 'tunic' for y in s) for s in outfits.values() if x in s):
-                log(f'  {x}: {tuck(pieces[x], tunics, Bpos["Neck"])} triangles tucked into the collar')
+                # A hood has no cape to keep: all of it below the collar's rim goes in.
+                log(f'  {x}: {tuck(pieces[x], tunics, Bpos["Neck"], 0.08 if x == "hood" else 0.02)} triangles tucked into the collar')
     for x in used:
         pieces[x].weights()
     # Layered weights, innermost garment first.
@@ -549,12 +632,13 @@ def build(src, out, body_id, log=print):
         log(f'  {x}: {pieces[x].relayered} vertices take the weights of the cloth under them')
     for x in used:
         pieces[x].finish()
-        log(f'  {x}: flipped {pieces[x].flipped} pieces, near-body {pieces[x].conf_mean:.2f}, band tris {pieces[x].band}')
+        log(f'  {x}: {pieces[x].ears} ear triangles peeled, {pieces[x].lined} lining/facing triangles dropped, flipped {pieces[x].flipped} pieces, near-body {pieces[x].conf_mean:.2f}, band tris {pieces[x].band}')
     layer = {x: meta['garments'][x]['layer'] for x in used}
     # Skin vertices (prim 0) and their normals, for the cover test.
     sk = body.prims[0]
     skP = sk['P']; skN = body.N[body.rep0]
     neckhead = np.isin(body.main[body.rep0], [names.index('Neck'), names.index('Head')])
+    legs_all = np.isin(body.main[body.rep0], [i for i, n in enumerate(names) if any(x in n for x in ('Leg', 'Foot', 'Toe'))])
     footleg = np.isin(body.main[body.rep0], [i for i, n in enumerate(names) if any(x in n for x in ('Leg', 'Foot', 'Toe')) and 'UpLeg' not in n])
     report = {'body': body_id, 'outfits': {}}
     new_nodes = []
@@ -595,6 +679,10 @@ def build(src, out, body_id, log=print):
         if shoes:
             top = min(np.percentile(q.Vw[:, 1], 98) for q in shoes) - 0.015
             cov |= footleg & (skP[:, 1] < top)
+        # Under a skirt to the ankles the legs are never seen: all of them go (kept, they came
+        # through the skirt's front in the stride).
+        if any(layer[y] == 'tunic' and pieces[y].Vw[:, 1].min() < 0.25 for y in gs):
+            cov |= legs_all
         drop = cov[sk['F']].all(1)
         rep_s, _ = weld(skP, 1e-5)
         drop = keep_specks(sk['F'], drop, rep_s)

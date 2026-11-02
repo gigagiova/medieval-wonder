@@ -1,6 +1,7 @@
-# Track B townsfolk: each outfit baked into one surface (`?npc=b`)
+# Track B townsfolk: each outfit baked into one surface
 
-An experiment behind a URL flag; the default townsfolk (v2) are unchanged.
+The default townsfolk since b171fcc (`?npc=v2` gives the older layered ones,
+`?npc=c` track C).
 
 The v2 people wear separate layered garment meshes that are fitted, hidden and
 pushed at run time (spring cloth bones, capsule pushes, rim darkening, hide
@@ -19,8 +20,17 @@ The input is the shipped v2 bodies (with the belts and facings of
 `tools/npc3/wardrobe_build.py`). The steps, per body (details in the
 docstring of `bake.py`):
 
-1. **Outward.** Each connected shell of each garment is wound and shaded to
-   face away from the body.
+1. **Clean shells.** Each connected shell of each garment is wound and shaded
+   to face away from the body. Saw-tooth "ear" triangles (two open edges)
+   along cut hems are peeled off. Linings, facings and inner tubes are
+   dropped whole: a shell lying (90%) within 3.5 cm inside a larger shell of
+   the same garment, or one that 80% of straight rays from it meet another
+   shell within 12 cm (the under-skirt tube of the knee tunic). Their rims
+   came out under hems in the stride; every open edge gets its own band
+   (step 5) instead.
+1b. **Collar.** A hood worn with a tunic goes into the tunic's collar: the hood
+   below the collar's rim (per angle round the neck) is cut away, so the
+   collar's finished edge shows, not the two cloths crossing.
 2. **Clearance (offline).** Where a surface lies on another garment worn under
    it, or on another shell of the same garment nearer the body (a robe's
    shoulder cape over its body), the outer one is moved out to 6 mm above
@@ -31,7 +41,17 @@ docstring of `bake.py`):
    - elsewhere, inpainted harmonically over the cloth, with the near points
      fixed (Abdrashitov et al., "Robust Skin Weights Transfer via Weight
      Inpainting", SIGGRAPH Asia 2023);
-   - below the crotch, shared between the two legs by distance to each.
+   - **by region:** each bit of cloth belongs to the left arm, the right
+     arm or the rest of the body, by distance along the cloth from where it
+     touches the skin, and takes weights from that region only (a bell sleeve
+     hanging by the hip follows the forearm, not the hip);
+   - **long skirts** (hem below the knee): from the pelvis at the crotch towards the
+     legs at the hem (70% legs at the hem, rising as t^1.5), each half following its own leg
+     there, shared softly across the middle (σ 9 cm), so the skirt reads as a
+     skirt in the stride, not as trousers; short skirts follow the thighs;
+   - **layered:** cloth within 2.5 cm of cloth worn under it (another garment, or
+     another shell of the same garment nearer the body: the cape on the robe,
+     the belt on the tunic) copies that cloth's weights, so the two move as one.
 
    The cloth bones and finger bones are not used. The body's own weights,
    and the head and face, are byte-for-byte the v2 ones.
@@ -45,13 +65,20 @@ docstring of `bake.py`):
      2.5 cm (7 cm under hoods, cowls and veils).
    - **Dropped:** a triangle goes when all three of its corners are covered
      or crossing.
+   - **Covered by a lower layer too:** any garment worn counts, not only those
+     over it (a hood's edge tucked under a collar).
    - **Always kept:** neck and head skin, and shoes. Under robes that reach
      the ankle, the shoes' small strap pieces are dropped instead.
+   - **Legs and feet:** skin inside a shoe or boot (below its top less 1.5 cm)
+     goes, so no heel shows through it; under a skirt to the ankles all the
+     leg skin goes (it came through the skirt's front in the stride).
    - **Specks:** dropped groups of fewer than six triangles are kept.
 5. **Thick edges.** Every open edge of a garment gets a turned-in band. The
    cloth within 6 cm of the edge is copied 4 mm inward with the winding
-   reversed, joined to the edge by a rim, and shaded as the cloth's inside
-   (`_SHADE` 0.55).
+   reversed and shaded as the cloth's inside (`_SHADE` 0.8). It is joined to the
+   edge by a rim with its own corners, shaded with the edge's own normal
+   (along the cloth, outward), so the rim reads as the cloth's thickness and
+   not as a dark crease.
 
 Output: `public/models/npcb/<body>.json`, with the same skeleton, materials and
 webp images as v2. Every outfit (a set of garments, belt styles included, no
