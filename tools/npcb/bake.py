@@ -52,7 +52,10 @@ from meshops import weld, vertex_normals, dense_weights, top4
 NEAR, FAR = 0.02, 0.08         # weight transfer: trusted within NEAR, inpainted beyond FAR
 REACH, TILT = 0.30, np.radians(35)
 BAND, THICK = 0.06, 0.004      # turned-in band at open edges
-LEG_SIGMA = 0.05               # skirt shared between legs: softness (m)
+LEG_SIGMA = 0.05               # (unused since v2 of the skirt field)
+SKIRT_SIGMA = 0.09             # skirt shared between the legs: softness (m)
+LEG_AT_HEM = 0.7               # how much the hem follows the legs (the rest: the pelvis)
+LAYER_NEAR = 0.025             # cloth within this of other cloth takes its weights
 MIN_SPECK = 6
 
 
@@ -216,33 +219,64 @@ class Piece:
         self.Nw = Nw
         self.push = np.zeros(len(U))
 
-    def finish(self):
-        """Weights and thick edges, on the (possibly inflated) cloth."""
-        m, F0, N0, rep, U, Fw = self.m, self.F0, self.N0, self.rep, self.U, self.Fw
-        body, names, bmap, legs, crotch_y = self.body, self.names, self.bmap, self.legs, self.crotch_y
-        P0 = U[rep]
-        Nw = vertex_normals(U, Fw)
-        # 2. Weights.
-        nj = len(names)
-        d, k = body.tree.query(U, 4)
-        w = 1 / np.maximum(d, 1e-4)
-        w /= w.sum(1, keepdims=True)
-        W0 = np.einsum('ik,ikj->ij', w, body.D[k])
-        dist = d[:, 0]
+    def weights(self):
+        """First pass: the body's weights over the cloth (section 2 of the docstring)."""
+        U, Fw = self.U, self.Fw
+        body, bmap, legs, crotch_y = self.body, self.bmap, self.legs, self.crotch_y
+        n = len(U)
+        L = adjacency(Fw, n)
+        self.L = L
+        # Which part of the body each bit of cloth belongs to (left arm, right arm, the rest),
+        # by distance along the cloth from where it touches the body: a bell sleeve hanging
+        # by the hip is the forearm's, not the hip's.
+        d1, k1 = body.tree.query(U)
+        lab = body.label[k1].copy()
+        seeds = np.nonzero(d1 < NEAR)[0]
+        if len(seeds):
+            from scipy.sparse.csgraph import dijkstra
+            E = np.concatenate([Fw[:, [0, 1]], Fw[:, [1, 2]], Fw[:, [2, 0]]])
+            el = np.linalg.norm(U[E[:, 0]] - U[E[:, 1]], axis=1) + 1e-9
+            G = sparse.coo_matrix((el, (E[:, 0], E[:, 1])), shape=(n, n)).tocsr()
+            # (With min_only, scipy also returns each vertex's nearest seed.)
+            dist, _, src = dijkstra(G, directed=False, indices=seeds, min_only=True, return_predecessors=True)
+            src = np.where(src < 0, 0, src)
+            ok = np.isfinite(dist) & (d1[src] < NEAR)
+            lab[ok] = body.label[k1[src[ok]]]
+        W0 = np.zeros((n, body.D.shape[1])); dist = np.zeros(n)
+        for l in np.unique(lab):
+            sel = np.nonzero(lab == l)[0]
+            tree, ids = body.label_trees[l]
+            d, k = tree.query(U[sel], 4)
+            w = 1 / np.maximum(d, 1e-4); w /= w.sum(1, keepdims=True)
+            W0[sel] = np.einsum('ik,ikj->ij', w, body.D[ids[k]])
+            dist[sel] = d[:, 0]
         conf = np.clip((FAR - dist) / (FAR - NEAR), 0, 1)
-        # Below the crotch, away from the legs: shared between them by distance to each.
-        if legs is not None:
-            below = np.clip((crotch_y - U[:, 1]) / 0.08, 0, 1) * (1 - conf)
-            if below.max() > 0:
+        # A skirt below the crotch: from the pelvis at the top towards the legs at the hem,
+        # each half following its own leg there, softly shared across the middle.
+        if legs is not None and lab.max() >= 0:
+            hem = U[:, 1].min()
+            span = max(crotch_y - hem, 0.05)
+            t = np.clip((crotch_y - U[:, 1]) / span, 0, 1)
+            skirt = (lab == 0) & (t > 0) & (conf < 1)
+            if skirt.any():
                 dl, kl = legs[0].query(U * [1, 3, 1])
                 dr, kr = legs[1].query(U * [1, 3, 1])
-                a = np.exp(-(dl - np.minimum(dl, dr)) / LEG_SIGMA)
-                b = np.exp(-(dr - np.minimum(dl, dr)) / LEG_SIGMA)
+                a = np.exp(-(dl - np.minimum(dl, dr)) / SKIRT_SIGMA)
+                b = np.exp(-(dr - np.minimum(dl, dr)) / SKIRT_SIGMA)
                 Wleg = (a[:, None] * body.D[legs[2][kl]] + b[:, None] * body.D[legs[3][kr]]) / (a + b)[:, None]
-                W0 = W0 * (1 - below[:, None]) + Wleg * below[:, None]
-                conf = np.maximum(conf, below)
-        W0 = remap_dense(W0, bmap)
-        L = adjacency(Fw, len(U))
+                Wpel = np.zeros_like(W0); Wpel[:, self.names.index('Hips')] = 1
+                f = (LEG_AT_HEM * t ** 1.5)[:, None]
+                Wsk = Wpel * (1 - f) + Wleg * f
+                g = (np.clip(t / 0.15, 0, 1) * (1 - conf))[:, None] * skirt[:, None]
+                W0 = W0 * (1 - g) + Wsk * g
+                conf = np.maximum(conf, g[:, 0])
+        self.W0 = remap_dense(W0, bmap)
+        self.conf = conf
+        self.lab = lab
+        self.solve()
+
+    def solve(self):
+        L, W0, conf = self.L, self.W0, self.conf
         W = W0.copy()
         for _ in range(400):
             W = conf[:, None] * W0 + (1 - conf[:, None]) * (L @ W)
@@ -250,7 +284,49 @@ class Piece:
         for _ in range(4):
             W = 0.6 * W + 0.4 * (L @ W)
         W /= W.sum(1, keepdims=True)
+        self.W = W
         self.conf_mean = float(conf.mean())
+
+    def relayer(self, inner):
+        """Second pass: cloth lying on other cloth takes that cloth's weights, so the two move
+        as one (a cape on its robe, a hood's cape tucked under a collar, a belt on its tunic).
+        `inner`: (welded positions, weights) of the garments worn under this one; the other
+        shells of this garment nearer the body are added here."""
+        U = self.U
+        med = {c: np.median(self.bodyd[self.comp == c]) for c in np.unique(self.comp)}
+        W0, conf = self.W0.copy(), self.conf.copy()
+        changed = 0
+        for c in np.unique(self.comp):
+            vs = np.nonzero(self.comp == c)[0]
+            srcP = [P for P, _ in inner]; srcW = [W for _, W in inner]
+            for c2 in med:
+                if c2 != c and med[c2] < med[c] - 0.002:
+                    o = np.nonzero(self.comp == c2)[0]
+                    srcP.append(U[o]); srcW.append(self.W[o])
+            if not srcP:
+                continue
+            P = np.concatenate(srcP); Ws = np.concatenate(srcW)
+            d, k = cKDTree(P).query(U[vs], 3)
+            on = d[:, 0] < LAYER_NEAR
+            # Nearer to that cloth than to the skin (or the skin is not under it).
+            on &= d[:, 0] < self.bodyd[vs] + 0.003
+            if not on.any():
+                continue
+            w = 1 / np.maximum(d[on], 1e-4); w /= w.sum(1, keepdims=True)
+            W0[vs[on]] = np.einsum('ik,ikj->ij', w, Ws[k[on]])
+            conf[vs[on]] = 1.0
+            changed += int(on.sum())
+        if changed:
+            self.W0, self.conf = W0, conf
+            self.solve()
+        self.relayered = changed
+
+    def finish(self):
+        """Thick edges, on the (possibly inflated) cloth with its final weights."""
+        m, F0, N0, rep, U, Fw = self.m, self.F0, self.N0, self.rep, self.U, self.Fw
+        P0 = U[rep]
+        Nw = vertex_normals(U, Fw)
+        W = self.W
         # 3. Thick open edges: the band within BAND of an open edge, copied inward.
         E = np.sort(np.concatenate([Fw[:, [0, 1]], Fw[:, [1, 2]], Fw[:, [2, 0]]]), 1)
         Eu, cnt = np.unique(E, axis=0, return_counts=True)
@@ -279,9 +355,10 @@ class Piece:
             copy[bv] = nv + np.arange(len(bv))
             self.src = np.concatenate([self.src, bv])
             P.append(P0[bv] - Nw[rep[bv]] * THICK)
-            N.append(-N0[bv]); UV.append(m['UV'][bv]); Wd.append(W[rep[bv]])
+            # (Shaded with the outer face's normal: the rim between them then has no dark crease.)
+            N.append(N0[bv]); UV.append(m['UV'][bv]); Wd.append(W[rep[bv]])
             # The inside is the cloth in its own shadow.
-            shade.append(np.full(len(bv), 0.55))
+            shade.append(np.full(len(bv), 0.75))
             Fo.append(copy[F0[band_t]][:, [0, 2, 1]])
             # The rim: each open edge (as the outer face winds it) joined to its copy.
             first = {}
@@ -367,6 +444,34 @@ def inflate(pieces, worn_with, depth, log=print):
         log(f'  clearance round {rnd}: ' + ', '.join(f'{x} {np.percentile(q.push, 99) * 1000:.0f}/{q.push.max() * 1000:.0f}mm' for x, q in pieces.items() if q.push.any()))
 
 
+def tuck(p, tunics, neck):
+    """A hood, cowl or veil worn with a tunic or robe goes into its collar: the head
+    cloth inside the collar (within 2 cm outside the collar's own radius) and below its
+    rim is cut away, so what shows there is the collar's finished edge, not the two
+    cloths crossing each other in a jagged line. Capes lying well outside the collar
+    are kept."""
+    bins = 48
+    T = np.concatenate([t.U for t in tunics])
+    r = np.hypot(T[:, 0] - neck[0], T[:, 2] - neck[2])
+    sel = (r < 0.16) & (T[:, 1] > neck[1] - 0.15)
+    T, r = T[sel], r[sel]
+    a = np.arctan2(T[:, 0] - neck[0], T[:, 2] - neck[2])
+    k = ((a / (2 * np.pi) * bins).round().astype(int)) % bins
+    top = np.full(bins, -np.inf); rad = np.zeros(bins)
+    np.maximum.at(top, k, T[:, 1])
+    for b in range(bins):
+        near = (k == b) & (T[:, 1] > top[b] - 0.015)
+        rad[b] = np.median(r[near]) if near.any() else 0
+    C = p.U[p.Fw].mean(1)
+    rc = np.hypot(C[:, 0] - neck[0], C[:, 2] - neck[2])
+    kc = ((np.arctan2(C[:, 0] - neck[0], C[:, 2] - neck[2]) / (2 * np.pi) * bins).round().astype(int)) % bins
+    cut = np.isfinite(top[kc]) & (C[:, 1] < top[kc] - 0.005) & (rc < rad[kc] + 0.02)
+    if cut.any():
+        F0 = p.F0[~cut]
+        p.F0, p.Fw = F0, p.rep[F0]
+    return int(cut.sum())
+
+
 class Body:
     def __init__(self, g, node, names):
         self.prims = [g.mesh(node, 0), g.mesh(node, 1)]
@@ -384,6 +489,12 @@ class Body:
         self.tree = cKDTree(U)
         main = D.argmax(1)
         self.main = main
+        # 0: trunk, legs and head; 1, 2: the left and right arm (arm, forearm, hand and fingers).
+        arm = lambda S: [i for i, n in enumerate(names) if n.startswith(S) and any(x in n for x in ('Arm', 'Hand'))]
+        self.label = np.zeros(len(U), int)
+        self.label[np.isin(main, arm('Left'))] = 1
+        self.label[np.isin(main, arm('Right'))] = 2
+        self.label_trees = {l: (cKDTree(U[self.label == l]), np.nonzero(self.label == l)[0]) for l in range(3)}
 
 
 def build(src, out, body_id, log=print):
@@ -425,6 +536,18 @@ def build(src, out, body_id, log=print):
     worn_with = {x: sorted({y for s in outfits.values() if x in s for y in s if y != x}) for x in used}
     inflate(pieces, worn_with, depth, log)
     for x in used:
+        if meta['garments'][x]['layer'] == 'head':
+            tunics = [pieces[y] for y in worn_with[x] if meta['garments'][y]['layer'] == 'tunic']
+            if tunics and all(any(meta['garments'][y]['layer'] == 'tunic' for y in s) for s in outfits.values() if x in s):
+                log(f'  {x}: {tuck(pieces[x], tunics, Bpos["Neck"])} triangles tucked into the collar')
+    for x in used:
+        pieces[x].weights()
+    # Layered weights, innermost garment first.
+    for x in sorted(used, key=lambda y: depth[y]):
+        inner = [(pieces[y].U, pieces[y].W) for y in worn_with[x] if depth[y] < depth[x] and meta['garments'][y]['layer'] != 'shoe']
+        pieces[x].relayer(inner)
+        log(f'  {x}: {pieces[x].relayered} vertices take the weights of the cloth under them')
+    for x in used:
         pieces[x].finish()
         log(f'  {x}: flipped {pieces[x].flipped} pieces, near-body {pieces[x].conf_mean:.2f}, band tris {pieces[x].band}')
     layer = {x: meta['garments'][x]['layer'] for x in used}
@@ -432,6 +555,7 @@ def build(src, out, body_id, log=print):
     sk = body.prims[0]
     skP = sk['P']; skN = body.N[body.rep0]
     neckhead = np.isin(body.main[body.rep0], [names.index('Neck'), names.index('Head')])
+    footleg = np.isin(body.main[body.rep0], [i for i, n in enumerate(names) if any(x in n for x in ('Leg', 'Foot', 'Toe')) and 'UpLeg' not in n])
     report = {'body': body_id, 'outfits': {}}
     new_nodes = []
     j = g.j
@@ -466,6 +590,11 @@ def build(src, out, body_id, log=print):
         cov = covered(skP, skN, V, F) | poking(skP, skN, V, F)
         # The neck is always kept: it closes the head to the collar or hood.
         cov &= ~neckhead
+        # Inside a shoe or boot: everything below its top (less 1.5 cm) goes, so no heel shows through it.
+        shoes = [pieces[y] for y in gs if layer[y] == 'shoe']
+        if shoes:
+            top = min(np.percentile(q.Vw[:, 1], 98) for q in shoes) - 0.015
+            cov |= footleg & (skP[:, 1] < top)
         drop = cov[sk['F']].all(1)
         rep_s, _ = weld(skP, 1e-5)
         drop = keep_specks(sk['F'], drop, rep_s)
@@ -481,6 +610,8 @@ def build(src, out, body_id, log=print):
         for x in gs:
             p = pieces[x]
             over = [pieces[y] for y in gs if depth[y] > depth[x]] if layer[x] != 'shoe' else []
+            # Covered by anything else worn (also a lower layer: a hood's edge tucked under a collar).
+            others = [pieces[y] for y in gs if y != x and layer[y] != 'shoe']
             keepF = np.ones(len(p.F), bool)
             if layer[x] == 'shoe' and any(layer[y] == 'tunic' and pieces[y].Vw[:, 1].min() < 0.25 for y in gs):
                 # Under a robe to the ankles only the shoe shows, not its small straps and laces.
@@ -494,7 +625,7 @@ def build(src, out, body_id, log=print):
                 cw = np.zeros(len(p.Vw), bool)
                 for c in np.unique(p.comp):
                     vs = np.nonzero(p.comp == c)[0]
-                    parts = [(q.Vw, q.Fw) for q in over] + [(p.Vw, p.Fw[p.comp[p.Fw[:, 0]] != c])]
+                    parts = [(q.Vw, q.Fw) for q in others] + [(p.Vw, p.Fw[p.comp[p.Fw[:, 0]] != c])]
                     off = np.cumsum([0] + [len(v) for v, _ in parts])
                     V = np.concatenate([v for v, _ in parts]); F = np.concatenate([f + o for (_, f), o in zip(parts, off[:-1])])
                     if len(F):
