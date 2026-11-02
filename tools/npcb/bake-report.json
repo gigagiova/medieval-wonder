@@ -1,0 +1,890 @@
+{
+ "m_young": {
+  "body": "m_young",
+  "outfits": {
+   "cowl+robe+rope+shoes": {
+    "tris": {
+     "skin": [
+      1408,
+      6038
+     ],
+     "head": 2960,
+     "robe": [
+      7051,
+      12355
+     ],
+     "rope": [
+      772,
+      798
+     ],
+     "cowl": [
+      3000,
+      3000
+     ],
+     "shoes": [
+      676,
+      2552
+     ]
+    },
+    "total": 15867
+   },
+   "robe+rope+shoes": {
+    "tris": {
+     "skin": [
+      1411,
+      6038
+     ],
+     "head": 2960,
+     "robe": [
+      7653,
+      12355
+     ],
+     "rope": [
+      772,
+      798
+     ],
+     "shoes": [
+      676,
+      2552
+     ]
+    },
+    "total": 13472
+   },
+   "belt_tunic+boots+hood+hose+tunic": {
+    "tris": {
+     "skin": [
+      1211,
+      6038
+     ],
+     "head": 2960,
+     "tunic": [
+      5789,
+      7940
+     ],
+     "belt_tunic": [
+      426,
+      426
+     ],
+     "hood": [
+      3000,
+      3000
+     ],
+     "hose": [
+      546,
+      1042
+     ],
+     "boots": [
+      1300,
+      1300
+     ]
+    },
+    "total": 15232
+   },
+   "boots+cord_tunic+hood+hose+tunic": {
+    "tris": {
+     "skin": [
+      1211,
+      6038
+     ],
+     "head": 2960,
+     "tunic": [
+      5789,
+      7940
+     ],
+     "cord_tunic": [
+      788,
+      798
+     ],
+     "hood": [
+      3000,
+      3000
+     ],
+     "hose": [
+      546,
+      1042
+     ],
+     "boots": [
+      1300,
+      1300
+     ]
+    },
+    "total": 15594
+   },
+   "belt+boots+hose+shirt": {
+    "tris": {
+     "skin": [
+      1355,
+      6038
+     ],
+     "head": 2960,
+     "shirt": [
+      4885,
+      4973
+     ],
+     "belt": [
+      419,
+      419
+     ],
+     "hose": [
+      466,
+      1042
+     ],
+     "boots": [
+      1300,
+      1300
+     ]
+    },
+    "total": 11385
+   },
+   "belt_robe+longrobe+shoes": {
+    "tris": {
+     "skin": [
+      1408,
+      6038
+     ],
+     "head": 2960,
+     "longrobe": [
+      7430,
+      12331
+     ],
+     "belt_robe": [
+      426,
+      426
+     ],
+     "shoes": [
+      676,
+      2552
+     ]
+    },
+    "total": 12900
+   },
+   "cord_robe+longrobe+shoes": {
+    "tris": {
+     "skin": [
+      1408,
+      6038
+     ],
+     "head": 2960,
+     "longrobe": [
+      7430,
+      12331
+     ],
+     "cord_robe": [
+      762,
+      798
+     ],
+     "shoes": [
+      676,
+      2552
+     ]
+    },
+    "total": 13236
+   },
+   "longrobe+sash_robe+shoes": {
+    "tris": {
+     "skin": [
+      1408,
+      6038
+     ],
+     "head": 2960,
+     "longrobe": [
+      7408,
+      12331
+     ],
+     "sash_robe": [
+      580,
+      596
+     ],
+     "shoes": [
+      676,
+      2552
+     ]
+    },
+    "total": 13032
+   }
+  },
+  "seconds": 154.4
+ },
+ "m_mid": {
+  "body": "m_mid",
+  "outfits": {
+   "cowl+robe+rope+shoes": {
+    "tris": {
+     "skin": [
+      1454,
+      6092
+     ],
+     "head": 2904,
+     "robe": [
+      6564,
+      11939
+     ],
+     "rope": [
+      792,
+      798
+     ],
+     "cowl": [
+      3000,
+      3000
+     ],
+     "shoes": [
+      656,
+      2728
+     ]
+    },
+    "total": 15370
+   },
+   "robe+rope+shoes": {
+    "tris": {
+     "skin": [
+      1457,
+      6092
+     ],
+     "head": 2904,
+     "robe": [
+      6865,
+      11939
+     ],
+     "rope": [
+      792,
+      798
+     ],
+     "shoes": [
+      656,
+      2728
+     ]
+    },
+    "total": 12674
+   },
+   "belt_tunic+boots+hood+hose+tunic": {
+    "tris": {
+     "skin": [
+      1179,
+      6092
+     ],
+     "head": 2904,
+     "tunic": [
+      5432,
+      7923
+     ],
+     "belt_tunic": [
+      426,
+      426
+     ],
+     "hood": [
+      3000,
+      3000
+     ],
+     "hose": [
+      536,
+      1038
+     ],
+     "boots": [
+      1300,
+      1300
+     ]
+    },
+    "total": 14777
+   },
+   "boots+cord_tunic+hood+hose+tunic": {
+    "tris": {
+     "skin": [
+      1179,
+      6092
+     ],
+     "head": 2904,
+     "tunic": [
+      5432,
+      7923
+     ],
+     "cord_tunic": [
+      780,
+      798
+     ],
+     "hood": [
+      3000,
+      3000
+     ],
+     "hose": [
+      536,
+      1038
+     ],
+     "boots": [
+      1300,
+      1300
+     ]
+    },
+    "total": 15131
+   },
+   "belt+boots+hose+shirt": {
+    "tris": {
+     "skin": [
+      1384,
+      6092
+     ],
+     "head": 2904,
+     "shirt": [
+      4873,
+      4977
+     ],
+     "belt": [
+      419,
+      419
+     ],
+     "hose": [
+      491,
+      1038
+     ],
+     "boots": [
+      1300,
+      1300
+     ]
+    },
+    "total": 11371
+   },
+   "belt_robe+longrobe+shoes": {
+    "tris": {
+     "skin": [
+      1451,
+      6092
+     ],
+     "head": 2904,
+     "longrobe": [
+      6943,
+      11891
+     ],
+     "belt_robe": [
+      426,
+      426
+     ],
+     "shoes": [
+      656,
+      2728
+     ]
+    },
+    "total": 12380
+   },
+   "cord_robe+longrobe+shoes": {
+    "tris": {
+     "skin": [
+      1451,
+      6092
+     ],
+     "head": 2904,
+     "longrobe": [
+      6943,
+      11891
+     ],
+     "cord_robe": [
+      792,
+      798
+     ],
+     "shoes": [
+      656,
+      2728
+     ]
+    },
+    "total": 12746
+   },
+   "longrobe+sash_robe+shoes": {
+    "tris": {
+     "skin": [
+      1451,
+      6092
+     ],
+     "head": 2904,
+     "longrobe": [
+      6921,
+      11891
+     ],
+     "sash_robe": [
+      583,
+      596
+     ],
+     "shoes": [
+      656,
+      2728
+     ]
+    },
+    "total": 12515
+   }
+  },
+  "seconds": 144.6
+ },
+ "m_old": {
+  "body": "m_old",
+  "outfits": {
+   "cowl+robe+rope+shoes": {
+    "tris": {
+     "skin": [
+      1502,
+      6102
+     ],
+     "head": 2896,
+     "robe": [
+      6680,
+      11970
+     ],
+     "rope": [
+      782,
+      798
+     ],
+     "cowl": [
+      3000,
+      3000
+     ],
+     "shoes": [
+      701,
+      2830
+     ]
+    },
+    "total": 15561
+   },
+   "robe+rope+shoes": {
+    "tris": {
+     "skin": [
+      1508,
+      6102
+     ],
+     "head": 2896,
+     "robe": [
+      6844,
+      11970
+     ],
+     "rope": [
+      782,
+      798
+     ],
+     "shoes": [
+      701,
+      2830
+     ]
+    },
+    "total": 12731
+   },
+   "belt_tunic+boots+hood+hose+tunic": {
+    "tris": {
+     "skin": [
+      1214,
+      6102
+     ],
+     "head": 2896,
+     "tunic": [
+      5222,
+      7825
+     ],
+     "belt_tunic": [
+      426,
+      426
+     ],
+     "hood": [
+      3000,
+      3000
+     ],
+     "hose": [
+      535,
+      1056
+     ],
+     "boots": [
+      1300,
+      1300
+     ]
+    },
+    "total": 14593
+   },
+   "boots+cord_tunic+hood+hose+tunic": {
+    "tris": {
+     "skin": [
+      1214,
+      6102
+     ],
+     "head": 2896,
+     "tunic": [
+      5222,
+      7825
+     ],
+     "cord_tunic": [
+      792,
+      798
+     ],
+     "hood": [
+      3000,
+      3000
+     ],
+     "hose": [
+      535,
+      1056
+     ],
+     "boots": [
+      1300,
+      1300
+     ]
+    },
+    "total": 14959
+   },
+   "belt+boots+hose+shirt": {
+    "tris": {
+     "skin": [
+      1299,
+      6102
+     ],
+     "head": 2896,
+     "shirt": [
+      4854,
+      4942
+     ],
+     "belt": [
+      420,
+      426
+     ],
+     "hose": [
+      479,
+      1056
+     ],
+     "boots": [
+      1300,
+      1300
+     ]
+    },
+    "total": 11248
+   },
+   "belt_robe+longrobe+shoes": {
+    "tris": {
+     "skin": [
+      1509,
+      6102
+     ],
+     "head": 2896,
+     "longrobe": [
+      6901,
+      11955
+     ],
+     "belt_robe": [
+      426,
+      426
+     ],
+     "shoes": [
+      701,
+      2830
+     ]
+    },
+    "total": 12433
+   },
+   "cord_robe+longrobe+shoes": {
+    "tris": {
+     "skin": [
+      1509,
+      6102
+     ],
+     "head": 2896,
+     "longrobe": [
+      6899,
+      11955
+     ],
+     "cord_robe": [
+      782,
+      798
+     ],
+     "shoes": [
+      701,
+      2830
+     ]
+    },
+    "total": 12787
+   },
+   "longrobe+sash_robe+shoes": {
+    "tris": {
+     "skin": [
+      1509,
+      6102
+     ],
+     "head": 2896,
+     "longrobe": [
+      6883,
+      11955
+     ],
+     "sash_robe": [
+      596,
+      596
+     ],
+     "shoes": [
+      701,
+      2830
+     ]
+    },
+    "total": 12585
+   }
+  },
+  "seconds": 173.3
+ },
+ "m_elder": {
+  "body": "m_elder",
+  "outfits": {
+   "cowl+robe+rope+shoes": {
+    "tris": {
+     "skin": [
+      1447,
+      6102
+     ],
+     "head": 2896,
+     "robe": [
+      6635,
+      11965
+     ],
+     "rope": [
+      782,
+      798
+     ],
+     "cowl": [
+      3000,
+      3000
+     ],
+     "shoes": [
+      724,
+      2912
+     ]
+    },
+    "total": 15484
+   },
+   "robe+rope+shoes": {
+    "tris": {
+     "skin": [
+      1450,
+      6102
+     ],
+     "head": 2896,
+     "robe": [
+      6819,
+      11965
+     ],
+     "rope": [
+      782,
+      798
+     ],
+     "shoes": [
+      724,
+      2912
+     ]
+    },
+    "total": 12671
+   },
+   "belt_tunic+boots+hood+hose+tunic": {
+    "tris": {
+     "skin": [
+      1170,
+      6102
+     ],
+     "head": 2896,
+     "tunic": [
+      5465,
+      7714
+     ],
+     "belt_tunic": [
+      426,
+      426
+     ],
+     "hood": [
+      3000,
+      3000
+     ],
+     "hose": [
+      544,
+      1040
+     ],
+     "boots": [
+      1300,
+      1300
+     ]
+    },
+    "total": 14801
+   },
+   "boots+cord_tunic+hood+hose+tunic": {
+    "tris": {
+     "skin": [
+      1170,
+      6102
+     ],
+     "head": 2896,
+     "tunic": [
+      5465,
+      7714
+     ],
+     "cord_tunic": [
+      774,
+      798
+     ],
+     "hood": [
+      3000,
+      3000
+     ],
+     "hose": [
+      544,
+      1040
+     ],
+     "boots": [
+      1300,
+      1300
+     ]
+    },
+    "total": 15149
+   },
+   "belt+boots+hose+shirt": {
+    "tris": {
+     "skin": [
+      1268,
+      6102
+     ],
+     "head": 2896,
+     "shirt": [
+      4899,
+      4991
+     ],
+     "belt": [
+      426,
+      426
+     ],
+     "hose": [
+      451,
+      1040
+     ],
+     "boots": [
+      1300,
+      1300
+     ]
+    },
+    "total": 11240
+   },
+   "belt_robe+longrobe+shoes": {
+    "tris": {
+     "skin": [
+      1456,
+      6102
+     ],
+     "head": 2896,
+     "longrobe": [
+      6829,
+      11974
+     ],
+     "belt_robe": [
+      426,
+      426
+     ],
+     "shoes": [
+      724,
+      2912
+     ]
+    },
+    "total": 12331
+   },
+   "cord_robe+longrobe+shoes": {
+    "tris": {
+     "skin": [
+      1456,
+      6102
+     ],
+     "head": 2896,
+     "longrobe": [
+      6829,
+      11974
+     ],
+     "cord_robe": [
+      786,
+      798
+     ],
+     "shoes": [
+      724,
+      2912
+     ]
+    },
+    "total": 12691
+   },
+   "longrobe+sash_robe+shoes": {
+    "tris": {
+     "skin": [
+      1456,
+      6102
+     ],
+     "head": 2896,
+     "longrobe": [
+      6804,
+      11974
+     ],
+     "sash_robe": [
+      564,
+      596
+     ],
+     "shoes": [
+      724,
+      2912
+     ]
+    },
+    "total": 12444
+   }
+  },
+  "seconds": 185.4
+ },
+ "w_young": {
+  "body": "w_young",
+  "outfits": {
+   "girdle+gown+shoes+veil": {
+    "tris": {
+     "skin": [
+      1718,
+      6046
+     ],
+     "head": 2952,
+     "gown": [
+      4775,
+      4906
+     ],
+     "girdle": [
+      557,
+      596
+     ],
+     "veil": [
+      2784,
+      2784
+     ],
+     "shoes": [
+      963,
+      2187
+     ]
+    },
+    "total": 13749
+   }
+  },
+  "seconds": 12.3
+ },
+ "w_mid": {
+  "body": "w_mid",
+  "outfits": {
+   "girdle+gown+shoes+veil": {
+    "tris": {
+     "skin": [
+      1811,
+      5980
+     ],
+     "head": 3018,
+     "gown": [
+      4776,
+      4938
+     ],
+     "girdle": [
+      551,
+      596
+     ],
+     "veil": [
+      2790,
+      2790
+     ],
+     "shoes": [
+      898,
+      2174
+     ]
+    },
+    "total": 13844
+   }
+  },
+  "seconds": 11.9
+ }
+}

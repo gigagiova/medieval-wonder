@@ -3,6 +3,14 @@
 This is the state of `main` (fast-forwarded from `claude/medieval-town`) at handover. Read `AGENTS.md` for the rules and the build commands.
 
 
+## Experiment: townsfolk baked into one surface (`?npc=b`, 2 November 2026)
+
+Track B of the townsfolk rework. Every body × outfit is baked offline into its
+visible outer surface, with one skin-weight field, and drawn plainly skinned and
+single-sided: no springs, pushes or hide masks at run time. Method, limits and
+rebuild: [tools/npcb/README.md](../tools/npcb/README.md). Assets are in
+`public/models/npcb/`. The default townsfolk are unchanged.
+
 ## The open ground filled (29 October 2026)
 
 The plan's open cells are no longer bare: kitchen gardens with edged beds of greens, vine
