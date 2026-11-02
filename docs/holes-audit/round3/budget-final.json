@@ -1,0 +1,32 @@
+[
+ {
+  "view": "?debug&shot&at=Curtis%20Ducis",
+  "triangles": 302682,
+  "calls": 146,
+  "cam": [
+   498.9,
+   47.3,
+   -123.1
+  ]
+ },
+ {
+  "view": "?debug&shot&at=Episcopium",
+  "triangles": 261422,
+  "calls": 88,
+  "cam": [
+   -25.1,
+   29.2,
+   -85
+  ]
+ },
+ {
+  "view": "?debug&shot&at=Forum",
+  "triangles": 264888,
+  "calls": 97,
+  "cam": [
+   -32.5,
+   37.1,
+   -154.3
+  ]
+ }
+]

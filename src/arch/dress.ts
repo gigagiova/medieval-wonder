@@ -412,6 +412,11 @@ export function washing(acc: Acc, f: Frame, u: number, v: number, wFace: number,
       const ctr = q.clone().addScaledVector(side, -s * 1);
       acc.quad(cm, top0, top1, mid1, mid0, ctr);
       acc.quad(cm, mid0, mid1, bot1, bot0, ctr);
+      // Cloth has two sides: the inside of the fold is seen from below and
+      // from the ends (one-sided, it showed what was behind; docs/HOLES-AUDIT.md).
+      const out = q.clone().addScaledVector(side, s * 1);
+      acc.quad(cm, top0, top1, mid1, mid0, out);
+      acc.quad(cm, mid0, mid1, bot1, bot0, out);
     };
     hang(1); hang(-1);
   }

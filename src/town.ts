@@ -398,10 +398,11 @@ function polyFaceTiles(acc: Acc, A: V2, Q: V2, ra: V2, rq: V2, yE: number, yR: n
     const nC = Math.max(1, Math.round((sMax * Math.hypot(1, slopeK)) / course));
     for (let k = 0; k < nC; k++) {
       if (rand() < 0.02) continue;
-      const s0 = (sMax * k) / nC - (k ? 0.03 : 0), s1 = (sMax * (k + 1)) / nC;
+      // (The eave course starts 6 cm in: its tube, tilted out, hung past the boards and opened from below.)
+      const s0 = (sMax * k) / nC - (k ? 0.03 : -0.06), s1 = (sMax * (k + 1)) / nC;
       const q0 = p.clone().addScaledVector(inw, s0), q1 = p.clone().addScaledVector(inw, s1);
       const slip = rand() < 0.03 ? R(-0.12, 0.12) : 0;
-      coppo(acc, 'roof', new THREE.Vector3(q0.x + e.x * slip, yAt(q0) + 0.03, q0.y + e.y * slip), new THREE.Vector3(q1.x + e.x * slip, yAt(q1) + 0.01, q1.y + e.y * slip), up3, side, 0.085, 0.07, seg, k === 0 ? 1 : 0);
+      coppo(acc, 'roof', new THREE.Vector3(q0.x + e.x * slip, yAt(q0) + 0.03, q0.y + e.y * slip), new THREE.Vector3(q1.x + e.x * slip, yAt(q1) + 0.01, q1.y + e.y * slip), up3, side, 0.085, 0.07, seg, k === 0 ? 1 : 0, true);
     }
   }
   // Hip / ridge tiles: bigger coppi along the hip from A to ra.
@@ -411,14 +412,15 @@ function polyFaceTiles(acc: Acc, A: V2, Q: V2, ra: V2, rq: V2, yE: number, yR: n
   const hs = new THREE.Vector3(-hd.y, 0, hd.x);
   for (let i = 0; i < nH; i++) {
     const a = A.clone().lerp(ra, i / nH), q = A.clone().lerp(ra, (i + 1) / nH);
-    coppo(acc, 'roof', new THREE.Vector3(a.x, yAt(a) + 0.05, a.y), new THREE.Vector3(q.x, yAt(q) + 0.04, q.y), new THREE.Vector3(0, 1, 0), hs, 0.11, 0.1);
+    // (The first hip tile's mouth hangs open at the eave corner: closed, see coppo.)
+    coppo(acc, 'roof', new THREE.Vector3(a.x, yAt(a) + 0.05, a.y), new THREE.Vector3(q.x, yAt(q) + 0.04, q.y), new THREE.Vector3(0, 1, 0), hs, 0.11, 0.1, 3, i === 0 ? 1 : 0);
   }
   if (ra.distanceTo(rq) > 0.3 && ra.clone().sub(A).dot(inw) > 0.2) {
     const nR = Math.max(1, Math.round(ra.distanceTo(rq) / 0.42));
     const rd = rq.clone().sub(ra).normalize();
     for (let i = 0; i < nR; i++) {
       const a = ra.clone().lerp(rq, i / nR), q = ra.clone().lerp(rq, (i + 1) / nR);
-      coppo(acc, 'roof', new THREE.Vector3(a.x, yR + 0.06, a.y), new THREE.Vector3(q.x, yR + 0.05, q.y), new THREE.Vector3(0, 1, 0), new THREE.Vector3(-rd.y, 0, rd.x), 0.12, 0.105);
+      coppo(acc, 'roof', new THREE.Vector3(a.x, yR + 0.06, a.y), new THREE.Vector3(q.x, yR + 0.05, q.y), new THREE.Vector3(0, 1, 0), new THREE.Vector3(-rd.y, 0, rd.x), 0.12, 0.105, 3, ((i === 0 ? 1 : 0) | (i === nR - 1 ? 2 : 0)) as 0 | 1 | 2 | 3);
     }
   }
 }

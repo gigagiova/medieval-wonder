@@ -15,7 +15,9 @@ const sum = (rows, skip) => {
     viewsOver100Magenta: ok.filter((r) => r.magenta > 100).length,
   };
 };
-const [a, b] = process.argv.slice(2).map(load);
+// --skip id,id: standing points to leave out (e.g. w11, a camera inside the town wall's masonry).
+const argv = process.argv.slice(2), si = argv.indexOf('--skip'), skipIds = si >= 0 ? argv.splice(si, 2)[1].split(',') : [];
+const [a, b] = argv.map(load).map((rows) => rows.filter((r) => !skipIds.includes(r.id)));
 // Skip a view if it is "inside" in either run, so both totals cover the same frames.
 const skip = new Set([...a, ...(b ?? [])].filter(inside).map((r) => `${r.id}|${r.yaw}|${r.pitch}`));
 const out = { before: sum(a, skip) };

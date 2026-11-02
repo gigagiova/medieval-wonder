@@ -30,7 +30,7 @@ import { readGltf } from './holes/gltf-node';
 import { fastTerrain, field } from '../src/displace';
 import { BOUNDS, insideness, WALL700, inPoly, type P2 } from '../src/benevento/geo';
 import { SITES, ROADS, siteToWorld } from '../src/benevento/sites';
-import { CHUNK, chunkKey, type ChunkItems } from '../src/benevento/fabric';
+import { CHUNK, chunkKey, wallPlan, type ChunkItems } from '../src/benevento/fabric';
 import { HOUSE, STREET, PLOT } from '../src/benevento/layout';
 import type { MeshBVH } from 'three-mesh-bvh';
 
@@ -102,6 +102,19 @@ for (const c of W.items.values()) for (const l of c.lots) {
     if (!lotsOver.has(k)) lotsOver.set(k, []);
     lotsOver.get(k)!.push(l);
   }
+}
+/** Inside the curtain (2.5 m thick, plus 0.3 m of its spolia and footing) or a tower (fabric.ts curtain(), tower()). */
+const WP = wallPlan();
+let eyesInWall = 0;
+function inWallMass(x: number, z: number) {
+  for (const p of WP.pieces) {
+    const [ax, az] = p.a, [bx, bz] = p.b, dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
+    const t = ((x - ax) * dx + (z - az) * dz) / L2;
+    if (t < -0.05 || t > 1.05) continue;
+    if (Math.hypot(ax + dx * t - x, az + dz * t - z) < 1.55) return true;
+  }
+  for (const t of WP.towers) if (Math.hypot(t.x + t.ox * 2.4 - x, t.z + t.oz * 2.4 - z) < (t.radius ?? 4.2) + 0.3) return true;
+  return false;
 }
 /** Lot footprints (houses one cannot enter) over a chunk, 0.5 m cells. */
 function footprintMask(it: ChunkItems) {
@@ -211,6 +224,8 @@ function eyeAudit(it: ChunkItems, list: BV[], foot: Uint8Array) {
   for (let gz = 2; gz < CHUNK; gz += 4) for (let gx = 2; gx < CHUNK; gx += 4) {
     const x = it.i * CHUNK + gx, z = it.j * CHUNK + gz;
     if (foot[Math.floor(gz / 0.5) * MR + Math.floor(gx / 0.5)]) continue;
+    // Not inside the town wall's masonry (its collider is solid; the ground runs on under it).
+    if (inWallMass(x, z)) { eyesInWall++; continue; }
     const t = fastTerrain(x, z);
     eo.set(x, t + 1.4, z);
     const f = first(list, eo, down, 4);
@@ -441,7 +456,7 @@ const summary = {
   groundPointsTested: groundPoints,
   groundHoles: holeCount,
   lodSeams: { edges: seamN, fullVsMidMaxGap: +seamMax.toFixed(3), fullVsMidOver2cm: seamOver, midVsCoarseMaxGap: +seamMaxMid.toFixed(3), midVsCoarseOver2cm: seamOverMid, edgesNotCoveredBySkirts: seamOpen },
-  eyes: { standingPoints: eyes.length, skippedInsideSolid: eyesInside, rays: eyeRays, backFaceRays: backRays, seeThroughGroundRays: holeRays,
+  eyes: { standingPoints: eyes.length, skippedInsideSolid: eyesInside, skippedInWallMasonry: eyesInWall, rays: eyeRays, backFaceRays: backRays, seeThroughGroundRays: holeRays,
     backFacePerMille: +(1000 * backRays / Math.max(1, eyeRays)).toFixed(3), seeThroughPerMille: +(1000 * holeRays / Math.max(1, eyeRays)).toFixed(3),
     eyesWithBackFaces: eyes.filter((e) => e.back > 0).length, eyesWithSeeThrough: eyes.filter((e) => e.hole > 0).length },
   openSurfaces: { sources: rows.length, sourcesWithBoundary: rows.filter((r) => r.boundaryEdges > 0).length, sourcesSeenFromBehind: rows.filter((r) => r.backHits > 0).length,

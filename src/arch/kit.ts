@@ -262,7 +262,7 @@ export function planks(acc: Acc, m: MatName, f: Frame, u0: number, u1: number, v
  * or p1 (3: both) (the eave course: seen from the lane, an open half-tube shows its
  * culled inside and the sky through it), flush with its end (set back, its culled inside showed as a crescent).
  */
-export function coppo(acc: Acc, m: MatName, p0: V3, p1: V3, up: V3, side: V3, r0: number, r1: number, seg = 3, cap: 0 | 1 | 2 | 3 = 0) {
+export function coppo(acc: Acc, m: MatName, p0: V3, p1: V3, up: V3, side: V3, r0: number, r1: number, seg = 3, cap: 0 | 1 | 2 | 3 = 0, under = false) {
   if (DETAIL.mid) return; // the underlay's tile texture carries the roof at mid distance
   const ring = (p: V3, r: number) => {
     const out: V3[] = [];
@@ -275,6 +275,10 @@ export function coppo(acc: Acc, m: MatName, p0: V3, p1: V3, up: V3, side: V3, r0
   const A = ring(p0, r0), B = ring(p1, r1);
   const below = v3().copy(p0).add(p1).multiplyScalar(0.5).addScaledVector(up, -1);
   for (let k = 0; k < seg; k++) acc.quad(m, A[k], A[k + 1], B[k + 1], B[k], below);
+  // `under`: its open underside closed by a chord (hipped roofs of traced
+  // footprints, whose rows run out over the hips and corners: seen from below
+  // or from across the roof, the tube's culled inside showed).
+  if (under) acc.quad(m, A[0], A[seg], B[seg], B[0], v3().copy(p0).add(p1).multiplyScalar(0.5).addScaledVector(up, 1));
   // (cap 3: both ends.)
   for (const end of [1, 2] as const) {
     if (!(cap & end)) continue;
