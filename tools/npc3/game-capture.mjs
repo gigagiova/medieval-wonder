@@ -69,6 +69,12 @@ for (const [pi, place] of places.entries()) {
         // By name: the list of people changes as the camera moves (the far ones are put away).
         const p = window.__npcDebug.people.find((q) => q.name + q.title === idx), pl = window.__player;
         if (!p) return null;
+        // FORCEWALK=1: the person's clip held on the walk (in place), to see the cloth in the stride.
+        if (force && !p.__forced) {
+          const W = { idle: 0, walk: 1, talk: 0, bless: 0, kneel: 0, pickup: 0, interact: 0 };
+          Object.defineProperty(p, 'want', { get: () => ({ ...W }), set: () => {}, configurable: true });
+          p.__forced = true;
+        }
         const f = { x: Math.sin(p.yaw), z: Math.cos(p.yaw) };
         const dir = view === 'front' ? f : { x: f.z, z: -f.x };
         const cam = { x: p.pos.x + dir.x * 1.9, y: p.pos.y + 1.35 * (p.scale ?? 1), z: p.pos.z + dir.z * 1.9 };
@@ -79,10 +85,10 @@ for (const [pi, place] of places.entries()) {
         if (Math.hypot(pl.pos.x - cam.x, pl.pos.z - cam.z) > 1.5) { pl.pos.set(cam.x, cam.y, cam.z); pl.vel?.set(0, 0, 0); pl.yaw = Math.atan2(-dx, -dz); }
         pl.pitch = Math.atan2(p.pos.y + 0.95 * (p.scale ?? 1) - pl.pos.y, Math.hypot(dx, dz));
         return { key: p.name + p.title, name: p.name, title: p.title, outfit: p.outfit?.id, body: p.outfit?.body, w: Object.fromEntries(Object.entries(p.w ?? {}).map(([a, v]) => [a, +(+v).toFixed(2)])) };
-      }, { idx, view });
+      }, { idx, view, force: !!process.env.FORCEWALK });
       if (!info) continue;
       // (Walkers come from out of sight: a few frames for them to be drawn.)
-    await frames(4);
+    await frames(process.env.FORCEWALK ? 10 : 4);
       const name = `${String(k).padStart(2, '0')}-${(info.title ?? 'x').replace(/\W+/g, '_')}-${view}.png`;
       await page.screenshot({ path: `${out}/${name}`, timeout: 600000 });
       meta.push({ k, view, place, file: name, ...info });
