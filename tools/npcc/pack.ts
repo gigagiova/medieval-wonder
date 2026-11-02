@@ -15,7 +15,10 @@ import path from 'node:path';
 
 const OUT = 'public/models/npcc';
 /** Saturation and brightness multipliers per character (1 = unchanged). */
-const GRADE: Record<string, { sat: number; bri: number }> = {};
+const GRADE: Record<string, { sat: number; bri: number }> = {
+  // The AI-baked habit is a saturated orange: brought down to undyed brown wool.
+  c_friar: { sat: 0.55, bri: 0.8 },
+};
 
 async function pack(work: string, id: string, io: NodeIO) {
   const doc = await io.read(path.join(work, id + '.glb'));
@@ -31,7 +34,10 @@ async function pack(work: string, id: string, io: NodeIO) {
     if (g) img = img.modulate({ saturation: g.sat, brightness: g.bri });
     tex.setImage(await img.webp({ quality: 88 }).toBuffer()).setMimeType('image/webp');
   }
-  for (const mat of root.listMaterials()) { mat.setRoughnessFactor(0.95).setMetallicFactor(0).setNormalTexture(null).setMetallicRoughnessTexture(null); }
+  for (const mat of root.listMaterials()) {
+    mat.setRoughnessFactor(0.95).setMetallicFactor(0).setNormalTexture(null).setMetallicRoughnessTexture(null).setEmissiveTexture(null);
+    for (const ext of mat.listExtensions()) ext.dispose();
+  }
   await doc.transform(dedup(), prune({ keepAttributes: true, keepLeaves: true }));
   console.log(`${id}: ${tris} tris`);
   await write(doc, io, id);
