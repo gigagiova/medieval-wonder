@@ -1,0 +1,434 @@
+[
+ {
+  "k": 0,
+  "view": "front",
+  "place": "Forum",
+  "file": "00-rustica-front.png",
+  "key": "Theodradarustica",
+  "name": "Theodrada",
+  "title": "rustica",
+  "outfit": "woman",
+  "body": "c_woman",
+  "w": {
+   "walk": 0.73,
+   "idle": 0.27,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 0,
+  "view": "side",
+  "place": "Forum",
+  "file": "00-rustica-side.png",
+  "key": "Theodradarustica",
+  "name": "Theodrada",
+  "title": "rustica",
+  "outfit": "woman",
+  "body": "c_woman",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "front",
+  "place": "Forum",
+  "file": "01-mulier_Beneventana-front.png",
+  "key": "Sergiamulier Beneventana",
+  "name": "Sergia",
+  "title": "mulier Beneventana",
+  "outfit": "woman",
+  "body": "c_woman",
+  "w": {
+   "walk": 0.7,
+   "idle": 0.3,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "side",
+  "place": "Forum",
+  "file": "01-mulier_Beneventana-side.png",
+  "key": "Sergiamulier Beneventana",
+  "name": "Sergia",
+  "title": "mulier Beneventana",
+  "outfit": "woman",
+  "body": "c_woman",
+  "w": {
+   "walk": 0.55,
+   "idle": 0.45,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "front",
+  "place": "Forum",
+  "file": "02-Iudaeus-front.png",
+  "key": "HananelIudaeus",
+  "name": "Hananel",
+  "title": "Iudaeus",
+  "outfit": "robe",
+  "body": "c_eastern",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 1,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "side",
+  "place": "Forum",
+  "file": "02-Iudaeus-side.png",
+  "key": "HananelIudaeus",
+  "name": "Hananel",
+  "title": "Iudaeus",
+  "outfit": "robe",
+  "body": "c_eastern",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 1,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 3,
+  "view": "front",
+  "place": "Forum",
+  "file": "03-medicus-front.png",
+  "key": "Martinusmedicus",
+  "name": "Martinus",
+  "title": "medicus",
+  "outfit": "robe",
+  "body": "c_eastern",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 3,
+  "view": "side",
+  "place": "Forum",
+  "file": "03-medicus-side.png",
+  "key": "Martinusmedicus",
+  "name": "Martinus",
+  "title": "medicus",
+  "outfit": "robe",
+  "body": "c_eastern",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "front",
+  "place": "Forum",
+  "file": "04-diaconus-front.png",
+  "key": "Diaconus Constantiusdiaconus",
+  "name": "Diaconus Constantius",
+  "title": "diaconus",
+  "outfit": "robe",
+  "body": "c_friar",
+  "w": {
+   "walk": 0,
+   "idle": 0.33,
+   "talk": 0.67,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "side",
+  "place": "Forum",
+  "file": "04-diaconus-side.png",
+  "key": "Diaconus Constantiusdiaconus",
+  "name": "Diaconus Constantius",
+  "title": "diaconus",
+  "outfit": "robe",
+  "body": "c_friar",
+  "w": {
+   "walk": 0,
+   "idle": 0.93,
+   "talk": 0.07,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "05-mulier_Beneventana-front.png",
+  "key": "Romanamulier Beneventana",
+  "name": "Romana",
+  "title": "mulier Beneventana",
+  "outfit": "woman",
+  "body": "c_woman",
+  "w": {
+   "walk": 0.68,
+   "idle": 0.32,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "05-mulier_Beneventana-side.png",
+  "key": "Romanamulier Beneventana",
+  "name": "Romana",
+  "title": "mulier Beneventana",
+  "outfit": "woman",
+  "body": "c_woman",
+  "w": {
+   "walk": 0.38,
+   "idle": 0.62,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 6,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "06-presbyter-front.png",
+  "key": "Presbyter Barbatuspresbyter",
+  "name": "Presbyter Barbatus",
+  "title": "presbyter",
+  "outfit": "robe",
+  "body": "c_friar",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 6,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "06-presbyter-side.png",
+  "key": "Presbyter Barbatuspresbyter",
+  "name": "Presbyter Barbatus",
+  "title": "presbyter",
+  "outfit": "robe",
+  "body": "c_friar",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 7,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "07-aldius-front.png",
+  "key": "Teuderadaldius",
+  "name": "Teuderad",
+  "title": "aldius",
+  "outfit": "peasantCloak",
+  "body": "c_man",
+  "w": {
+   "walk": 0.27,
+   "idle": 0.73,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 7,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "07-aldius-side.png",
+  "key": "Teuderadaldius",
+  "name": "Teuderad",
+  "title": "aldius",
+  "outfit": "peasantCloak",
+  "body": "c_man",
+  "w": {
+   "walk": 0.48,
+   "idle": 0.52,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 8,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "08-peregrinus-front.png",
+  "key": "Ermenfridperegrinus",
+  "name": "Ermenfrid",
+  "title": "peregrinus",
+  "outfit": "robeCloak",
+  "body": "c_eastern",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 1
+  }
+ },
+ {
+  "k": 8,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "08-peregrinus-side.png",
+  "key": "Ermenfridperegrinus",
+  "name": "Ermenfrid",
+  "title": "peregrinus",
+  "outfit": "robeCloak",
+  "body": "c_eastern",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 1
+  }
+ },
+ {
+  "k": 10,
+  "view": "front",
+  "place": "Porta Aurea",
+  "file": "10-peregrinus-front.png",
+  "key": "Aldoperegrinus",
+  "name": "Aldo",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "c_villager",
+  "w": {
+   "walk": 0.41,
+   "idle": 0.14,
+   "talk": 0.44,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 10,
+  "view": "side",
+  "place": "Porta Aurea",
+  "file": "10-peregrinus-side.png",
+  "key": "Aldoperegrinus",
+  "name": "Aldo",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "c_villager",
+  "w": {
+   "walk": 0.02,
+   "idle": 0,
+   "talk": 0.98,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 11,
+  "view": "front",
+  "place": "Porta Aurea",
+  "file": "11-peregrinus-front.png",
+  "key": "Petrusperegrinus",
+  "name": "Petrus",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "c_villager",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 1,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 11,
+  "view": "side",
+  "place": "Porta Aurea",
+  "file": "11-peregrinus-side.png",
+  "key": "Petrusperegrinus",
+  "name": "Petrus",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "c_villager",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 1,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 12,
+  "view": "front",
+  "place": "Porta Aurea",
+  "file": "12-negotiator-front.png",
+  "key": "Stephanusnegotiator",
+  "name": "Stephanus",
+  "title": "negotiator",
+  "outfit": "robe",
+  "body": "c_eastern",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 12,
+  "view": "side",
+  "place": "Porta Aurea",
+  "file": "12-negotiator-side.png",
+  "key": "Stephanusnegotiator",
+  "name": "Stephanus",
+  "title": "negotiator",
+  "outfit": "robe",
+  "body": "c_eastern",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ }
+]
