@@ -280,3 +280,61 @@ already over ~130 draw calls on `main` before this work.
 - **sites.ts floors** now feed `layout.ts` §2 too (as RESERVED raster). The
   smaller polygons do not change the layout: the episcopium's `reserve`
   covers it, and S. Pietro lies outside the walls.
+
+## Round 2 (2 November 2026)
+
+Before is published `main` 0f7f90d; after is this round's work. The geometry
+audit covers the whole world and uses the same (updated) tool for both runs. The
+render audit was rerun only for the affected standing points (w00, w02 under the
+theatre cavea; g098, g126 town eaves; w11 by Porta Gloriosa). Files are in
+`docs/holes-audit/round2/`; each image in `pairs/` is round 1 on the left and
+round 2 on the right.
+
+**Causes and fixes**
+- **Holes at hipped-roof corners** (`town.ts polyRoof`). Each wall pushed its
+  own eave square out from itself. On every corner that is not a right angle
+  (most traced footprints), the two roof faces left a triangular hole between
+  them, boards and tiles included. From below, one saw the tiles' insides
+  through it. Fix: the eave corners are now mitred, i.e. the point where the
+  two eave lines cross, clamped to 3 × the overhang on sharp corners.
+- **Huts' sheds** (`plotbuild.ts`). The back wall now goes up to the roof's
+  boards, as in the lean-to houses. The front is open by design.
+- **Theatre.**
+  - Seat blocks now always have their back (they had one only where the row
+    behind was robbed).
+  - Ruined walls (`shapes.ts jaggedWall`, the theatre's upper walls on the
+    cavea) were open underneath and are seen from the passages below. They now
+    have a bed: one face underneath, wherever `ruin()` is used.
+- **Curtain wall (580 rays): not a visible defect.** Nearly all of it comes
+  from standing points such as (−294, −378), which lies 0.66 m from the axis
+  of the 2.5 m-thick curtain. The audit found the ground inside the wall and
+  stood there, but the curtain's box collider keeps players out. A new
+  level-ray rule (most level rays meeting a back face within 6 m means the
+  point is inside a solid) did not catch these points.
+- **Porta Gloriosa: not a travel point.** The gate's teleport is at
+  (−52.9, −325.3), 9 m out from the built gate (−56.9, −317.2). The view w11
+  (−81.9, −318.0) is a geometry-audit standing point inside the curtain, by
+  the plan position the gate was traced near. It is the same kind of
+  standing point as above; no travel point moved.
+
+**Geometry audit (whole world)**
+
+| | before (0f7f90d) | after |
+|---|---|---|
+| Rays meeting a back face | 2,609 (0.50 ‰) | 2,074 (0.40 ‰) |
+| Standing points seeing a back face | 1,528 | 1,273 |
+| Sources seen from behind | 60 | 53 |
+| Hipped-roof tiles / boards (`polyFaceTiles` / `split`) | 734 / 324 | 722 / 194 |
+| Theatre seats / theatre ruins | 191 / 168 | 0 / 0 |
+| Ground holes, LOD seams, sightlines through the ground | unchanged (20 + 291 mid, 0, 1,014) | unchanged |
+
+**Render audit, affected points (38 comparable frames):** magenta 302,510 →
+204,844 pixels. Of what is left, 200,000 pixels are w11's two frames from inside
+the curtain. Theatre frames w00/w02 go from 92,276 → 37 pixels. Town eaves:
+g098 −76 %, g126 −24 %.
+
+**Still left**
+- Tiles on hipped roofs (722 rays): small slivers at ridges and eaves seen from
+  the far side (the dots along the ridge line in `g126_y180_p22`).
+- Hanging cloths and pieces on balconies (`dress.ts hang`, 65 rays).
+- The curtain standing-point artefact above.
