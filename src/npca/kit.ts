@@ -105,8 +105,16 @@ export function outfitA(id: string, body: string): OutfitA {
   const groups: Record<'cloth' | 'skin', THREE.SkinnedMesh[]> = { cloth: [], skin: [] };
   const all: THREE.SkinnedMesh[] = [];
   t.traverse((x) => { if ((x as THREE.SkinnedMesh).isSkinnedMesh) all.push(x as THREE.SkinnedMesh); });
+  const long = def.parts.includes('robe');
   for (const m of all) {
     if (!def.parts.includes(m.userData.part)) { m.parent!.remove(m); continue; }
+    // Under an ankle-length skirt only the shoes' feet: the boot shafts would come through it in the stride.
+    if (long && m.userData.part === 'boots') {
+      const g = m.geometry.clone(), P = g.attributes.position, ix = g.index!, keep: number[] = [];
+      for (let i = 0; i < ix.count; i += 3) if ([0, 1, 2].every((k) => P.getY(ix.getX(i + k)) < 0.1)) keep.push(ix.getX(i), ix.getX(i + 1), ix.getX(i + 2));
+      g.setIndex(keep);
+      m.geometry = g;
+    }
     groups[(m.material as THREE.Material).name === 'cloth' ? 'cloth' : 'skin'].push(m);
   }
   for (const kind of ['cloth', 'skin'] as const) {

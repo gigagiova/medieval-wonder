@@ -177,6 +177,9 @@ def build(sex):
     return parts
 
 
+LEAD = 0.55  # how far the hem follows the legs (the rest hangs from the hips)
+
+
 def skirt(over, pos, J, sex, name, rings=12):
     """A tube from just inside and above the over-garment's hem down to the ankles.
 
@@ -218,7 +221,7 @@ def skirt(over, pos, J, sex, name, rings=12):
             sel = d <= d.min() + 1e-9
         r0[k] = rad[sel].max(); y0[k] = H[sel, 1].min()
     top = y0 + 0.05
-    ankle = pos['LeftFoot'][1] + (0.02 if sex == 'man' else 0.0)
+    ankle = 0.035  # to the ground: the feet are under it, only the toes show
     knee = pos['LeftLeg'][1]
     # Ellipse at the ankle round both feet and a stride's swing: half width, front, back.
     aw, af, ab = (0.25, 0.22, 0.2) if sex == 'man' else (0.24, 0.21, 0.2)
@@ -254,11 +257,12 @@ def skirt(over, pos, J, sex, name, rings=12):
     if (fn * Nn[Fs[:, 0]]).sum() < 0:
         Fs = Fs[:, [0, 2, 1]]
     # UVs: a plain patch of the over-garment's cloth, from just above its hem at each angle.
-    UV = np.zeros((len(V), 2))
-    for k in range(n):
-        tgt = np.array([hip[0] + (r0[k] - 0.005) * np.sin(th[k]), y0[k] + 0.08, hip[2] + (r0[k] - 0.005) * np.cos(th[k])])
-        i = np.argmin(((P - tgt) ** 2).sum(1))
-        UV[k::n] = over['UV'][i]
+    # (One plain spot for all of it, at the small of the back: sampling round the hem
+    # drew its seams, toggles and stitching down the skirt as dark streaks.)
+    kb = int(np.argmin(np.abs(np.abs(th) - np.pi)))
+    tgt = np.array([hip[0], y0[kb] + 0.12, hip[2] - (r0[kb] - 0.005)])
+    i = np.argmin(((P - tgt) ** 2).sum(1))
+    UV = np.tile(over['UV'][i], (len(V), 1))
     # Weights.
     nj = max(J.values()) + 1
     Wd = np.zeros((len(V), nj))
@@ -287,7 +291,7 @@ def skirt(over, pos, J, sex, name, rings=12):
                 wleg[th_i] += ws * (1 - kb)
                 wleg[ca_i] += ws * kb
             # how much the legs lead: from the hem's own skin at the top to all leg at the hem
-            g = min(1.0, t * 1.6)
+            g = min(LEAD, t * 1.4)
             w = wh * (1 - g) + wleg * g
             Wd[i] = w
     # top 4
