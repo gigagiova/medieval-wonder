@@ -1,0 +1,254 @@
+[
+ {
+  "k": 0,
+  "view": "front",
+  "place": "Templum",
+  "file": "00-peregrinus-front.png",
+  "key": "Petrusperegrinus",
+  "name": "Petrus",
+  "title": "peregrinus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0.01,
+   "idle": 0,
+   "talk": 0.99,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 0,
+  "view": "side",
+  "place": "Templum",
+  "file": "00-peregrinus-side.png",
+  "key": "Petrusperegrinus",
+  "name": "Petrus",
+  "title": "peregrinus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 1,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "front",
+  "place": "Templum",
+  "file": "01-peregrinus-front.png",
+  "key": "Aldoperegrinus",
+  "name": "Aldo",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 1,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "side",
+  "place": "Templum",
+  "file": "01-peregrinus-side.png",
+  "key": "Aldoperegrinus",
+  "name": "Aldo",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 1,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "front",
+  "place": "Templum",
+  "file": "02-arimannus-front.png",
+  "key": "Arechisarimannus",
+  "name": "Arechis",
+  "title": "arimannus",
+  "outfit": "soldier",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "side",
+  "place": "Templum",
+  "file": "02-arimannus-side.png",
+  "key": "Arechisarimannus",
+  "name": "Arechis",
+  "title": "arimannus",
+  "outfit": "soldier",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 3,
+  "view": "front",
+  "place": "Templum",
+  "file": "03-arimannus-front.png",
+  "key": "Ansprandarimannus",
+  "name": "Ansprand",
+  "title": "arimannus",
+  "outfit": "soldier",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 3,
+  "view": "side",
+  "place": "Templum",
+  "file": "03-arimannus-side.png",
+  "key": "Ansprandarimannus",
+  "name": "Ansprand",
+  "title": "arimannus",
+  "outfit": "soldier",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "front",
+  "place": "Templum",
+  "file": "04-negotiator-front.png",
+  "key": "Stephanusnegotiator",
+  "name": "Stephanus",
+  "title": "negotiator",
+  "outfit": "robe",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "side",
+  "place": "Templum",
+  "file": "04-negotiator-side.png",
+  "key": "Stephanusnegotiator",
+  "name": "Stephanus",
+  "title": "negotiator",
+  "outfit": "robe",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "front",
+  "place": "Templum",
+  "file": "05-puer-front.png",
+  "key": "Grimoaldpuer",
+  "name": "Grimoald",
+  "title": "puer",
+  "outfit": "soldier",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "side",
+  "place": "Templum",
+  "file": "05-puer-side.png",
+  "key": "Grimoaldpuer",
+  "name": "Grimoald",
+  "title": "puer",
+  "outfit": "soldier",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 6,
+  "view": "front",
+  "place": "Templum",
+  "file": "06-faber_ferrarius-front.png",
+  "key": "Tatofaber ferrarius",
+  "name": "Tato",
+  "title": "faber ferrarius",
+  "outfit": "soldier",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 0.83,
+   "talk": 0.17,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 6,
+  "view": "side",
+  "place": "Templum",
+  "file": "06-faber_ferrarius-side.png",
+  "key": "Tatofaber ferrarius",
+  "name": "Tato",
+  "title": "faber ferrarius",
+  "outfit": "soldier",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 0.98,
+   "talk": 0.02,
+   "bless": 0,
+   "kneel": 0
+  }
+ }
+]

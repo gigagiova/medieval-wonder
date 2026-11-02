@@ -1,5 +1,10 @@
 # Townsfolk wardrobe: evidence (29 October 2026)
 
+**Superseded in part (2 November 2026):** after the owner's review of the live
+game, the cloaks, the arm IK and the oversized push capsules were removed. The
+in-game main-versus-fix evidence for that is in [game/README.md](game/README.md).
+The test-rig sheets and crossing counts below predate it.
+
 "Main" is the published build (`df5b806`, the bodies as baked by `tools/npc2`).
 "Now" is this branch. Both were measured with the same tools, the same audit
 code (`src/npc2/audit.ts` copied into the main tree for the run) and the same

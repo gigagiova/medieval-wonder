@@ -121,6 +121,9 @@ than patched:
 - **Hose above the knee under a knee tunic** (never seen, but it showed
   through the skirt in the stride) is dropped.
 
+Evidence (15 people in the built game, main against the fix):
+[evidence/game/README.md](evidence/game/README.md).
+
 **The Lombard multi-part belt** (src/npc/props.ts makeBeltFittings): four
 narrow leather side straps from small mounts at the front and the left, each
 ending in a slim bronze strap end tapering to a rounded tip, a larger main

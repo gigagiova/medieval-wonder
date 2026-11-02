@@ -1,0 +1,218 @@
+[
+ {
+  "k": 0,
+  "view": "front",
+  "place": "Forum",
+  "file": "00-Iudaeus-front.png",
+  "key": "HananelIudaeus",
+  "name": "Hananel",
+  "title": "Iudaeus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 0.45,
+   "talk": 0.55,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 0,
+  "view": "side",
+  "place": "Forum",
+  "file": "00-Iudaeus-side.png",
+  "key": "HananelIudaeus",
+  "name": "Hananel",
+  "title": "Iudaeus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 0.93,
+   "talk": 0.07,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "front",
+  "place": "Forum",
+  "file": "01-negotiator-front.png",
+  "key": "Maurusnegotiator",
+  "name": "Maurus",
+  "title": "negotiator",
+  "outfit": "robe",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "side",
+  "place": "Forum",
+  "file": "01-negotiator-side.png",
+  "key": "Maurusnegotiator",
+  "name": "Maurus",
+  "title": "negotiator",
+  "outfit": "robe",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "front",
+  "place": "Forum",
+  "file": "02-medicus-front.png",
+  "key": "Martinusmedicus",
+  "name": "Martinus",
+  "title": "medicus",
+  "outfit": "robe",
+  "body": "m_old",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "side",
+  "place": "Forum",
+  "file": "02-medicus-side.png",
+  "key": "Martinusmedicus",
+  "name": "Martinus",
+  "title": "medicus",
+  "outfit": "robe",
+  "body": "m_old",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 3,
+  "view": "front",
+  "place": "Forum",
+  "file": "03-Vulgar_de_Sepino-front.png",
+  "key": "KuberVulgar de Sepino",
+  "name": "Kuber",
+  "title": "Vulgar de Sepino",
+  "outfit": "soldier",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 3,
+  "view": "side",
+  "place": "Forum",
+  "file": "03-Vulgar_de_Sepino-side.png",
+  "key": "KuberVulgar de Sepino",
+  "name": "Kuber",
+  "title": "Vulgar de Sepino",
+  "outfit": "soldier",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "front",
+  "place": "Porta Aurea",
+  "file": "04-arimannus-front.png",
+  "key": "Ansprandarimannus",
+  "name": "Ansprand",
+  "title": "arimannus",
+  "outfit": "soldier",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "side",
+  "place": "Porta Aurea",
+  "file": "04-arimannus-side.png",
+  "key": "Ansprandarimannus",
+  "name": "Ansprand",
+  "title": "arimannus",
+  "outfit": "soldier",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "front",
+  "place": "Porta Aurea",
+  "file": "05-arimannus-front.png",
+  "key": "Arechisarimannus",
+  "name": "Arechis",
+  "title": "arimannus",
+  "outfit": "soldier",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "side",
+  "place": "Porta Aurea",
+  "file": "05-arimannus-side.png",
+  "key": "Arechisarimannus",
+  "name": "Arechis",
+  "title": "arimannus",
+  "outfit": "soldier",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ }
+]

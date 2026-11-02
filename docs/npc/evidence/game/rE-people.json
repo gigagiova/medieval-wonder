@@ -1,0 +1,146 @@
+[
+ {
+  "k": 0,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "00-presbyter-front.png",
+  "key": "Presbyter Iohannespresbyter",
+  "name": "Presbyter Iohannes",
+  "title": "presbyter",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 0.7,
+   "talk": 0.3,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 0,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "00-presbyter-side.png",
+  "key": "Presbyter Iohannespresbyter",
+  "name": "Presbyter Iohannes",
+  "title": "presbyter",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 0.97,
+   "talk": 0.03,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "01-mendicus-front.png",
+  "key": "Bonusmendicus",
+  "name": "Bonus",
+  "title": "mendicus",
+  "outfit": "peasantHood",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "01-mendicus-side.png",
+  "key": "Bonusmendicus",
+  "name": "Bonus",
+  "title": "mendicus",
+  "outfit": "peasantHood",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "02-diaconus-front.png",
+  "key": "Diaconus Constantiusdiaconus",
+  "name": "Diaconus Constantius",
+  "title": "diaconus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "02-diaconus-side.png",
+  "key": "Diaconus Constantiusdiaconus",
+  "name": "Diaconus Constantius",
+  "title": "diaconus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 3,
+  "view": "front",
+  "place": "Curtis Ducis",
+  "file": "03-arimannus-front.png",
+  "key": "Walpertarimannus",
+  "name": "Walpert",
+  "title": "arimannus",
+  "outfit": "soldier",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 3,
+  "view": "side",
+  "place": "Curtis Ducis",
+  "file": "03-arimannus-side.png",
+  "key": "Walpertarimannus",
+  "name": "Walpert",
+  "title": "arimannus",
+  "outfit": "soldier",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ }
+]
