@@ -100,7 +100,8 @@ export function tiledGable(b: Builder, acc: Acc, w: number, d: number, hr: numbe
       const nC = Math.max(1, Math.round(Math.hypot(len, len * tanA) / cS));
       for (let k = 0; k < nC; k++) {
         if (chance(0.025)) continue;
-        const z0 = s * (len * k) / nC - s * 0.03, z1 = s * (len * (k + 1)) / nC;
+        // (The eave course stops 6 cm short of the eave: past the boards its open underside showed.)
+        const z0 = s * (len * k) / nC - s * 0.03, z1 = s * Math.min((len * (k + 1)) / nC, run - 0.06);
         const lift = 0.025;
         const p0 = P(lx, top(lx, z0) + lift, z0), p1 = P(lx, top(lx, z1) + 0.005, z1);
         up.set(0, 1, 0).addScaledVector(Z, s * tanA).normalize();
@@ -171,7 +172,7 @@ export function tiledLeanTo(acc: Acc, len: number, run: number, hHigh: number, h
   for (let lx = -len / 2 + 0.15; lx < len / 2 - 0.1; lx += pitch + R(-0.02, 0.02)) {
     for (let k = 0; k < nC; k++) {
       // (The top course starts on the boards, not past them: seen from below its end showed.)
-      const a = z0 + (run * k) / nC + (k ? -0.03 : 0.02), c = z0 + (run * (k + 1)) / nC + R(-0.03, 0.03) * (k === nC - 1 ? 1 : 0);
+      const a = z0 + (run * k) / nC + (k ? -0.03 : 0.02), c = Math.min(z1 - 0.06, z0 + (run * (k + 1)) / nC + R(-0.03, 0.03) * (k === nC - 1 ? 1 : 0));
       coppo(acc, 'roof', P(lx, yAt(a) + 0.03, a), P(lx, yAt(c) + 0.005, c), up, X, 0.085, 0.07, 3, ((k === 0 ? 1 : 0) | (k === nC - 1 ? 2 : 0)) as 0 | 1 | 2 | 3);
     }
   }
