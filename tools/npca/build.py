@@ -133,7 +133,17 @@ def build(sex):
     for f, node, pid, layer in PARTS[sex]:
         s = files.setdefault(f, Src(os.path.join(OUTF, f + '.gltf')))
         ni = s.node_index(node)
-        for m in s.prims(ni):
+        prims = s.prims(ni)
+        # How far out the sleeves reach (T-pose, arms along x): the arm's skin inside them is never
+        # seen, and in the stride and the talk it came through the shoulders as bare patches.
+        cl = [m for m in prims if m['material'] in CLOTH_Q]
+        cuff = {sgn: max([(m['P'][:, 0] * sgn).max() for m in cl] + [0]) for sgn in (1, -1)}
+        for m in prims:
+            if m['material'] not in CLOTH_Q and cl:
+                X = m['P'][:, 0]
+                inside = np.where(X > 0, X < cuff[1] - 0.03, -X < cuff[-1] - 0.03)
+                keep = ~inside[m['F']].all(1)
+                m['F'] = m['F'][keep]
             if m['material'] in CLOTH_Q:
                 parts.append(dict(name=pid, P=m['P'], N=m['N'], UV=atlas_uv(m['UV'], CLOTH_Q[m['material']]), J=remap(m), W=m['W'], F=m['F'], kind='cloth', layer=layer))
             else:  # the hands' (and wrists') skin, from the regular body's map
@@ -147,7 +157,13 @@ def build(sex):
             if m['material'].startswith('MI_Superhero'):
                 # Above the collar line, within the neck's width (no shoulders).
                 neckY = pos['Neck'][1] - (0.06 if sex == 'man' else 0.05)
-                ok = (P[:, 1] > neckY) & (np.abs(P[:, 0]) < 0.12)
+                # (Not the trapezius: round the back of the collar it came through the tunic.)
+                nk = pos['Neck']
+                ok = (P[:, 1] > neckY) & (np.abs(P[:, 0]) < 0.12) & ((P[:, 1] > nk[1] + 0.03) | (np.hypot(P[:, 0] - nk[0], P[:, 2] - nk[2]) < 0.075))
+                # The scalp a little in, under the hair cards (made for the regular head): it showed through them.
+                hc = pos['Head'] + np.array([0, 0.09, 0.01])
+                up = np.clip((P[:, 1] - (pos['Head'][1] + 0.13)) / 0.04, 0, 1)[:, None]
+                P = hc + (P - hc) * (1 - 0.025 * up)
                 keep = ok[m['F']].all(1)
                 F = m['F'][keep]
                 used = np.unique(F)

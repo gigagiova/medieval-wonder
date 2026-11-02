@@ -31,8 +31,10 @@ const OUTFITS: Record<string, { sex: Sex; parts: string[] }> = {
   peasantHood: { sex: 'man', parts: ['tunic', 'arms', 'arms_skin', 'legs', 'boots', 'hood', 'beard', ...FACE] },
   peasantCloak: { sex: 'man', parts: ['tunic', 'arms', 'arms_skin', 'legs', 'boots', 'hair', 'beard', ...FACE] },
   // Armed men: a leather jerkin and belt over the tunic.
-  soldier: { sex: 'man', parts: ['jerkin', 'jarms', 'jarms_skin', 'belt1', 'legs', 'boots', 'hair', 'beard', ...FACE] },
-  soldierCloak: { sex: 'man', parts: ['jerkin', 'jarms', 'jarms_skin', 'belt1', 'legs', 'boots', 'hair', 'beard', ...FACE] },
+  // (Cropped hair: they wear helmets and caps, and long hair cards came out under them as spikes.
+  // Lombard men shaved the back of the head: Paul the Deacon, HL IV.22.)
+  soldier: { sex: 'man', parts: ['jerkin', 'jarms', 'jarms_skin', 'belt1', 'legs', 'boots', 'buzz', 'beard', ...FACE] },
+  soldierCloak: { sex: 'man', parts: ['jerkin', 'jarms', 'jarms_skin', 'belt1', 'legs', 'boots', 'buzz', 'beard', ...FACE] },
   // Clergy and better-off townsmen: the tunic over an ankle-length robe.
   robe: { sex: 'man', parts: ['tunic', 'arms', 'arms_skin', 'robe', 'boots', 'hair', 'beard', ...FACE] },
   robeCloak: { sex: 'man', parts: ['tunic', 'arms', 'arms_skin', 'robe', 'boots', 'hair', 'beard', ...FACE] },
@@ -185,7 +187,7 @@ export function dressA(body: THREE.Object3D, outfit: OutfitA, d: DyesA) {
     if (m.userData.npcA === 'cloth') {
       const tex = (clothTex[outfit.sex] ??= src.map);
       if (tex) tex.colorSpace = THREE.SRGBColorSpace;
-      const mat = fabric(d.kind, 0xffffff, { attr: 'rest', vertexColors: true, side: THREE.FrontSide });
+      const mat = fabric(d.kind, 0xffffff, { attr: 'rest', vertexColors: true });
       mat.map = tex;
       m.material = mat;
     } else {
