@@ -230,7 +230,34 @@ const summonTownsfolk = () => setTimeout(async () => {
     // Lanes in the town and roads outside it; who is about is decided near the player as they go.
     const md = getMapData();
     const phoneLike = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 500;
-    spawnTownsfolk(scene, { streets: md.streets, ground: (x, z) => terrain(x, z) + field(x, 0, z, 'ground', gv).y, lamps, places: md.landmarks, director: populationDirector(scene, md), showDist: phoneLike ? 45 : 60 });
+    // Where a person may stand, from the same collision mesh the player walks
+    // against: nothing solid (a well's rim, a basin, a bench, a brazier, a
+    // wall) rises 30 cm to 1.6 m above the ground within 60 cm of the feet,
+    // and the ground under them is not a hole (a well's shaft).
+    const ground = (x: number, z: number) => terrain(x, z) + field(x, 0, z, 'ground', gv).y;
+    const ray = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+    const top = (x: number, z: number, g: number) => { ray.origin.set(x, g + 1.9, z); const h = bvh.raycastFirst(ray, THREE.DoubleSide, 0, 2.6); return h ? h.point.y : null; };
+    const standable = (x: number, z: number) => {
+      const g = ground(x, z), c = top(x, z, g);
+      if (c !== null && (c > g + 0.3 || c < g - 0.3)) return false;
+      // Two rings: at the feet (30 cm) and a stride out (60 cm), so a person
+      // cannot stand in the middle of a well wider than the inner ring.
+      for (const [n, r] of [[6, 0.3], [10, 0.6]]) for (let k = 0; k < n; k++) {
+        const a = (k / n) * Math.PI * 2, y = top(x + Math.cos(a) * r, z + Math.sin(a) * r, g);
+        if (y !== null && y > g + 0.3 && y < g + 1.6) return false;
+      }
+      // Enclosed by something low all round (the rim of a well or a basin seen
+      // from inside it): low solids on more than half of a 90 cm ring.
+      let low = 0;
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2, y = top(x + Math.cos(a) * 0.9, z + Math.sin(a) * 0.9, g);
+        if (y !== null && y > g + 0.3 && y < g + 1.3) low++;
+      }
+      if (low > 6) return false;
+      return true;
+    };
+    Object.assign(window, { __standable: standable });
+    spawnTownsfolk(scene, { streets: md.streets, ground, standable, lamps, places: md.landmarks, director: populationDirector(scene, md), showDist: phoneLike ? 45 : 60 });
     say(`The townsfolk are about (${((performance.now() - t0) / 1000).toFixed(0)} s)`);
     Object.assign(window, { __pop: popDebug, __npcDebug: npcDebug, __player: player });
   } catch (e) {

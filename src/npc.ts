@@ -1270,6 +1270,8 @@ function pointAt(st: Street, s: number) {
 export interface TownOpts {
   streets: { pts: THREE.Vector2[]; w: number; main?: boolean }[];
   ground: (x: number, z: number) => number;
+  /** Whether a person may stand here (nothing solid at the feet: a well's rim, a bench, a brazier). Default: anywhere. */
+  standable?: (x: number, z: number) => boolean;
   lamps: Lamp[];
   /** Named places (getMapData().landmarks): Porta, Atrium, Palatium… */
   places?: { name: string; x: number; z: number }[];
@@ -1327,6 +1329,15 @@ export function pushOutOfTownsfolk(p: THREE.Vector3, radius = 0.32) {
     const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz), r = radius + 0.28;
     if (d < r && d > 1e-4) { p.x = q.x + (dx / d) * r; p.z = q.z + (dz / d) * r; }
   }
+}
+
+/** standable(), cached on a 25 cm grid (the collision mesh does not move). */
+const _ob = new THREE.Vector3(), okCache = new Map<number, boolean>();
+function okAt(ok: (x: number, z: number) => boolean, x: number, z: number) {
+  const ix = Math.round(x * 4), iz = Math.round(z * 4), k = ix * 100003 + iz;
+  let v = okCache.get(k);
+  if (v === undefined) { v = ok(ix / 4, iz / 4); if (okCache.size > 200000) okCache.clear(); okCache.set(k, v); }
+  return v;
 }
 
 class Town {
@@ -1512,6 +1523,14 @@ class Town {
       p.yaw = Math.atan2(c.tx * a.dir, c.tz * a.dir);
     } else {
       a.mode = a.resume = 'post';
+      // Never inside a prop: the nearest spot within 3 m where one may stand.
+      const ok = this.o.standable;
+      if (ok && !ok(sp.at!.x, sp.at!.z)) {
+        search: for (let r = 0.25; r <= 3; r += 0.25) for (let k = 0; k < 12; k++) {
+          const t = (k / 12) * Math.PI * 2, x = sp.at!.x + Math.cos(t) * r, z = sp.at!.z + Math.sin(t) * r;
+          if (ok(x, z)) { sp.at!.set(x, sp.at!.y, z); break search; }
+        }
+      }
       a.home.copy(sp.at!);
       a.homeYaw = sp.yaw ?? 0;
       p.pos.copy(sp.at!);
@@ -1599,12 +1618,20 @@ class Town {
     };
     for (const b of this.agents) if (b !== a && b.p.dist < 30) consider(b.p.pos, 2.2, 1.2);
     consider(player, 2.6, 2);
+    // A prop ahead (a well, a bench) is walked round like a person standing there.
+    const ok = this.o.standable;
+    if (ok) for (const ahead of [0.8, 1.5]) {
+      const qx = p.pos.x + gx * ahead, qz = p.pos.z + gz * ahead;
+      if (!okAt(ok, qx, qz)) consider(_ob.set(qx, 0, qz), 2.2, 1.6);
+    }
     let vx = gx + sx, vz = gz + sz;
     const vl = Math.hypot(vx, vz) || 1;
     vx = (vx / vl) * want; vz = (vz / vl) * want;
     a.vel.x += (vx - a.vel.x) * Math.min(1, dt * 3);
     a.vel.y += (vz - a.vel.y) * Math.min(1, dt * 3);
+    const px = p.pos.x, pz = p.pos.z;
     p.pos.x += a.vel.x * dt; p.pos.z += a.vel.y * dt;
+    if (ok && !okAt(ok, p.pos.x, p.pos.z) && okAt(ok, px, pz)) { p.pos.x = px; p.pos.z = pz; a.vel.multiplyScalar(0.5); a.off = -a.off || 0.6; }
     a.s = THREE.MathUtils.clamp(a.s + (a.vel.x * tx + a.vel.y * tz) * dt, 0, cur.L);
     // Stay inside the street.
     const m = pointAt(cur, a.s);
