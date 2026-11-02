@@ -388,7 +388,9 @@ def skirt(low, L, H, spec):
     ix = {n: i for i, n in enumerate(names)}
     dl, _ = seg_dist(P, L['LeftUpLeg'], L['LeftLeg']); dl2, _ = seg_dist(P, L['LeftLeg'], L['LeftFoot'])
     dr, _ = seg_dist(P, L['RightUpLeg'], L['RightLeg']); dr2, _ = seg_dist(P, L['RightLeg'], L['RightFoot'])
-    d = np.minimum.reduce([dl, dl2, dr, dr2])
+    # (The feet too: a toe is 15 cm from the ankle, and must stay on its foot.)
+    feet = [seg_dist(P, L[S + a_], L[S + b_])[0] for S in ('Left', 'Right') for a_, b_ in (('Foot', 'ToeBase'), ('ToeBase', 'Toe_End'))]
+    d = np.minimum.reduce([dl, dl2, dr, dr2, *feet])
     z = P[:, 2]
     hipz, kneez, ankz = L['LeftUpLeg'].z, L['LeftLeg'].z, L['LeftFoot'].z
     R = np.interp(z, [ankz, kneez, hipz], [0.06 * k, 0.075 * k, 0.11 * k])
