@@ -57,7 +57,7 @@ for (const [pi, place] of places.entries()) {
     const d = window.__npcDebug, pl = window.__player;
     // Walking people first (the captures had too few), then talking, then the nearest.
     const busy = (p) => ((p.w?.walk ?? 0) > 0.4 ? 2 : 0) + ((p.w?.talk ?? 0) > 0.5 ? 1 : 0);
-    return d.people.filter((p) => p.group.visible && p.pos.distanceTo(pl.pos) < 70 && !taken.includes(p.name + p.title))
+    return d.people.filter((p) => p.pos.distanceTo(pl.pos) < 110 && !taken.includes(p.name + p.title))
       .sort((a, b) => busy(b) - busy(a) || a.pos.distanceTo(pl.pos) - b.pos.distanceTo(pl.pos)).slice(0, n)
       .map((p) => d.people.indexOf(p));
   }, { n: Math.ceil(+count / places.length), taken: meta.map((m) => m.key) });
@@ -76,7 +76,8 @@ for (const [pi, place] of places.entries()) {
         pl.pitch = Math.atan2(p.pos.y + 0.95 * (p.scale ?? 1) - pl.pos.y, Math.hypot(dx, dz));
         return { key: p.name + p.title, name: p.name, title: p.title, outfit: p.outfit?.id, body: p.outfit?.body, w: Object.fromEntries(Object.entries(p.w ?? {}).map(([a, v]) => [a, +(+v).toFixed(2)])) };
       }, { idx, view });
-      await frames(3);
+      // (Walkers come from out of sight: a few frames for them to be drawn.)
+    await frames(4);
       const name = `${String(k).padStart(2, '0')}-${(info.title ?? 'x').replace(/\W+/g, '_')}-${view}.png`;
       await page.screenshot({ path: `${out}/${name}`, timeout: 600000 });
       meta.push({ k, view, place, file: name, ...info });
