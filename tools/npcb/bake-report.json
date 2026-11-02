@@ -203,7 +203,7 @@
     "total": 11027
    }
   },
-  "seconds": 121.1
+  "seconds": 117.8
  },
  "m_mid": {
   "body": "m_mid",
@@ -409,7 +409,7 @@
     "total": 10600
    }
   },
-  "seconds": 113.1
+  "seconds": 116.3
  },
  "m_old": {
   "body": "m_old",
@@ -615,7 +615,71 @@
     "total": 10666
    }
   },
-  "seconds": 114.4
+  "seconds": 114.1
+ },
+ "w_young": {
+  "body": "w_young",
+  "outfits": {
+   "girdle+gown+shoes+veil": {
+    "tris": {
+     "skin": [
+      1414,
+      6046
+     ],
+     "head": 2952,
+     "gown": [
+      4764,
+      4882
+     ],
+     "girdle": [
+      512,
+      596
+     ],
+     "veil": [
+      2750,
+      2750
+     ],
+     "shoes": [
+      961,
+      1483
+     ]
+    },
+    "total": 13353
+   }
+  },
+  "seconds": 9.7
+ },
+ "w_mid": {
+  "body": "w_mid",
+  "outfits": {
+   "girdle+gown+shoes+veil": {
+    "tris": {
+     "skin": [
+      1463,
+      5980
+     ],
+     "head": 3018,
+     "gown": [
+      4740,
+      4894
+     ],
+     "girdle": [
+      514,
+      596
+     ],
+     "veil": [
+      2758,
+      2764
+     ],
+     "shoes": [
+      898,
+      1518
+     ]
+    },
+    "total": 13391
+   }
+  },
+  "seconds": 9.8
  },
  "m_elder": {
   "body": "m_elder",
@@ -821,70 +885,6 @@
     "total": 10590
    }
   },
-  "seconds": 121.0
- },
- "w_young": {
-  "body": "w_young",
-  "outfits": {
-   "girdle+gown+shoes+veil": {
-    "tris": {
-     "skin": [
-      1414,
-      6046
-     ],
-     "head": 2952,
-     "gown": [
-      4764,
-      4882
-     ],
-     "girdle": [
-      512,
-      596
-     ],
-     "veil": [
-      2750,
-      2750
-     ],
-     "shoes": [
-      961,
-      1483
-     ]
-    },
-    "total": 13353
-   }
-  },
-  "seconds": 10.3
- },
- "w_mid": {
-  "body": "w_mid",
-  "outfits": {
-   "girdle+gown+shoes+veil": {
-    "tris": {
-     "skin": [
-      1463,
-      5980
-     ],
-     "head": 3018,
-     "gown": [
-      4740,
-      4894
-     ],
-     "girdle": [
-      514,
-      596
-     ],
-     "veil": [
-      2758,
-      2764
-     ],
-     "shoes": [
-      898,
-      1518
-     ]
-    },
-    "total": 13391
-   }
-  },
-  "seconds": 9.5
+  "seconds": 119.7
  }
 }

@@ -349,10 +349,18 @@ class Piece:
         for c in np.unique(self.comp):
             vs = np.nonzero(self.comp == c)[0]
             srcP = [P for P, _ in inner]; srcW = [W for _, W in inner]
+            # Of the garment's own shells nearer the body, only the one this shell mostly lies
+            # on (a cape on the robe's body, not also on its sleeves): mixed, the cape's edge was
+            # torn between trunk and arm and its inside flipped into view.
+            best, bestn = None, 0
             for c2 in med:
                 if c2 != c and med[c2] < med[c] - 0.002:
                     o = np.nonzero(self.comp == c2)[0]
-                    srcP.append(U[o]); srcW.append(self.W[o])
+                    n_on = int((cKDTree(U[o]).query(U[vs])[0] < LAYER_NEAR).sum())
+                    if n_on > bestn:
+                        best, bestn = o, n_on
+            if best is not None:
+                srcP.append(U[best]); srcW.append(self.W[best])
             if not srcP:
                 continue
             P = np.concatenate(srcP); Ws = np.concatenate(srcW)
