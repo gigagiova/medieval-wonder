@@ -22,11 +22,11 @@
       3000
      ],
      "shoes": [
-      676,
+      399,
       1223
      ]
     },
-    "total": 14231
+    "total": 13954
    },
    "robe+rope+shoes": {
     "tris": {
@@ -44,21 +44,21 @@
       798
      ],
      "shoes": [
-      676,
+      399,
       1223
      ]
     },
-    "total": 11643
+    "total": 11366
    },
    "belt_tunic+boots+hood+hose+tunic": {
     "tris": {
      "skin": [
-      1189,
+      1179,
       6038
      ],
      "head": 2960,
      "tunic": [
-      5809,
+      5947,
       6911
      ],
      "belt_tunic": [
@@ -66,8 +66,8 @@
       426
      ],
      "hood": [
-      3594,
-      3594
+      2976,
+      3000
      ],
      "hose": [
       696,
@@ -78,17 +78,17 @@
       1300
      ]
     },
-    "total": 15948
+    "total": 15458
    },
    "boots+cord_tunic+hood+hose+tunic": {
     "tris": {
      "skin": [
-      1189,
+      1179,
       6038
      ],
      "head": 2960,
      "tunic": [
-      5809,
+      5947,
       6911
      ],
      "cord_tunic": [
@@ -96,8 +96,8 @@
       798
      ],
      "hood": [
-      3594,
-      3594
+      2976,
+      3000
      ],
      "hose": [
       696,
@@ -108,7 +108,7 @@
       1300
      ]
     },
-    "total": 16320
+    "total": 15830
    },
    "belt+boots+hose+shirt": {
     "tris": {
@@ -152,11 +152,11 @@
       426
      ],
      "shoes": [
-      676,
+      399,
       1223
      ]
     },
-    "total": 11217
+    "total": 10940
    },
    "cord_robe+longrobe+shoes": {
     "tris": {
@@ -174,11 +174,11 @@
       798
      ],
      "shoes": [
-      676,
+      399,
       1223
      ]
     },
-    "total": 11548
+    "total": 11271
    },
    "longrobe+sash_robe+shoes": {
     "tris": {
@@ -196,14 +196,14 @@
       596
      ],
      "shoes": [
-      676,
+      399,
       1223
      ]
     },
-    "total": 11304
+    "total": 11027
    }
   },
-  "seconds": 120.2
+  "seconds": 121.1
  },
  "m_mid": {
   "body": "m_mid",
@@ -228,11 +228,11 @@
       3000
      ],
      "shoes": [
-      656,
+      392,
       1502
      ]
     },
-    "total": 13860
+    "total": 13596
    },
    "robe+rope+shoes": {
     "tris": {
@@ -250,21 +250,21 @@
       798
      ],
      "shoes": [
-      656,
+      392,
       1502
      ]
     },
-    "total": 11093
+    "total": 10829
    },
    "belt_tunic+boots+hood+hose+tunic": {
     "tris": {
      "skin": [
-      1186,
+      1139,
       6092
      ],
      "head": 2904,
      "tunic": [
-      4934,
+      5137,
       5481
      ],
      "belt_tunic": [
@@ -272,8 +272,8 @@
       426
      ],
      "hood": [
-      3445,
-      3445
+      2966,
+      3000
      ],
      "hose": [
       663,
@@ -284,17 +284,17 @@
       1300
      ]
     },
-    "total": 14832
+    "total": 14509
    },
    "boots+cord_tunic+hood+hose+tunic": {
     "tris": {
      "skin": [
-      1186,
+      1139,
       6092
      ],
      "head": 2904,
      "tunic": [
-      4934,
+      5137,
       5481
      ],
      "cord_tunic": [
@@ -302,8 +302,8 @@
       798
      ],
      "hood": [
-      3445,
-      3445
+      2966,
+      3000
      ],
      "hose": [
       663,
@@ -314,7 +314,7 @@
       1300
      ]
     },
-    "total": 15214
+    "total": 14891
    },
    "belt+boots+hose+shirt": {
     "tris": {
@@ -358,11 +358,11 @@
       426
      ],
      "shoes": [
-      656,
+      392,
       1502
      ]
     },
-    "total": 10760
+    "total": 10496
    },
    "cord_robe+longrobe+shoes": {
     "tris": {
@@ -380,11 +380,11 @@
       798
      ],
      "shoes": [
-      656,
+      392,
       1502
      ]
     },
-    "total": 11138
+    "total": 10874
    },
    "longrobe+sash_robe+shoes": {
     "tris": {
@@ -402,14 +402,14 @@
       596
      ],
      "shoes": [
-      656,
+      392,
       1502
      ]
     },
-    "total": 10864
+    "total": 10600
    }
   },
-  "seconds": 115.3
+  "seconds": 113.1
  },
  "m_old": {
   "body": "m_old",
@@ -434,11 +434,11 @@
       3000
      ],
      "shoes": [
-      689,
+      407,
       1429
      ]
     },
-    "total": 14136
+    "total": 13854
    },
    "robe+rope+shoes": {
     "tris": {
@@ -456,21 +456,21 @@
       798
      ],
      "shoes": [
-      689,
+      407,
       1429
      ]
     },
-    "total": 11236
+    "total": 10954
    },
    "belt_tunic+boots+hood+hose+tunic": {
     "tris": {
      "skin": [
-      1199,
+      1192,
       6102
      ],
      "head": 2896,
      "tunic": [
-      4500,
+      4700,
       4876
      ],
      "belt_tunic": [
@@ -478,8 +478,8 @@
       426
      ],
      "hood": [
-      3518,
-      3518
+      2976,
+      3000
      ],
      "hose": [
       685,
@@ -490,17 +490,17 @@
       1300
      ]
     },
-    "total": 14498
+    "total": 14149
    },
    "boots+cord_tunic+hood+hose+tunic": {
     "tris": {
      "skin": [
-      1199,
+      1192,
       6102
      ],
      "head": 2896,
      "tunic": [
-      4500,
+      4700,
       4876
      ],
      "cord_tunic": [
@@ -508,8 +508,8 @@
       798
      ],
      "hood": [
-      3518,
-      3518
+      2976,
+      3000
      ],
      "hose": [
       685,
@@ -520,7 +520,7 @@
       1300
      ]
     },
-    "total": 14889
+    "total": 14540
    },
    "belt+boots+hose+shirt": {
     "tris": {
@@ -564,11 +564,11 @@
       426
      ],
      "shoes": [
-      689,
+      399,
       1429
      ]
     },
-    "total": 10839
+    "total": 10549
    },
    "cord_robe+longrobe+shoes": {
     "tris": {
@@ -586,11 +586,11 @@
       798
      ],
      "shoes": [
-      689,
+      399,
       1429
      ]
     },
-    "total": 11217
+    "total": 10927
    },
    "longrobe+sash_robe+shoes": {
     "tris": {
@@ -608,14 +608,14 @@
       596
      ],
      "shoes": [
-      689,
+      399,
       1429
      ]
     },
-    "total": 10956
+    "total": 10666
    }
   },
-  "seconds": 112.9
+  "seconds": 114.4
  },
  "m_elder": {
   "body": "m_elder",
@@ -640,11 +640,11 @@
       3000
      ],
      "shoes": [
-      724,
+      415,
       1724
      ]
     },
-    "total": 14115
+    "total": 13806
    },
    "robe+rope+shoes": {
     "tris": {
@@ -662,21 +662,21 @@
       798
      ],
      "shoes": [
-      724,
+      415,
       1724
      ]
     },
-    "total": 11207
+    "total": 10898
    },
    "belt_tunic+boots+hood+hose+tunic": {
     "tris": {
      "skin": [
-      1193,
+      1199,
       6102
      ],
      "head": 2896,
      "tunic": [
-      4399,
+      4533,
       4733
      ],
      "belt_tunic": [
@@ -684,8 +684,8 @@
       426
      ],
      "hood": [
-      3587,
-      3587
+      2978,
+      3000
      ],
      "hose": [
       686,
@@ -696,17 +696,17 @@
       1300
      ]
     },
-    "total": 14449
+    "total": 13980
    },
    "boots+cord_tunic+hood+hose+tunic": {
     "tris": {
      "skin": [
-      1193,
+      1199,
       6102
      ],
      "head": 2896,
      "tunic": [
-      4399,
+      4533,
       4733
      ],
      "cord_tunic": [
@@ -714,8 +714,8 @@
       686
      ],
      "hood": [
-      3587,
-      3587
+      2978,
+      3000
      ],
      "hose": [
       686,
@@ -726,7 +726,7 @@
       1300
      ]
     },
-    "total": 14721
+    "total": 14252
    },
    "belt+boots+hose+shirt": {
     "tris": {
@@ -770,11 +770,11 @@
       426
      ],
      "shoes": [
-      724,
+      415,
       1724
      ]
     },
-    "total": 10876
+    "total": 10567
    },
    "cord_robe+longrobe+shoes": {
     "tris": {
@@ -792,11 +792,11 @@
       686
      ],
      "shoes": [
-      724,
+      415,
       1724
      ]
     },
-    "total": 11167
+    "total": 10858
    },
    "longrobe+sash_robe+shoes": {
     "tris": {
@@ -814,14 +814,14 @@
       484
      ],
      "shoes": [
-      724,
+      415,
       1724
      ]
     },
-    "total": 10899
+    "total": 10590
    }
   },
-  "seconds": 116.9
+  "seconds": 121.0
  },
  "w_young": {
   "body": "w_young",
@@ -846,14 +846,14 @@
       2750
      ],
      "shoes": [
-      963,
+      961,
       1483
      ]
     },
-    "total": 13355
+    "total": 13353
    }
   },
-  "seconds": 9.5
+  "seconds": 10.3
  },
  "w_mid": {
   "body": "w_mid",
@@ -866,7 +866,7 @@
      ],
      "head": 3018,
      "gown": [
-      4736,
+      4740,
       4894
      ],
      "girdle": [
@@ -874,15 +874,15 @@
       596
      ],
      "veil": [
-      2760,
-      2760
+      2758,
+      2764
      ],
      "shoes": [
       898,
       1518
      ]
     },
-    "total": 13389
+    "total": 13391
    }
   },
   "seconds": 9.5
