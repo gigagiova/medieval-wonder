@@ -42,7 +42,8 @@ export interface OutfitV2 {
  * and thickened) with the body's skin weights over all of it. Drawn
  * single-sided, plainly skinned: no cloth bones, pushes or hide masks.
  */
-export const NPC_B = typeof location !== 'undefined' && new URLSearchParams(location.search).get('npc') === 'b';
+/** Baked single-surface outfits (track B): the default; `?npc=v2` for the layered garments, `?npc=c` / `?npc=v1` for the others. */
+export const NPC_B = typeof location !== 'undefined' && [null, 'b'].includes(new URLSearchParams(location.search).get('npc'));
 const DIR = NPC_B ? 'models/npcb/' : 'models/npc2/';
 const flatNormal = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1);
 flatNormal.needsUpdate = true;
