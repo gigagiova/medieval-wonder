@@ -20,8 +20,9 @@ mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 540, height: 720 } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
-// (?shot with &hold keeps the title overlay hidden and the frame loop running.)
-await page.goto(`${base}/index.html?at=${at}&shot=0,0,0,0,0&hold`, { timeout: 600000 });
+// (Not ?shot: in shot mode the frame loop stops 12 frames after any teleport. The
+// title overlay and controls are hidden by CSS below instead.)
+await page.goto(`${base}/index.html?at=${at.split(',')[0]}`, { timeout: 600000 });
 await page.waitForFunction(() => window.__ready && window.__npcDebug, null, { timeout: 900000 });
 // Only the 3D view (no title, map button, joystick).
 await page.addStyleTag({ content: '* { visibility: hidden !important } canvas { visibility: visible !important }' });
