@@ -1,0 +1,166 @@
+{
+ "before": {
+  "views": 258,
+  "insideSkipped": 14,
+  "magentaPx": 478161,
+  "greenBelowPx": 1878,
+  "viewsWithMagenta": 180,
+  "viewsWithGreen": 4,
+  "viewsOver100Magenta": 97
+ },
+ "after": {
+  "views": 258,
+  "insideSkipped": 14,
+  "magentaPx": 202561,
+  "greenBelowPx": 1880,
+  "viewsWithMagenta": 180,
+  "viewsWithGreen": 4,
+  "viewsOver100Magenta": 71
+ },
+ "worstBefore": [
+  {
+   "view": "w07|0|-0.3",
+   "file": "w07_y0_p-30.png",
+   "before": {
+    "magenta": 80440,
+    "green": 0
+   },
+   "after": {
+    "magenta": 80440,
+    "green": 0
+   }
+  },
+  {
+   "view": "w07|1.571|-0.3",
+   "file": "w07_y90_p-30.png",
+   "before": {
+    "magenta": 74480,
+    "green": 0
+   },
+   "after": {
+    "magenta": 74480,
+    "green": 0
+   }
+  },
+  {
+   "view": "w04|-1.571|0.22",
+   "file": "w04_y-90_p22.png",
+   "before": {
+    "magenta": 38362,
+    "green": 0
+   },
+   "after": {
+    "magenta": 2,
+    "green": 0
+   }
+  },
+  {
+   "view": "w00|3.142|0.22",
+   "file": "w00_y180_p22.png",
+   "before": {
+    "magenta": 29688,
+    "green": 0
+   },
+   "after": {
+    "magenta": 6,
+    "green": 0
+   }
+  },
+  {
+   "view": "w04|0|0.22",
+   "file": "w04_y0_p22.png",
+   "before": {
+    "magenta": 28145,
+    "green": 0
+   },
+   "after": {
+    "magenta": 5,
+    "green": 0
+   }
+  },
+  {
+   "view": "w01|1.571|0.22",
+   "file": "w01_y90_p22.png",
+   "before": {
+    "magenta": 21432,
+    "green": 0
+   },
+   "after": {
+    "magenta": 11,
+    "green": 0
+   }
+  },
+  {
+   "view": "w00|3.142|-0.3",
+   "file": "w00_y180_p-30.png",
+   "before": {
+    "magenta": 21413,
+    "green": 0
+   },
+   "after": {
+    "magenta": 7,
+    "green": 0
+   }
+  },
+  {
+   "view": "w01|1.571|-0.3",
+   "file": "w01_y90_p-30.png",
+   "before": {
+    "magenta": 20608,
+    "green": 0
+   },
+   "after": {
+    "magenta": 3,
+    "green": 0
+   }
+  },
+  {
+   "view": "w07|3.142|0.22",
+   "file": "w07_y180_p22.png",
+   "before": {
+    "magenta": 18969,
+    "green": 0
+   },
+   "after": {
+    "magenta": 18952,
+    "green": 0
+   }
+  },
+  {
+   "view": "w04|0|-0.3",
+   "file": "w04_y0_p-30.png",
+   "before": {
+    "magenta": 17702,
+    "green": 0
+   },
+   "after": {
+    "magenta": 2,
+    "green": 0
+   }
+  },
+  {
+   "view": "w02|1.571|0.22",
+   "file": "w02_y90_p22.png",
+   "before": {
+    "magenta": 17039,
+    "green": 0
+   },
+   "after": {
+    "magenta": 4,
+    "green": 0
+   }
+  },
+  {
+   "view": "w02|1.571|-0.3",
+   "file": "w02_y90_p-30.png",
+   "before": {
+    "magenta": 12419,
+    "green": 0
+   },
+   "after": {
+    "magenta": 5,
+    "green": 0
+   }
+  }
+ ]
+}

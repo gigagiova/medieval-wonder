@@ -338,3 +338,70 @@ g098 −76 %, g126 −24 %.
   the far side (the dots along the ridge line in `g126_y180_p22`).
 - Hanging cloths and pieces on balconies (`dress.ts hang`, 65 rays).
 - The curtain standing-point artefact above.
+
+## Round 3 (2 November 2026, merged with main a6b7e5a)
+
+**Fixes**
+- **Tiles on hipped roofs** (`town.ts polyFaceTiles`, `arch/roof.ts`).
+  - The eave course now starts 6 cm in from the eave (gables and lean-tos:
+    it stops 6 cm short). Its tube is tilted outward and used to hang past
+    the boards, open underneath.
+  - The tile ends at the start of each hip and at both ends of each ridge
+    row are capped.
+  - The row tiles of hipped roofs are closed underneath by a chord (`coppo(..., under)`).
+    Their rows run out over hips and mitred corners, and from below or from
+    across the roof their culled insides showed (the dots along ridge lines).
+    Cost: 2 triangles per tile on hipped roofs.
+- **Hung cloths** (`arch/dress.ts`, the sheets folded over a pole): both sides.
+- **Audit:** standing points inside the town wall's masonry are skipped: the
+  curtain's 2.5 m width plus 0.3 m, and the towers. The curtain's collider is
+  solid, and the ground runs on under it. The render summary takes `--skip`,
+  and w11, the camera inside the curtain, is left out of the render totals.
+
+**Geometry audit (whole world)**
+
+Round 2 and the final run were both measured with the round-3 tool. Round 1's
+figure comes from the older tool, which still counted standing points inside
+the wall, so it is not exactly comparable.
+
+| | round 1 | round 2 | final |
+|---|---|---|---|
+| Rays meeting a back face | 2,777 | 1,490 (0.29 ‰) | 1,160 (0.22 ‰) |
+| Standing points seeing a back face | 1,611 | 1,252 | 955 |
+| Hipped-roof tiles (`polyFaceTiles`) | 824 | 718 | 521 |
+| Hung cloths (`hang`, all) | 127 | 127 | 0 |
+| Sources seen from behind | 61 | 52 | 48 |
+
+With the round-3 tool, 600 standing points are skipped as inside the wall's
+masonry. Ground holes (20 full, 291 middle, 16 + 30 deliberate openings), LOD
+seams (0 uncovered) and sightlines through the ground (1,014) are unchanged.
+
+**Render audit (all 34 points, w11 left out)**
+
+| | original main | round 1 | final |
+|---|---|---|---|
+| Magenta pixels | 1,472,320 | 478,161 | 202,531 |
+| Green pixels below the horizon | 314,100 | 1,878 | 1,880 |
+| Frames with more than 100 magenta pixels | 104 | 97 | 71 |
+
+The original and round-1 columns come from two `summarize-render.mjs` runs
+(each against the final render), so the frames each one leaves out as "inside
+a solid" differ slightly. Files: `docs/holes-audit/round3/` (both reports, the
+final render, the summaries, `pairs/` round 1 | final).
+
+**Budget (`?debug`, 390×844, headless)**
+
+| View | round 1 | final |
+|---|---|---|
+| Curtis Ducis | 293,650 tris / 147 calls | 302,682 / 146 |
+| Episcopium | 259,695 / 88 | 261,422 / 88 |
+| Forum | 264,828 / 97 | 264,888 / 97 |
+
+All three views are under 350k triangles. Curtis Ducis's draw calls were
+already over ~130 on main before the holes work.
+
+**Left**
+- Hipped-roof tiles: 521 rays, slivers at some corners.
+- polyRoof boards: 194 rays.
+- The edges of balcony and pentice roofs (seen in `g126_y180_p22`).
+- The water seen from below at the bridges: 47 rays.

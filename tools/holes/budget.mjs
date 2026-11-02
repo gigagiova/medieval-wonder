@@ -18,8 +18,9 @@ const VIEWS = [
   '?debug&shot&at=Curtis%20Ducis', '?debug&shot&at=Episcopium', '?debug&shot&at=Forum', '?debug&shot&at=Porta%20Aurea',
   '?debug&shot&at=Theatrum', '?debug&shot=-60,-,-290,0,0.15', '?debug&shot=40,-,-200,1.5,0.15', '?debug&shot=200,-,-180,3,0.15',
 ];
+const ONLY = arg('--only', '');
 const rows = [];
-for (const q of VIEWS) {
+for (const q of VIEWS.filter((v) => !ONLY || ONLY.split(',').some((o) => v.includes(o)))) {
   const b = await chromium.launch({ headless: true, args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
     const p = await b.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
