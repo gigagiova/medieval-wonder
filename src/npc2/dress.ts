@@ -98,8 +98,13 @@ function inside(m: THREE.MeshStandardMaterial) {
   const prev = m.onBeforeCompile, key = m.customProgramCacheKey();
   m.onBeforeCompile = (sh, r) => {
     prev.call(m, sh, r);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
-      if (!gl_FrontFacing) outgoingLight *= 0.6;
+    // Only near an open edge (kit.ts rimOf): a back face elsewhere is the cloth
+    // folded over itself in motion, the same cloth, not its shadowed inside.
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float rim; varying float vRim;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRim = rim;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vRim;')
+      .replace('#include <opaque_fragment>', `
+      if (!gl_FrontFacing) outgoingLight *= mix(1.0, 0.6, smoothstep(0.0, 0.6, vRim));
       #include <opaque_fragment>`);
   };
   m.customProgramCacheKey = () => key + '-in';

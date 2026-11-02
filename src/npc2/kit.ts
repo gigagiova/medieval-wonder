@@ -238,6 +238,7 @@ export function outfitV2(id: string, body: string, belt?: BeltStyle): OutfitV2 {
       g.setAttribute('rest', g.attributes.position);
       g.setAttribute('restN', g.attributes.normal);
       g.setAttribute('color', grime(g, k.m));
+      g.setAttribute('rim', rimOf(g));
     }
     m.geometry = g;
   });
@@ -306,6 +307,46 @@ function beltOf(t: THREE.Object3D, M: Measure, meta: BodyMeta): Garment {
  * dust and mud splashed up the hem from the street, fading out by the knee,
  * and the grubby, worn edges of cuffs round the wrists.
  */
+/**
+ * How near each vertex is to an open edge of the cloth (hem, cuff, neckline):
+ * 1 on the edge, falling to 0 by RIM metres along the cloth from it. The
+ * inside of a garment is seen in shadow only through such an opening
+ * (dress.ts inside()); elsewhere a back face is the cloth folded over itself
+ * in motion, and darkening it drew dark specks on light robes.
+ * Open edges: triangle edges used once, with vertices welded by position.
+ */
+const RIM = 0.09;
+function rimOf(g: THREE.BufferGeometry) {
+  const P = g.attributes.position, n = P.count, ix = g.index!;
+  const key = (i: number) => `${Math.round(P.getX(i) * 2000)},${Math.round(P.getY(i) * 2000)},${Math.round(P.getZ(i) * 2000)}`;
+  const id = new Int32Array(n), ids = new Map<string, number>();
+  for (let i = 0; i < n; i++) { const k = key(i); let v = ids.get(k); if (v === undefined) { v = ids.size; ids.set(k, v); } id[i] = v; }
+  const edges = new Map<string, number>();
+  for (let t = 0; t < ix.count; t += 3) for (let e = 0; e < 3; e++) {
+    const a = id[ix.getX(t + e)], b = id[ix.getX(t + (e + 1) % 3)];
+    const k = a < b ? `${a}_${b}` : `${b}_${a}`;
+    edges.set(k, (edges.get(k) ?? 0) + 1);
+  }
+  const open: THREE.Vector3[] = [];
+  const seen = new Set<number>();
+  for (const [k, c] of edges) if (c === 1) for (const w of k.split('_').map(Number)) seen.add(w);
+  for (let i = 0; i < n; i++) if (seen.has(id[i])) { open.push(new THREE.Vector3().fromBufferAttribute(P, i)); seen.delete(id[i]); }
+  // Distance to the nearest open-edge point, through a coarse grid.
+  const C = RIM, grid = new Map<string, THREE.Vector3[]>();
+  const cell = (v: THREE.Vector3) => `${Math.floor(v.x / C)},${Math.floor(v.y / C)},${Math.floor(v.z / C)}`;
+  for (const v of open) { const k = cell(v); (grid.get(k) ?? grid.set(k, []).get(k)!).push(v); }
+  const out = new Float32Array(n), v = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    v.fromBufferAttribute(P, i);
+    const cx = Math.floor(v.x / C), cy = Math.floor(v.y / C), cz = Math.floor(v.z / C);
+    let d = C;
+    for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++)
+      for (const q of grid.get(`${cx + x},${cy + y},${cz + z}`) ?? []) d = Math.min(d, v.distanceTo(q));
+    out[i] = 1 - d / C;
+  }
+  return new THREE.BufferAttribute(out, 1);
+}
+
 function grime(g: THREE.BufferGeometry, M: Measure) {
   const p = g.attributes.position, c = new Float32Array(p.count * 3);
   const wr = [M.bone('LeftHand'), M.bone('RightHand')], v = new THREE.Vector3();
