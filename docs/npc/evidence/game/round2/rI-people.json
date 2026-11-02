@@ -1,0 +1,470 @@
+[
+ {
+  "k": 0,
+  "view": "front",
+  "place": "Porta Aurea",
+  "file": "00-puer-front.png",
+  "key": "Pauluspuer",
+  "name": "Paulus",
+  "title": "puer",
+  "outfit": "soldier",
+  "body": "m_old",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 0,
+  "view": "side",
+  "place": "Porta Aurea",
+  "file": "00-puer-side.png",
+  "key": "Pauluspuer",
+  "name": "Paulus",
+  "title": "puer",
+  "outfit": "soldier",
+  "body": "m_old",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "front",
+  "place": "Porta Aurea",
+  "file": "01-mulier_Beneventana-front.png",
+  "key": "Sergiamulier Beneventana",
+  "name": "Sergia",
+  "title": "mulier Beneventana",
+  "outfit": "woman",
+  "body": "w_young",
+  "w": {
+   "walk": 0.08,
+   "idle": 0.92,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "side",
+  "place": "Porta Aurea",
+  "file": "01-mulier_Beneventana-side.png",
+  "key": "Sergiamulier Beneventana",
+  "name": "Sergia",
+  "title": "mulier Beneventana",
+  "outfit": "woman",
+  "body": "w_young",
+  "w": {
+   "walk": 0.13,
+   "idle": 0.87,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "front",
+  "place": "Porta Aurea",
+  "file": "02-rustica-front.png",
+  "key": "Romanarustica",
+  "name": "Romana",
+  "title": "rustica",
+  "outfit": "womanShawl",
+  "body": "w_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "side",
+  "place": "Porta Aurea",
+  "file": "02-rustica-side.png",
+  "key": "Romanarustica",
+  "name": "Romana",
+  "title": "rustica",
+  "outfit": "womanShawl",
+  "body": "w_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "front",
+  "place": "Porta Aurea",
+  "file": "04-faber_ferrarius-front.png",
+  "key": "Tatofaber ferrarius",
+  "name": "Tato",
+  "title": "faber ferrarius",
+  "outfit": "soldier",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "side",
+  "place": "Porta Aurea",
+  "file": "04-faber_ferrarius-side.png",
+  "key": "Tatofaber ferrarius",
+  "name": "Tato",
+  "title": "faber ferrarius",
+  "outfit": "soldier",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "front",
+  "place": "Theatrum",
+  "file": "05-peregrinus-front.png",
+  "key": "Ermenfridperegrinus",
+  "name": "Ermenfrid",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "side",
+  "place": "Theatrum",
+  "file": "05-peregrinus-side.png",
+  "key": "Ermenfridperegrinus",
+  "name": "Ermenfrid",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 6,
+  "view": "front",
+  "place": "Theatrum",
+  "file": "06-mulier_Beneventana-front.png",
+  "key": "Constantiamulier Beneventana",
+  "name": "Constantia",
+  "title": "mulier Beneventana",
+  "outfit": "womanShawl",
+  "body": "w_mid",
+  "w": {
+   "walk": 0.41,
+   "idle": 0.59,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 6,
+  "view": "side",
+  "place": "Theatrum",
+  "file": "06-mulier_Beneventana-side.png",
+  "key": "Constantiamulier Beneventana",
+  "name": "Constantia",
+  "title": "mulier Beneventana",
+  "outfit": "womanShawl",
+  "body": "w_mid",
+  "w": {
+   "walk": 0.48,
+   "idle": 0.52,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 7,
+  "view": "front",
+  "place": "Theatrum",
+  "file": "07-anus-front.png",
+  "key": "Ranigundaanus",
+  "name": "Ranigunda",
+  "title": "anus",
+  "outfit": "womanShawl",
+  "body": "w_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 7,
+  "view": "side",
+  "place": "Theatrum",
+  "file": "07-anus-side.png",
+  "key": "Ranigundaanus",
+  "name": "Ranigunda",
+  "title": "anus",
+  "outfit": "womanShawl",
+  "body": "w_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 8,
+  "view": "front",
+  "place": "Theatrum",
+  "file": "08-puer-front.png",
+  "key": "Bonuspuer",
+  "name": "Bonus",
+  "title": "puer",
+  "outfit": "peasantHood",
+  "body": "m_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 8,
+  "view": "side",
+  "place": "Theatrum",
+  "file": "08-puer-side.png",
+  "key": "Bonuspuer",
+  "name": "Bonus",
+  "title": "puer",
+  "outfit": "peasantHood",
+  "body": "m_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 9,
+  "view": "front",
+  "place": "Theatrum",
+  "file": "09-rustica-front.png",
+  "key": "Annarustica",
+  "name": "Anna",
+  "title": "rustica",
+  "outfit": "woman",
+  "body": "w_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 9,
+  "view": "side",
+  "place": "Theatrum",
+  "file": "09-rustica-side.png",
+  "key": "Annarustica",
+  "name": "Anna",
+  "title": "rustica",
+  "outfit": "woman",
+  "body": "w_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 10,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "10-mulier_Beneventana-front.png",
+  "key": "Sabinamulier Beneventana",
+  "name": "Sabina",
+  "title": "mulier Beneventana",
+  "outfit": "woman",
+  "body": "w_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 10,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "10-mulier_Beneventana-side.png",
+  "key": "Sabinamulier Beneventana",
+  "name": "Sabina",
+  "title": "mulier Beneventana",
+  "outfit": "woman",
+  "body": "w_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 11,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "11-aldius-front.png",
+  "key": "Audoaldaldius",
+  "name": "Audoald",
+  "title": "aldius",
+  "outfit": "peasantHood",
+  "body": "m_young",
+  "w": {
+   "walk": 0.51,
+   "idle": 0.49,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 11,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "11-aldius-side.png",
+  "key": "Audoaldaldius",
+  "name": "Audoald",
+  "title": "aldius",
+  "outfit": "peasantHood",
+  "body": "m_young",
+  "w": {
+   "walk": 0.25,
+   "idle": 0.75,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 12,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "12-rustica-front.png",
+  "key": "Ermelindarustica",
+  "name": "Ermelinda",
+  "title": "rustica",
+  "outfit": "woman",
+  "body": "w_mid",
+  "w": {
+   "walk": 0.51,
+   "idle": 0.49,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 12,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "12-rustica-side.png",
+  "key": "Ermelindarustica",
+  "name": "Ermelinda",
+  "title": "rustica",
+  "outfit": "woman",
+  "body": "w_mid",
+  "w": {
+   "walk": 0.46,
+   "idle": 0.54,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 14,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "14-presbyter-front.png",
+  "key": "Presbyter Ursuspresbyter",
+  "name": "Presbyter Ursus",
+  "title": "presbyter",
+  "outfit": "robe",
+  "body": "m_mid",
+  "w": {
+   "walk": 0.03,
+   "idle": 0.97,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 14,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "14-presbyter-side.png",
+  "key": "Presbyter Ursuspresbyter",
+  "name": "Presbyter Ursus",
+  "title": "presbyter",
+  "outfit": "robe",
+  "body": "m_mid",
+  "w": {
+   "walk": 0.17,
+   "idle": 0.83,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ }
+]
