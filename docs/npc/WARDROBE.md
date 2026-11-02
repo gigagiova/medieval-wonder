@@ -121,6 +121,24 @@ than patched:
 - **Hose above the knee under a knee tunic** (never seen, but it showed
   through the skirt in the stride) is dropped.
 
+**Cloaks tried again as a short mantle (2 November 2026), and rejected.** The
+cloak cut off 30 cm below the hip joint and skinned to the trunk alone (no
+springs, no limb weights) still let the tunic's and the robe's skirt come
+through its lower back and sides in every clip, and the cut hem was ragged
+(`evidence/game/mantle-rejected.webp`: a Lombard retainer and a priest; idle,
+walk, talk; front, side, back). The cloaks stay off until a mantle is made for
+these bodies, cut to clear the skirt (or with the skirt cut under it).
+
+**Dark specks on light robes.** They were the cloth's back faces, turned towards
+the eye where the robe folds over itself in the walk and the talk (drawn magenta
+to prove it), darkened as if they were the garment's shadowed inside. Back faces
+are now darkened only within 9 cm of an open edge (hem, cuff, neckline), where
+the inside really is what one sees (`rim` in `src/npc2/kit.ts`).
+
+**Props.** Townsfolk stand and walk only where `standable()` (src/main.ts) says:
+nothing low and solid within 60 cm of the feet in the collision mesh the player
+walks against, and no low ring round them (the inside of a well).
+
 Evidence (15 people in the built game, main against the fix):
 [evidence/game/README.md](evidence/game/README.md).
 
