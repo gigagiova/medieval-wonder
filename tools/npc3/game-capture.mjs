@@ -59,12 +59,14 @@ for (const [pi, place] of places.entries()) {
     const busy = (p) => ((p.w?.walk ?? 0) > 0.4 ? 2 : 0) + ((p.w?.talk ?? 0) > 0.5 ? 1 : 0);
     return d.people.filter((p) => p.pos.distanceTo(pl.pos) < 110 && !taken.includes(p.name + p.title))
       .sort((a, b) => busy(b) - busy(a) || a.pos.distanceTo(pl.pos) - b.pos.distanceTo(pl.pos)).slice(0, n)
-      .map((p) => d.people.indexOf(p));
+      .map((p) => p.name + p.title);
   }, { n: Math.ceil(+count / places.length), taken: meta.map((m) => m.key) });
   for (const idx of list) {
     for (const view of ['front', 'side']) {
       const info = await page.evaluate(({ idx, view }) => {
-        const p = window.__npcDebug.people[idx], pl = window.__player;
+        // By name: the list of people changes as the camera moves (the far ones are put away).
+        const p = window.__npcDebug.people.find((q) => q.name + q.title === idx), pl = window.__player;
+        if (!p) return null;
         const f = { x: Math.sin(p.yaw), z: Math.cos(p.yaw) };
         const dir = view === 'front' ? f : { x: f.z, z: -f.x };
         const cam = { x: p.pos.x + dir.x * 1.9, y: p.pos.y + 1.35 * (p.scale ?? 1), z: p.pos.z + dir.z * 1.9 };
@@ -76,6 +78,7 @@ for (const [pi, place] of places.entries()) {
         pl.pitch = Math.atan2(p.pos.y + 0.95 * (p.scale ?? 1) - pl.pos.y, Math.hypot(dx, dz));
         return { key: p.name + p.title, name: p.name, title: p.title, outfit: p.outfit?.id, body: p.outfit?.body, w: Object.fromEntries(Object.entries(p.w ?? {}).map(([a, v]) => [a, +(+v).toFixed(2)])) };
       }, { idx, view });
+      if (!info) continue;
       // (Walkers come from out of sight: a few frames for them to be drawn.)
     await frames(4);
       const name = `${String(k).padStart(2, '0')}-${(info.title ?? 'x').replace(/\W+/g, '_')}-${view}.png`;
