@@ -346,6 +346,7 @@ class Piece:
         med = {c: np.median(self.bodyd[self.comp == c]) for c in np.unique(self.comp)}
         W0, conf = self.W0.copy(), self.conf.copy()
         changed = 0
+        under = [P for P, _ in inner]
         for c in np.unique(self.comp):
             vs = np.nonzero(self.comp == c)[0]
             srcP = [P for P, _ in inner]; srcW = [W for _, W in inner]
@@ -361,13 +362,15 @@ class Piece:
                         best, bestn = o, n_on
             if best is not None:
                 srcP.append(U[best]); srcW.append(self.W[best])
+                under.append(U[best])
             if not srcP:
                 continue
             P = np.concatenate(srcP); Ws = np.concatenate(srcW)
             kk = min(3, len(P))
             d, k = cKDTree(P).query(U[vs], kk)
             d, k = d.reshape(len(vs), kk), k.reshape(len(vs), kk)
-            on = d[:, 0] < LAYER_NEAR
+            # (A hood's shoulder cape hangs looser on the tunic: within 5 cm it moves with it.)
+            on = d[:, 0] < (0.05 if self.layer == 'head' else LAYER_NEAR)
             # Nearer to that cloth than to the skin (or the skin is not under it).
             on &= d[:, 0] < self.bodyd[vs] + 0.003
             if not on.any():
@@ -412,6 +415,7 @@ class Piece:
         if changed:
             self.W0, self.conf = W0, conf
             self.solve()
+        self.under = np.concatenate(under) if under else None
         self.relayered = changed
         self.walls = walls
 
@@ -426,6 +430,28 @@ class Piece:
         Eu, cnt = np.unique(E, axis=0, return_counts=True)
         bedges = Eu[cnt == 1]
         bverts = np.unique(bedges)
+        # Open edges lying on other cloth (a cape's edge on its robe, a hood's edge on the
+        # tunic's shoulders) get no turned-in band and rim: the cloth beneath closes the view,
+        # and the band's inner copy showed through as grey shards. Instead the cloth within
+        # 3 cm of such an edge is lifted 3 mm off what lies under it.
+        self.on_cloth_edges = 0
+        if getattr(self, 'under', None) is not None and len(bverts):
+            tree_u = cKDTree(self.under)
+            on = tree_u.query(U[bverts])[0] < 0.02
+            self.on_cloth_edges = int(on.sum())
+            if on.any():
+                from scipy.sparse.csgraph import dijkstra as _dj
+                Eu0, _c0 = np.unique(np.sort(np.concatenate([Fw[:, [0, 1]], Fw[:, [1, 2]], Fw[:, [2, 0]]]), 1), axis=0, return_counts=True)
+                el0 = np.linalg.norm(U[Eu0[:, 0]] - U[Eu0[:, 1]], axis=1) + 1e-9
+                G0 = sparse.coo_matrix((el0, (Eu0[:, 0], Eu0[:, 1])), shape=(len(U), len(U))).tocsr()
+                dd = _dj(G0, directed=False, indices=bverts[on], min_only=True, limit=0.03)
+                lift = np.clip(1 - dd / 0.03, 0, 1) * 0.003
+                lift[~np.isfinite(lift)] = 0
+                U = U + Nw * lift[:, None]
+                self.U = U
+                P0 = U[rep]
+                bverts = bverts[~on]
+                bedges = bedges[np.isin(bedges, bverts).all(1)]
         geo = np.full(len(U), np.inf)
         if len(bverts):
             # Dijkstra over the cloth's edges from every open-edge vertex.
@@ -690,7 +716,7 @@ def build(src, out, body_id, log=print):
         log(f'  {x}: {pieces[x].relayered} vertices take the weights of the cloth under them ({pieces[x].walls} inner wall)')
     for x in used:
         pieces[x].finish()
-        log(f'  {x}: {pieces[x].ears} ear triangles peeled, {pieces[x].lined} lining/facing triangles dropped, flipped {pieces[x].flipped} pieces, near-body {pieces[x].conf_mean:.2f}, band tris {pieces[x].band}')
+        log(f'  {x}: {pieces[x].on_cloth_edges} open-edge vertices on cloth (no band), {pieces[x].ears} ear triangles peeled, {pieces[x].lined} lining/facing triangles dropped, flipped {pieces[x].flipped} pieces, near-body {pieces[x].conf_mean:.2f}, band tris {pieces[x].band}')
     layer = {x: meta['garments'][x]['layer'] for x in used}
     # Skin vertices (prim 0) and their normals, for the cover test.
     sk = body.prims[0]
