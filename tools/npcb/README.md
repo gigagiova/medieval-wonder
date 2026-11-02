@@ -104,10 +104,14 @@ surface over the swinging arms.
 
 ## Known limits
 
-- **Robes swing as the legs do.** With no cloth simulation and no spring
-  bones, the skirt between the legs stretches like wide trousers in the
-  stride.
-- **The peasant's hood is short.** It ends just under the tunic collar. Its
-  lower edge shows as a jagged line where it passes into the collar.
+- **No cloth simulation.** Long skirts follow the pelvis near the waist and
+  the legs near the hem (70%). They read as a skirt in the stride, but they
+  don't swing or trail.
+- **The peasant's hood edge.** The hood is cut at the collar, but its own
+  lower edge is still saw-toothed where it shows at the sides of the neck.
+- **Seen from below,** a hem's turned-in band (6 cm) ends in a saw-toothed
+  line, and the cloth above it is single-sided. Only a camera near the
+  ground sees it.
 - **Defects in the source assets show as in v2:** the painted wear patches on
-  the robe texture, and the open heel of the boots and shoes.
+  the robe texture (small squares near the hem, arcs on the cape), and the
+  women's pink neck from the face fit.
