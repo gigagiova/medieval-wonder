@@ -253,3 +253,14 @@ The game is published at https://gigagiova.github.io/medieval-wonder/ through
 the GitHub Pages workflow on pushes to main. On phones, drag the view to look
 and use the on-screen stick to move. Device-orientation controls and their
 permission prompt/button have been removed.
+
+## Townsfolk: baked single-surface outfits (2 November 2026)
+
+The default townsfolk are now track B: each outfit is baked offline (`tools/npcb/bake.py`)
+into one surface on the MakeHuman bodies with the scanned faces kept exactly. The bake
+deletes covered skin and inner layers, moves cloth clear of what lies beneath it, thickens
+open edges and gives the cloth the body's skin weights. Nothing is simulated, pushed or
+hidden at run time. `?npc=v2` shows the older layered garments, `?npc=c` the auto-rigged
+single-surface models of track C (`tools/npcc`), and branch `claude/npc-track-a` holds the
+stylised CC0 track A. Evidence: `docs/npc/evidence/trackb/` and `round2/`. Cloaks are off
+in every track: none of the attempts could keep them clean.
