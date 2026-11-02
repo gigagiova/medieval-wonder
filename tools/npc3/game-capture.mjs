@@ -65,7 +65,7 @@ for (const [pi, place] of places.entries()) {
   }, { n: Math.ceil(+count / places.length), taken: meta.map((m) => m.key), who: (process.env.WHO ?? '').toLowerCase().split(',').filter(Boolean) });
   for (const idx of list) {
     for (const view of ['front', 'side']) {
-      const info = await page.evaluate(({ idx, view }) => {
+      const info = await page.evaluate(({ idx, view, force }) => {
         // By name: the list of people changes as the camera moves (the far ones are put away).
         const p = window.__npcDebug.people.find((q) => q.name + q.title === idx), pl = window.__player;
         if (!p) return null;
