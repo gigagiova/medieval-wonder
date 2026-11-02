@@ -3,7 +3,7 @@
 //   npx vite build && npx vite preview --port 4181 &
 //   node tools/npc3/game-capture.mjs http://127.0.0.1:4181 <outdir> [places=Templum,Porta,Atrium] [count=15] [warm=10]
 //
-// Loads index.html?at=<place> (title overlay hidden), lets the population
+// Loads index.html?at=<place> (title overlay hidden; env QUERY is appended, e.g. QUERY=&npc=a), lets the population
 // fill in and run for `warm` frames, then at each place (a teleport name;
 // the first is the start) for its share of `count` people (walking and
 // talking ones first, then the nearest) puts the player's camera 1.9 m in front of each and 1.9 m
@@ -22,7 +22,7 @@ const page = await browser.newPage({ viewport: { width: 540, height: 720 } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 // (Not ?shot: in shot mode the frame loop stops 12 frames after any teleport. The
 // title overlay and controls are hidden by CSS below instead.)
-await page.goto(`${base}/index.html?at=${at.split(',')[0]}`, { timeout: 600000 });
+await page.goto(`${base}/index.html?at=${at.split(",")[0]}${process.env.QUERY ?? ""}`, { timeout: 600000 });
 await page.waitForFunction(() => window.__ready && window.__npcDebug, null, { timeout: 900000 });
 // Only the 3D view (no title, map button, joystick).
 await page.addStyleTag({ content: '* { visibility: hidden !important } canvas { visibility: visible !important }' });

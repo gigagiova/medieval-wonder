@@ -13,7 +13,7 @@ const [base, out, at = 'Templum', secs = '25'] = process.argv.slice(2);
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
-await page.goto(`${base}/index.html?debug&at=${at}`, { timeout: 300000 });
+await page.goto(`${base}/index.html?debug&at=${at}${process.env.QUERY ?? ""}`, { timeout: 300000 });
 await page.waitForFunction(() => window.__npcDebug && window.__pop, null, { timeout: 600000 });
 await page.evaluate(() => { const d = window.__npcDebug.prof; d.springs = 0; d.springPeople = 0; d.frames = 0; d.anim = 0; });
 await page.waitForTimeout(+secs * 1000);
