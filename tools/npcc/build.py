@@ -84,6 +84,91 @@ def decimate(o, tris):
     bpy.ops.object.modifier_apply(modifier='tri')
 
 
+def mat_image(m):
+    if m and m.use_nodes:
+        for n in m.node_tree.nodes:
+            if n.type == 'TEX_IMAGE' and n.image:
+                return n.image
+    return None
+
+
+def grid_atlas(low, size, out_png, boost=None):
+    """One material for the low mesh: each source texture copied whole into a square cell of one
+    atlas (power-of-two cells by the share of surface each covers, packed as a quadtree), and the
+    mesh's own UVs moved into its cell: the artists' UVs and texels are kept."""
+    me = low.data
+    mats = list(me.materials)
+    key = [(mat_image(m).name if mat_image(m) else 'flat:' + (m.name if m else '-')) for m in mats]
+    area = {}
+    for p in me.polygons:
+        m = mats[p.material_index]
+        b = max([v for k_, v in (boost or {}).items() if m and k_ in m.name] or [1])
+        area[key[p.material_index]] = area.get(key[p.material_index], 0) + p.area * b
+    keys = sorted(area, key=lambda k_: -area[k_])
+    tot = sum(area.values())
+    C = size * 2
+
+    def sizes(f):
+        out = {}
+        for k_ in keys:
+            if k_.startswith('flat:'):
+                out[k_] = 16; continue
+            want = f * C * math.sqrt(area[k_] / tot)
+            s_ = 32
+            while s_ * 2 <= min(want, C / 2):
+                s_ *= 2
+            out[k_] = s_
+        return out
+    f = 4.0
+    while sum(v * v for v in sizes(f).values()) > C * C:
+        f *= 0.95
+    S = sizes(f)
+    free = [(0, 0, C)]  # quadtree free squares
+    cell = {}
+    for k_ in sorted(keys, key=lambda k_: -S[k_]):
+        s_ = S[k_]
+        free.sort(key=lambda q: (q[2], q[1], q[0]))
+        i = next(i for i, q in enumerate(free) if q[2] >= s_)
+        x, y, w = free.pop(i)
+        while w > s_:
+            w //= 2
+            free += [(x + w, y, w), (x, y + w, w), (x + w, y + w, w)]
+        cell[k_] = (x, y, s_)
+    canvas = np.zeros((C, C, 4), np.float32); canvas[..., 3] = 1
+    for k_, (x, y, s_) in cell.items():
+        if k_.startswith('flat:'):
+            m = bpy.data.materials.get(k_[5:])
+            col = list(m.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value) if m and m.use_nodes and 'Principled BSDF' in m.node_tree.nodes else [0.4, 0.35, 0.3, 1]
+            canvas[y:y + s_, x:x + s_] = col
+            continue
+        im = bpy.data.images[k_].copy()
+        im.scale(s_, s_)
+        px = np.empty(s_ * s_ * 4, np.float32); im.pixels.foreach_get(px)
+        canvas[y:y + s_, x:x + s_] = px.reshape(s_, s_, 4)
+        print('atlas cell', k_, s_, f'{100 * area[k_] / tot:.1f}%')
+    uvl = me.uv_layers.active or me.uv_layers[0]
+    uv = np.empty(len(me.loops) * 2, np.float32); uvl.data.foreach_get('uv', uv); uv = uv.reshape(-1, 2)
+    for p in me.polygons:
+        x, y, s_ = cell[key[p.material_index]]
+        for li in p.loop_indices:
+            u, v = np.clip(uv[li], 0, 1)
+            uv[li] = ((x + 1 + u * (s_ - 2)) / C, (y + 1 + v * (s_ - 2)) / C)
+    uvl.data.foreach_set('uv', uv.ravel())
+    for other in [l for l in me.uv_layers if l != uvl]:
+        me.uv_layers.remove(other)
+    img = bpy.data.images.new('atlas', C, C)
+    img.pixels.foreach_set(canvas.ravel())
+    img.filepath_raw = out_png; img.file_format = 'PNG'; img.save()
+    img.pack()
+    mat = bpy.data.materials.new('atlas'); mat.use_nodes = True
+    nt = mat.node_tree; bsdf = nt.nodes['Principled BSDF']
+    tex = nt.nodes.new('ShaderNodeTexImage'); tex.image = img
+    nt.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
+    me.materials.clear(); me.materials.append(mat)
+    for p in me.polygons:
+        p.material_index = 0
+
+
 def bake_atlas(high, low, size, out_png):
     """One material and one UV atlas for the low mesh, baked from the many materials of the high one."""
     bpy.context.view_layer.objects.active = low
@@ -92,7 +177,12 @@ def bake_atlas(high, low, size, out_png):
     low.data.uv_layers.new(name='atlas')
     bpy.ops.object.select_all(action='DESELECT'); low.select_set(True)
     bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004)
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.003)
+    # (Decimation leaves slivers that smart projection packs as far-flung specks, shrinking the rest:
+    # same texel density everywhere, then packed afresh.)
+    bpy.ops.uv.select_all(action='SELECT')
+    bpy.ops.uv.average_islands_scale()
+    bpy.ops.uv.pack_islands(rotate=True, margin=0.002)
     bpy.ops.object.mode_set(mode='OBJECT')
     img = bpy.data.images.new('atlas', size, size)
     mat = bpy.data.materials.new('atlas'); mat.use_nodes = True
@@ -362,7 +452,7 @@ def main():
     s = spec['height'] / (hi.z - lo.z)
     for o in ms:
         o.data.transform(mathutils.Matrix.Translation(spec.get('shift', (0, 0, 0))) @ mathutils.Matrix.Scale(s, 4))
-    multi = len({m.name for o in ms for m in o.data.materials}) > 1
+    multi = len({(mat_image(m).name if mat_image(m) else m.name) for o in ms for m in o.data.materials}) > 1
     if multi and len(ms) > 1:
         hide_covered(ms)
     high = join(ms)
@@ -375,11 +465,9 @@ def main():
         if debug and 'only' in a:
             return
     if multi:
-        low = high.copy(); low.data = high.data.copy(); low.name = cid
-        bpy.context.scene.collection.objects.link(low)
+        low = high; low.name = cid
         decimate(low, spec.get('tris', 12000))
-        bake_atlas(high, low, spec.get('tex', 1024), out.replace('.glb', '_atlas.png'))
-        bpy.data.objects.remove(high)
+        grid_atlas(low, spec.get('tex', 1024), out.replace('.glb', '_atlas.png'), spec.get('boost'))
     else:
         low = high; low.name = cid
         decimate(low, spec.get('tris', 12000))
