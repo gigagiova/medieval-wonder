@@ -54,14 +54,15 @@ for (const [pi, place] of places.entries()) {
   console.log('place', place, JSON.stringify(went));
   await frames(+warm);
   // Moving people first (mid-walk, mid-talk), then the rest; nearest first.
-  const list = await page.evaluate(({ n, taken }) => {
+  // WHO=monachus,presbyter,...: only people whose title contains one of these.
+  const list = await page.evaluate(({ n, taken, who }) => {
     const d = window.__npcDebug, pl = window.__player;
     // Walking people first (the captures had too few), then talking, then the nearest.
     const busy = (p) => ((p.w?.walk ?? 0) > 0.4 ? 2 : 0) + ((p.w?.talk ?? 0) > 0.5 ? 1 : 0);
-    return d.people.filter((p) => p.pos.distanceTo(pl.pos) < 110 && !taken.includes(p.name + p.title))
+    return d.people.filter((p) => p.pos.distanceTo(pl.pos) < 110 && !taken.includes(p.name + p.title) && (!who.length || who.some((w) => (p.title ?? '').toLowerCase().includes(w))))
       .sort((a, b) => busy(b) - busy(a) || a.pos.distanceTo(pl.pos) - b.pos.distanceTo(pl.pos)).slice(0, n)
       .map((p) => p.name + p.title);
-  }, { n: Math.ceil(+count / places.length), taken: meta.map((m) => m.key) });
+  }, { n: Math.ceil(+count / places.length), taken: meta.map((m) => m.key), who: (process.env.WHO ?? '').toLowerCase().split(',').filter(Boolean) });
   for (const idx of list) {
     for (const view of ['front', 'side']) {
       const info = await page.evaluate(({ idx, view }) => {
