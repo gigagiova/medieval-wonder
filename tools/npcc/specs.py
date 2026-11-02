@@ -15,7 +15,7 @@ SPECS = {
     'c_soldier': dict(uid='95bf19fa8edd42b99ec2be9f1dce4b11', sex='man', height=1.80, pose='T', tris=14000,
                       drop=('Shield', 'Sword_07', 'Teeth', 'Dagger_06', 'Chain_mail'), boost={'Head': 8, 'Hands': 2}),
     # Medieval woman figure (mikurban, CC BY 4.0) — gown, apron, kerchief
-    'c_woman': dict(uid='3b6553e6af11465e97bbd8b4fdfee91c', sex='woman', height=1.60, pose='down', tris=14000, skirt=True, boost={'woman_body': 2, 'headkerchief': 1.5},
+    'c_woman': dict(uid='3b6553e6af11465e97bbd8b4fdfee91c', sex='woman', height=1.60, pose='down', tris=14000, skirt=True, boost={'woman_body': 2, 'headkerchief': 1.5}, reach=0.06,
                     marks=dict(LeftArm=(0.165, 0.04, 1.28), LeftForeArm=(0.19, 0.06, 0.98), LeftHand=(0.175, 0.01, 0.85), LeftHandTip=(0.15, -0.03, 0.71),
                                RightArm=(-0.165, 0.04, 1.28), RightForeArm=(-0.20, 0.04, 0.99), RightHand=(-0.15, -0.06, 0.93), RightHandTip=(-0.06, -0.10, 0.85))),
     # Nun (CC BY 4.0) — black habit, veil, cord

@@ -92,6 +92,9 @@ def mat_image(m):
     return None
 
 
+PAD = lambda s_: max(2, s_ // 32)
+
+
 def grid_atlas(low, size, out_png, boost=None):
     """One material for the low mesh: each source texture copied whole into a square cell of one
     atlas (power-of-two cells by the share of surface each covers, packed as a quadtree), and the
@@ -141,10 +144,13 @@ def grid_atlas(low, size, out_png, boost=None):
             col = list(m.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value) if m and m.use_nodes and 'Principled BSDF' in m.node_tree.nodes else [0.4, 0.35, 0.3, 1]
             canvas[y:y + s_, x:x + s_] = col
             continue
+        # The texture shrunk inside its cell, its edges smeared out to the cell's border: mipmaps
+        # of the atlas then never mix in a neighbouring cell (pale streaks along the seams).
+        pad = PAD(s_)
         im = bpy.data.images[k_].copy()
-        im.scale(s_, s_)
-        px = np.empty(s_ * s_ * 4, np.float32); im.pixels.foreach_get(px)
-        canvas[y:y + s_, x:x + s_] = px.reshape(s_, s_, 4)
+        im.scale(s_ - 2 * pad, s_ - 2 * pad)
+        px = np.empty((s_ - 2 * pad) ** 2 * 4, np.float32); im.pixels.foreach_get(px)
+        canvas[y:y + s_, x:x + s_] = np.pad(px.reshape(s_ - 2 * pad, s_ - 2 * pad, 4), ((pad, pad), (pad, pad), (0, 0)), mode='edge')
         print('atlas cell', k_, s_, f'{100 * area[k_] / tot:.1f}%')
     uvl = me.uv_layers.active or me.uv_layers[0]
     uv = np.empty(len(me.loops) * 2, np.float32); uvl.data.foreach_get('uv', uv); uv = uv.reshape(-1, 2)
@@ -152,7 +158,8 @@ def grid_atlas(low, size, out_png, boost=None):
         x, y, s_ = cell[key[p.material_index]]
         for li in p.loop_indices:
             u, v = np.clip(uv[li], 0, 1)
-            uv[li] = ((x + 1 + u * (s_ - 2)) / C, (y + 1 + v * (s_ - 2)) / C)
+            pad = PAD(s_)
+            uv[li] = ((x + pad + u * (s_ - 2 * pad)) / C, (y + pad + v * (s_ - 2 * pad)) / C)
     uvl.data.foreach_set('uv', uv.ravel())
     for other in [l for l in me.uv_layers if l != uvl]:
         me.uv_layers.remove(other)
@@ -454,7 +461,7 @@ def main():
         o.data.transform(mathutils.Matrix.Translation(spec.get('shift', (0, 0, 0))) @ mathutils.Matrix.Scale(s, 4))
     multi = len({(mat_image(m).name if mat_image(m) else m.name) for o in ms for m in o.data.materials}) > 1
     if multi and len(ms) > 1:
-        hide_covered(ms)
+        hide_covered(ms, spec.get('reach', 0.04))
     high = join(ms)
     high.name = 'high'
     L, H = landmarks(high, spec)
