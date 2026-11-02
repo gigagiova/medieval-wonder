@@ -146,6 +146,14 @@ def covered(P, N, V, F):
     return out
 
 
+POKE = 0.025
+
+
+def poking(P, N, V, F, reach=POKE):
+    """Vertices lying outside a surface they should be under: a ray inward meets it within reach."""
+    return ray_hits(P - N * 0.0005, -N, V, F, reach)
+
+
 def keep_specks(F, drop, rep):
     """Dropped triangles in groups smaller than MIN_SPECK are kept (holes in plain view)."""
     idx = np.nonzero(drop)[0]
@@ -175,8 +183,9 @@ def keep_specks(F, drop, rep):
 class Piece:
     """One garment, baked: outward, one weight field, thick edges."""
 
-    def __init__(self, name, m, body, names, bmap, legs, crotch_y):
+    def __init__(self, name, m, body, names, bmap, legs, crotch_y, layer):
         self.name = name
+        self.layer = layer
         P0, F0 = m['P'], m['F'].copy()
         rep, U = weld(P0, 1e-5)
         Fw = rep[F0]
@@ -201,6 +210,18 @@ class Piece:
         bad = np.einsum('ij,ij->i', N0, Nw[rep]) < 0
         N0[bad] = -N0[bad]
         self.flipped = flipped
+        self.m, self.P0, self.F0, self.N0, self.rep, self.U, self.Fw, self.comp = m, P0, F0, N0, rep, U, Fw, comp
+        self.body, self.names, self.bmap, self.legs, self.crotch_y = body, names, bmap, legs, crotch_y
+        self.bodyd = body.tree.query(U)[0]
+        self.Nw = Nw
+        self.push = np.zeros(len(U))
+
+    def finish(self):
+        """Weights and thick edges, on the (possibly inflated) cloth."""
+        m, F0, N0, rep, U, Fw = self.m, self.F0, self.N0, self.rep, self.U, self.Fw
+        body, names, bmap, legs, crotch_y = self.body, self.names, self.bmap, self.legs, self.crotch_y
+        P0 = U[rep]
+        Nw = vertex_normals(U, Fw)
         # 2. Weights.
         nj = len(names)
         d, k = body.tree.query(U, 4)
@@ -289,6 +310,63 @@ class Piece:
         self.Nv = Nw[rep]
 
 
+CLEAR, MAX_PUSH = 0.006, 0.015
+
+
+def inflate(pieces, worn_with, depth, log=print):
+    """Clearance, offline: where one surface lies on another (another garment
+    worn under it, or another shell of the same garment nearer the body),
+    the outer one is moved out along its normal to CLEAR above the inner,
+    at most MAX_PUSH, the push spread smoothly over the cloth. Both are then
+    skinned alike (finish()), so the clearance holds in motion."""
+    for rnd in range(3):
+        for x, p in pieces.items():
+            if p.layer == 'shoe':
+                continue
+            inner = [y for y in worn_with[x] if depth[y] < depth[x]]
+            Q, Qd, Qc, own = [], [], [], []
+            for y in inner:
+                Q.append(pieces[y].U); Qd.append(np.full(len(pieces[y].U), -1.0)); Qc.append(np.full(len(pieces[y].U), -1)); own.append(np.zeros(len(pieces[y].U), bool))
+            Q.append(p.U); Qd.append(p.bodyd); Qc.append(p.comp); own.append(np.ones(len(p.U), bool))
+            Q = np.concatenate(Q); Qd = np.concatenate(Qd); Qc = np.concatenate(Qc); own = np.concatenate(own)
+            tree = cKDTree(Q)
+            N = vertex_normals(p.U, p.Fw)
+            need = np.zeros(len(p.U))
+            # Only the cloth's outer face is moved (not a lining or facing that looks at the body).
+            _, near = p.body.tree.query(p.U)
+            outer = np.einsum('ij,ij->i', N, p.body.N[near]) > 0.3
+            for i, nb in enumerate(tree.query_ball_point(p.U, 0.03)):
+                if not outer[i]:
+                    continue
+                nb = np.asarray(nb)
+                if not len(nb):
+                    continue
+                # Another garment beneath, or another shell of this one lying nearer the body.
+                ok = ~own[nb] | ((Qc[nb] != p.comp[i]) & (Qd[nb] < p.bodyd[i] - 0.002))
+                nb = nb[ok]
+                if not len(nb):
+                    continue
+                d = p.U[i] - Q[nb]
+                h = d @ N[i]
+                lat = np.linalg.norm(d - h[:, None] * N[i], axis=1)
+                # Another garment may have come up to 1 cm through it; a shell of the same garment only touches.
+                lo = np.where(own[nb], -0.003, -0.01)
+                sel = (lat < 0.012) & (h > lo) & (h < CLEAR)
+                if sel.any():
+                    need[i] = np.clip((CLEAR - h[sel]).max(), 0, MAX_PUSH)
+            if not need.any():
+                continue
+            L = adjacency(p.Fw, len(p.U))
+            push = need.copy()
+            for _ in range(6):
+                push = np.maximum(need, 0.5 * push + 0.5 * (L @ push))
+            push = np.minimum(push, MAX_PUSH - p.push)
+            p.U = p.U + N * push[:, None]
+            p.push += push
+            p.bodyd = p.body.tree.query(p.U)[0]
+        log(f'  clearance round {rnd}: ' + ', '.join(f'{x} {np.percentile(q.push, 99) * 1000:.0f}/{q.push.max() * 1000:.0f}mm' for x, q in pieces.items() if q.push.any()))
+
+
 class Body:
     def __init__(self, g, node, names):
         self.prims = [g.mesh(node, 0), g.mesh(node, 1)]
@@ -342,12 +420,18 @@ def build(src, out, body_id, log=print):
     used = sorted({x for s in outfits.values() for x in s})
     pieces = {}
     for x in used:
-        pieces[x] = Piece(x, g.mesh('G_' + x), body, names, bmap, legs if meta['garments'][x]['layer'] in ('tunic', 'over', 'belt') else None, crotch_y)
-        log(f'  {x}: flipped {pieces[x].flipped} pieces, near-body {pieces[x].conf_mean:.2f}, band tris {pieces[x].band}')
+        pieces[x] = Piece(x, g.mesh('G_' + x), body, names, bmap, legs if meta['garments'][x]['layer'] in ('tunic', 'over', 'belt') else None, crotch_y, meta['garments'][x]['layer'])
     depth = {x: meta['garments'][x]['depth'] for x in used}
+    worn_with = {x: sorted({y for s in outfits.values() if x in s for y in s if y != x}) for x in used}
+    inflate(pieces, worn_with, depth, log)
+    for x in used:
+        pieces[x].finish()
+        log(f'  {x}: flipped {pieces[x].flipped} pieces, near-body {pieces[x].conf_mean:.2f}, band tris {pieces[x].band}')
+    layer = {x: meta['garments'][x]['layer'] for x in used}
     # Skin vertices (prim 0) and their normals, for the cover test.
     sk = body.prims[0]
     skP = sk['P']; skN = body.N[body.rep0]
+    neckhead = np.isin(body.main[body.rep0], [names.index('Neck'), names.index('Head')])
     report = {'body': body_id, 'outfits': {}}
     new_nodes = []
     j = g.j
@@ -379,7 +463,9 @@ def build(src, out, body_id, log=print):
         outer = [pieces[x] for x in gs]
         V = np.concatenate([q.Vw for q in outer]); off = np.cumsum([0] + [len(q.Vw) for q in outer])
         F = np.concatenate([q.Fw + o for q, o in zip(outer, off[:-1])])
-        cov = covered(skP, skN, V, F)
+        cov = covered(skP, skN, V, F) | poking(skP, skN, V, F)
+        # The neck is always kept: it closes the head to the collar or hood.
+        cov &= ~neckhead
         drop = cov[sk['F']].all(1)
         rep_s, _ = weld(skP, 1e-5)
         drop = keep_specks(sk['F'], drop, rep_s)
@@ -394,13 +480,31 @@ def build(src, out, body_id, log=print):
         new_nodes.append({'name': 'body|' + key, 'mesh': len(j['meshes']) - 1, 'skin': skin_node['skin'], 'extras': skin_node.get('extras')})
         for x in gs:
             p = pieces[x]
-            over = [pieces[y] for y in gs if depth[y] > depth[x]]
+            over = [pieces[y] for y in gs if depth[y] > depth[x]] if layer[x] != 'shoe' else []
             keepF = np.ones(len(p.F), bool)
-            if over:
-                V = np.concatenate([q.Vw for q in over]); off = np.cumsum([0] + [len(q.Vw) for q in over])
-                F = np.concatenate([q.Fw + o for q, o in zip(over, off[:-1])])
-                # The cloth itself; a band copy is covered when its source is.
-                cov = covered(p.P[:len(p.rep)], p.Nv, V, F)[p.src]
+            if layer[x] == 'shoe' and any(layer[y] == 'tunic' and pieces[y].Vw[:, 1].min() < 0.25 for y in gs):
+                # Under a robe to the ankles only the shoe shows, not its small straps and laces.
+                sizes = np.bincount(p.comp)
+                small = sizes[p.comp] < 80
+                keepF = ~small[p.rep[p.src]][p.F].all(1)
+            elif layer[x] != 'shoe':
+                # Garments worn over it, and the other shells of the same garment
+                # (a cape over the robe, a sleeve over the side), cover it.
+                Nv = vertex_normals(p.Vw, p.Fw)
+                cw = np.zeros(len(p.Vw), bool)
+                for c in np.unique(p.comp):
+                    vs = np.nonzero(p.comp == c)[0]
+                    parts = [(q.Vw, q.Fw) for q in over] + [(p.Vw, p.Fw[p.comp[p.Fw[:, 0]] != c])]
+                    off = np.cumsum([0] + [len(v) for v, _ in parts])
+                    V = np.concatenate([v for v, _ in parts]); F = np.concatenate([f + o for (_, f), o in zip(parts, off[:-1])])
+                    if len(F):
+                        cw[vs] = covered(p.Vw[vs], Nv[vs], V, F)
+                # Through a garment worn over it (a collar over the hood's cape): dropped, the outer one shows.
+                # (A hood's or cowl's shoulder cape can lie several cm under a tunic's collar in the bind pose.)
+                for q in over:
+                    cw |= poking(p.Vw, Nv, q.Vw, q.Fw, 0.07 if q.layer == 'head' else POKE)
+                cov = cw[p.rep]
+                cov = cov[p.src]
                 drop = cov[p.F].all(1)
                 rep_full = p.rep[p.src] + np.where(p.src != np.arange(len(p.src)), len(p.Vw), 0)
                 drop = keep_specks(p.F, drop, rep_full)
