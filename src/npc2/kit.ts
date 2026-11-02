@@ -36,7 +36,14 @@ export interface OutfitV2 {
   garments: { id: string; fabric: string; layer: string; map?: 'detail' | 'color' }[];
 }
 
-const DIR = 'models/npc2/';
+/**
+ * Track B (`?npc=b`, tools/npcb/bake.py): each outfit baked offline into one
+ * closed surface (covered skin and inner cloth removed, open edges turned in
+ * and thickened) with the body's skin weights over all of it. Drawn
+ * single-sided, plainly skinned: no cloth bones, pushes or hide masks.
+ */
+export const NPC_B = typeof location !== 'undefined' && new URLSearchParams(location.search).get('npc') === 'b';
+const DIR = NPC_B ? 'models/npcb/' : 'models/npc2/';
 const flatNormal = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1);
 flatNormal.needsUpdate = true;
 /** The bodies, and which v1 outfits each can wear (by sex). */
@@ -114,7 +121,9 @@ function prep(t: THREE.Object3D, native: boolean) {
       if (src.map) src.map.colorSpace = THREE.SRGBColorSpace;
       m.material = new THREE.MeshStandardMaterial({ map: src.map, color: 0xc8beb4, roughness: 0.18, metalness: 0 });
     }
-    if (m.userData.npc2 === 'garment') { m.userData.garment = n.replace(/^G_/, '').replace(/_\d+$/, ''); if (!native) outward(m.geometry); }
+    // (Track B: one node per piece and outfit, `G_<garment>|<outfit>` / `body|<outfit>`; already wound outward.)
+    if (NPC_B && n.includes('|')) m.userData.variant = n.split('|')[1].replace(/_\d+$/, '');
+    if (m.userData.npc2 === 'garment') { m.userData.garment = n.replace(/^G_/, '').split('|')[0].replace(/_\d+$/, ''); if (!native && !NPC_B) outward(m.geometry); }
     if (m.userData.npc2 === 'body') {
       // Skin: npc.ts tints it per person and gives it the soft wrapped light of skin (withAtmos).
       // The same skin shading as the scanned v1 bodies (src/npc/scan.ts): pores, wrapped light, matte.
@@ -196,12 +205,28 @@ export function outfitV2(id: string, body: string, belt?: BeltStyle): OutfitV2 {
     return g;
   });
   const of = { ...base, garments };
+  const bKey = [...garments].sort().join('+');
   const t = SkeletonUtils.clone(k.template);
   const drop: THREE.Object3D[] = [];
   t.traverse((x) => {
     const m = x as THREE.SkinnedMesh;
     if (!m.isSkinnedMesh) return;
     if (m.userData.npc2 === 'garment' && !of.garments.includes(m.userData.garment)) { drop.push(m); return; }
+    if (NPC_B) {
+      // Only this outfit's baked pieces; nothing hidden at run time.
+      if (m.userData.variant !== undefined && m.userData.variant !== bKey) { drop.push(m); return; }
+      if (m.userData.npc2 === 'garment') {
+        const g = m.geometry.clone();
+        g.setAttribute('rest', g.attributes.position);
+        g.setAttribute('restN', g.attributes.normal);
+        // Mud and wear, times the baked shade of the turned-in band (the cloth's inside).
+        const c = grime(g, k.m), sh = g.getAttribute('_shade');
+        if (sh) for (let i = 0; i < sh.count; i++) for (let j = 0; j < 3; j++) c.setComponent(i, j, c.getComponent(i, j) * sh.getX(i));
+        g.setAttribute('color', c);
+        m.geometry = g;
+      }
+      return;
+    }
     // Triangles all of whose corners this outfit hides.
     const h = m.geometry.getAttribute('_hide');
     if (!h && m.userData.npc2 !== 'garment') return;

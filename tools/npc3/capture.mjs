@@ -22,7 +22,7 @@ const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--ena
 const page = await browser.newPage({ viewport: { width: W, height: H } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 const list = groups.split(',');
-await page.goto(`http://127.0.0.1:${port}/population-test.html?groups=${list.join(',')}&t=0.1&gap=3`, { timeout: 300000 });
+await page.goto(`http://127.0.0.1:${port}/population-test.html?groups=${list.join(',')}&t=0.1&gap=3${process.env.NPC ? '&npc=' + process.env.NPC : ''}`, { timeout: 300000 });
 await page.waitForFunction(() => window.__done === true, null, { timeout: 600000 });
 await page.waitForTimeout(2000);
 const V = views.split(','), A = anims.split(',');

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { fabric, type FabricKind } from '../npc/fabric';
 import { matte } from '../npc/rig';
-import type { OutfitV2 } from './kit';
+import { NPC_B, type OutfitV2 } from './kit';
 
 // Dyeing a v2 person's garments: each garment gets the scanned cloth of its
 // kind (src/npc/fabric.ts: weave at true size, laid in the bind pose) in the
@@ -35,7 +35,7 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
     meshes.push(m);
     const src = m.material as THREE.MeshStandardMaterial;
     const col = g.layer === 'tunic' ? dyes.tunic : g.layer === 'over' ? dyes.over : g.layer === 'head' ? dyes.head : g.layer === 'leg' ? dyes.leg : g.layer === 'shoe' || g.layer === 'belt' ? dyes.shoe : dyes.tunic;
-    if (g.layer === 'belt' && g.map !== 'color') { if (!dyes.belt.userData.bias) { layerBias(dyes.belt, LAYER_BIAS.belt); dyes.belt.userData.bias = true; } m.material = dyes.belt; return; }
+    if (g.layer === 'belt' && g.map !== 'color') { if (NPC_B) dyes.belt.side = THREE.FrontSide; if (!dyes.belt.userData.bias) { layerBias(dyes.belt, LAYER_BIAS.belt); dyes.belt.userData.bias = true; } m.material = dyes.belt; return; }
     let mat: THREE.MeshStandardMaterial;
     // A persona's own cloth for tunic, overgarment and headcloth (src/npc/population.ts).
     const kind = (dyes.kinds && { tunic: dyes.kinds[0], over: dyes.kinds[1], head: dyes.kinds[2] }[g.layer]) || KIND[g.fabric];
@@ -56,7 +56,8 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
       src.map.colorSpace = g.map === 'detail' ? THREE.NoColorSpace : THREE.SRGBColorSpace;
       if (g.map === 'detail') detailMap(mat);
     }
-    inside(mat);
+    // Track B: closed, outward-wound surfaces drawn single-sided (tools/npcb/bake.py).
+    if (NPC_B) mat.side = THREE.FrontSide; else inside(mat);
     // Hood and cowl: closed shells wound outwards (tools/npc2/derive.py), drawn one-sided.
     if (g.id === 'hood' || g.id === 'cowl') { mat.side = THREE.FrontSide; lining(mat, m.geometry); }
     if (LAYER_BIAS[g.layer]) layerBias(mat, LAYER_BIAS[g.layer]);

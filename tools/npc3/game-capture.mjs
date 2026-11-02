@@ -22,7 +22,8 @@ const page = await browser.newPage({ viewport: { width: 540, height: 720 } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 // (Not ?shot: in shot mode the frame loop stops 12 frames after any teleport. The
 // title overlay and controls are hidden by CSS below instead.)
-await page.goto(`${base}/index.html?at=${at.split(',')[0]}`, { timeout: 600000 });
+// NPC=b (or v1) for another set of townsfolk.
+await page.goto(`${base}/index.html?at=${at.split(',')[0]}${process.env.NPC ? '&npc=' + process.env.NPC : ''}`, { timeout: 600000 });
 await page.waitForFunction(() => window.__ready && window.__npcDebug, null, { timeout: 900000 });
 // Only the 3D view (no title, map button, joystick).
 await page.addStyleTag({ content: '* { visibility: hidden !important } canvas { visibility: visible !important }' });

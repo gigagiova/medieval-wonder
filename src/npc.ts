@@ -12,7 +12,7 @@ import * as Props from './npc/props';
 import { makeStaff } from './npc/population-props';
 import { fabric, type FabricKind } from './npc/fabric';
 import { LINES, NAMES, TITLE, type Line, type Speaker } from './npc/lines';
-import { loadV2, kitsV2, bodiesV2, outfitV2, type OutfitV2, type BeltStyle } from './npc2/kit';
+import { loadV2, kitsV2, bodiesV2, outfitV2, NPC_B, type OutfitV2, type BeltStyle } from './npc2/kit';
 import { dressV2 } from './npc2/dress';
 import { makeSprings } from './npc2/springs';
 import { clampArmSwing } from './npc2/arms';
@@ -401,8 +401,9 @@ export class Person {
     this.cloth = v2
       ? dressV2(this.body, outfit as unknown as OutfitV2, { tunic, over, head, belt, leg: dye(pick(rnd, [...DYES.undyed, ...DYES.woad]), 0.3), shoe: new THREE.Color(0x8a7a6a).multiplyScalar(0.8 + rnd() * 0.3), kinds: lc?.kinds, role }) as unknown as Clothing
       : new Clothing(scene, outfit.garment, skel, mats, ropeMat, this.scale, (n) => this.bones.get(n)!);
-    if (v2) this.springs = makeSprings(this.body, outfit as unknown as OutfitV2, this.scale, (n) => this.bones.get(n));
-    if (v2) this.push = makePush(this.body, outfit as unknown as OutfitV2, (n) => this.bones.get(n));
+    // (Track B, ?npc=b: plainly skinned, no springs and no pushes.)
+    if (v2 && !NPC_B) this.springs = makeSprings(this.body, outfit as unknown as OutfitV2, this.scale, (n) => this.bones.get(n));
+    if (v2 && !NPC_B) this.push = makePush(this.body, outfit as unknown as OutfitV2, (n) => this.bones.get(n));
     this.cloaked = v2 && (outfit as unknown as OutfitV2).garments.some((g) => g.id === 'cloak');
 
     // Motion.
