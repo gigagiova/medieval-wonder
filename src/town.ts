@@ -262,6 +262,24 @@ export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: nu
   };
   const pos: number[] = [];
   const sgn = area2 > 0 ? 1 : -1;
+  // The eave corners: where the eave lines of the two walls meeting at a
+  // corner cross (a mitre), clamped on very sharp corners. Each wall used to
+  // push its own eave out square to itself, so on every corner that is not a
+  // right angle (most traced footprints) the two faces left a triangular hole
+  // in the roof between them (docs/HOLES-AUDIT.md).
+  const corner: V2[] = [];
+  for (let k = 0; k < n; k++) {
+    let ip = (k + n - 1) % n, guard = 0;
+    while (c[ip].distanceTo(c[k]) < 0.05 && guard++ < n) ip = (ip + n - 1) % n;
+    let iq = (k + 1) % n; guard = 0;
+    while (c[iq].distanceTo(c[k]) < 0.05 && guard++ < n) iq = (iq + 1) % n;
+    const e0 = c[k].clone().sub(c[ip]).normalize(), e1 = c[iq].clone().sub(c[k]).normalize();
+    const o0 = V(e0.y, -e0.x).multiplyScalar(sgn), o1 = V(e1.y, -e1.x).multiplyScalar(sgn);
+    const bis = o0.clone().add(o1), cos = o0.dot(o1);
+    // Mitre: along the bisector, over / cos(half angle); clamped to 3 x over.
+    const len = bis.lengthSq() > 1e-8 ? Math.min(3 * over, over / Math.sqrt(Math.max(1e-6, (1 + cos) / 2))) : over;
+    corner.push(bis.lengthSq() > 1e-8 ? c[k].clone().addScaledVector(bis.normalize(), len) : c[k].clone().addScaledVector(o1, over));
+  }
   for (let k = 0; k < n; k++) {
     const a = c[k], q = c[(k + 1) % n];
     const e = q.clone().sub(a);
@@ -269,7 +287,7 @@ export function polyRoof(b: Builder, c: V2[], h: number, pitch: number, over: nu
     if (L < 0.05) continue;
     e.multiplyScalar(1 / L);
     const out = V(e.y, -e.x).multiplyScalar(sgn);
-    const A = a.clone().addScaledVector(out, over).addScaledVector(e, -over), Q = q.clone().addScaledVector(out, over).addScaledVector(e, over);
+    const A = corner[k], Q = corner[(k + 1) % n];
     const ra = ridgePt(a), rq = ridgePt(q);
     const yE = h - over * pitch;
     const tri = (p1: number[], p2: number[], p3: number[]) => {

@@ -69,7 +69,7 @@ async function moveTo(page, v, yaw, pitch) {
   await page.waitForFunction('window.__done === true', null, { timeout: 300000, polling: 200 });
 }
 
-const views = JSON.parse(readFileSync(VIEWS, 'utf8')).filter((v) => !ONLY || v.id === ONLY);
+const views = JSON.parse(readFileSync(VIEWS, 'utf8')).filter((v) => !ONLY || ONLY.split(',').includes(v.id));
 const rows = [];
 const sheet = async (id, files) => {
   const tiles = await Promise.all(files.map((f) => sharp(f).resize(195, 422).png().toBuffer()));

@@ -217,16 +217,18 @@ function eyeAudit(it: ChunkItems, list: BV[], foot: Uint8Array) {
     if (!f || f.ny < 0.3) continue; // no floor (a hole, counted in A) or standing in something
     const y = t + 1.4 - f.d + 1.65;
     eo.set(x, y, z);
-    let back = 0, hole = 0, near = 0;
+    let back = 0, hole = 0, near = 0, flat = 0, flatBack = 0;
     let bx = 0, bz = 0, hx = 0, hz = 0;
     const found: { tag: number; mat: number; p: number[] }[] = [];
     const sh: number[][] = [];
     for (const d of dirs) {
       const h = first(list, eo, d, RANGE);
+      if (!h && Math.abs(d.y) < 0.2) flat++;
       if (h) {
         const dot = h.nx * d.x + h.ny * d.y + h.nz * d.z;
         // A back face with a front face in the same place (a surface given
         // both sides, see bothSides()) is not seen: the front one is drawn.
+        if (Math.abs(d.y) < 0.2) { flat++; if (dot > 0 && h.d < 6) flatBack++; }
         if (dot > 0 && !h.soup.ds[h.tri] && !frontTwin(list, eo, d, h.d)) {
           back++; bx += d.x; bz += d.z;
           if (h.d < 1.0) near++;
@@ -244,7 +246,9 @@ function eyeAudit(it: ChunkItems, list: BV[], foot: Uint8Array) {
       }
     }
     // The eye is inside a solid (a tower, a thick wall, the cavea's mass): not a place to stand.
-    if (near > NR * 0.15 || back > NR * 0.4) { eyesInside++; continue; }
+    // (or most level rays meet the inside of something within 6 m: the eye is
+    // inside a wall or a mass that is only skin, e.g. the curtain's rubble core)
+    if (near > NR * 0.15 || back > NR * 0.4 || flatBack > flat * 0.5) { eyesInside++; continue; }
     eyeRays += NR; backRays += back; holeRays += hole;
     for (const q of found) { const st = statOf(q.tag, q.mat); st.back++; if (st.pts.length < 40) st.pts.push(q.p.map((v) => +v.toFixed(2))); }
     for (const p of sh) if (sightHoles.length < 200000) sightHoles.push(p);

@@ -222,7 +222,10 @@ function hut(b: Builder, h: Hut) {
   };
   if (h.kind === 'shed') {
     // Back wall and ends of planks, the front open on posts; a lean-to roof of old tiles.
-    wall(0, -h.d / 2, h.w, h.h + 0.9, true);
+    // (The back wall goes up to the boards of the roof, as in town.ts's lean-to houses:
+    // it stopped short and left the shed open under its high side. docs/HOLES-AUDIT.md)
+    const run = h.d + 0.5, under = h.h + 0.75 + (-0.8) * (-h.d / 2 + run / 2) / run - 0.08;
+    wall(0, -h.d / 2, h.w, under + 0.3, true);
     wall(-h.w / 2, -h.d / 4, h.d / 2, h.h + 0.5, false);
     wall(h.w / 2, -h.d / 4, h.d / 2, h.h + 0.5, false);
     for (const u of [-h.w / 2 + 0.1, h.w / 2 - 0.1]) { const [x, z] = at(u, h.d / 2 - 0.1); flat(b, 'wood', 0.16, h.h + 0.3, 0.16, x, -0.3, z, h.ry, true); }
