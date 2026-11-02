@@ -349,10 +349,18 @@ class Piece:
         for c in np.unique(self.comp):
             vs = np.nonzero(self.comp == c)[0]
             srcP = [P for P, _ in inner]; srcW = [W for _, W in inner]
+            # Of the garment's own shells nearer the body, only the one this shell mostly lies
+            # on (a cape on the robe's body, not also on its sleeves): mixed, the cape's edge was
+            # torn between trunk and arm and its inside flipped into view.
+            best, bestn = None, 0
             for c2 in med:
                 if c2 != c and med[c2] < med[c] - 0.002:
                     o = np.nonzero(self.comp == c2)[0]
-                    srcP.append(U[o]); srcW.append(self.W[o])
+                    n_on = int((cKDTree(U[o]).query(U[vs])[0] < LAYER_NEAR).sum())
+                    if n_on > bestn:
+                        best, bestn = o, n_on
+            if best is not None:
+                srcP.append(U[best]); srcW.append(self.W[best])
             if not srcP:
                 continue
             P = np.concatenate(srcP); Ws = np.concatenate(srcW)
@@ -368,10 +376,44 @@ class Piece:
             W0[vs[on]] = np.einsum('ik,ikj->ij', w, Ws[k[on]])
             conf[vs[on]] = 1.0
             changed += int(on.sum())
+        # Double-walled cloth (a robe whose skirt is an outer and an inner wall joined at
+        # the hem; a cape): the inner wall, which a ray out along its normal meets the same
+        # shell within 3 cm, copies the weights of the outer wall over it. Weighted on their
+        # own, the inner wall (nearer the legs) crossed the outer one in the stride and showed
+        # as dark slits at the hem.
+        Nv = vertex_normals(U, self.Fw)
+        inner_wall = np.zeros(len(U), bool)
+        for c in np.unique(self.comp):
+            vs = np.nonzero(self.comp == c)[0]
+            Fc = self.Fw[self.comp[self.Fw[:, 0]] == c]
+            if len(Fc) < 50:
+                continue
+            # (Out = away from the body, along the nearest body point's normal: the inner wall's
+            # own normals face the body.)
+            _, nb = self.body.tree.query(U[vs])
+            out = self.body.N[nb]
+            inner_wall[vs] = ray_hits(U[vs] + out * 0.002, out, U, Fc, 0.03)
+        walls = 0
+        for c in np.unique(self.comp):
+            iv = np.nonzero((self.comp == c) & inner_wall)[0]
+            ov = np.nonzero((self.comp == c) & ~inner_wall)[0]
+            if not len(iv) or len(ov) < 3:
+                continue
+            d, k = cKDTree(U[ov]).query(U[iv], 3)
+            near = d[:, 0] < 0.04
+            w = 1 / np.maximum(d[near], 1e-4); w /= w.sum(1, keepdims=True)
+            src = W0 if changed else self.W0
+            W0 = W0 if changed else self.W0.copy()
+            conf = conf if changed else self.conf.copy()
+            # (From the solved outer wall, so the inner follows exactly what the outer does.)
+            W0[iv[near]] = np.einsum('ik,ikj->ij', w, self.W[ov[k[near]]])
+            conf[iv[near]] = 1.0
+            changed += int(near.sum()); walls += int(near.sum())
         if changed:
             self.W0, self.conf = W0, conf
             self.solve()
         self.relayered = changed
+        self.walls = walls
 
     def finish(self):
         """Thick edges, on the (possibly inflated) cloth with its final weights."""
@@ -545,11 +587,27 @@ def tuck(p, tunics, neck, reach=0.02):
     C = p.U[p.Fw].mean(1)
     rc = np.hypot(C[:, 0] - neck[0], C[:, 2] - neck[2])
     kc = ((np.arctan2(C[:, 0] - neck[0], C[:, 2] - neck[2]) / (2 * np.pi) * bins).round().astype(int)) % bins
-    cut = np.isfinite(top[kc]) & (C[:, 1] < top[kc] - 0.005) & (rc < rad[kc] + reach)
+    # Tucked, not cut: the head cloth below the collar's rim is drawn in to just inside the
+    # collar (1 cm under its radius), fading in over the 2 cm above the rim, so its own edge
+    # lies hidden under the tunic. Only cloth deep inside (6 cm below the rim) is cut away.
+    U = p.U.copy()
+    rv = np.hypot(U[:, 0] - neck[0], U[:, 2] - neck[2])
+    kv = ((np.arctan2(U[:, 0] - neck[0], U[:, 2] - neck[2]) / (2 * np.pi) * bins).round().astype(int)) % bins
+    ok = np.isfinite(top[kv]) & (rad[kv] > 0) & (rv < rad[kv] + reach)
+    f = np.clip((top[kv] + 0.02 - U[:, 1]) / 0.02, 0, 1) * ok
+    want = np.minimum(rv, rad[kv] - 0.01)
+    rn = rv + (want - rv) * f
+    sc = np.where(rv > 1e-6, rn / np.maximum(rv, 1e-6), 1)
+    U[:, 0] = neck[0] + (U[:, 0] - neck[0]) * sc
+    U[:, 2] = neck[2] + (U[:, 2] - neck[2]) * sc
+    p.U = U
+    p.bodyd = p.body.tree.query(U)[0]
+    p.tucked = True
+    cut = np.isfinite(top[kc]) & (C[:, 1] < top[kc] - 0.06) & (rc < rad[kc] + reach)
     if cut.any():
         F0 = p.F0[~cut]
         p.F0, p.Fw = F0, p.rep[F0]
-    return int(cut.sum())
+    return int((f > 0).sum())
 
 
 class Body:
@@ -622,14 +680,14 @@ def build(src, out, body_id, log=print):
             tunics = [pieces[y] for y in worn_with[x] if meta['garments'][y]['layer'] == 'tunic']
             if tunics and all(any(meta['garments'][y]['layer'] == 'tunic' for y in s) for s in outfits.values() if x in s):
                 # A hood has no cape to keep: all of it below the collar's rim goes in.
-                log(f'  {x}: {tuck(pieces[x], tunics, Bpos["Neck"], 0.08 if x == "hood" else 0.02)} triangles tucked into the collar')
+                log(f'  {x}: {tuck(pieces[x], tunics, Bpos["Neck"], 0.08 if x == "hood" else 0.02)} vertices tucked into the collar')
     for x in used:
         pieces[x].weights()
     # Layered weights, innermost garment first.
     for x in sorted(used, key=lambda y: depth[y]):
         inner = [(pieces[y].U, pieces[y].W) for y in worn_with[x] if depth[y] < depth[x] and meta['garments'][y]['layer'] != 'shoe']
         pieces[x].relayer(inner)
-        log(f'  {x}: {pieces[x].relayered} vertices take the weights of the cloth under them')
+        log(f'  {x}: {pieces[x].relayered} vertices take the weights of the cloth under them ({pieces[x].walls} inner wall)')
     for x in used:
         pieces[x].finish()
         log(f'  {x}: {pieces[x].ears} ear triangles peeled, {pieces[x].lined} lining/facing triangles dropped, flipped {pieces[x].flipped} pieces, near-body {pieces[x].conf_mean:.2f}, band tris {pieces[x].band}')
@@ -705,7 +763,17 @@ def build(src, out, body_id, log=print):
                 # Under a robe to the ankles only the shoe shows, not its small straps and laces.
                 sizes = np.bincount(p.comp)
                 small = sizes[p.comp] < 80
-                keepF = ~small[p.rep[p.src]][p.F].all(1)
+                # The shoe's top (its light folded cuff) under the robe: covered by the skirt, or
+                # coming through it near the hem, goes; it read as a torn patch on the hem.
+                robes = [pieces[y] for y in gs if layer[y] == 'tunic']
+                Vr = np.concatenate([q.Vw for q in robes]); orr = np.cumsum([0] + [len(q.Vw) for q in robes])
+                Fr = np.concatenate([q.Fw + o for q, o in zip(robes, orr[:-1])])
+                Nv = vertex_normals(p.Vw, p.Fw)
+                hem = Vr[:, 1].min()
+                top = p.Vw[:, 1] > hem + 0.01
+                hid = top & (covered(p.Vw, Nv, Vr, Fr) | poking(p.Vw, Nv, Vr, Fr, 0.05))
+                drop_v = (hid | small)[p.rep[p.src]]
+                keepF = ~drop_v[p.F].all(1)
             elif layer[x] != 'shoe':
                 # Garments worn over it, and the other shells of the same garment
                 # (a cape over the robe, a sleeve over the side), cover it.
@@ -721,6 +789,8 @@ def build(src, out, body_id, log=print):
                 # Through a garment worn over it (a collar over the hood's cape): dropped, the outer one shows.
                 # (A hood's or cowl's shoulder cape can lie several cm under a tunic's collar in the bind pose.)
                 for q in over:
+                    if getattr(q, 'tucked', False):
+                        continue  # (a hood tucked into this collar lies inside it)
                     cw |= poking(p.Vw, Nv, q.Vw, q.Fw, 0.07 if q.layer == 'head' else POKE)
                 cov = cw[p.rep]
                 cov = cov[p.src]
