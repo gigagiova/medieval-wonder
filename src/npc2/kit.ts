@@ -44,6 +44,7 @@ export interface OutfitV2 {
  */
 /** Baked single-surface outfits (track B): the default; `?npc=v2` for the layered garments, `?npc=c` / `?npc=v1` for the others. */
 export const NPC_B = typeof location !== 'undefined' && [null, 'b'].includes(new URLSearchParams(location.search).get('npc'));
+const NPC_DBG = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('npcdbg') : null;
 const DIR = NPC_B ? 'models/npcb/' : 'models/npc2/';
 const flatNormal = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1);
 flatNormal.needsUpdate = true;
@@ -239,6 +240,17 @@ export function outfitV2(id: string, body: string, belt?: BeltStyle): OutfitV2 {
         // Mud and wear, times the baked shade of the turned-in band (the cloth's inside).
         const c = grime(g, k.m), sh = g.getAttribute('_shade');
         if (sh) for (let i = 0; i < sh.count; i++) for (let j = 0; j < 3; j++) c.setComponent(i, j, c.getComponent(i, j) * sh.getX(i));
+        // ?npcdbg=band: the turned-in band copies red, the rim strips blue (diagnostics).
+        // ?npcdbg=shells: each connected island of the cloth its own colour.
+        if (NPC_DBG === 'shells' && g.index) {
+          const ix = g.index, n = g.attributes.position.count, par = new Int32Array(n).map((_, i) => i);
+          const f = (a: number): number => { while (par[a] !== a) { par[a] = par[par[a]]; a = par[a]; } return a; };
+          for (let t = 0; t < ix.count; t += 3) { const a = f(ix.getX(t)); par[f(ix.getX(t + 1))] = a; par[f(ix.getX(t + 2))] = a; }
+          const pal = [[1, 0, 0], [0, 1, 0], [0, 0.4, 1], [1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 0.5, 0], [0.5, 0, 1], [1, 1, 1]];
+          const ids = new Map<number, number>();
+          for (let i = 0; i < n; i++) { const r = f(i); if (!ids.has(r)) ids.set(r, ids.size); const c3 = pal[ids.get(r)! % pal.length]; c.setXYZ(i, c3[0], c3[1], c3[2]); }
+        }
+        if (sh && NPC_DBG === 'band') for (let i = 0; i < sh.count; i++) { const v = sh.getX(i); if (v < 0.85) c.setXYZ(i, 1, 0, 0); else if (v < 0.999) c.setXYZ(i, 0, 0.3, 1); }
         g.setAttribute('color', c);
         m.geometry = g;
       }

@@ -61,6 +61,8 @@ export function dressV2(body: THREE.Object3D, outfit: OutfitV2, dyes: Dyes) {
     // Hood and cowl: closed shells wound outwards (tools/npc2/derive.py), drawn one-sided.
     if (g.id === 'hood' || g.id === 'cowl') { mat.side = THREE.FrontSide; lining(mat, m.geometry); }
     if (LAYER_BIAS[g.layer]) layerBias(mat, LAYER_BIAS[g.layer]);
+    // Track B: a garment's cape shells drawn a little nearer the eye (baked `_BIAS`, metres).
+    if (NPC_B && m.geometry.getAttribute('_bias')) shellBias(mat);
     m.material = mat;
   });
   return new ClothingV2(meshes);
@@ -87,6 +89,17 @@ function layerBias(m: THREE.Material, metres: number) {
       gl_Position = projectionMatrix * vec4(mvPosition.xyz + normalize(-mvPosition.xyz) * ${metres.toFixed(4)}, 1.0);`);
   };
   m.customProgramCacheKey = () => key + '-bias' + metres;
+}
+
+function shellBias(m: THREE.Material) {
+  const prev = m.onBeforeCompile, key = m.customProgramCacheKey();
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float _bias;')
+      .replace('#include <fog_vertex>', `#include <fog_vertex>
+      if (_bias > 0.0) { vec4 bp = projectionMatrix * vec4(mvPosition.xyz + normalize(-mvPosition.xyz) * _bias, 1.0); gl_Position.z = bp.z / bp.w * gl_Position.w; }`);
+  };
+  m.customProgramCacheKey = () => key + '-shellbias';
 }
 
 /**

@@ -183,6 +183,17 @@ def keep_specks(F, drop, rep):
     return drop
 
 
+def lies_on(U, bodyd, comp, c, c2, reach=0.05):
+    """How many vertices of shell c lie over shell c2: their nearest c2 point is within reach
+    and nearer the body (by 2 mm) than they are. Local, not by the shells' median distance:
+    a long skirt or a wide sleeve hangs further from the body on average than a shoulder cape."""
+    vs = np.nonzero(comp == c)[0]; o = np.nonzero(comp == c2)[0]
+    if not len(vs) or not len(o):
+        return 0
+    d, k = cKDTree(U[o]).query(U[vs])
+    return int(((d < reach) & (bodyd[o[k]] < bodyd[vs] - 0.002)).sum())
+
+
 class Piece:
     """One garment, baked: outward, one weight field, thick edges."""
 
@@ -347,23 +358,30 @@ class Piece:
         W0, conf = self.W0.copy(), self.conf.copy()
         changed = 0
         under = [P for P, _ in inner]
+        capes = []
+        self.cape_comps = set()
+        copied = np.zeros(len(U), bool)
         for c in np.unique(self.comp):
             vs = np.nonzero(self.comp == c)[0]
             srcP = [P for P, _ in inner]; srcW = [W for _, W in inner]
             # Of the garment's own shells nearer the body, only the one this shell mostly lies
             # on (a cape on the robe's body, not also on its sleeves): mixed, the cape's edge was
             # torn between trunk and arm and its inside flipped into view.
-            # Every shell of this garment nearer the body that it lies on (a cape on the robe's
-            # body and on its sleeves): each point copies the nearest of them, and where the
-            # source changes (trunk to arm) the weights are blended over a band, below. Only
-            # the body's shell (round 3), the raised arm pushed the sleeve out through the cape.
+            # Of the garment's own shells nearer the body, only the one this shell mostly lies
+            # on (a cape on the robe's body). Round 5 also took the sleeves: the cape's sides then
+            # followed the arm and lifted off the back in a long grey gash (reverted).
             src_lab = [np.full(len(P_), -1) for P_ in srcP]
+            best, bestn, bestc = None, 20, -1
             for c2 in med:
-                if c2 != c and med[c2] < med[c] - 0.002:
-                    o = np.nonzero(self.comp == c2)[0]
-                    if int((cKDTree(U[o]).query(U[vs])[0] < LAYER_NEAR).sum()) > 0:
-                        srcP.append(U[o]); srcW.append(self.W[o]); under.append(U[o])
-                        src_lab.append(np.full(len(o), c2))
+                if c2 != c:
+                    n_on = lies_on(U, self.bodyd, self.comp, c, c2)
+                    if n_on > bestn:
+                        best, bestn, bestc = np.nonzero(self.comp == c2)[0], n_on, c2
+            if best is not None:
+                srcP.append(U[best]); srcW.append(self.W[best]); under.append(U[best])
+                src_lab.append(np.full(len(best), bestc))
+                capes.append(vs)
+                self.cape_comps.add(int(c))
             if not srcP:
                 continue
             P = np.concatenate(srcP); Ws = np.concatenate(srcW)
@@ -371,7 +389,11 @@ class Piece:
             d, k = cKDTree(P).query(U[vs], kk)
             d, k = d.reshape(len(vs), kk), k.reshape(len(vs), kk)
             # (A hood's shoulder cape hangs looser on the tunic: within 5 cm it moves with it.)
-            on = d[:, 0] < (0.05 if self.layer == 'head' else LAYER_NEAR)
+            # A shell of the same garment (the robe's body under its cape) is copied out to 6 cm:
+            # the cape's loose lower edge must move exactly with the back it hangs over.
+            lab_all = np.concatenate(src_lab)[k[:, 0]]
+            thr = np.where(lab_all >= 0, 0.06, 0.05 if self.layer == 'head' else LAYER_NEAR)
+            on = d[:, 0] < thr
             # Nearer to that cloth than to the skin (or the skin is not under it).
             on &= d[:, 0] < self.bodyd[vs] + 0.003
             if not on.any():
@@ -379,17 +401,7 @@ class Piece:
             w = 1 / np.maximum(d[on], 1e-4); w /= w.sum(1, keepdims=True)
             W0[vs[on]] = np.einsum('ik,ikj->ij', w, Ws[k[on]])
             conf[vs[on]] = 1.0
-            # Where neighbouring points copy different shells (trunk, sleeve), loosen them so the
-            # solve blends the weights over a band instead of tearing the cloth there.
-            lab_all = np.concatenate(src_lab)[k[:, 0]]
-            lab_v = np.full(len(U), -2); lab_v[vs[on]] = lab_all[on]
-            E = np.concatenate([self.Fw[:, [0, 1]], self.Fw[:, [1, 2]], self.Fw[:, [2, 0]]])
-            seam = np.zeros(len(U), bool)
-            m = (lab_v[E[:, 0]] >= -1) & (lab_v[E[:, 1]] >= -1) & (lab_v[E[:, 0]] != lab_v[E[:, 1]])
-            seam[E[m].ravel()] = True
-            for _ in range(3):
-                seam[E[seam[E[:, 0]], 1]] = True; seam[E[seam[E[:, 1]], 0]] = True
-            conf[seam & (lab_v >= -1)] = 0.2
+            copied[vs[on]] = True
             changed += int(on.sum())
         # Double-walled cloth (a robe whose skirt is an outer and an inner wall joined at
         # the hem; a cape): the inner wall, which a ray out along its normal meets the same
@@ -430,6 +442,48 @@ class Piece:
         self.under = np.concatenate(under) if under else None
         self.relayered = changed
         self.walls = walls
+
+    def follow_cape(self):
+        """Under the garment's own cape (a robe's shoulder cape over its body and sleeves),
+        the inner shells take the cape's weights, so nothing under it can cross it in motion;
+        over the 4 cm above the cape's edge they blend back to their own weights (the solve
+        inpaints them). The cape leads and what lies under it follows."""
+        self.followed = 0
+        if self.layer != 'tunic':
+            return
+        U, comp = self.U, self.comp
+        med = {c: np.median(self.bodyd[comp == c]) for c in np.unique(comp)}
+        _, nb = self.body.tree.query(U)
+        away = self.body.N[nb]
+        W0, conf = self.W0.copy(), self.conf.copy()
+        n = 0
+        for c in np.unique(comp):
+            capes_c = [c2 for c2 in getattr(self, 'cape_comps', ()) if c2 != c and lies_on(U, self.bodyd, comp, c2, c) > 20]
+            if not capes_c:
+                continue
+            Fc = self.Fw[np.isin(comp[self.Fw[:, 0]], capes_c)]
+            if len(Fc) < 50:
+                continue
+            vs = np.nonzero(comp == c)[0]
+            Nn = vertex_normals(U, self.Fw)[vs]
+            under = ray_hits(U[vs] + away[vs] * 0.002, away[vs], U, Fc, 0.08) | ray_hits(U[vs] + Nn * 0.002, Nn, U, Fc, 0.08)
+            vs = vs[under]
+            if not len(vs):
+                continue
+            cv = np.unique(Fc)
+            Ec = np.sort(np.concatenate([Fc[:, [0, 1]], Fc[:, [1, 2]], Fc[:, [2, 0]]]), 1)
+            Eu_, cn_ = np.unique(Ec, axis=0, return_counts=True)
+            edge_v = np.unique(Eu_[cn_ == 1])
+            d, k = cKDTree(U[cv]).query(U[vs], 3)
+            w = 1 / np.maximum(d, 1e-4); w /= w.sum(1, keepdims=True)
+            W0[vs] = np.einsum('ik,ikj->ij', w, self.W[cv[k]])
+            de = cKDTree(U[edge_v]).query(U[vs])[0] if len(edge_v) else np.full(len(vs), 1.0)
+            conf[vs] = np.clip(de / 0.04, 0.3, 1.0)
+            n += len(vs)
+        if n:
+            self.W0, self.conf = W0, conf
+            self.solve()
+        self.followed = n
 
     def finish(self):
         """Thick edges, on the (possibly inflated) cloth with its final weights."""
@@ -538,6 +592,10 @@ class Piece:
         Dfull = np.concatenate(Wd)
         self.J, self.W = top4(Dfull)
         self.shade = np.concatenate(shade)
+        # A cape shell (lying on the garment's own body or sleeve) is drawn as if 1.2 cm nearer
+        # the eye: what is left of the sleeve rising under it with the arm stays hidden.
+        cape_v = np.isin(self.comp, list(getattr(self, 'cape_comps', ())))
+        self.bias = np.where(cape_v[rep[self.src]], 0.012, 0.0)
         self.F = np.concatenate(Fo).astype(np.int64)
         self.n_outer = len(F0)  # the first n_outer triangles are the cloth itself
         self.rep = rep
@@ -767,6 +825,10 @@ def build(src, out, body_id, log=print):
         pieces[x].relayer(inner)
         log(f'  {x}: {pieces[x].relayered} vertices take the weights of the cloth under them ({pieces[x].walls} inner wall)')
     for x in used:
+        pieces[x].follow_cape()
+        if pieces[x].followed:
+            log(f'  {x}: {pieces[x].followed} vertices under its own cape take the cape\'s weights')
+    for x in used:
         pieces[x].finish()
         log(f'  {x}: {pieces[x].on_cloth_edges} open-edge vertices on cloth (no band), {pieces[x].ears} ear triangles peeled, {pieces[x].lined} lining/facing triangles dropped, flipped {pieces[x].flipped} pieces, near-body {pieces[x].conf_mean:.2f}, band tris {pieces[x].band}')
     layer = {x: meta['garments'][x]['layer'] for x in used}
@@ -800,6 +862,7 @@ def build(src, out, body_id, log=print):
             'JOINTS_0': acc(J, 5123 if J.dtype == np.uint16 else 5121, 'VEC4'),
             'WEIGHTS_0': acc(p.W.astype(np.float32), 5126, 'VEC4'),
             '_SHADE': acc(p.shade.astype(np.float32), 5126, 'SCALAR'),
+            '_BIAS': acc(p.bias.astype(np.float32), 5126, 'SCALAR'),
         }
     gmat = {x: j['meshes'][g.node('G_' + x)['mesh']]['primitives'][0].get('material') for x in used}
     gextras = {x: g.node('G_' + x).get('extras') for x in used}
@@ -870,6 +933,31 @@ def build(src, out, body_id, log=print):
                     V = np.concatenate([v for v, _ in parts]); F = np.concatenate([f + o for (_, f), o in zip(parts, off[:-1])])
                     if len(F):
                         cw[vs] = covered(p.Vw[vs], Nv[vs], V, F)
+                # Under the garment's own cape (a robe's shoulder cape over its body and sleeves): any
+                # inner shell a single ray straight out from the body meets the cape within 8 cm is
+                # dropped, except within 3 cm of the cape's edge. The five-ray cone let slanted rays
+                # out under the cape, and the kept robe body and sleeve crossed the cape in the walk
+                # and with a raised arm (the grey blade on the priest's back). The cape's weights
+                # match the robe body under it, so no hole opens.
+                med = {c: np.median(p.bodyd[p.comp == c]) for c in np.unique(p.comp)}
+                _, nb = p.body.tree.query(p.Vw)
+                away = p.body.N[nb]
+                for c in np.unique(p.comp):
+                    capes_c = [c2 for c2 in getattr(p, 'cape_comps', ()) if c2 != c and lies_on(p.Vw, p.bodyd, p.comp, c2, c) > 20]
+                    if not capes_c:
+                        continue
+                    Fc = p.Fw[np.isin(p.comp[p.Fw[:, 0]], capes_c)]
+                    if len(Fc) < 50:
+                        continue
+                    Ec = np.sort(np.concatenate([Fc[:, [0, 1]], Fc[:, [1, 2]], Fc[:, [2, 0]]]), 1)
+                    Eu_, cn_ = np.unique(Ec, axis=0, return_counts=True)
+                    edge_v = np.unique(Eu_[cn_ == 1])
+                    vs = np.nonzero(p.comp == c)[0]
+                    if len(edge_v):
+                        far = cKDTree(p.Vw[edge_v]).query(p.Vw[vs])[0] > 0.02
+                        vs = vs[far]
+                    if len(vs):
+                        cw[vs] |= ray_hits(p.Vw[vs] + away[vs] * 0.002, away[vs], p.Vw, Fc, 0.08) | ray_hits(p.Vw[vs] + Nv[vs] * 0.002, Nv[vs], p.Vw, Fc, 0.08)
                 # Through a garment worn over it (a collar over the hood's cape): dropped, the outer one shows.
                 # (A hood's or cowl's shoulder cape can lie several cm under a tunic's collar in the bind pose.)
                 for q in over:
