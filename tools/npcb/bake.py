@@ -353,16 +353,17 @@ class Piece:
             # Of the garment's own shells nearer the body, only the one this shell mostly lies
             # on (a cape on the robe's body, not also on its sleeves): mixed, the cape's edge was
             # torn between trunk and arm and its inside flipped into view.
-            best, bestn = None, 0
+            # Every shell of this garment nearer the body that it lies on (a cape on the robe's
+            # body and on its sleeves): each point copies the nearest of them, and where the
+            # source changes (trunk to arm) the weights are blended over a band, below. Only
+            # the body's shell (round 3), the raised arm pushed the sleeve out through the cape.
+            src_lab = [np.full(len(P_), -1) for P_ in srcP]
             for c2 in med:
                 if c2 != c and med[c2] < med[c] - 0.002:
                     o = np.nonzero(self.comp == c2)[0]
-                    n_on = int((cKDTree(U[o]).query(U[vs])[0] < LAYER_NEAR).sum())
-                    if n_on > bestn:
-                        best, bestn = o, n_on
-            if best is not None:
-                srcP.append(U[best]); srcW.append(self.W[best])
-                under.append(U[best])
+                    if int((cKDTree(U[o]).query(U[vs])[0] < LAYER_NEAR).sum()) > 0:
+                        srcP.append(U[o]); srcW.append(self.W[o]); under.append(U[o])
+                        src_lab.append(np.full(len(o), c2))
             if not srcP:
                 continue
             P = np.concatenate(srcP); Ws = np.concatenate(srcW)
@@ -378,6 +379,17 @@ class Piece:
             w = 1 / np.maximum(d[on], 1e-4); w /= w.sum(1, keepdims=True)
             W0[vs[on]] = np.einsum('ik,ikj->ij', w, Ws[k[on]])
             conf[vs[on]] = 1.0
+            # Where neighbouring points copy different shells (trunk, sleeve), loosen them so the
+            # solve blends the weights over a band instead of tearing the cloth there.
+            lab_all = np.concatenate(src_lab)[k[:, 0]]
+            lab_v = np.full(len(U), -2); lab_v[vs[on]] = lab_all[on]
+            E = np.concatenate([self.Fw[:, [0, 1]], self.Fw[:, [1, 2]], self.Fw[:, [2, 0]]])
+            seam = np.zeros(len(U), bool)
+            m = (lab_v[E[:, 0]] >= -1) & (lab_v[E[:, 1]] >= -1) & (lab_v[E[:, 0]] != lab_v[E[:, 1]])
+            seam[E[m].ravel()] = True
+            for _ in range(3):
+                seam[E[seam[E[:, 0]], 1]] = True; seam[E[seam[E[:, 1]], 0]] = True
+            conf[seam & (lab_v >= -1)] = 0.2
             changed += int(on.sum())
         # Double-walled cloth (a robe whose skirt is an outer and an inner wall joined at
         # the hem; a cape): the inner wall, which a ray out along its normal meets the same
@@ -827,7 +839,9 @@ def build(src, out, body_id, log=print):
             p = pieces[x]
             over = [pieces[y] for y in gs if depth[y] > depth[x]] if layer[x] != 'shoe' else []
             # Covered by anything else worn (also a lower layer: a hood's edge tucked under a collar).
-            others = [pieces[y] for y in gs if y != x and layer[y] != 'shoe']
+            # (A tucked hood does not cut the tunic: partly covered, the tunic's shoulder was left
+            # in a saw-tooth that stuck out past the hood's edge. The hood moves with the tunic there.)
+            others = [pieces[y] for y in gs if y != x and layer[y] != 'shoe' and not (layer[x] == 'tunic' and getattr(pieces[y], 'tucked', False))]
             keepF = np.ones(len(p.F), bool)
             if layer[x] == 'shoe' and any(layer[y] == 'tunic' and pieces[y].Vw[:, 1].min() < 0.25 for y in gs):
                 # Under a robe to the ankles only the shoe shows, not its small straps and laces.
