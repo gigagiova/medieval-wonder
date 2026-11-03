@@ -1,0 +1,326 @@
+[
+ {
+  "k": 0,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "00-presbyter-front.png",
+  "key": "Presbyter Iohannespresbyter",
+  "name": "Presbyter Iohannes",
+  "title": "presbyter",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 1,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 0,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "00-presbyter-side.png",
+  "key": "Presbyter Iohannespresbyter",
+  "name": "Presbyter Iohannes",
+  "title": "presbyter",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "01-diaconus-front.png",
+  "key": "Diaconus Constantiusdiaconus",
+  "name": "Diaconus Constantius",
+  "title": "diaconus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 0.97,
+   "talk": 0.03,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "01-diaconus-side.png",
+  "key": "Diaconus Constantiusdiaconus",
+  "name": "Diaconus Constantius",
+  "title": "diaconus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "02-mulier_Beneventana-front.png",
+  "key": "Benedictamulier Beneventana",
+  "name": "Benedicta",
+  "title": "mulier Beneventana",
+  "outfit": "womanShawl",
+  "body": "w_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "02-mulier_Beneventana-side.png",
+  "key": "Benedictamulier Beneventana",
+  "name": "Benedicta",
+  "title": "mulier Beneventana",
+  "outfit": "womanShawl",
+  "body": "w_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 3,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "03-peregrinus-front.png",
+  "key": "Ermenfridperegrinus",
+  "name": "Ermenfrid",
+  "title": "peregrinus",
+  "outfit": "robe",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 1
+  }
+ },
+ {
+  "k": 3,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "03-peregrinus-side.png",
+  "key": "Ermenfridperegrinus",
+  "name": "Ermenfrid",
+  "title": "peregrinus",
+  "outfit": "robe",
+  "body": "m_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "front",
+  "place": "Forum",
+  "file": "04-mulier_Beneventana-front.png",
+  "key": "Mariamulier Beneventana",
+  "name": "Maria",
+  "title": "mulier Beneventana",
+  "outfit": "woman",
+  "body": "w_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "side",
+  "place": "Forum",
+  "file": "04-mulier_Beneventana-side.png",
+  "key": "Mariamulier Beneventana",
+  "name": "Maria",
+  "title": "mulier Beneventana",
+  "outfit": "woman",
+  "body": "w_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "front",
+  "place": "Forum",
+  "file": "05-mulier_Beneventana-front.png",
+  "key": "Agathamulier Beneventana",
+  "name": "Agatha",
+  "title": "mulier Beneventana",
+  "outfit": "womanShawl",
+  "body": "w_young",
+  "w": {
+   "walk": 0.27,
+   "idle": 0.73,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "side",
+  "place": "Forum",
+  "file": "05-mulier_Beneventana-side.png",
+  "key": "Agathamulier Beneventana",
+  "name": "Agatha",
+  "title": "mulier Beneventana",
+  "outfit": "womanShawl",
+  "body": "w_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 6,
+  "view": "front",
+  "place": "Forum",
+  "file": "06-mulier_Beneventana-front.png",
+  "key": "Iustamulier Beneventana",
+  "name": "Iusta",
+  "title": "mulier Beneventana",
+  "outfit": "woman",
+  "body": "w_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 6,
+  "view": "side",
+  "place": "Forum",
+  "file": "06-mulier_Beneventana-side.png",
+  "key": "Iustamulier Beneventana",
+  "name": "Iusta",
+  "title": "mulier Beneventana",
+  "outfit": "woman",
+  "body": "w_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 8,
+  "view": "front",
+  "place": "Porta",
+  "file": "08-peregrinus-front.png",
+  "key": "Aldoperegrinus",
+  "name": "Aldo",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "m_young",
+  "w": {
+   "walk": 0.31,
+   "idle": 0.02,
+   "talk": 0.67,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 8,
+  "view": "side",
+  "place": "Porta",
+  "file": "08-peregrinus-side.png",
+  "key": "Aldoperegrinus",
+  "name": "Aldo",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "m_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 9,
+  "view": "front",
+  "place": "Porta",
+  "file": "09-peregrinus-front.png",
+  "key": "Petrusperegrinus",
+  "name": "Petrus",
+  "title": "peregrinus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 1,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 9,
+  "view": "side",
+  "place": "Porta",
+  "file": "09-peregrinus-side.png",
+  "key": "Petrusperegrinus",
+  "name": "Petrus",
+  "title": "peregrinus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ }
+]
