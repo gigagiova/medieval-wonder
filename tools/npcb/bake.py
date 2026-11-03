@@ -55,6 +55,8 @@ BAND, THICK = 0.06, 0.004      # turned-in band at open edges
 LEG_SIGMA = 0.05               # (unused since v2 of the skirt field)
 SKIRT_SIGMA = 0.09             # skirt shared between the legs: softness (m)
 LEG_AT_HEM = 0.7               # how much the hem follows the legs (the rest: the pelvis)
+CAPE_MARGIN = 0.0              # inner shells under a cape dropped right up to its edge
+CAPE_BIAS = 0.02               # cape shells drawn this much nearer the eye (m)
 LAYER_NEAR = 0.025             # cloth within this of other cloth takes its weights
 MIN_SPECK = 6
 
@@ -595,7 +597,7 @@ class Piece:
         # A cape shell (lying on the garment's own body or sleeve) is drawn as if 1.2 cm nearer
         # the eye: what is left of the sleeve rising under it with the arm stays hidden.
         cape_v = np.isin(self.comp, list(getattr(self, 'cape_comps', ())))
-        self.bias = np.where(cape_v[rep[self.src]], 0.012, 0.0)
+        self.bias = np.where(cape_v[rep[self.src]], CAPE_BIAS, 0.0)
         self.F = np.concatenate(Fo).astype(np.int64)
         self.n_outer = len(F0)  # the first n_outer triangles are the cloth itself
         self.rep = rep
@@ -954,7 +956,7 @@ def build(src, out, body_id, log=print):
                     edge_v = np.unique(Eu_[cn_ == 1])
                     vs = np.nonzero(p.comp == c)[0]
                     if len(edge_v):
-                        far = cKDTree(p.Vw[edge_v]).query(p.Vw[vs])[0] > 0.02
+                        far = cKDTree(p.Vw[edge_v]).query(p.Vw[vs])[0] > CAPE_MARGIN
                         vs = vs[far]
                     if len(vs):
                         cw[vs] |= ray_hits(p.Vw[vs] + away[vs] * 0.002, away[vs], p.Vw, Fc, 0.08) | ray_hits(p.Vw[vs] + Nv[vs] * 0.002, Nv[vs], p.Vw, Fc, 0.08)

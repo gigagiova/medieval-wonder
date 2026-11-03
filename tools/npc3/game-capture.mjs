@@ -96,10 +96,15 @@ for (const [pi, place] of places.entries()) {
       if (!info) continue;
       // (Walkers come from out of sight: a few frames for them to be drawn.)
     await frames(process.env.FORCEWALK || process.env.FORCE ? 10 : 4);
-      const name = `${String(k).padStart(2, '0')}-${(info.title ?? 'x').replace(/\W+/g, '_')}-${view}.png`;
-      await page.screenshot({ path: `${out}/${name}`, timeout: 600000 });
-      meta.push({ k, view, place, file: name, ...info });
-      console.log(name, JSON.stringify(info));
+      // FRAMES=n: n shots of this view, STEP frames apart (default 3), through the person's clip.
+      const nf = +(process.env.FRAMES ?? 1);
+      for (let fi = 0; fi < nf; fi++) {
+        if (fi) await frames(+(process.env.STEP ?? 3));
+        const name = `${String(k).padStart(2, '0')}-${(info.title ?? 'x').replace(/\W+/g, '_')}-${view}${nf > 1 ? '-f' + fi : ''}.png`;
+        await page.screenshot({ path: `${out}/${name}`, timeout: 600000 });
+        meta.push({ k, view: nf > 1 ? view + '-f' + fi : view, place, file: name, ...info });
+        console.log(name, JSON.stringify(info));
+      }
     }
     k++;
   }
