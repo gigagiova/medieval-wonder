@@ -664,6 +664,67 @@ def inflate(pieces, worn_with, depth, log=print):
         log(f'  clearance round {rnd}: ' + ', '.join(f'{x} {np.percentile(q.push, 99) * 1000:.0f}/{q.push.max() * 1000:.0f}mm' for x, q in pieces.items() if q.push.any()))
 
 
+CAPE_ON_TOP = False            # round 7 experiment: no visible gain over round 6 (docs/npc/evidence/trackb/round7)
+CAPE_OUT = 0.0045              # a cape sits this far outside the robe body under it
+CAPE_SEAM = 0.01               # .. except within this of its top seam (where it is sewn on)
+
+
+def cape_on_top(p, B, log):
+    """A robe's shoulder cape and the robe body interleave in the source mesh (the cape on top
+    in places, under the robe body in others), which showed as specks of the robe body on the
+    cape in every frame. Wherever a cape vertex lies at or inside the robe body (measured along
+    the robe body's normal), it is pushed out to CAPE_OUT outside it, the push smoothed over the
+    cape so there are no steps. Only below the cape's top seam (4 cm under its highest point at
+    each angle round the spine): above it, on the upper back, the robe body is the outer surface
+    and is left alone. The cover test then drops the robe body under the cape."""
+    U, comp = p.U, p.comp
+    sizes = np.bincount(comp[p.Fw[:, 0]], minlength=comp.max() + 1)
+    big = int(sizes.argmax())
+    tri_big = comp[p.Fw[:, 0]] == big
+    vb = np.unique(p.Fw[tri_big])
+    if len(vb) < 50:
+        return 0
+    Nb = vertex_normals(U, p.Fw[tri_big])
+    tree = cKDTree(U[vb])
+    spine = B['Spine'][1]
+    c0 = B['Spine2'][[0, 2]]
+    moved = 0
+    for c in np.unique(comp):
+        if c == big or sizes[c] < 200:
+            continue
+        vs = np.nonzero(comp == c)[0]
+        if U[vs, 1].min() < spine:
+            continue  # (a sleeve, hanging below the waist in the bind pose)
+        if lies_on(U, p.bodyd, comp, c, big) < 20:
+            continue
+        # The top seam: the cape's highest point per angle round the spine; only below it by 4 cm.
+        a = np.arctan2(U[vs, 0] - c0[0], U[vs, 2] - c0[1])
+        k = ((a / (2 * np.pi) * 36).round().astype(int)) % 36
+        top = np.full(36, -np.inf)
+        np.maximum.at(top, k, U[vs, 1])
+        below = U[vs, 1] < top[k] - CAPE_SEAM
+        d, j = tree.query(U[vs])
+        q = vb[j]
+        h = np.einsum('ij,ij->i', U[vs] - U[q], Nb[q])
+        need = np.where(below & (d < 0.05) & (h < CAPE_OUT), np.clip(CAPE_OUT - h, 0, 0.04), 0.0)
+        if not need.any():
+            continue
+        # Smoothed over the cape (never less than needed), so there are no steps.
+        L = adjacency(p.Fw[comp[p.Fw[:, 0]] == c], len(U))
+        full = np.zeros(len(U)); full[vs] = need
+        sm = full.copy()
+        for _ in range(8):
+            sm = np.maximum(full, 0.5 * sm + 0.5 * (L @ sm))
+        dirs = np.zeros((len(U), 3)); dirs[vs] = Nb[q]
+        U = U + dirs * sm[:, None]
+        moved += int((sm[vs] > 1e-4).sum())
+        log(f'  {p.name}: cape shell {c}: {int((need > 0).sum())} vertices inside the robe body, pushed out (max {need.max() * 1000:.0f} mm), {moved} moved with smoothing')
+    if moved:
+        p.U = U
+        p.bodyd = p.body.tree.query(U)[0]
+    return moved
+
+
 def tuck(p, tunics, neck, reach=0.02):
     """A hood, cowl or veil worn with a tunic or robe goes into its collar: the head
     cloth inside the collar (within 2 cm outside the collar's own radius) and below its
@@ -813,6 +874,9 @@ def build(src, out, body_id, log=print):
     depth = {x: meta['garments'][x]['depth'] for x in used}
     worn_with = {x: sorted({y for s in outfits.values() if x in s for y in s if y != x}) for x in used}
     inflate(pieces, worn_with, depth, log)
+    for x in used:
+        if CAPE_ON_TOP and meta['garments'][x]['layer'] == 'tunic':
+            cape_on_top(pieces[x], Bpos, log)
     for x in used:
         if meta['garments'][x]['layer'] == 'head':
             tunics = [pieces[y] for y in worn_with[x] if meta['garments'][y]['layer'] == 'tunic']
