@@ -22,7 +22,7 @@ for f in F:
 n = 0
 for key in keys:
     ims, labels = [], []
-    for view in ('front', 'side'):
+    for view in os.environ.get('VIEWS', 'front,side').split(','):
         f = next((x for x in F if x['key'] == key and x['view'] == view), None)
         m = M.get((key, view))
         if not f or not m:

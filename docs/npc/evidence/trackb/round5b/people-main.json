@@ -1,0 +1,654 @@
+[
+ {
+  "k": 0,
+  "view": "back",
+  "place": "Episcopium",
+  "file": "00-presbyter-back.png",
+  "near": [],
+  "key": "Presbyter Iohannespresbyter",
+  "name": "Presbyter Iohannes",
+  "title": "presbyter",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 1,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 0,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "00-presbyter-front.png",
+  "near": [],
+  "key": "Presbyter Iohannespresbyter",
+  "name": "Presbyter Iohannes",
+  "title": "presbyter",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 0,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "00-presbyter-side.png",
+  "near": [
+   "Bonus mendicus peasantHood m_young"
+  ],
+  "key": "Presbyter Iohannespresbyter",
+  "name": "Presbyter Iohannes",
+  "title": "presbyter",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "back",
+  "place": "Episcopium",
+  "file": "01-diaconus-back.png",
+  "near": [],
+  "key": "Diaconus Constantiusdiaconus",
+  "name": "Diaconus Constantius",
+  "title": "diaconus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "01-diaconus-front.png",
+  "near": [
+   "Presbyter Iohannes presbyter robe m_elder"
+  ],
+  "key": "Diaconus Constantiusdiaconus",
+  "name": "Diaconus Constantius",
+  "title": "diaconus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 1,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "01-diaconus-side.png",
+  "near": [],
+  "key": "Diaconus Constantiusdiaconus",
+  "name": "Diaconus Constantius",
+  "title": "diaconus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "back",
+  "place": "Episcopium",
+  "file": "02-monachus-back.png",
+  "near": [],
+  "key": "Frater Petrusmonachus",
+  "name": "Frater Petrus",
+  "title": "monachus",
+  "outfit": "monk",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "02-monachus-front.png",
+  "near": [
+   "Frater Deusdedit monachus monk m_young",
+   "Dulcia anus womanShawl w_young"
+  ],
+  "key": "Frater Petrusmonachus",
+  "name": "Frater Petrus",
+  "title": "monachus",
+  "outfit": "monk",
+  "body": "m_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 2,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "02-monachus-side.png",
+  "near": [],
+  "key": "Frater Petrusmonachus",
+  "name": "Frater Petrus",
+  "title": "monachus",
+  "outfit": "monk",
+  "body": "m_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 3,
+  "view": "back",
+  "place": "Episcopium",
+  "file": "03-monachus-back.png",
+  "near": [],
+  "key": "Frater Deusdeditmonachus",
+  "name": "Frater Deusdedit",
+  "title": "monachus",
+  "outfit": "monk",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 3,
+  "view": "front",
+  "place": "Episcopium",
+  "file": "03-monachus-front.png",
+  "near": [
+   "Frater Petrus monachus monk m_young",
+   "Dulcia anus womanShawl w_young"
+  ],
+  "key": "Frater Deusdeditmonachus",
+  "name": "Frater Deusdedit",
+  "title": "monachus",
+  "outfit": "monk",
+  "body": "m_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 3,
+  "view": "side",
+  "place": "Episcopium",
+  "file": "03-monachus-side.png",
+  "near": [],
+  "key": "Frater Deusdeditmonachus",
+  "name": "Frater Deusdedit",
+  "title": "monachus",
+  "outfit": "monk",
+  "body": "m_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "back",
+  "place": "Forum",
+  "file": "04-medicus-back.png",
+  "near": [],
+  "key": "Martinusmedicus",
+  "name": "Martinus",
+  "title": "medicus",
+  "outfit": "robe",
+  "body": "m_old",
+  "w": {
+   "walk": 0,
+   "idle": 0.03,
+   "talk": 0.97,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "front",
+  "place": "Forum",
+  "file": "04-medicus-front.png",
+  "near": [
+   "Hananel Iudaeus robe m_elder",
+   "Kuber Vulgar de Sepino soldier m_young"
+  ],
+  "key": "Martinusmedicus",
+  "name": "Martinus",
+  "title": "medicus",
+  "outfit": "robe",
+  "body": "m_old",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 4,
+  "view": "side",
+  "place": "Forum",
+  "file": "04-medicus-side.png",
+  "near": [],
+  "key": "Martinusmedicus",
+  "name": "Martinus",
+  "title": "medicus",
+  "outfit": "robe",
+  "body": "m_old",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "back",
+  "place": "Forum",
+  "file": "05-negotiator-back.png",
+  "near": [],
+  "key": "Maurusnegotiator",
+  "name": "Maurus",
+  "title": "negotiator",
+  "outfit": "robe",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "front",
+  "place": "Forum",
+  "file": "05-negotiator-front.png",
+  "near": [],
+  "key": "Maurusnegotiator",
+  "name": "Maurus",
+  "title": "negotiator",
+  "outfit": "robe",
+  "body": "m_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 5,
+  "view": "side",
+  "place": "Forum",
+  "file": "05-negotiator-side.png",
+  "near": [],
+  "key": "Maurusnegotiator",
+  "name": "Maurus",
+  "title": "negotiator",
+  "outfit": "robe",
+  "body": "m_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 6,
+  "view": "back",
+  "place": "Forum",
+  "file": "06-Iudaeus-back.png",
+  "near": [],
+  "key": "HananelIudaeus",
+  "name": "Hananel",
+  "title": "Iudaeus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 6,
+  "view": "front",
+  "place": "Forum",
+  "file": "06-Iudaeus-front.png",
+  "near": [
+   "Martinus medicus robe m_old",
+   "Kuber Vulgar de Sepino soldier m_young"
+  ],
+  "key": "HananelIudaeus",
+  "name": "Hananel",
+  "title": "Iudaeus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 6,
+  "view": "side",
+  "place": "Forum",
+  "file": "06-Iudaeus-side.png",
+  "near": [],
+  "key": "HananelIudaeus",
+  "name": "Hananel",
+  "title": "Iudaeus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 7,
+  "view": "back",
+  "place": "Forum",
+  "file": "07-peregrinus-back.png",
+  "near": [],
+  "key": "Ermenfridperegrinus",
+  "name": "Ermenfrid",
+  "title": "peregrinus",
+  "outfit": "robe",
+  "body": "m_young",
+  "w": {
+   "walk": 0,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 1
+  }
+ },
+ {
+  "k": 7,
+  "view": "front",
+  "place": "Forum",
+  "file": "07-peregrinus-front.png",
+  "near": [],
+  "key": "Ermenfridperegrinus",
+  "name": "Ermenfrid",
+  "title": "peregrinus",
+  "outfit": "robe",
+  "body": "m_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 7,
+  "view": "side",
+  "place": "Forum",
+  "file": "07-peregrinus-side.png",
+  "near": [],
+  "key": "Ermenfridperegrinus",
+  "name": "Ermenfrid",
+  "title": "peregrinus",
+  "outfit": "robe",
+  "body": "m_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 8,
+  "view": "back",
+  "place": "Porta",
+  "file": "08-peregrinus-back.png",
+  "near": [],
+  "key": "Aldoperegrinus",
+  "name": "Aldo",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "m_young",
+  "w": {
+   "walk": 0.4,
+   "idle": 0.03,
+   "talk": 0.57,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 8,
+  "view": "front",
+  "place": "Porta",
+  "file": "08-peregrinus-front.png",
+  "near": [
+   "Petrus peregrinus robe m_elder",
+   "Stephanus negotiator robe m_mid"
+  ],
+  "key": "Aldoperegrinus",
+  "name": "Aldo",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "m_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 8,
+  "view": "side",
+  "place": "Porta",
+  "file": "08-peregrinus-side.png",
+  "near": [],
+  "key": "Aldoperegrinus",
+  "name": "Aldo",
+  "title": "peregrinus",
+  "outfit": "peasantHood",
+  "body": "m_young",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 9,
+  "view": "back",
+  "place": "Porta",
+  "file": "09-peregrinus-back.png",
+  "near": [],
+  "key": "Petrusperegrinus",
+  "name": "Petrus",
+  "title": "peregrinus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 0,
+   "idle": 0.33,
+   "talk": 0.67,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 9,
+  "view": "front",
+  "place": "Porta",
+  "file": "09-peregrinus-front.png",
+  "near": [
+   "Aldo peregrinus peasantHood m_young",
+   "Stephanus negotiator robe m_mid"
+  ],
+  "key": "Petrusperegrinus",
+  "name": "Petrus",
+  "title": "peregrinus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 9,
+  "view": "side",
+  "place": "Porta",
+  "file": "09-peregrinus-side.png",
+  "near": [],
+  "key": "Petrusperegrinus",
+  "name": "Petrus",
+  "title": "peregrinus",
+  "outfit": "robe",
+  "body": "m_elder",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 10,
+  "view": "back",
+  "place": "Porta",
+  "file": "10-negotiator-back.png",
+  "near": [],
+  "key": "Stephanusnegotiator",
+  "name": "Stephanus",
+  "title": "negotiator",
+  "outfit": "robe",
+  "body": "m_mid",
+  "w": {
+   "walk": 0,
+   "idle": 1,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 10,
+  "view": "front",
+  "place": "Porta",
+  "file": "10-negotiator-front.png",
+  "near": [
+   "Aldo peregrinus peasantHood m_young",
+   "Petrus peregrinus robe m_elder"
+  ],
+  "key": "Stephanusnegotiator",
+  "name": "Stephanus",
+  "title": "negotiator",
+  "outfit": "robe",
+  "body": "m_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ },
+ {
+  "k": 10,
+  "view": "side",
+  "place": "Porta",
+  "file": "10-negotiator-side.png",
+  "near": [],
+  "key": "Stephanusnegotiator",
+  "name": "Stephanus",
+  "title": "negotiator",
+  "outfit": "robe",
+  "body": "m_mid",
+  "w": {
+   "walk": 1,
+   "idle": 0,
+   "talk": 0,
+   "bless": 0,
+   "kneel": 0
+  }
+ }
+]
